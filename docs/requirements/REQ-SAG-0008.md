@@ -14,13 +14,13 @@
 
 ### Requirement Statement
 
-Definitions: A Logger is an sc-observability crate `Logger`. The general logger writes the general log. Session rows are written in Rust through sc-observability to the default session files (ADR-SAG-0021, REQ-SAG-0003). The default session files are the JSONL files under `~/.sc-agent/sessions/`. Injecting a Logger means the caller passes in the Logger sc-agent uses. The entry point is a CLI's `main` or a Python app's generated client (ADR-SAG-0021). The wheel is the sc-decidr Python package, which holds the decidr and sitr Python APIs (ADR-SAG-0021). The default general Logger is the sc-observability Logger that writes the general log at the path ADR-SAG-0021 gives. A Python callable is any Python object that can be called, such as a function, method, lambda or object with `__call__`. To flush a Logger is to write out every record that Logger is holding. To forward a log record to a destination means sc-agent passes that record to the destination.
+Definitions: A Logger is an sc-observability crate `Logger`. The linked crate is the sc-observability Rust crate compiled into the wheel. The general logger writes the general log. Session rows are written in Rust through sc-observability to the default session files (ADR-SAG-0021, REQ-SAG-0003). The default session files are the JSONL files under `~/.sc-agent/sessions/`. Injecting a Logger means the caller passes in the Logger sc-agent uses. The entry point is a CLI's `main` or a Python app's generated client (ADR-SAG-0021). The wheel is the sc-decidr Python package, which holds the decidr and sitr Python APIs (ADR-SAG-0021). The default general Logger is the sc-observability Logger that writes the general log at the path ADR-SAG-0021 gives. A Python callable is any Python object that can be called, such as a function, method, lambda or object with `__call__`. To flush a Logger is to write out every record that Logger is holding. To forward a log record to a destination means sc-agent passes that record to the destination.
 
 **MUST statements:**
 
 - sc-agent MUST write session rows to the default session files.
 - The Rust API MUST accept an injected general Logger.
-- When a Python caller requests a named Logger, the wheel MUST return a Logger built from the sc-observability crate the wheel links.
+- When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.
 - Every decidr and sitr call in the wheel MUST accept, as its injected general Logger, a Logger the wheel returned.
 - When a general Logger is injected, sc-agent MUST write every general-log record of the call through that Logger.
 - When no general Logger is injected, sc-agent MUST write the general log through the default general Logger.

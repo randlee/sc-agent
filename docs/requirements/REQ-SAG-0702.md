@@ -38,7 +38,7 @@ Definitions:
 - When a Run has no override, every call through that Run MUST use the configured value.
 - When a Run is given an invalid send timeout, it MUST return the error value `decidr.invalid_request_timeout`.
 - When a Run is given an invalid worker count, it MUST return the error value `decidr.invalid_workers`.
-- A request MUST fit the selected model's context.
+- When a provider rejects a request as too large for the model's context, the call MUST return the provider's error.
 - When a send exceeds the send timeout, the Run MUST resend it until it has made 5 sends in all, the first included.
 - A batch MUST return one batch result per request.
 - The batch callback MUST receive each result when that result finishes.
@@ -70,7 +70,7 @@ Owner ruling (2026-11-21), Rand Lee: "I do not require results in request order.
 - [ ] A Rust unit test gives a Run a worker count of -1 and checks the result is the error value `decidr.invalid_workers`.
 - [ ] A Python unit test builds `sc_agent.Run` with `timeout_secs` and `workers` and checks a batch through it uses both values.
 - [ ] A Python unit test checks that `run.send` and `run.send_batch` have no `timeout_secs` or `workers` parameter.
-- [ ] A Rust unit test sends a request larger than the selected model's context and checks the result is an error value and no send is made.
+- [ ] A Rust unit test has a provider reject a request as too large for the model's context and checks the call returns the provider's error.
 - [ ] A Rust unit test with a loopback runner that never answers checks the result has the error id `http.network` and `attempts` equal to the fixed send count.
 - [ ] A Rust unit test sends a batch and checks it returns one result per request, each with its input position.
 - [ ] A Rust unit test sends a batch whose requests finish out of order and checks the callback sees finish order.
