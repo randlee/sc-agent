@@ -26,7 +26,7 @@ Definitions: A provider endpoint is one host reached through one `HttpClient`. T
 
 A busy provider is busy for every worker; one worker's holdoff that the others ignore only multiplies the busy replies.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "1,2,4,8 is an example of exp backoff not something to hard code."
+Owner ruling (2026-11-21), Rand Lee: "1,2,4,8 is an example of exp backoff not something to hard code."
 
 ### Success Criteria
 

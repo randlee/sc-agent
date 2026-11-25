@@ -31,7 +31,7 @@ An interrupted batch must leave a complete, readable session log and a clear fai
 
 Owner ruling (2026-11-20), Rand Lee: "Python exceptions need to be caught (return error) so app doesn't crash."
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "always return descriminated unions w/ error info"
+Owner ruling (2026-11-21), Rand Lee: "always return descriminated unions w/ error info"
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 

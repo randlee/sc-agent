@@ -22,8 +22,6 @@
 
 Bounded input keeps memory use predictable and turns an oversized input into a clear error before any send.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."
-
 ### Success Criteria
 
 **Acceptance Criteria:**

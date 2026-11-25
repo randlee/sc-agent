@@ -28,7 +28,7 @@ Definitions: A decision value is a value a decision model returns (a Jev probabi
 
 Rounding is the consumer's concern. A value rounded inside sc-agent loses information no consumer can recover.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I would never create a requirement requiring subnanosecond rounding for a http call." "Don't round % to int."
+Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiring subnanosecond rounding for a http call." "Don't round % to int."
 
 ### Success Criteria
 

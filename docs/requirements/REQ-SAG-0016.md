@@ -43,7 +43,7 @@ Owner ruling (2026-11-20), Rand Lee: nothing raises; throwing exceptions is proh
 
 Owner ruling (2026-11-20), Rand Lee: "Python exceptions need to be caught (return error) so app doesn't crash."
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info"
+Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info"
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 

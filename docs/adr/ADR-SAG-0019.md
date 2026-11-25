@@ -153,7 +153,7 @@ Two consumers rebuilt the wheel boundary and the copies diverged, so every conce
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order." "No hand built checks."
+Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order." "No hand built checks."
 
 ### Consequences
 

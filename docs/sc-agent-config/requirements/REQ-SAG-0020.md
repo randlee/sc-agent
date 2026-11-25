@@ -33,8 +33,6 @@ Definitions: A CLI is one of sc-agent's command-line programs that reads configu
 
 A per-CLI prefix keeps an override meant for one CLI from changing another. The project/phase has one name because one phase spans every CLI and tools outside sc-agent.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."
-
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 ### Success Criteria

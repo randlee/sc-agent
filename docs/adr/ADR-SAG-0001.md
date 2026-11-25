@@ -44,7 +44,7 @@ When every backend receives the same data, their answers are comparable by const
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I do not require results in request order."
+Owner ruling (2026-11-21), Rand Lee: "I do not require results in request order."
 
 ### Consequences
 
