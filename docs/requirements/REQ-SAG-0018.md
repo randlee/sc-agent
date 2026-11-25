@@ -57,8 +57,8 @@ Definitions (how the template is built: ADR-SAG-0019 decision 1):
 - The sitr section's extraction output MUST reach the consumer's prompt.
 - The wheel README MUST name the consumer template.
 - A dry run MUST check that its input and arguments compose into a valid request.
-- When the TypeSafe key is absent, every consumer MUST complete a decision call with `haiku`.
-- When the TypeSafe key is absent, every consumer MUST complete a decision call with `luna`.
+- A consumer's decision call with `haiku` MUST complete when the TypeSafe key is absent.
+- A consumer's decision call with `luna` MUST complete when the TypeSafe key is absent.
 - The consent gate MUST ask for consent only when the Run's provider is TypeSafe.
 
 **MUST NOT statements:**
