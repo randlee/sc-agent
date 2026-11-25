@@ -89,8 +89,6 @@ A wheel is not an entry point and has no row: it writes to the Logger its caller
 
 The entry point is the only code that knows the process's lifetime, so it is the only correct owner of the Logger: it obtains the Logger before the first general-log record and flushes after each call. Exposing the crate's own Logger from the wheel keeps one copy and one queue in the process and needs no Python package. Fixed paths keep every log in one known place for audit, and a separate `sessions/` tree lets tools and the later SQLite load read every session with a path glob. The session log is the record of every Jev query from every tool, so it cannot be turned off and is never rotated; it stays small enough because `project` changes over time.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I was planning to bring the sitr wheel back once we get mvp working."
-
 Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: the session log is written in Rust through sc-observability, which accepts events up to 1 MiB; the session log is never rotated or pruned.
 
 Owner ruling (2026-11-24, round 3), Rand Lee, recorded in the same design doc: the session row carries no `run_id`; `send` and `send_batch` take the caller's `run_id`, and sc-agent appends `{run_id, session_id, cached}` to `runs.jsonl` beside `sessions.jsonl`, written the same way and never rotated, on a cache miss and on a cache hit.

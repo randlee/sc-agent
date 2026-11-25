@@ -28,7 +28,7 @@
 
 A bad value found at load time names the key to fix; found later it fails mid-batch or sends a credential in clear text.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "Use time structs for time."
+Owner ruling (2026-11-21), Rand Lee: "Use time structs for time."
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 

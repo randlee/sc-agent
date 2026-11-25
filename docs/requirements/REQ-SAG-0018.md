@@ -116,7 +116,7 @@ Owner ruling (2026-11-20), Rand Lee: "Keyring is super basic."
 
 Owner ruling (2026-11-21), Rand Lee: the shared template carries what the wheel does not support and both consumers share (fixture loading and coverage, batch settings and ids, result-line encoding, attempt counting, the remote-judge consent gate), with consumer-specific values only through template variables or named blocks, as extension points for future consumers.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "No hand built checks." "Keyring is super basic." "always return descriminated unions w/ error info"
+Owner ruling (2026-11-21), Rand Lee: "No hand built checks." "Keyring is super basic." "always return descriminated unions w/ error info"
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 

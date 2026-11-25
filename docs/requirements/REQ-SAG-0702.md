@@ -41,7 +41,7 @@ Definitions:
 
 Different callers in one process need different parallelism and different patience. Without per-call overrides both are fixed by configuration, so consumers refuse or ignore their own flags.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order."
+Owner ruling (2026-11-21), Rand Lee: "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order."
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 

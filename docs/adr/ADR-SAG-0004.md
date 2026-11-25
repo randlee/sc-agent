@@ -46,6 +46,8 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 Owner ruling (2026-11-21), Rand Lee: "Errors are discriminated unions Result<t,e> I don't care about per crate"; "Extra fields are fine, make sure adr doesn't limit too much. I don't want findings for returning more."
 
+Owner ruling (2026-11-21), Rand Lee: "always return descriminated unions w/ error info"
+
 ### Consequences
 
 **Positive:**
@@ -55,8 +57,6 @@ Owner ruling (2026-11-21), Rand Lee: "Errors are discriminated unions Result<t,e
 **Negative:**
 
 - A program that wants only HTTP or logging still links the whole core.
-
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "always return descriminated unions w/ error info"
 
 ### Alternatives Considered
 

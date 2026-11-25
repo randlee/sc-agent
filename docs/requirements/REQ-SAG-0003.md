@@ -44,8 +44,6 @@ Definitions: The general log is the diagnostic log of one entry point (ADR-SAG-0
 
 sc-observability already rotates and prunes the general log. Session logs are the long-term record used to analyse tens of thousands of decisions, so losing any of them loses data.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."
-
 Owner ruling (2026-11-24, round 3), Rand Lee, recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: `runs.jsonl` sits beside `sessions.jsonl`, in the same directory, is written the same way and is never rotated.
 
 ### Success Criteria

@@ -35,7 +35,7 @@ Definitions: A discriminated union is a tagged result type whose variant names t
 
 Agents and tools act on errors programmatically. A dropped lower-layer id or a panic removes the information needed to decide the next step. This rule applies to every repository the owner maintains.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "always return descriminated unions w/ error info"
+Owner ruling (2026-11-21), Rand Lee: "always return descriminated unions w/ error info"
 
 ### Success Criteria
 

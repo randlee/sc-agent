@@ -33,8 +33,6 @@ Definitions: The project/phase is the name of the project or phase a session bel
 
 Agents work by phase, so sessions are grouped by project/phase. A default would merge sessions of different phases into one file.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."
-
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 ### Success Criteria

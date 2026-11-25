@@ -28,7 +28,7 @@ Definitions: The request timeout bounds one request to a runner. The local runne
 
 Local models are slower than remote providers and loading a model can take minutes; counting load time against the request timeout fails requests that would succeed.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "Use time structs for time."
+Owner ruling (2026-11-21), Rand Lee: "Use time structs for time."
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
