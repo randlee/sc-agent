@@ -1,7 +1,7 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
 **Status:** Approved  
-**Version:** 1.4.0  
+**Version:** 1.5.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -23,9 +23,11 @@ Definitions:
 - The template variables are `client_name`, `tool_version` (the consumer's released version), `sitr` (`true` or `false`, selecting the syntax-query section), `sc_decidr_version`, and `legacy_result_schemas`. Model selectors are passed unchanged as call arguments.
 - `legacy_result_schemas` is the template variable listing the result-line schema tags, besides `jev-batch-result/1`, whose lines the consumer module still reads. It is empty for a consumer that has none.
 - The result types are the classes `Ok`, `Err` and `Result` that the consumer module returns from its calls.
+- The CLI envelope helpers are the consumer module's `ToolError`, `err`, `utf8_stdio`, `canceled_envelope` and `run_main`.
 - The consent settings module is the consumer's own module that reads the consumer's remote-judge consent setting. The consumer template names it through an extension point.
 - The generic error code is the consumer code that the category-to-code map gives for the category `other`.
 - The test fake is `sc_agent.testing.FakeRun`, a class in the wheel's public test module `sc_agent.testing`. It stands in for a Run in consumers' tests: it records the arguments it was opened with and the requests sent through it, and returns scripted results.
+- The fake installer is `sc_agent.testing.fake_open_run(script)`, which installs a test fake for a rendered consumer module and answers that module's `session_rows` calls from the script's rows.
 - The client name is the template variable `client_name`. It names the consumer module's Logger and is the `agent_role` the module passes.
 - The Run is the wheel's `sc_agent.Run` context object (ADR-SAG-0019 decision 14). It is created with the tool identity, the cache policy and the values that do not change between calls; creating it mints the run's ULID `run_id` in Rust, readable as `run.run_id`; it has `send`, `send_batch` and `cancel`, and closing it flushes its Logger.
 - The session-row reader is the wheel's `sc_agent.session_rows`, which returns session rows by `session_id` (REQ-SAG-0022).
@@ -36,7 +38,7 @@ Definitions:
 - The logging wiring is the consumer module's code that obtains one Logger with `logger(client name)`, or takes the consumer's own Logger, and gives it to every Run and every sitr call.
 - The error mapping is the consumer module's code that reads an error value's `category` and maps that category to a consumer code through a category-to-code map the consumer passes in.
 - The sitr section is the part of the consumer module that runs tree-sitter extraction; its output is passed into the consumer's prompt authoring.
-- Consumer logic is prompt authoring and the processing of results and decision trees. It stays in the consumer.
+- Consumer logic is prompt authoring and the domain handling of results and decision trees. It stays in the consumer.
 - The shared consumer code is what the wheel does not support and both consumers share: fixture loading and coverage, batch settings and ids, result-line encoding and the remote-judge consent gate.
 - An extension point is a template variable or a named block of the consumer template. Consumer-specific values reach the consumer module only through extension points, so later consumers can use the same template.
 - The wheel README is `crates/sc-agent-py/README.md`.
@@ -73,8 +75,10 @@ Definitions:
 - The category-to-code map MUST have an entry for each category of REQ-SAG-0017.
 - The error mapping MUST map a category that is not in REQ-SAG-0017 to the generic error code.
 - The consumer template MUST define the result types.
+- The consumer template MUST define the CLI envelope helpers.
 - The consent gate MUST read the consent setting through the consent settings module.
 - The sc-decidr wheel MUST ship the test fake.
+- The sc-decidr wheel MUST ship the fake installer.
 - Extension points MUST be the only template inputs that change the consumer module's code.
 - The consumer template MUST carry the shared consumer code.
 - A consumer-specific value MUST reach the consumer module only through an extension point.
@@ -195,6 +199,8 @@ Lead ruling (2026-11-24, round 3): attempt counting is removed from the shared c
 - [ ] Each rendered module defines `Ok`, `Err` and `Result`, and `consumer.py.j2` is the only consumer-module template in the installed wheel.
 - [ ] A rendered module's consent gate reads the consent setting through the consent settings module given through the extension point, and the rendered module does not contain the consent settings module.
 - [ ] `sc_agent.testing.FakeRun` imports from the installed wheel; it records its open arguments and the requests sent through it and returns its scripted results.
+- [ ] Each rendered module defines `ToolError`, `err`, `utf8_stdio`, `canceled_envelope` and `run_main`.
+- [ ] `sc_agent.testing.fake_open_run` imports from the installed wheel, and a rendered module's `session_rows` call under it returns the script's rows.
 
 ### Dependencies
 

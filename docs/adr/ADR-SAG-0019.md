@@ -1,7 +1,7 @@
 # Decision: sc-decidr is the one Python decision harness: error values with a stored category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 1.4.0  
+**Version:** 1.5.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -84,9 +84,9 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
    **The integration artifact is a generated module** (REQ-SAG-0018). The wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, as package data, and each consumer renders its integration module from it. To carry the file, the wheel moves to maturin's mixed layout; `import sc_agent` is unchanged.
 
-   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping. Prompt authoring and result processing stay in the consumer.
+   - The template covers the decision call, model pass-through, logging wiring, cancellation, the error-to-category-to-code mapping and the CLI envelope helpers. Prompt authoring and the consumer's domain handling of results stay in the consumer.
    - Its variables are `client_name`, `tool_version`, `sitr` (`true` or `false`), `sc_decidr_version` and `legacy_result_schemas`; model selectors are call arguments. `legacy_result_schemas` is the list of result-line schema tags, besides `jev-batch-result/1`, whose lines the module still reads; it is empty for a consumer that has none.
-   - The result types `Ok`, `Err` and `Result` are defined inside `consumer.py.j2`. The wheel ships no other template for the consumer module.
+   - The result types `Ok`, `Err` and `Result` and the CLI envelope helpers `ToolError`, `err`, `utf8_stdio`, `canceled_envelope` and `run_main` are defined inside `consumer.py.j2`. The wheel ships no other template for the consumer module.
    - The remote-judge consent setting is read by the consumer's own consent settings module, which the template names through an extension point. The template contains no settings reader.
    - The template's category-to-code map has an entry for every category of decision 6. A category outside that list maps to the consumer's generic error code, the code the map gives for `other`. Session logging and the injected general logger are not optional (REQ-SAG-0008, REQ-SAG-0022).
    - sc-compose is an external render tool, not a dependency of the wheel. The template's front matter declares its sc-compose minimum (`requires.cli`); the minimum is declared, not enforced.
@@ -94,7 +94,7 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
    **The lower-level API stays the contract.** `Run` (with its `send` and `send_batch`), `session_rows`, `provider_keys`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public. The generated code uses only them and the standard library.
 
-   **`sc_agent.testing` is a public test module of the wheel.** It holds `FakeRun`, a stand-in for a Run that records the arguments it was opened with and the requests sent through it and returns scripted results, for consumers' tests. The generated code does not import it.
+   **`sc_agent.testing` is a public test module of the wheel.** It holds `FakeRun`, a stand-in for a Run that records the arguments it was opened with and the requests sent through it and returns scripted results, and `fake_open_run(script)`, which installs a `FakeRun` for a rendered module and answers that module's `session_rows` calls from the script's rows, for consumers' tests. The generated code does not import it.
 
 2. **Typed fields: `attempts` and `category`.**
 
@@ -172,7 +172,8 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
     - sc-agent never branches on a provider's or a model's name. Adding a model is one row plus configuration.
     - Configuration key `models.<alias>` with `provider` and `id` overrides the built-in row for that alias (REQ-SAG-0019); it is not how a local model gets its id. It may only name a built-in provider; it cannot add a provider, a credential or a remote address.
     - The model table is sorted by release date, newest first, and a unit test verifies the order.
-    - Resolution, with no `provider` argument: the configured `models.<alias>.provider` when set; otherwise the first row in table order that serves the alias and whose provider is keyless or has its credential in a source of REQ-SAG-0401. When none qualifies, the error names every candidate's credential.
+    - Resolution, with no `provider` argument: the configured `models.<alias>.provider` when set; otherwise the first row in table order that serves the alias and whose provider is keyless or has its credential in a source of REQ-SAG-0401. When none qualifies and a candidate's keyring read failed, resolution returns that keyring error (a `secrets.*` id); otherwise, when none qualifies, the error names every candidate's credential.
+    - A full model id selects exactly the row with that id.
     - A model selection is resolved once, at the boundary (a CLI flag or Run creation), into one typed value, `ResolvedModel { alias, id, provider }`, where `provider` references the provider constant (base address, wire, credential). That value is what flows through the send, the cache key, the session row's `model_requested` and `provider`, and the redaction; no model name and provider name pair is passed down the stack or resolved again. There is no `provider` argument or `--provider` flag: `models.<alias>.provider` in configuration and the rule above choose the provider. In Python the Run holds its model value, readable as the property `run.model`; there is no per-call model and no selector method. A caller that needs another model opens another Run. Consumers take the selector from their caller (`--model` or configuration) and never name a model in code; fan-out across models is the caller's job (owner ruling 2026-11-24).
     - The haiku and luna rows include Nous: `anthropic/claude-haiku-5.5` and `openai/gpt-6-luna`.
 

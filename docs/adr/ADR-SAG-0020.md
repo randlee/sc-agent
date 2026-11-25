@@ -1,9 +1,9 @@
 # Decision: Configuration has a shared scope and one scope per CLI, each global and per worktree
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-18  
-**Last Updated:** 2026-11-22  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-18  
 
@@ -65,6 +65,8 @@ A setting is looked up in nine layers, and the first layer that sets it wins:
 7. the global `<cli>.json`;
 8. the global `sc-agent.json`;
 9. the built-in default, or a typed error when the setting is required and has no default.
+
+One exception: `models.<alias>` keys are set only in configuration files, layers 3 to 8. No flag or environment variable sets them, and an environment variable under `DECIDR_MODELS__` fails the load with a typed error (REQ-SAG-0019, REQ-SAG-0020).
 
 Environment variables are named after the CLI: `DECIDR_<SETTING>`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).
 
