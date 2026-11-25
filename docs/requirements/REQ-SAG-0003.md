@@ -34,8 +34,6 @@ Definitions: The general log is the diagnostic log of one entry point (ADR-SAG-0
 
 sc-observability already rotates and prunes the general log. Session logs are the long-term record used to analyse tens of thousands of decisions, so losing any of them loses data.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."
-
 ### Success Criteria
 
 **Acceptance Criteria:**

@@ -97,8 +97,6 @@ The entry point is the only code that knows the process's lifetime, so it is the
 
 - Every caller must supply a project/phase before its first request.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I was planning to bring the sitr wheel back once we get mvp working."
-
 ### Alternatives Considered
 
 #### Alternative 1: Python creates the Logger from the `sc-observability` Python package

@@ -31,7 +31,7 @@ Owner ruling (2026-11-20), Rand Lee: "Keyring is super basic."
 
 Owner ruling (2026-11-20), Rand Lee: "Isn't ENV > .env > keyring (or win/linux equivalent) standard order?" A variable already set in the environment wins over `.env`, which is also dotenvy's default.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "Keyring is super basic."
+Owner ruling (2026-11-21), Rand Lee: "Keyring is super basic."
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 

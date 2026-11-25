@@ -35,9 +35,9 @@ Definitions: A busy response is a non-quota HTTP 429, 502 or 529. A send is one 
 
 Providers signal overload with busy responses and expect clients to back off. Holding off in the queue keeps workers free and lets cancellation take effect immediately.
 
-Owner ruling (2026-11-20), Rand Lee: "I did ask for exponential backoff / retry when busy (i.e. 1,2,4,8,..). Nothing precise or fancy." "My words are what I want, not excess control resulting." "1,2,4,8 is an example of exp backoff not something to hard code."
+Owner ruling (2026-11-20), Rand Lee: "I did ask for exponential backoff / retry when busy (i.e. 1,2,4,8,..). Nothing precise or fancy." "1,2,4,8 is an example of exp backoff not something to hard code."
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "Use time structs for time."
+Owner ruling (2026-11-21), Rand Lee: "Use time structs for time."
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 

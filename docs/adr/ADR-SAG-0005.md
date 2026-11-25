@@ -57,8 +57,6 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 - Installing the wheel always installs both the decidr and sitr APIs.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I was planning to bring the sitr wheel back once we get mvp working."
-
 ### Alternatives Considered
 
 #### Alternative 1: PyO3 bindings and CLI inside sc-treesitter with no feature gates
