@@ -44,7 +44,7 @@ Definitions (how the template is built: ADR-SAG-0019 decision 1):
 - The consumer template MUST be tested against the sc-decidr wheel of the same release.
 - The consumer module MUST call only the permitted API.
 - The consumer module MUST pass the model selector through unchanged.
-- The consumer template MUST ship in the sc-decidr wheel as package data.
+- The sc-decidr wheel's package data MUST include the consumer template.
 - PyPI MUST hold the sc-decidr wheel of every covered release.
 - The consumer module MUST use `sc_agent.sitr` only inside the sitr section.
 - The sitr section MUST stay separate from the decision call.
