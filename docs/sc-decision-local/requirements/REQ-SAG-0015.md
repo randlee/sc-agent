@@ -1,9 +1,9 @@
 # Requirement: Local runner timeouts
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -14,11 +14,11 @@
 
 ### Requirement Statement
 
-Definitions: The request timeout bounds one request to a runner. The local runner is Laya, at the host and port from configuration.
+Definitions: The request timeout bounds one request to a runner. A local runner is a local decision runner (REQ-SAG-0801), `laya` or `decider`, at the host and port from configuration.
 
 **MUST statements:**
 
-- The local runner MUST use the same request timeout as the remote providers: 120 seconds, or the call's `timeout_secs` (REQ-SAG-0702).
+- A local runner MUST use the same request timeout as the remote providers: 120 seconds, or the call's `timeout_secs` (REQ-SAG-0702).
 
 **MUST NOT statements:**
 
@@ -32,11 +32,13 @@ Owner ruling (2026-11-21), Rand Lee: "Use time structs for time."
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
+Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): decider is a local runner beside laya.
+
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] A Laya request with no `timeout_secs` uses a 120-second request timeout; with `timeout_secs` it uses that value.
+- [ ] A Laya request and a decider request with no `timeout_secs` each use a 120-second request timeout; with `timeout_secs` on the Run each uses that value.
 
 ### Dependencies
 

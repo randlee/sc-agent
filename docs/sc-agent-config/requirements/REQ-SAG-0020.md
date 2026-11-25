@@ -1,9 +1,9 @@
 # Requirement: Configuration environment variable names
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-18  
-**Last Updated:** 2026-11-22  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -23,7 +23,7 @@ Definitions: A CLI is one of sc-agent's command-line programs that reads configu
 - When a setting is a shared setting other than the project/phase, each CLI MUST read it from that CLI's own prefix, such as `DECIDR_WORKERS`.
 - When a CLI loads configuration, a value set by an environment variable MUST pass the same validation as the same value set in a configuration file.
 - A failed validation of an environment value MUST name the environment variable.
-- An environment value MUST be parsed as JSON when valid JSON, otherwise as a string. For example, `DECIDR_LAYA__MODEL=1` is a number, like `"model": 1` in a file, and fails the string model validation; a quoted JSON string is accepted.
+- An environment value MUST be parsed as JSON when valid JSON, otherwise as a string. For example, `DECIDR_MODELS__LAYA__ID=1` is a number, like `"id": 1` in a file, and fails the string id validation; a quoted JSON string is accepted.
 
 **MUST NOT statements:**
 
@@ -34,6 +34,8 @@ Definitions: A CLI is one of sc-agent's command-line programs that reads configu
 A per-CLI prefix keeps an override meant for one CLI from changing another. The project/phase has one name because one phase spans every CLI and tools outside sc-agent.
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
+Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): a local endpoint's model id moved from `laya.model` to the model entry `models.laya.id` (REQ-SAG-0019), so the example names the new key path.
 
 ### Success Criteria
 

@@ -1,9 +1,9 @@
 # Decision: sc-decidr is the one Python decision harness: error values with a stored category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-22  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-14  
 
@@ -15,7 +15,7 @@
 
 ### Related Documents
 
-New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category table), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 covers decision values. REQ-SAG-0601 and REQ-SAG-0602 cover resends. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count and timeouts. ADR-SAG-0004 sets the crate layering and that errors are `Result<T, E>`.
+New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category table), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 covers decision values. REQ-SAG-0601 and REQ-SAG-0602 cover resends. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count and timeouts. ADR-SAG-0004 sets the crate layering and that errors are `Result<T, E>`. Amended 2026-11-24 (decisions 1, 13, 14 and 15): REQ-SAG-0005 and REQ-SAG-0703 (session rows, run log and result cache), REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0801 and REQ-SAG-0019 (providers as endpoints, model rows and model configuration), REQ-SAG-0022 (the session-row reader) and NFR-SAG-0004 (one owner). ADR-SAG-0021 sets the log paths and the session sink.
 
 **Requirements:**
 
@@ -31,14 +31,24 @@ New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category
 - REQ-SAG-0701
 - REQ-SAG-0013
 - REQ-SAG-0015
+- REQ-SAG-0005
+- REQ-SAG-0703
+- REQ-SAG-0101
+- REQ-SAG-0102
+- REQ-SAG-0801
+- REQ-SAG-0019
+- REQ-SAG-0022
+- NFR-SAG-0004
+- NFR-SAG-0005
 
 **Architecture Decisions:**
 
 - ADR-SAG-0004
+- ADR-SAG-0021
 
 ### Context
 
-sc-decidr is the one harness through which sc-agent's Python consumers reach decision models: Jev, decider, Laya, Haiku and Luna. It owns model selection, API-key lookup, session logging (one record per query and response), the injectable general logger, resends and errors.
+sc-decidr is the one harness through which sc-agent's Python consumers reach decision models: Jev, decider, Laya, Haiku and Luna. It owns model selection, API-key lookup, session logging (one row per query sent to a model, REQ-SAG-0005), the injectable general logger, resends and errors.
 
 The owner requires that judge-jev, plan-anchor and every later Python consumer have identical integration for errors, API keys, model selection, the injectable general logger and session logging. They differ only in prompt authoring and in processing results and decision trees.
 
@@ -61,22 +71,25 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
    | Concern | Provided by sc-decidr | Consumer does |
    | --- | --- | --- |
-   | Model and provider | `model=` takes a short name or a full model id. With `provider=None` the first provider table, in list order, that has the name is used; among rows that share a short name the most recent wins. | Pass the selector unchanged. Never set `provider`. |
+   | Model and provider | A model selector (short name or full model id) is resolved once, by decision 13, into a typed model value: the Run's default `model=`, or a per-call override `run.model(selector)`. There is no `provider` argument. | Pass the selector unchanged. |
    | API keys | The environment, then the repo-root `.env`, then the OS keyring. | Nothing. |
-   | Session log | One record per query and response, always written to the wheel's default location, tagged with `project` and `agent_role`. | Pass `project` and `agent_role`. Sessions are appended to the default session files (REQ-SAG-0008, ADR-SAG-0021); no session Logger is injected. |
-   | General log | The generated client obtains one Logger from the sc-decidr wheel, named after the client and writing `~/.sc-agent/logs/<client>.log.jsonl`, and injects it into every sc-decidr and sitr call (REQ-SAG-0022, ADR-SAG-0021). | Log its own records to the client's Logger, or pass its own Logger to the client. |
+   | Session log | One row per query sent to a model, always written to the wheel's default location, tagged with `project` and `agent_role`; a cache hit writes no row and one link record in `runs.jsonl` (REQ-SAG-0005, REQ-SAG-0703). | Pass `project` and `agent_role`. Rows are written by sc-agent's session sink (ADR-SAG-0021); no session Logger is injected. |
+| Run | `sc_agent.Run(tool=, tool_version=, cache=, ...)`, a context object that mints the run's ULID `run_id` in Rust, resolves the configuration once and owns the Logger, the cancel flag and the cache policy (decision 14). | Create one Run per command, send through it, read `run.run_id` for its own records. |
+| Session rows | `sc_agent.session_rows`, the one reader of the session-log layout (REQ-SAG-0022). | Call it; never read session files itself. |
+| Provider keys | `sc_agent.provider_keys()`, the credential names of every provider in the Rust provider table. | Call it for secret redaction; never list keys itself. |
+   | General log | The generated client obtains one Logger from the sc-decidr wheel, named after the client and writing `~/.sc-agent/logs/<client>.log.jsonl`, gives it to its Run at creation and injects it into every sitr call (REQ-SAG-0022, ADR-SAG-0021). | Log its own records to the client's Logger, or pass its own Logger to the client. |
    | Errors | The returned error value: `id`, `message`, `action`, a stored `category` and the send count (decisions 2, 5 and 6). | Map a category to its own codes. Never parse message text. |
-   | Limits | `timeout_secs`, `workers`, a fixed resend count and cancellation (decision 7). | Pass its own flags through. |
+   | Limits | `timeout_secs`, `workers`, a fixed resend count and cancellation, set on the Run (decisions 7 and 14). | Pass its own flags through. |
    | Batch order | `send_batch` returns one result per request, each with its input position (decision 8). | Nothing. |
 
    **The integration artifact is a generated module** (REQ-SAG-0018). The wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, as package data, and each consumer renders its integration module from it. To carry the file, the wheel moves to maturin's mixed layout; `import sc_agent` is unchanged.
 
    - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping. Prompt authoring and result processing stay in the consumer.
-   - Its variables are `client_name`, `sitr` (`true` or `false`) and `sc_decidr_version`; model selectors are call arguments. Session logging and the injected general logger are not optional (REQ-SAG-0008, REQ-SAG-0022).
+   - Its variables are `client_name`, `tool_version`, `sitr` (`true` or `false`) and `sc_decidr_version`; model selectors are call arguments. Session logging and the injected general logger are not optional (REQ-SAG-0008, REQ-SAG-0022).
    - sc-compose is an external render tool, not a dependency of the wheel. The template's front matter declares its sc-compose minimum (`requires.cli`); the minimum is declared, not enforced.
    - All Jev queries and responses go to the session log, so every consumer's Jev data takes the same path and can be filtered by repository and agent.
 
-   **The lower-level API stays the contract.** `send`, `send_batch`, `digest`, `logger`, `log`, `flush`, `Cancel` and `sc_agent.sitr` are public. The generated code uses only them and the standard library.
+   **The lower-level API stays the contract.** `Run` (with its `send` and `send_batch`), `session_rows`, `provider_keys`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public. The generated code uses only them and the standard library.
 
 2. **Typed fields: `attempts` and `category`.**
 
@@ -112,13 +125,13 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
 
    **Retryable means "worth resubmitting as a new call later, after the wheel's own resends have run out."** It is true for `busy` and `network` only. A consumer that resubmits waits first and does not wrap the wheel in an immediate retry loop.
 
-7. **Per-call limits: `timeout_secs` (exists) and `workers` (new).**
+7. **Per-run limits: `timeout_secs` and `workers`.**
 
-   `send` and `send_batch` take an optional timeout (a Duration) and an optional worker count; each applies to that call only; a bad value is an error value.
+   A Run takes an optional timeout (a Duration) and an optional worker count; each applies to that Run's calls only; a bad value is an error value. Amended 2026-11-24: the limits moved from each call to the Run (decision 14).
 
-   - Python: `send_batch(workers=, timeout_secs=)` and `send(timeout_secs=)`. CLI: `--workers N` and `--timeout-secs SECS`.
-   - A limit applies to its own call only. `None` means the configured value. A `workers` value below or above the configured count is honored.
-   - `timeout_secs` replaces the default 120 s send timeout for every send of the call.
+   - Python: `Run(workers=, timeout_secs=)`. CLI: `--workers N` and `--timeout-secs SECS`, for that command's Run.
+   - A limit applies to its own Run only. `None` means the configured value. A `workers` value below or above the configured count is honored.
+   - `timeout_secs` replaces the default 120 s send timeout for every send of the Run.
    - Every send gets the full timeout, resends included. Busy and network errors are resent up to a fixed count.
 
    REQ-SAG-0702 holds the requirements.
@@ -147,11 +160,41 @@ sc-decidr makes the wheel the one consumer boundary for Python decision consumer
     - The pyo3 abi3 feature in `sc-agent-py` moves to the abi3 feature of the Python floor, so the wheel tag matches the `requires-python` the wheel declares.
     - Until sc-compose can read `floors.toml`, the template carries these values as literals.
 
+13. **A provider is an endpoint; models are rows that reference it.**
+
+    - A provider is a base address, a wire and an optional credential name. The base address is a fixed remote URL or a host and port read from configuration (the local endpoints `laya` and `decider`).
+    - The model table has one row per model: short name, model id, release date and the provider it references. A local endpoint's row may have no built-in id; its id comes from configuration, and when none is set the request body carries no `model` (decider).
+    - sc-agent never branches on a provider's or a model's name. Adding a model is one row plus configuration.
+    - Configuration key `models.<alias>` with `provider` and `id` overrides the built-in row for that alias (REQ-SAG-0019). It may only name a built-in provider; it cannot add a provider, a credential or a remote address.
+    - Resolution, with no `provider` argument: the configured `models.<alias>.provider` when set; otherwise, taking the sources of REQ-SAG-0401 in order, the first provider in table order that serves the alias and whose credential that source holds; a keyless provider always qualifies. When none qualifies, the error names every candidate's credential.
+    - A model selection is resolved once, at the boundary (a CLI flag, Run creation, or a per-call override), into one typed value, `ResolvedModel { alias, id, provider }`, where `provider` references the provider constant (base address, wire, credential). That value is what flows through the send, the cache key, the session row's `model_requested` and `provider`, and the redaction; no model name and provider name pair is passed down the stack or resolved again. There is no `provider` argument or `--provider` flag: `models.<alias>.provider` in configuration and the rule above choose the provider. In Python the Run holds the default model value, and a per-call override is a model value obtained once from the Run with `run.model(selector)`, because resolution reads the Run's configuration and credential sources.
+    - The haiku and luna rows include Nous: `anthropic/claude-haiku-5.5` and `openai/gpt-6-luna`.
+
+14. **A run is a context object.**
+
+    - `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`). Creating it mints the run's ULID `run_id` in Rust; `session_id` ULIDs are also minted in Rust. `run.run_id` is readable for the tool's own records.
+    - Everything that does not change between the calls of one command is resolved once, when the Run is created, and held by it: the tool identity, the cache policy, the project/phase, the configuration directory and the layered settings, the worker count, the send timeout, the repository identity, the log root and the credential sources. The Run owns the general Logger, or borrows the Logger given at creation; it flushes after each call and on exit.
+    - Per call, a caller passes only what may vary between calls: the request or requests, and optionally `model`, `agent_role`, a `cache` override for that call, and `on_result` for a batch. Defaults for `model` and `agent_role` may be set on the Run.
+    - `run.cancel()` cancels the Run's calls. A call after the Run is closed returns a typed error value.
+    - Creating a Run never raises. When a creation value is invalid (an empty `tool` or `tool_version`, a missing project/phase, a bad limit, an unresolvable model), the Run holds that error value, and each of its calls returns it with no send, no session row and no link record. `run.model(selector)` returns a model value or an error value.
+    - `run.send` is `run.send_batch` with one request: one code path.
+    - There is no per-job cache: a caller that needs both policies sends two batches; each job is still looked up on its own (REQ-SAG-0703).
+    - The test seams (provider base URL, the wait function and the keyring lookup) are given once, when the Run is created, as one typed value; they are not call arguments.
+    - In Rust the Run is one struct holding newtypes (`RunId`, `ToolIdentity { tool, tool_version }`, `CachePolicy`) and the resolved values above; `sc_agent::send` and `sc_agent::batch` take the Run and the per-call values, and `decidr` creates one Run per command. In Python the Run and the Logger are `#[pyclass]` types with typed fields; no capsule and no string-keyed option table crosses the boundary. The Python Run's exit flushes the Logger.
+
+15. **One owner (NFR-SAG-0004).**
+
+    ULID minting, the provider table and its credential list, the model table and the session-log layout are owned by the Rust crate and exported by the wheel; the consumer template and every consumer call them and hold no copy.
+
 ### Rationale
 
 Two consumers rebuilt the wheel boundary and the copies diverged, so every concern except prompt authoring and result interpretation moves into sc-decidr, and the integration code is generated from one template. A stored category and the send count replace message-text parsing and pinned id lists. Storing the category when the error is built needs no lookup. Per-call limits and position-tagged batch results remove the consumer code that worked around their absence. Prerelease tooling leaves the product API so it does not freeze into the error contract.
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
+Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): this ADR is amended in place. Every piece of logic or data has one owner and everything else calls it. A provider is an endpoint and models are table rows that reference provider constants, with no name-string branching; laya and decider are models on configured local endpoints, and decider's model id is optional. The run is a typed context object that mints `run_id` in Rust; everything that does not vary between its calls (configuration, project, repository, log root, Logger, cancel flag, limits, test seams) is resolved once at its creation, and per call only the request, model, agent role, cache override and batch callback are passed. Values passed together are one Rust struct (NFR-SAG-0005). The wheel owns ULID minting, the session-row reader and the provider-key list. One cache policy per call, no per-job cache list. A model selection is resolved once at the boundary into one typed value that carries the provider; there is no separate `provider` argument. Session logging writes one row per query sent to a model; a cache hit writes a link record and no row.
+
+Lead ruling 2026-11-24, pending owner confirmation: the resolution order of decision 13 (configuration wins, else the first provider whose credential resolves).
 
 Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order." "No hand built checks."
 
