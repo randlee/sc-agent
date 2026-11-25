@@ -43,6 +43,12 @@ Definitions: `<log_root>` is `~/.sc-agent`, or a CLI's `<CLI>_LOG_ROOT` when set
 - For every cache hit (REQ-SAG-0703), sc-agent MUST append one link record to the run log with that query's `run_id`, the matching row's `session_id` and `cached: true`.
 - Link records MUST be written in Rust through a session sink.
 
+
+- Each new session row MUST store `ok`, `answers` and `error` instead of an opaque `result` envelope. On success `answers` contains one entry per question, with `question_id`, `kind` and the kind's typed fields; `error` is null. On failure `answers` is null and `error` retains `id`, `category`, `message`, `action` and `attempts`.
+- The answer kinds MUST be `noul` (`noul`), `choice` (`choice`, `confidence`, `probabilities`), `score` (`score`, `confidence`, `legend`, `probabilities`) and `box` (`top`, `bottom`, `left`, `right`, `confidence`). Fractional values MUST remain floating point without rounding (REQ-SAG-0007); the existing API's null box/confidence values remain representable.
+- Rust MUST own the per-kind answer types used for provider decoding, returned typed answers and session serialization. The wheel MUST expose these types to Python; the template and consumers MUST NOT infer an answer kind by joining the request or implement their own answer parser.
+- The reader and cache MUST read both phase-j `sc-agent-session/2` rows with `result` and the new typed rows. The planned `sc-agent-session/2` tag is retained; readers distinguish its two payload shapes by their fields, and historical rows MUST NOT be rewritten. Cache identity, latest-success selection, link records and the exact event-size limit remain unchanged (REQ-SAG-0703).
+
 **MUST NOT statements:**
 
 - sc-agent MUST NOT offer any setting, argument or environment variable that turns session logging off.

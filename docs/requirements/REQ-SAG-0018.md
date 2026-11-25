@@ -95,6 +95,14 @@ Definitions:
 - The secret redaction MUST cover the value of every provider key.
 - The secret redaction MUST get the provider keys by calling the provider-key export.
 
+
+- Every application record written to a general log MUST carry `schema`, `tool`, `tool_version`, `run_id`, `project` and `agent_role` from its Run. Records tied to one query MUST carry that query's `session_id`; non-query records omit it. A batch result that failed before a session exists retains the existing nullable `session_id` field of `jev-batch-result/2`.
+- The Rust Run MUST own construction of that header; the generated client MUST obtain it through the wheel. Tool-specific payloads stay in tool records, with no second copy of request, answers, attempts, sends or model response (NFR-SAG-0004).
+- `jev-batch-result/2` MUST remain the batch-result tag; there is no second batch schema bump in phase k.
+- One shared `log_result_line` in the generated client MUST write generic batch-result events for both tools. compare, drift and plan-anchor run summaries MUST use the same header with their own schema tags and tool-owned derived fields.
+- The client MUST provide the linked walk records of REQ-SAG-0024 for any injected decision tree and branch-selection callback. Prompt authoring, branch selection and verdict interpretation stay with the tool.
+- Dry-run commands MUST continue to compose and display requests without creating a Run or writing any session, run, result, walk or general-log application record.
+
 **MUST NOT statements:**
 
 - The consumer module MUST NOT contain consumer logic.

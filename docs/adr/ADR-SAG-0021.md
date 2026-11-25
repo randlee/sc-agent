@@ -87,6 +87,8 @@ A wheel is not an entry point and has no row: it writes to the Logger its caller
 - Session logs and general logs are never written to the same folder tree.
 - A session is never filed under a guessed project/phase.
 
+- The existing Run writes `run.start` and `run.end` through its general Logger (REQ-SAG-0023); these are not session rows or run↔session links. It owns the common application header of REQ-SAG-0018. Shared client logging writes linked `walk.start`, `walk.step` and `walk.end` events (REQ-SAG-0024), and generic batch-result events for both tools; no request or answers are copied into these events. A dry run creates no Run and writes none of these records. Session sinks, retention and paths remain as above.
+
 ### Rationale
 
 The entry point is the only code that knows the process's lifetime, so it is the only correct owner of the Logger: it obtains the Logger before the first general-log record and flushes after each call. Exposing the crate's own Logger from the wheel keeps one copy and one queue in the process and needs no Python package. Fixed paths keep every log in one known place for audit, and a separate `sessions/` tree lets tools and the later SQLite load read every session with a path glob. The session log is the record of every Jev query from every tool, so it cannot be turned off and is never rotated; it stays small enough because `project` changes over time.
