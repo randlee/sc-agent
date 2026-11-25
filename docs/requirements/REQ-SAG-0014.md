@@ -14,9 +14,15 @@
 
 ### Requirement Statement
 
+Definitions: The target model is the model selected to receive the request.
+
 **MUST statements:**
 
-- A request that exceeds the target model’s context limit MUST be refused with an error before any send.
+- When a request exceeds the target model’s context limit, sc-agent MUST return an error.
+
+**MUST NOT statements:**
+
+- sc-agent MUST NOT send a request that exceeds the target model’s context limit.
 
 ### Rationale
 
