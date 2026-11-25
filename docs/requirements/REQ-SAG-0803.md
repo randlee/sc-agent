@@ -1,9 +1,9 @@
 # Requirement: First-release publish dry-run
 
 **Status:** Approved  
-**Version:** 0.2.1  
+**Version:** 0.2.0  
 **Created:** 2026-11-11  
-**Last Updated:** 2026-11-24  
+**Last Updated:** 2026-11-21  
 **Owner:** Rand Lee  
 
 ---
@@ -14,16 +14,12 @@
 
 ### Requirement Statement
 
-Definitions: Manifest publish order is the order of the `publish_order` values in `release/publish-artifacts.toml`. A verification location is CI or a documented local recipe. A crates.io dry run runs `cargo publish --dry-run` for every declared publishable crates.io crate in manifest publish order at a verification location. A sc-decidr wheel build is the maturin wheel build for the **sc-decidr** PyPI package.
-
 **MUST statements:**
 
-- The release process MUST prove the crates.io dry run.
-- The release process MUST prove the sc-decidr wheel build at a verification location.
+- The release process MUST prove `cargo publish --dry-run` in manifest publish order for every crates.io crate declared publishable and the maturin wheel build for the **sc-decidr** PyPI package in CI or a documented local recipe.
+- Production registry uploads and version tags remain out of scope until the owner dispatches a release.
 
 ### Rationale
-
-Production registry uploads and version tags remain out of scope until the owner dispatches a release.
 
 Dry-run catches manifest, workspace version, and wheel build failures before credentials are spent on a real tag.
 

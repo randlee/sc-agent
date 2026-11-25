@@ -63,7 +63,6 @@ Owner ruling (2026-11-21), Rand Lee: "Extra fields are fine, make sure adr doesn
 - [ ] A unit test verifies that a busy error read in Rust and in Python, through the returned error value or the result line's `error`, carries the send count.
 - [ ] A unit test verifies that each error value reports its own `category`.
 - [ ] A unit test verifies that `decision.cancelled` carries `attempts` equal to its sends.
-- [ ] A unit test verifies that Python exceptions raised during a wheel call, including in `on_result`, are caught and returned as error values.
 
 ### Dependencies
 
