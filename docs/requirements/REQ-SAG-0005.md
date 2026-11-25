@@ -22,6 +22,12 @@ Definitions: JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-del
 - For every query sent to a model, sc-agent MUST append a session row to the query's session log.
 - For every session row that answers a Run's query, sc-agent MUST append one link record to the query's run log.
 
+
+- Each new session row MUST store `ok`, `answers` and `error` instead of an opaque `result` envelope. On success `answers` contains one entry per question, with `question_id`, `kind` and the kind's typed fields; `error` is null. On failure `answers` is null and `error` retains `id`, `category`, `message`, `action` and `attempts`.
+- The answer kinds MUST be `noul` (`noul`), `choice` (`choice`, `confidence`, `probabilities`), `score` (`score`, `confidence`, `legend`, `probabilities`) and `box` (`top`, `bottom`, `left`, `right`, `confidence`). Fractional values MUST remain floating point without rounding (REQ-SAG-0007); the existing API's null box/confidence values remain representable.
+- Rust MUST own the per-kind answer types used for provider decoding, returned typed answers and session serialization. The wheel MUST expose these types to Python; the template and consumers MUST NOT infer an answer kind by joining the request or implement their own answer parser.
+- The reader and cache MUST read both phase-j `sc-agent-session/2` rows with `result` and the new typed rows. The planned `sc-agent-session/2` tag is retained; readers distinguish its two payload shapes by their fields, and historical rows MUST NOT be rewritten. Cache identity, latest-success selection, link records and the exact event-size limit remain unchanged (REQ-SAG-0703).
+
 **MUST NOT statements:**
 
 - sc-agent MUST NOT append more than one session row for one query.

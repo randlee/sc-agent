@@ -100,6 +100,8 @@ The wheel is the one consumer boundary. Decision numbers are stable; there is no
 
 15. **One owner (NFR-SAG-0004).** ULID minting, the provider table and its credential list, the model table and the session-log layout are owned by the sc-agent Rust crate and exposed through the decidr CLI and the wheel, which exports the provider-key list, the session-row reader and the Run that mints `run_id`; the consumer template and every consumer call them and hold no copy.
 
+16. **Phase-k audit values share their owners.** Run lifecycle events are methods of the existing Run, not a second lifecycle or free `run_start`/`run_end` API (REQ-SAG-0023). Common application headers and walk identities are created by Rust and exposed as typed pyclasses. Provider answers, persisted typed answers and Python answers use the same per-kind Rust types (REQ-SAG-0005); the template's duplicate NamedTuple answer shapes and kind-inference parser leave. The planned session tag stays `sc-agent-session/2`; its earlier opaque-result rows remain readable by shape without a historical rewrite. The batch-result tag stays /2. The client template owns generic walk scheduling and logging; consumer callbacks own prompt and branch semantics (REQ-SAG-0024). SQLite, importers and HTML reports belong to the later design phase.
+
 ### Rationale
 
 Two consumers rebuilt the boundary and diverged, so the boundary moves into the wheel and integration code is generated from one template. A stored category and the send count replace message parsing and pinned id lists, and per-run limits and position-tagged results remove consumer workarounds; prerelease tooling leaves the product API so it does not freeze into the error contract.
