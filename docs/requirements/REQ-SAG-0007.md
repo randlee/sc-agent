@@ -18,7 +18,8 @@ Definitions: A decision value is a value a decision model returns (a Jev probabi
 
 **MUST statements:**
 
-- sc-agent MUST return decision values at the precision it received or computed them, using floating-point types where values are fractional.
+- sc-agent MUST return decision values at the precision it received or computed them.
+- sc-agent MUST use floating-point types for fractional decision values.
 
 **MUST NOT statements:**
 

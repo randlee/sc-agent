@@ -22,6 +22,7 @@
 ### Context
 
 Requirements, non-functional requirements and architecture decisions are read by agents and by Raptor.
+The problem is that free-form records cannot be reliably imported into Raptor for tools to query and judge.
 
 ### Decision
 

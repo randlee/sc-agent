@@ -30,7 +30,8 @@ Definitions: A CLI is an sc-agent command-line program that reads configuration,
   9. the built-in default.
 - When a required setting has no built-in default and no layer sets it, the CLI MUST fail with a missing-setting error.
 - `sc-agent.json` MUST accept the shared defaults for `project`, `workers` and the optional `laya` runner; a CLI file may override them.
-- `<cli>.json` and `<cli>.local.json` MUST accept that CLI's settings and the shared settings; an unknown file key MUST produce a typed error naming that file and key path.
+- `<cli>.json` and `<cli>.local.json` MUST accept that CLI's settings and the shared settings.
+- An unknown file key MUST produce a typed error naming that file and key path.
 - `<cli>.json` in the local folder MUST accept the same keys as `<cli>.json` in the global folder.
 - `sc-agent.json` in the local folder MUST accept the same keys as `sc-agent.json` in the global folder.
 - When the CLI does not run inside a git work tree, layers 3 through 5 MUST be skipped.
