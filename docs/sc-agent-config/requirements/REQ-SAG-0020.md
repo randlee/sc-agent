@@ -22,7 +22,7 @@ Definitions: A CLI is one of sc-agent's command-line programs that reads configu
 - Every CLI MUST take the project/phase from the `SC_PROJECT` environment variable.
 - When a setting is a shared setting other than the project/phase, each CLI MUST read it from that CLI's own prefix, such as `DECIDR_WORKERS`.
 - When a CLI loads configuration, a value set by an environment variable MUST pass the same validation as the same value set in a configuration file.
-- A failed validation of an environment value MUST name the environment variable.
+- When an environment value fails validation, the error MUST include the name of the environment variable that set the value.
 - When an environment value is valid JSON, it MUST be parsed as JSON.
 - When an environment value is not valid JSON, it MUST be taken as a string.
 
