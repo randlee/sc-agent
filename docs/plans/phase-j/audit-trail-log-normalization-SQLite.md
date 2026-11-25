@@ -79,18 +79,20 @@ Owner decisions, 2026-11-24, from the design review and the phase-j planning ses
 - **D32.** The sanity tool becomes an sc-agent tool in its own repo. It is out of scope here.
 - **D33.** A requirement is generally one or two sentences, with background and context in support. An ADR may be longer, but the ADR and the code that satisfies it should fit one context window.
 
+**Rulings of 2026-11-25**
+
+- **D34.** The size limit on a request is the context of the model used. One rule: a request must fit the selected model's context. For haiku and luna the limit is known exactly; Jev's tokenizer is not public, so its limit is an estimate. The 8 MiB request guard and the "over 1 MiB gets no session row" rule, with its boundary test, are not separate requirements.
+- **D35.** Config can add a local model that runs on another computer. Config cannot change where a paid API's key is sent.
+- **D36.** When several providers serve a model, the order is: the configured provider, then one that needs no key, then the first whose key is found.
+- **D37.** Python results are typed, not dicts.
+- **D38.** Phases j, k and l are meant to be complete in a few hours. That only happens if nothing is over-specified and the line limits stay tight.
+
 ## Open items for the owner
 
-Conflicts and gaps found when the decisions were read together. Each needs one line.
-
-1. **Three size limits disagree.** The code refuses a request over 8 MiB (REQ-SAG-0014). The records give a session event over 1 MiB no row and an error, with a boundary test. Jev's context is under 64k. The owner asked "what could possibly exceed 1MiB?" and no answer is recorded. Is one rule enough (a request must fit the selected model's context), with the 1 MiB no-row rule and its test removed?
-2. **Config model rows and endpoints.** D15 lets config add model rows. The lead added a restriction: config may not add a remote endpoint, so a key cannot be sent to another server. Keep that restriction?
-3. **Which provider serves a model that several providers offer.** The lead's order is: the configured provider, then one that needs no key, then the first whose key is found. Confirm or replace.
-4. **Typed results in Python.** D21 and D23 point to a typed result, not a dict; it changes every tool's call sites. Asked on 2026-11-24, not answered.
-5. **Release cadence.** One release after phases j, k and l, or one per phase? Asked twice, not answered.
-6. **The two new NFRs.** D20 asked for a rule against copying; NFR-SAG-0004 states it in 8 MUST statements. D21 was said as a design view; NFR-SAG-0005 makes it a requirement. Keep NFR-SAG-0005 as a record, or carry D21 in the plan only?
-7. **Phase k against the final phase j.** Phase k was planned against an earlier phase-j plan and reconciled once. The `Run` context it was to introduce (2.2) now arrives in j-1, so phase k keeps only the start/end events from 2.2.
-8. **Phase l.** The line limit for phase l (a new crate, or a budget change) is not decided. Three questions from the first draft are still open: whether the JSONL session log stays after the dual-write period; whether a purely additive core change may be a minor version; whether the importer loads all history.
+1. **NFR-SAG-0005** ("Values passed together are one Rust struct", 3 MUST statements). The lead wrote it from D21. The owner did not ask for a record. Until the owner says otherwise it is carried in the sprint beads, not as a record.
+2. **Phase k** was planned against an earlier phase-j plan and reconciled once (to plan v6). The `Run` context it was to introduce (2.2) now arrives in j-1, so phase k keeps only the start/end events from 2.2. It needs one more reconcile against the final phase j before review.
+3. **Phase l.** The line limit for phase l (a new crate, or a budget change) is not decided. Three questions from the first draft are still open: whether the JSONL session log stays after the dual-write period; whether a purely additive core change may be a minor version; whether the importer loads all history.
+4. **Releases.** Whether j, k and l ship as one release or one each is not stated; D38 says they should not wait on each other.
 
 **Lead rulings, not owner decisions.** These fill gaps the decisions leave. They belong in the sprint beads unless the owner confirms them: a cache hit returns the most recent successful matching row and an error row is never a hit; fixture (`--answers-file`) runs are treated like dry runs; the `laya.model` setting is removed; `project` may be empty in a result line when it came from configuration; the general log's `decision.result` carries `session_id` and `cached`, not the answer; an integration test whose key is absent reports "not run".
 
@@ -154,7 +156,7 @@ Phase 1 fixes the existing logs in place: stale docs, the session log written th
 
 - Replace the hand-written append in `send` (`SESSION_APPEND` mutex, `std::fs::OpenOptions`, lib.rs \~1160–1190) with an sc-observability Logger that writes the session file.
 - Path and behavior stay as REQ-SAG-0003/0005 state: `<log_root>/sessions/<repo-id>/<agent_role>/<project>/sessions.jsonl`, never rotated or pruned, appended by every process.
-- The session log is always on; no setting turns it off. One query gives one row. A session event is at most 1 MiB including the wrapper: a request that fits is recorded whole, and a larger one gets no row and a `log.session_write` error. A cache hit (1.4) writes no row.
+- The session log is always on; no setting turns it off. One query gives one row. A request that fits the selected model's context (D34) is recorded whole. A cache hit (1.4) writes no row.
 - Phase A's sprint a-8 already designed this: a session Logger with a registered `JsonlFileSink` that never rotates. The first step of the sprint confirms that sc-observability 1.5.0's public API supports a non-rotating sink at a caller-chosen path. If it does not, that change lands in sc-observability first.
 - Records: amend ADR-SAG-0021 (remove "Session rows are appended directly…; no session Logger is injected"), add the sc-observability rule to REQ-SAG-0003 and REQ-SAG-0008, and the row and size rules to REQ-SAG-0005.
 
