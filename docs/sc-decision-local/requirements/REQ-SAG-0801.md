@@ -14,14 +14,14 @@
 
 ### Requirement Statement
 
-Definitions: A local decision runner is a daemon on the user's machine or network that serves a decision model through the Jev API. A local endpoint is a keyless provider whose host and port come from configuration (REQ-SAG-0019). sc-agent has two local decision runners, `laya` and `decider`; each runner's models are fixed-id rows of the model table on local endpoints. The decider has one row per server (2b and 4b), each on its own local endpoint.
+Definitions: A local decision runner is a daemon on the user's machine or network that serves a decision model through the Jev API. A local endpoint is a keyless provider whose host and port come from configuration (REQ-SAG-0019). sc-agent has two local decision runners, `laya` and `decider`; each runner's models are fixed-id rows of the model table on local endpoints. The decider has two rows, `decider-2b-v11` and `decider-4b-v2.1`, each on its own local endpoint.
 
 **MUST statements:**
 
 - Each local endpoint MUST be defined in configuration by host and port (`<endpoint>.host`, `<endpoint>.port`).
-- Each local decision runner's model MUST have a fixed model id in its model-table row; laya's is `laya:en`.
-- A `decider` selection MUST resolve to the latest decider row, as a short name does for any model (REQ-SAG-0102).
-- Whether a request body carries `model` MUST be decided by the provider's wire, not by the model id; the decider's wire sends no `model`.
+- Each local decision runner's model MUST have a fixed model id in its model-table row: `laya:en` for laya, and `decider-2b-v11` and `decider-4b-v2.1` for the decider.
+- A `decider` selection MUST resolve by the short-name rule of REQ-SAG-0102, as for any model.
+- Every request to a local decision runner MUST carry the resolved model id as `model`.
 - Each local decision runner MUST be selectable by its name wherever a decision model is selected.
 - `sc-agent` MUST send requests to a local decision runner in the Jev API format.
 - Adding a local decision runner MUST need only one provider constant, one model row and configuration.
@@ -38,14 +38,14 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): laya and decider are models on configured local endpoints; decider's model id is optional and omitted from the body when unset.
 
-Owner ruling 2026-11-24 (supersedes the optional or configured local model id above): laya and decider have fixed model ids in the model table, like every other model. laya's row id is `laya:en`; decider has one fixed-id row per server (2b, 4b), and selecting `decider` resolves to its latest row, as for `haiku`. Whether a request body carries `model` is a property of the provider's wire, not of the model id. Cache keys always use the resolved fixed id.
+Owner ruling 2026-11-24 (supersedes the optional or configured local model id and the omitted `model` above): laya and decider have fixed model ids in the model table, like every other model. laya requires `laya:en`. decider has two rows, `decider-2b-v11` (port 18000) and `decider-4b-v2.1` (port 18001), both released 2026-09-24, and `decider` resolves by the same rule as `haiku`. The decider servers accept and ignore `model`, so every request carries the resolved id. Cache keys always use the resolved fixed id.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
 - [ ] A laya host and port set in configuration are used with no rebuild, and a `laya` request carries `laya:en`.
-- [ ] With both decider endpoints configured, `--model decider` resolves to the latest decider row, sends a Jev API request with no `model` to that row's endpoint, and its session row's `model_requested` is that row's fixed id.
+- [ ] With both decider endpoints configured, `--model decider` resolves by the REQ-SAG-0102 rule and sends a Jev API request carrying that row's id as `model` to that row's endpoint; `--model decider-4b-v2.1` sends to the 4b endpoint; each session row's `model_requested` is the row's fixed id.
 - [ ] A local endpoint selection whose host or port is unset returns a missing-setting error naming every layer.
 - [ ] A search of sc-agent's source (`crates/`, outside tests) finds no host or port literal for a local runner. Documentation of the owner's integration cases may name configured values.
 

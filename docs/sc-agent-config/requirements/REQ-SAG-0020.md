@@ -37,7 +37,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): a local endpoint's model id moved from `laya.model` to the model entry `models.laya.id` (REQ-SAG-0019), so the example names the new key path.
 
-Owner ruling 2026-11-24 (supersedes the optional or configured local model id above): laya and decider have fixed model ids in the model table, like every other model. laya's row id is `laya:en`; decider has one fixed-id row per server (2b, 4b), and selecting `decider` resolves to its latest row, as for `haiku`. Whether a request body carries `model` is a property of the provider's wire, not of the model id. Cache keys always use the resolved fixed id.
+Owner ruling 2026-11-24 (supersedes the optional or configured local model id and the omitted `model` above): laya and decider have fixed model ids in the model table, like every other model. laya requires `laya:en`. decider has two rows, `decider-2b-v11` (port 18000) and `decider-4b-v2.1` (port 18001), both released 2026-09-24, and `decider` resolves by the same rule as `haiku`. The decider servers accept and ignore `model`, so every request carries the resolved id. Cache keys always use the resolved fixed id.
 
 ### Success Criteria
 

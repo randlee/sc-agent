@@ -23,7 +23,7 @@ Definitions: A query is one decision request sent through `send`, or one request
 - `sc_agent.Run` MUST accept an optional cache policy, `cache`, that overrides the configured flag for that Run.
 - `run.send` and `run.send_batch` MUST accept an optional per-call `cache` argument.
 - A call's `cache` MUST override the Run's cache policy for that call only, and for every job of that call.
-- The cache key MUST be the request hash together with the requested model, which is the resolved model's fixed id; a query's model MUST stay in its session row and its cache lookup, and in its request text whenever the provider's wire carries `model`.
+- The cache key MUST be the request hash together with the requested model, which is the resolved model's fixed id; a query's model MUST stay in its request text, its session row and its cache lookup.
 - Before each model call whose cache flag is on, sc-agent MUST look for a matching row in the query's session log.
 - When the query's session log cannot be read, the lookup MUST return the error value `session.unreadable` (REQ-SAG-0022) and the query MUST NOT be sent.
 - A cache hit's result MUST carry `attempts: 0`.
@@ -68,7 +68,7 @@ Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): no per-job cache list; one 
 - [ ] A Run created with `cache=False` sends a request that has a matching row; a call through it with `cache=True` returns the hit.
 - [ ] With the configuration key `cache` set to `false`, a request that has a matching row makes a model call.
 - [ ] A matching row in another project's session log is not a cache hit.
-- [ ] Two queries with the same request text to the two decider rows (2b and 4b) are two different cache keys, and each key holds that row's fixed id even though the decider's request body carries no `model`.
+- [ ] The same request sent to `decider-2b-v11` and to `decider-4b-v2.1` makes two model calls and writes two rows, each keyed on its row's fixed id.
 - [ ] With the query's session log unreadable, a send with cache on returns `session.unreadable` and makes no model call.
 - [ ] A cache hit's result carries `attempts: 0`.
 - [ ] When the only row with the same request hash and requested model is an error row, a send with cache on makes a model call and writes a new row.
