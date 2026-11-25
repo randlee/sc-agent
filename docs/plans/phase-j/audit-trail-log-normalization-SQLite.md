@@ -90,6 +90,9 @@ Owner decisions, 2026-11-24, from the design review and the phase-j planning ses
 - **D38.** Phases j, k and l are meant to be complete in a few hours. That only happens if nothing is over-specified and the line limits stay tight.
 - **D39.** NFR-SAG-0005 ("Values passed together are one Rust struct") is not a record. D21 is carried in the sprint beads.
 - **D40.** j-1 is split by crate. The clean-up adds nothing that was not simply skipped before, and it is a net delete.
+- **D41.** An error is never returned from the cache. Only a successful result is a cache hit.
+- **D42.** A clean-up does not loosen a requirement. REQ-SAG-0007 keeps the surfaces develop checked: the Rust API, the CLI and the Python bindings. A missing test is a finding, not a reason to drop a check.
+- **D43.** A record passes judge-jev when its verdict is yes and every answer is at or above 0.6. A yes verdict below 0.6 is not a pass.
 
 ## Open items for the owner
 
@@ -97,7 +100,7 @@ Owner decisions, 2026-11-24, from the design review and the phase-j planning ses
 2. **Phase l** is planned on `integrate/phase-l` (six sprints), written while phase j was still changing. The line limit for phase l (a new crate, or a budget change) is not decided. Three questions from the first draft are still open: whether the JSONL session log stays after the dual-write period; whether a purely additive core change may be a minor version; whether the importer loads all history.
 3. **Releases.** Whether j, k and l ship as one release or one each is not stated; D38 says they should not wait on each other.
 
-**Lead rulings, not owner decisions.** These fill gaps the decisions leave. They belong in the sprint beads unless the owner confirms them: a cache hit returns the most recent successful matching row and an error row is never a hit; fixture (`--answers-file`) runs are treated like dry runs; the `laya.model` setting is removed; `project` may be empty in a result line when it came from configuration; the general log's `decision.result` carries `session_id` and `cached`, not the answer; an integration test whose key is absent reports "not run".
+**Lead rulings, not owner decisions.** These fill gaps the decisions leave. They belong in the sprint beads unless the owner confirms them: a cache hit returns the most recent matching row; fixture (`--answers-file`) runs are treated like dry runs; the `laya.model` setting is removed; `project` may be empty in a result line when it came from configuration; the general log's `decision.result` carries `session_id` and `cached`, not the answer; an integration test whose key is absent reports "not run".
 
 ## Current state
 
