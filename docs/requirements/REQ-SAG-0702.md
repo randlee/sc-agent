@@ -20,6 +20,7 @@ Definitions:
 - The worker count is the number of requests of one batch that are sent at the same time.
 - A Run is the run context a tool creates, uses for its calls and then disposes. `decidr send` creates one Run per command from its `--timeout-secs` and `--workers` options.
 - An override is a send timeout or a worker count given to a Run.
+- To clamp a value is to replace it with the nearest bound of a range when it falls outside that range.
 - An invalid send timeout is a send timeout that is negative or not a number.
 - An invalid worker count is a worker count below 1.
 - The configured send timeout is 120 s unless configuration sets another value (REQ-SAG-0015).
