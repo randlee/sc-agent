@@ -28,7 +28,7 @@ Definitions: A CLI is an sc-agent command-line program that reads configuration,
   7. `<cli>.json` in the global folder;
   8. `sc-agent.json` in the global folder;
   9. the built-in default.
-- When a required setting has no built-in default and no layer sets it, the CLI MUST fail with a missing-setting error.
+- When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.
 - Each configuration file MUST accept the shared settings.
 - A CLI file MUST accept that CLI's settings.
 - A file in the local folder MUST accept the same keys as the same-named file in the global folder.

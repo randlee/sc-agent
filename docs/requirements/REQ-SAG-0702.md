@@ -40,7 +40,7 @@ Definitions:
 - When a Run is given an invalid send timeout, it MUST return the error value `decidr.invalid_request_timeout`.
 - When a Run is given an invalid worker count, it MUST return the error value `decidr.invalid_workers`.
 - When a provider rejects a request as too large for the model's context, the call MUST return the provider's error.
-- When a send exceeds the send timeout, the Run MUST resend it until it has made 5 sends in all, the first included.
+- When a send exceeds the send timeout and fewer than 5 sends of that request have been made, the Run MUST resend it.
 - A batch MUST return one batch result per request.
 - The batch callback MUST receive each result when that result finishes.
 
