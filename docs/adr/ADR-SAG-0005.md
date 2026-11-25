@@ -47,8 +47,6 @@ Keeping PyO3 in `sc-agent-py` and clap in `sitr` keeps the library's dependency 
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I was planning to bring the sitr wheel back once we get mvp working."
-
 ### Consequences
 
 **Positive:**
