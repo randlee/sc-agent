@@ -1,7 +1,7 @@
 # Requirement: Session log JSONL layout and row content
 
 **Status:** Approved  
-**Version:** 0.4.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: `<log_root>` is `~/.sc-agent`, or a CLI's `<CLI>_LOG_ROOT` when set (REQ-SAG-0003). JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A CLI is a command-line interface program. The session directory is `<log_root>/sessions/<repo>/<agent_role>/<project>/`. A session's session directory is the session directory for that session's repo, agent role and project. A query is one decision request sent through `send`, or one request of a `send_batch` call. A session row is the JSON object written for one query. A session event is the sc-observability log event that holds one session row, its wrapper included. 1 MiB is 1,048,576 bytes. A cache hit is defined in REQ-SAG-0703. `model_requested` is the resolved model id the query asked for. `provider` is the provider the query was sent to. `model_answered` is the model id the provider's response reported. `usage` is the token usage the provider reported, as `input_tokens` and `output_tokens`.
+Definitions: `<log_root>` is `~/.sc-agent`, or a CLI's `<CLI>_LOG_ROOT` when set (REQ-SAG-0003). JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A CLI is a command-line interface program. The session directory is `<log_root>/sessions/<repo>/<agent_role>/<project>/`. A session's session directory is the session directory for that session's repo, agent role and project. A query is one decision request sent through `send`, or one request of a `send_batch` call. A session row is the JSON object written for one query. A session event is the sc-observability log event that holds one session row, its wrapper included. 1 MiB is 1,048,576 bytes. A cache hit is defined in REQ-SAG-0703. `model_requested` is the resolved model id the query asked for. `provider` is the provider the query was sent to. `model_answered` is the model id the provider's response reported. `usage` is the token usage the provider reported, as `input_tokens` and `output_tokens`. `run_id` is the ULID the caller passes to identify one run of its command (REQ-SAG-0018). The run log is the file `runs.jsonl` in the session directory. A link record is the JSON object `{run_id, session_id, cached}` written to the run log for one query. The session sink is defined in REQ-SAG-0003.
 
 **MUST statements:**
 
@@ -34,19 +34,28 @@ Definitions: `<log_root>` is `~/.sc-agent`, or a CLI's `<CLI>_LOG_ROOT` when set
 - When a session event is larger than 1 MiB, sc-agent MUST write no row for that query.
 - When a session event is larger than 1 MiB, sc-agent MUST return a `log.session_write` error.
 - When a session write fails, sc-agent MUST return a `log.session_write` error.
+- `sc_agent.send` MUST require a `run_id` argument.
+- `sc_agent.send_batch` MUST require a `run_id` argument.
+- `decidr send` MUST mint one ULID `run_id` per command run and pass it to every query of that run.
+- When `run_id` is not a ULID, sc-agent MUST return an error value and send nothing.
+- For every query it writes a session row for, sc-agent MUST append one link record to the run log with that query's `run_id`, that row's `session_id` and `cached: false`.
+- For every cache hit (REQ-SAG-0703), sc-agent MUST append one link record to the run log with that query's `run_id`, the matching row's `session_id` and `cached: true`.
+- Link records MUST be written in Rust through the session sink.
 
 **MUST NOT statements:**
 
 - sc-agent MUST NOT offer any setting, argument or environment variable that turns session logging off.
 - A cache hit MUST NOT write a session row.
+- A session row MUST NOT carry `run_id`.
+- sc-agent MUST NOT rotate, prune or delete a run log.
 - A session row MUST NOT carry a start time or an end time; its `session_id` ULID carries the time.
 - sc-agent MUST NOT truncate a request to make its session event fit.
 
 ### Rationale
 
-Directory separation lets tools select a repository, role or project with a path glob without opening files. Every Jev query from every tool lands in the session log, so tool records reference a row by `session_id` instead of copying the query or the response.
+Directory separation lets tools select a repository, role or project with a path glob without opening files. Every Jev query from every tool lands in the session log, so tool records reference a row by `session_id` instead of copying the query or the response. Runs and sessions are many-to-many: one run uses many sessions, and through cache hits one session serves many runs, so the session row cannot hold the run. The run log holds the link; the link with `cached: false` names the run that created the session.
 
-Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: the session log is written through sc-observability, which accepts events up to 1 MiB; the row carries the model, provider and token usage; the ULID carries the time.
+Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: the session log is written through sc-observability, which accepts events up to 1 MiB; the row carries the model, provider and token usage; the ULID carries the time. Round 3: the session row carries no `run_id`; `send` and `send_batch` take the caller's `run_id`, and sc-agent appends `{run_id, session_id, cached}` to `runs.jsonl` beside `sessions.jsonl`, written the same way and never rotated, on a cache miss and on a cache hit.
 
 ### Success Criteria
 
@@ -57,6 +66,10 @@ Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trai
 - [ ] A loopback response that reports no token usage gives a row whose `usage` is null.
 - [ ] A request whose session event is just under 1 MiB is written whole; a request whose session event is over 1 MiB returns `log.session_write` and adds no row.
 - [ ] A cache hit (REQ-SAG-0703) adds no row.
+- [ ] A `send_batch` of 3 requests with `run_id` R against the loopback runner adds 3 link records to `runs.jsonl` in the same session directory, each with `run_id` R, its row's `session_id` and `cached: false`, and none of the 3 session rows has a `run_id` field.
+- [ ] A cache hit with `run_id` R2 adds one link record with `run_id` R2, the matching row's `session_id` and `cached: true`.
+- [ ] A `send` with `run_id` `not-a-ulid` returns an error value and adds no session row and no link record.
+- [ ] After the run log grows past the sc-observability rotation size, the next link record is appended to the same `runs.jsonl`, and no rotated copy of it exists.
 
 ### Dependencies
 

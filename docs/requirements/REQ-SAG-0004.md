@@ -1,7 +1,7 @@
 # Requirement: Session log identity: repo, agent role, project and tool
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -27,6 +27,9 @@ Definitions: `repo` identifies the repository a session ran in. `project` is a c
 - The `decidr` CLI MUST set `tool` to `decidr` and `tool_version` to its own version.
 - A generated consumer client MUST set `tool` to the consumer's product name and `tool_version` to the consumer's released version.
 - `tool` and `tool_version` MUST be accepted from the caller through the PyO3 bindings.
+- `tool` MUST be required on every `send` and `send_batch` call, including calls that end in a cache hit.
+- `tool_version` MUST be required on every `send` and `send_batch` call, including calls that end in a cache hit.
+- When `tool` or `tool_version` is missing, sc-agent MUST return an error.
 - `repo` MUST be the repository's git `origin` URL normalized to `<host>/<owner>/<repo>`.
 - `repo` MUST have no scheme.
 - `repo` MUST have no `.git` suffix.
@@ -54,6 +57,8 @@ Definitions: `repo` identifies the repository a session ran in. `project` is a c
 
 Session logs are separated and analysed by repository, by type of work and by project or phase, and each row traces back to the tool and version that sent it, and later synced to a server where repositories from many machines and owners meet.
 
+Lead ruling (2026-11-24, round 3), recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: `tool` and `tool_version` are required on every send; `decidr` sets `tool` to `decidr`.
+
 ### Success Criteria
 
 **Acceptance Criteria:**
@@ -63,6 +68,7 @@ Session logs are separated and analysed by repository, by type of work and by pr
 - [ ] A CLI call and a PyO3 call with the same `project` and `agent_role` write rows with the same values in those fields.
 - [ ] A `project` of `Phase B` is rejected with an error and no row is written.
 - [ ] A request with no `agent_role` is rejected with an error and no row is written.
+- [ ] A PyO3 `send` with no `tool`, and one with no `tool_version`, each returns an error, makes no model call and writes no row.
 - [ ] Every session written by the plan-anchor generated client carries `agent_role` `plan-anchor`, and every session written by the judge-jev generated client carries `agent_role` `judge-jev`.
 - [ ] A `decidr send` row carries `tool` `decidr` and the CLI's version; a row written by the judge-jev generated client carries `tool` `judge-jev` and judge-jev's released version.
 

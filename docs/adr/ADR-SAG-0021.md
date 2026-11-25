@@ -1,7 +1,7 @@
 # Decision: One sc-observability Logger per process, owned by the entry point; general logs and session logs in separate trees
 
 **Status:** Approved  
-**Version:** 0.5.0  
+**Version:** 0.6.0  
 **Created:** 2026-11-18  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -55,12 +55,12 @@ There is one Python wheel. A Python process that loads sc-agent has one copy of 
 
 **Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged, so with nothing configured every log lands under `~/.sc-agent/` for a full audit. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.
 
-**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its own internal sc-observability session Logger, whose sink appends to the session file at the path below. That sink never rotates or prunes the file. Callers inject no session Logger and cannot replace its sink.
+**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its own internal sc-observability session Logger, whose sink appends to the session file at the path below. That sink never rotates or prunes the file. The same sink appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Callers inject no session Logger and cannot replace its sink.
 
 **Paths.** The log root is `~/.sc-agent` and is not a configuration setting. One function returns a CLI's log root: its `<CLI>_LOG_ROOT` environment override when set (used by tests), else `~/.sc-agent`. The CLIs and the wheel call that function; nothing else computes a log path.
 
 - A general log is `~/.sc-agent/logs/<name>.log.jsonl`, the path sc-observability 1.5.0 writes for a Logger of that name.
-- Session logs are `~/.sc-agent/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`. `sessions/` sits beside `logs/` and holds nothing but session logs.
+- Session logs are `~/.sc-agent/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`, and each one's run log is `runs.jsonl` in the same directory. `sessions/` sits beside `logs/` and holds nothing but session logs and run logs.
 
 | Entry point | General log | Session logs |
 |---|---|---|
@@ -92,6 +92,8 @@ The entry point is the only code that knows the process's lifetime, so it is the
 Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "I was planning to bring the sitr wheel back once we get mvp working."
 
 Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: the session log is written in Rust through sc-observability, which accepts events up to 1 MiB; the session log is never rotated or pruned.
+
+Owner ruling (2026-11-24, round 3), Rand Lee, recorded in the same design doc: the session row carries no `run_id`; `send` and `send_batch` take the caller's `run_id`, and sc-agent appends `{run_id, session_id, cached}` to `runs.jsonl` beside `sessions.jsonl`, written the same way and never rotated, on a cache miss and on a cache hit.
 
 ### Consequences
 

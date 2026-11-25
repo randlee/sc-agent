@@ -1,7 +1,7 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
 **Status:** Approved  
-**Version:** 0.8.0  
+**Version:** 0.9.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -29,7 +29,7 @@ Definitions:
 - The error mapping is the consumer module's code that reads an error value's `category` and maps that category to a consumer code through a category-to-code map the consumer passes in.
 - The sitr section is the part of the consumer module that runs tree-sitter extraction; its output is passed into the consumer's prompt authoring.
 - Consumer logic is prompt authoring and the processing of results and decision trees. It stays in the consumer.
-- The shared consumer code is what the wheel does not support and both consumers share: fixture loading and coverage, batch settings and ids, result-line encoding, attempt counting and the remote-judge consent gate.
+- The shared consumer code is what the wheel does not support and both consumers share: fixture loading and coverage, batch settings and ids, result-line encoding and the remote-judge consent gate.
 - An extension point is a template variable or a named block of the consumer template. Consumer-specific values reach the consumer module only through extension points, so later consumers can use the same template.
 - The wheel README is `crates/sc-agent-py/README.md`.
 - A decision call is a call to `send` or `send_batch`.
@@ -46,6 +46,11 @@ Definitions:
 - A dry run is a consumer command run that composes its requests without sending them.
 - The session lookup helper is the consumer template function that reads a session row by its `session_id`.
 - An intentional resend is a send of a request identical to one already sent, made on purpose: a repeat, a stability or variance check, or a near-threshold re-ask.
+- The run log and its link records are defined in REQ-SAG-0005.
+- A provider key is one of the environment variables `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and `OPENROUTER_API_KEY`.
+- The secret redaction is the consumer template's code that replaces a provider key's value with a placeholder before text is logged, written or shown.
+- A tool is a consumer whose module is rendered from the consumer template.
+- The loopback provider stub is a test HTTP server on the loopback interface that answers as a provider.
 
 **MUST statements:**
 
@@ -71,16 +76,20 @@ Definitions:
 - The wheel README MUST give the consumer template's render command.
 - The consumer module MUST mint `run_id` once per run, before the run's first decision call.
 - Every result line of a run MUST carry that run's `run_id`.
+- Every decision call in the consumer module MUST pass the run's `run_id`.
 - The consumer template MUST write every result line with the schema tag `jev-batch-result/2`.
 - A result line MUST carry the generic result fields.
 - A result line's `session_id` MUST be the `session_id` its send returned, or null when the send returned none.
 - Every tool record derived from a query MUST carry the run's `run_id` and that query's `session_id`.
 - The consumer template MUST provide the session lookup helper.
-- The consumer module MUST find a run's queries through the `session_id`s in that run's result lines and tool records.
+- The consumer module MUST find a run's queries through the run log's link records for that `run_id`, or through the `session_id`s in that run's result lines and tool records.
 - The consumer module MUST pass the caller's `cache` argument (REQ-SAG-0703) to every decision call.
 - An intentional resend MUST pass `cache=False`.
 - A dry run MUST check that its input and arguments compose into a valid request.
 - A dry run MUST show each request it would send on stdout, or in the file named by `--out`.
+- Every tool MUST complete a decision call with `--model haiku` when `TYPESAFE_API_KEY` is absent and the provider key of a provider that serves `haiku` is present.
+- Every tool MUST complete a decision call with `--model luna` when `TYPESAFE_API_KEY` is absent and the provider key of a provider that serves `luna` is present.
+- The secret redaction MUST cover the value of every provider key.
 
 **MUST NOT statements:**
 
@@ -95,6 +104,9 @@ Definitions:
 - A dry run MUST NOT write a session row.
 - A dry run MUST NOT write a result line.
 - A dry run MUST NOT write a run record or a tool record.
+- A dry run MUST NOT write a link record.
+- A tool MUST NOT require `TYPESAFE_API_KEY` for a `haiku` or `luna` decision call.
+- A test of this requirement MUST NOT use a real provider key, read the platform keyring or set `HOME`.
 
 ### Rationale
 
@@ -108,7 +120,11 @@ Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess contr
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
-Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: a tool references `session_id` and never copies the request or the response; the shared result line holds generic fields only and tool ids live in tool records; `run_id` is a ULID minted once per run; a dry run writes nothing as if it were real. A `session_id` is known only after the send returns, and a cache hit returns an older one, so the result line and the tool records hold the link from a run to its queries.
+Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: a tool references `session_id` and never copies the request or the response; the shared result line holds generic fields only and tool ids live in tool records; `run_id` is a ULID minted once per run; a dry run writes nothing as if it were real. A `session_id` is known only after the send returns, and a cache hit returns an older one.
+
+Owner rulings (2026-11-24, round 3), Rand Lee, recorded in the same design doc: the session row carries no `run_id`; the template passes `run_id` to every send, and sc-agent appends a `{run_id, session_id, cached}` link record to `runs.jsonl` on a cache miss and on a cache hit, so the run log plus the tool records hold the link from a run to its queries. Every tool built on sc-agent works with `--model haiku` and `--model luna`, including when no `TYPESAFE_API_KEY` is set, and secret redaction covers every provider key. Resuming a haiku or luna session to ask follow-up "why" questions is future work, GitHub issue randlee/sc-agent#428, and is not required here.
+
+Lead ruling (2026-11-24, round 3): attempt counting is removed from the shared consumer code; `attempts` is session data, read from the session row.
 
 ### Success Criteria
 
@@ -129,7 +145,11 @@ Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trai
 - [ ] Two runs of the same command carry different `run_id`s.
 - [ ] With the cache on, a second identical run writes result lines whose `session_id`s equal the first run's, under the second run's `run_id`, and the session log gains no row.
 - [ ] A rendered module's call with `cache=False` adds a new session row for an identical request.
-- [ ] A rendered module's dry run prints the would-send requests, writes no result line and adds no session row.
+- [ ] A rendered module's dry run prints the would-send requests, writes no result line and adds no session row or link record.
+- [ ] A rendered module's batch of 3 queries under `run_id` R adds 3 link records with `run_id` R to the run log, and their `session_id`s equal the 3 result lines' `session_id`s.
+- [ ] With `TYPESAFE_API_KEY` unset and only `ANTHROPIC_API_KEY` set to a dummy value, each rendered module's `--model haiku` call completes against the loopback provider stub.
+- [ ] With `TYPESAFE_API_KEY` unset and only `OPENAI_API_KEY` set to a dummy value, each rendered module's `--model luna` call completes against the loopback provider stub.
+- [ ] With each provider key set to a distinct dummy value, a rendered module's general log, result lines and stdout contain none of those values.
 
 ### Dependencies
 
