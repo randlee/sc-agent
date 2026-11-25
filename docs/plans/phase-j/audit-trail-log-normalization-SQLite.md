@@ -16,7 +16,7 @@ The work is three phases. Each is meant to be small.
 
 | Phase | Intent | Sprints (beads) |
 | --- | --- | --- |
-| j | Fix the existing logs in place, and clean up the calling interface first so later sprints build on it. Phase 1 below, plus what the owner added on 2026-11-24: the result cache, run links, the `Run` context, decider and Nous, config model rows. | j-1 call structs: the `Run`, provider tables and resolution, one send path → j-2 session log and j-3 client template, in parallel → j-4 plan-anchor and j-5 judge-jev, in parallel |
+| j | Fix the existing logs in place, and clean up the calling interface first so later sprints build on it. Phase 1 below, plus what the owner added on 2026-11-24: the result cache, run links, the `Run` context, decider and Nous, config model rows. | j-1 call structs, split by crate (D40): `sc-agent` first, then `sc-agent-py` and `decidr` → j-2 session log and j-3 client template, in parallel → j-4 plan-anchor and j-5 judge-jev, in parallel |
 | k | Give every tool the same record shapes while the logs are still JSONL. Phase 2 below. | k-1 shared audit contract → k-2 run events and typed answers, k-3 one client logger and linked tree traversal → k-4 judge-jev, k-5 plan-anchor |
 | l | Per-repo SQLite, extension tables, reports. Phase 3 below. | l-1 SQLite store and schema contract → l-2 dual-write, l-3 audit client and runs report → l-4 judge-jev, l-5 plan-anchor → l-6 skills explain schema upgrades |
 
@@ -89,6 +89,7 @@ Owner decisions, 2026-11-24, from the design review and the phase-j planning ses
 - **D37.** Python results are typed, not dicts.
 - **D38.** Phases j, k and l are meant to be complete in a few hours. That only happens if nothing is over-specified and the line limits stay tight.
 - **D39.** NFR-SAG-0005 ("Values passed together are one Rust struct") is not a record. D21 is carried in the sprint beads.
+- **D40.** j-1 is split by crate. The clean-up adds nothing that was not simply skipped before, and it is a net delete.
 
 ## Open items for the owner
 
