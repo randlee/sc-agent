@@ -1,7 +1,7 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
 **Status:** Approved  
-**Version:** 1.1.0  
+**Version:** 1.2.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -38,7 +38,7 @@ Definitions:
 - A decision call is a call to `send` or `send_batch` of a Run.
 - A covered release is an sc-agent release of version 0.2.0 or later.
 - The permitted API is the public API, the Python standard library, and the consumer's own modules named through an extension point (such as the consent settings module).
-- A model value is the typed result of resolving a model selector once (ADR-SAG-0019 decision 13): the Run's default model, or a per-call override obtained with `run.model(selector)`. It carries the alias, the model id and the provider.
+- A model value is the typed result of resolving a model selector once (ADR-SAG-0019 decision 13): the Run's model (`run.model`), one per Run. It carries the alias, the model id and the provider.
 - PyPI is the Python Package Index, pypi.org.
 - A run is one execution of one consumer command. A run may send many queries: a batch (an array of queries, each giving one result line) or a decision tree (many queries with consumer processing between them).
 - `run_id` is the ULID that identifies one run.
@@ -61,7 +61,7 @@ Definitions:
 
 - The consumer template MUST ship in the sc-decidr wheel as package data.
 - The consumer module MUST make every decision call through a Run.
-- The consumer module MUST pass the model selector through unchanged to the Run or to `run.model`.
+- The consumer module MUST pass the model selector it receives from its caller through unchanged to the Run.
 - Every decision call in the consumer module MUST pass the session tags.
 - The consumer module MUST contain the logging wiring.
 - The consumer module MUST contain the error mapping.
@@ -100,6 +100,7 @@ Definitions:
 
 **MUST NOT statements:**
 
+- The consumer module MUST NOT name a model in code; the caller chooses the model.
 - The consumer module MUST NOT contain consumer logic.
 - The consumer module MUST NOT choose a provider.
 - The consumer template MUST NOT contain a copy.

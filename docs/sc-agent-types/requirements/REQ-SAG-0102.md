@@ -1,7 +1,7 @@
 # Requirement: Model catalog: static provider tables
 
 **Status:** Approved  
-**Version:** 0.4.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-09  
 **Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
@@ -18,16 +18,15 @@ Definitions: The model catalog is the provider table and the model table built i
 
 **MUST statements:**
 
-- Within one provider, a short name MUST resolve to that provider's row with that short name and the latest release date.
+- The model table MUST be sorted by release date, newest first; rows that share a release date keep their table order.
 - When a model entry names a provider for an alias, the alias MUST resolve to that provider, with the entry's `id` when set.
-- Otherwise, when a keyless provider serves the short name, the short name MUST resolve to the first such provider in provider-table order.
-- Otherwise, sc-agent MUST take the credential sources in order and resolve the short name to the first provider, in provider-table order, whose credential the first source holding any serving provider's credential holds.
+- Otherwise, a short name MUST resolve to the first row, in model-table order, that has that short name and whose provider is keyless or has its credential in one of the credential sources.
 - A credential source that fails to read MUST count as not holding that credential.
 - When no provider qualifies and a keyring read failed during resolution, resolution MUST return the keyring's error value.
 - Otherwise, when no provider qualifies, resolution MUST return the error value `secrets.key_missing`, with category `auth`, naming every candidate's credential-variable name.
 - Every model row, local endpoints included, MUST carry a fixed model id.
 - The `nous` provider MUST serve `haiku` as `anthropic/claude-haiku-5.5` and `luna` as `openai/gpt-6-luna`.
-- A model selector MUST be resolved once, at the CLI flag, at Run creation or at a per-call override, and the resolved model MUST be what the send, the cache key and the session row use.
+- A model selector MUST be resolved once, at the CLI flag or at Run creation, and the resolved model MUST be what the send, the cache key and the session row use.
 - A full model id MUST select its row exactly.
 - Each built-in model MUST carry the model's published release date.
 
@@ -46,16 +45,20 @@ Owner ruling 2026-11-24 (plan review, ADR-SAG-0003): a provider is an endpoint, 
 
 Owner ruling 2026-11-24 (supersedes the optional or configured local model id and the omitted `model` above): laya and decider have fixed model ids in the model table, like every other model. laya requires `laya:en`. decider has two rows, `decider-2b-v11` (port 18000) and `decider-4b-v2.1` (port 18001), both released 2026-09-24, and `decider` resolves by the same rule as `haiku`. The decider servers accept and ignore `model`, so every request carries the resolved id. Cache keys always use the resolved fixed id.
 
-Lead ruling 2026-11-24, pending owner confirmation: the resolution rule (a model entry wins, else the first provider whose credential resolves), and a credential source read error counts as not held. The alternative under owner review is provider-major: the first serving provider in table order that is keyless or whose credential resolves.
+Owner ruling 2026-11-24 (plan review), on resolving a short name to the first row in table order whose provider is keyless or holds a credential: "that is fine as long as the table is sorted (newest-oldest) and verified to be sorted in unit test." A credential source read error counts as not held.
+
+Lead ruling 2026-11-24, pending owner confirmation: the two decider rows share a release date, so `decider` resolves to the row listed first, `decider-4b-v2.1`.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
+- [ ] A unit test verifies that the model table is sorted by release date, newest first.
 - [ ] When two rows of one provider share a short name, the short name resolves to the row with the later release date.
 - [ ] With only `ANTHROPIC_API_KEY` in the environment, `haiku` resolves to `anthropic`; with only `NOUS_API_KEY`, `haiku` resolves to `nous` with id `anthropic/claude-haiku-5.5` and `luna` to `nous` with id `openai/gpt-6-luna`, even though the nous rows tie with the first-table rows on release date.
 - [ ] With `ANTHROPIC_API_KEY` in the environment and `models.haiku.provider` set to `openrouter`, `haiku` resolves to `openrouter`.
-- [ ] With a key in the environment for a later provider and a key in `.env` for an earlier one, the environment's provider wins and the keyring is not read.
+- [ ] With keys for two providers that serve `haiku`, the provider of the earlier row in table order wins wherever each key is held.
+- [ ] With both decider endpoints configured, `decider` resolves to the first decider row in table order.
 - [ ] With no credential for any provider that serves `haiku`, resolution returns `secrets.key_missing` with category `auth`, naming every candidate's credential-variable name.
 - [ ] A search of `crates/sc-agent/src` finds no comparison of a provider or model name with a string literal outside the model and provider tables.
 
