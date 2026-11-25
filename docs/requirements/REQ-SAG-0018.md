@@ -36,7 +36,7 @@ Definitions (how the template is built: ADR-SAG-0019 decision 1):
 
 **MUST statements:**
 
-- Every consumer MUST make its decision calls through a consumer module rendered from the consumer template.
+- Every consumer MUST make its decision calls inside a consumer module rendered from the consumer template.
 - A consumer-specific value MUST reach the consumer module only through an extension point.
 - Extension points MUST be the only template inputs that change the consumer module's code.
 - The consumer template MUST carry the shared consumer code.
