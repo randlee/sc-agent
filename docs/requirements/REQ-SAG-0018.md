@@ -1,9 +1,9 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
 **Status:** Approved  
-**Version:** 0.7.0  
+**Version:** 0.8.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-22  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -37,6 +37,15 @@ Definitions:
 - The permitted API is the public API, the Python standard library, and the consumer's own modules named through an extension point (such as the consent settings module).
 - `provider` is the keyword argument of `send` and `send_batch` that forces a provider instead of resolving it from the model selector.
 - PyPI is the Python Package Index, pypi.org.
+- A run is one execution of one consumer command. A run may send many queries: a batch (an array of queries, each giving one result line) or a decision tree (many queries with consumer processing between them).
+- `run_id` is the ULID that identifies one run.
+- The result line is the JSON object the consumer module writes for one query of a batch, with the schema tag `jev-batch-result/2`.
+- The generic result fields are `schema`, `tool`, `tool_version`, `run_id`, `session_id`, `request_id`, `project`, `agent_role`, `threshold`, `verdict`, `min_confidence`, `leaning`, `ok` and `error`.
+- The session data is what the session row holds: `request`, `raw_response`, `answers`, `model_answered`, `attempts`, `retry_count` and `sends`.
+- A tool record is a record a consumer writes for its own data, such as plan-anchor's `anchor_id` and `candidate_id` or judge-jev's record id.
+- A dry run is a consumer command run that composes its requests without sending them.
+- The session lookup helper is the consumer template function that reads a session row by its `session_id`.
+- An intentional resend is a send of a request identical to one already sent, made on purpose: a repeat, a stability or variance check, or a near-threshold re-ask.
 
 **MUST statements:**
 
@@ -60,12 +69,32 @@ Definitions:
 - The public API MUST stay documented in the wheel README.
 - The wheel README MUST name the consumer template.
 - The wheel README MUST give the consumer template's render command.
+- The consumer module MUST mint `run_id` once per run, before the run's first decision call.
+- Every result line of a run MUST carry that run's `run_id`.
+- The consumer template MUST write every result line with the schema tag `jev-batch-result/2`.
+- A result line MUST carry the generic result fields.
+- A result line's `session_id` MUST be the `session_id` its send returned, or null when the send returned none.
+- Every tool record derived from a query MUST carry the run's `run_id` and that query's `session_id`.
+- The consumer template MUST provide the session lookup helper.
+- The consumer module MUST find a run's queries through the `session_id`s in that run's result lines and tool records.
+- The consumer module MUST pass the caller's `cache` argument (REQ-SAG-0703) to every decision call.
+- An intentional resend MUST pass `cache=False`.
+- A dry run MUST check that its input and arguments compose into a valid request.
+- A dry run MUST show each request it would send on stdout, or in the file named by `--out`.
 
 **MUST NOT statements:**
 
 - The consumer module MUST NOT contain consumer logic.
 - The consumer module MUST NOT set `provider`.
 - The consumer module MUST NOT parse error message text.
+- A result line MUST NOT carry any field other than the generic result fields.
+- A result line MUST NOT carry session data.
+- A tool record MUST NOT carry session data.
+- The general log records of a consumer MUST NOT carry session data.
+- A record MUST NOT need a query's `session_id` before that query's send returns.
+- A dry run MUST NOT write a session row.
+- A dry run MUST NOT write a result line.
+- A dry run MUST NOT write a run record or a tool record.
 
 ### Rationale
 
@@ -78,6 +107,8 @@ Owner ruling (2026-11-21), Rand Lee: the shared template carries what the wheel 
 Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "No hand built checks." "Keyring is super basic." "always return descriminated unions w/ error info"
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
+Owner rulings (2026-11-24), Rand Lee, recorded in `docs/plans/phase-j/audit-trail-log-normalization-SQLite.md`: a tool references `session_id` and never copies the request or the response; the shared result line holds generic fields only and tool ids live in tool records; `run_id` is a ULID minted once per run; a dry run writes nothing as if it were real. A `session_id` is known only after the send returns, and a cache hit returns an older one, so the result line and the tool records hold the link from a run to its queries.
 
 ### Success Criteria
 
@@ -94,6 +125,11 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 - [ ] A `KeyboardInterrupt` during a rendered module's batch cancels the `Cancel` passed to its decision call.
 - [ ] Scanning both rendered modules finds only wheel references to the permitted API: `send`, `send_batch`, `digest`, `logger`, `log`, `flush`, `Cancel`, and `sc_agent.sitr`.
 - [ ] The README of `crates/sc-agent-py` names the template and its render command.
+- [ ] A rendered module's batch against the loopback runner writes one `jev-batch-result/2` line per query, each with exactly the generic result fields, one shared ULID `run_id`, and a `session_id` that the session lookup helper finds in the session log.
+- [ ] Two runs of the same command carry different `run_id`s.
+- [ ] With the cache on, a second identical run writes result lines whose `session_id`s equal the first run's, under the second run's `run_id`, and the session log gains no row.
+- [ ] A rendered module's call with `cache=False` adds a new session row for an identical request.
+- [ ] A rendered module's dry run prints the would-send requests, writes no result line and adds no session row.
 
 ### Dependencies
 
@@ -103,4 +139,5 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 - REQ-SAG-0016
 - REQ-SAG-0017
 - REQ-SAG-0702
+- REQ-SAG-0703
 - NFR-SAG-0003

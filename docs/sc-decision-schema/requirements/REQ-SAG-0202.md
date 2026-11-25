@@ -1,9 +1,9 @@
 # Requirement: Question digest computed by sc-sha
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -16,12 +16,13 @@
 
 Definitions: The information is everything sent to the decision model with a question, other than the questions themselves. A single question is one question of the request. The question digest is the SHA-256 digest of the information plus one single question. sc-sha is the SHA-256 library sc-agent uses.
 
-Decision-model caching is out of scope of this requirement and will be specified separately.
+The result cache is specified by REQ-SAG-0703. Its key is the hash of the full request text and the requested model, not the question digest.
 
 **MUST statements:**
 
 - For every question sent to a decision model, sc-agent MUST compute a question digest over 100% of the information sent plus that single question.
 - The question digest MUST be computed by sc-sha.
+- The question digest MUST stay a hash of content only, with no model id added.
 - The question digest MUST be recorded with that question's response, so the response can be retrieved by its digest.
 
 **MUST NOT statements:**
@@ -46,3 +47,4 @@ A response must be retrievable from the exact information and question that prod
 **Related:**
 
 - REQ-SAG-0004
+- REQ-SAG-0703

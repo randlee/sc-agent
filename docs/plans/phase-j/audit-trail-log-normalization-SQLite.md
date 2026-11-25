@@ -10,7 +10,7 @@ This design covers sc-agent (Rust core and the sc-decidr wheel's client template
 
 **Owner decisions this design rests on (2026-11-24):**
 
-- The session log is written in Rust through sc-observability, which accepts events up to 1 MiB.
+- The session log is written in Rust through sc-observability, which accepts events up to 1 MiB including the wrapper. The largest request that fits is recorded whole; a larger one gets no row and a `log.session_write` error. The session log is always on and cannot be turned off.
 - One SQLite database per repo, in WAL mode: several tools write at once. Cross-repo queries are rare and serve tool evaluation only.
 - Records are append-only and immutable; they change only during a schema upgrade or similar maintenance.
 - Fully typed tables, with JSON columns for extension.
@@ -18,8 +18,8 @@ This design covers sc-agent (Rust core and the sc-decidr wheel's client template
 - The general log stays JSONL for now.
 - Every tool logs each run's start and end: session id, model, mode; the end shows pass or fail with an error code and the elapsed time.
 - `run_id` is a ULID everywhere. The ULID carries the time, so the session row needs no start or end time.
-- A batch result references its `session_id` and does not repeat the session's data. `anchor_id` becomes `subject_id`.
-- Any cache keyed on a question's sha256 also keys on the model: jev, haiku and decider answer differently.
+- A batch result references its `session_id` and does not repeat the session's data. The shared result line holds generic fields only; tool-specific ids (plan-anchor `anchor_id` and `candidate_id`, judge-jev's record id) live in each tool's own records, which reference `session_id`. There is no `subject_id`.
+- The result cache keys on the sha256 of the full request text sent to Jev and the requested model: jev, haiku and decider answer differently. The per-question `digest` stays a content-only hash (1.4).
 - Tree walks are linked records, designed for arbitrary decision trees, at least when the tree is injected into the client.
 - Extension tables can be added after release, and a tool may own several.
 - Schema versions: sc-agent's core schema uses major versions; a tool's extension schema uses minor versions on top of the core major it builds on. A shared schema toolset (rules, checks, tests) keeps the tools consistent.
@@ -85,25 +85,31 @@ Phase 1 fixes the existing logs in place, with no new storage: stale docs, the s
 
 - Replace the hand-written append in `send` (`SESSION_APPEND` mutex, `std::fs::OpenOptions`, lib.rs \~1160–1190) with an sc-observability Logger that writes the session file.
 - Path and behavior stay as REQ-SAG-0003/0005 state: `<log_root>/sessions/<repo-id>/<agent_role>/<project>/sessions.jsonl`, never rotated or pruned, appended by every process.
+- The session log is always on; no setting turns it off. One query gives one row. A session event is at most 1 MiB including the wrapper: a request that fits is recorded whole, and a larger one gets no row and a `log.session_write` error. A cache hit (1.4) writes no row.
 - Phase A's sprint a-8 already designed this: a session Logger with a registered `JsonlFileSink` that never rotates. The first step of the sprint confirms that sc-observability 1.5.0's public API supports a non-rotating sink at a caller-chosen path. If it does not, that change lands in sc-observability first.
-- Records: amend ADR-SAG-0021 (remove "Session rows are appended directly…; no session Logger is injected") and add the sc-observability rule to REQ-SAG-0003.
+- Records: amend ADR-SAG-0021 (remove "Session rows are appended directly…; no session Logger is injected"), add the sc-observability rule to REQ-SAG-0003 and REQ-SAG-0008, and the row and size rules to REQ-SAG-0005.
 
 ### 1.3 Model and provider in the session row (sc-agent)
 
-- Add `model_requested`, `provider` and `model_answered` to the row.
-- Keep the provider's token usage instead of discarding it in `fn response` for the `messages` and `chat/completions` wires: add `usage` with input and output tokens as the provider reports them.
+- Add the schema tag `sc-agent-session/2`, `model_requested`, `provider` and `model_answered` to the row.
+- Add `tool` and `tool_version` (the client name, or `decidr`), so every row traces back to the tool that sent it (REQ-SAG-0004).
+- Keep the provider's token usage instead of discarding it in `fn response` for the `messages` and `chat/completions` wires: add `usage` with `input_tokens` and `output_tokens` as the provider reports them, null when it reports none.
 - No start or end time: the `session_id` ULID carries the time.
 
-### 1.4 Cache key includes the model (sc-agent)
+### 1.4 Result cache keyed on the full request and the model (sc-agent)
 
 - The per-question sha256 (`digest`, public) stays a hash of content only, so the same question can be compared across models.
-- A cache hit requires both the sha256 and `model_answered` to match. Document this on `digest` and in the requirement that exposes it. Phase 3 indexes `(question_sha256, model_answered)`.
+- The result cache is the owner's design in the rulings below, specified by REQ-SAG-0703: a flag, default on, as a config key and a per-call `cache=` argument on `send` and `send_batch` (per job in a batch).
+- Before each model call, a row in the same session log (same repo, `agent_role`, `project`) with the same sha256 of the full request text and the same requested model is a hit. `model_answered` is not known before the call, so it is not part of the key.
+- A hit returns that row's result with `cached: true` and that row's `session_id`, makes no API call and writes no row. Batches are decided per item.
+- Callers that resend an identical request on purpose (repeats, stability or variance checks, near-threshold re-asks) pass `cache=False`.
 
 ### 1.5 One meaning for run\_id (client template + both tools)
 
 - `run_id` = a ULID minted once per tool run.
 - `session_id` = the ULID of one query (unchanged).
 - `request_id` = the consumer's deterministic key for a batch line (unchanged).
+- A run is a batch (one result line per query) or a decision tree (many queries with tool processing between them). Its result and step records carry `run_id` and `session_id`; they are the link from a run to its queries (2.2).
 - judge-jev: `run_id` is no longer `sha256(request_id)[:16]`. `--run-name` stays as a human label carried beside the ULID.
 - plan-anchor: `run_id` is no longer `<gate>-<stamp>-<item>`. The run file is named `<run_id>.json` until Phase 3 moves it. Check `change_report.py` and `coverage` for any reliance on the old name's order or parts.
 
@@ -111,7 +117,10 @@ Phase 1 fixes the existing logs in place, with no new storage: stale docs, the s
 
 - `jev-batch-result/2` replaces `/1`.
 - It carries `session_id` at top level and drops what the session row already holds: `request`, `raw_response`, `answers`, `model_answered`, `sends`, `attempts`, `retry_count`.
-- It keeps the consumer's interpretation: `run_id`, `request_id`, `item_id`, `subject_id` (was `anchor_id`), `candidate_id`, `repeat`, `roles`, `kind`, `threshold`, `verdict`, `min_confidence`, `leaning`, `ok`, `error`.
+- It holds generic fields only: `schema`, `tool`, `tool_version`, `run_id`, `session_id`, `request_id`, `project`, `agent_role`, `threshold`, `verdict`, `min_confidence`, `leaning`, `ok`, `error`.
+- Tool-specific fields (plan-anchor `item_id`, `anchor_id`, `candidate_id`, `repeat`, `roles`, `kind`; judge-jev's record id) move to each tool's own records, keyed by `run_id` and `request_id` and referencing `session_id`. No tool copies the request, raw response, answers, `model_answered`, attempts or sends into its records or its general log.
+- `session_id` is known only when the send returns; no record needs it earlier.
+- A dry run only checks that the input and arguments compose into a valid request and shows the would-send request (stdout or `--out`). It writes no session row, no result line, no general-log result event and no run or result record; `dry_run` leaves the result line.
 - `result_line` in `decidr_client.py.j2` is the one place this changes. Each tool's `jev-batch-result.schema.json` follows.
 - Readers that use the dropped fields read them from the session row by `session_id`. A helper for that lookup belongs in the client template, so the two tools don't each write one. Known readers: judge-jev jev\_runs.py (answers, \~234/249); plan-anchor anchor\_tuning\_contract.py (raw\_response, \~197) and the tournament in jev\_judge.py (answers vs raw\_response \~4259, raw\_response\_sha256 evidence \~4287).
 
@@ -139,7 +148,7 @@ No timestamp field: the general-log event already has one, and the ULIDs order e
 - Rust gains `run_start` and `run_end` in sc-agent.
 - `run_start(tool, mode, model, project, agent_role)` returns a ULID `run_id` and writes a `run.start` general-log event. `mode` is the tool's subcommand or flow (`batch`, `quality`, `tournament`, `judge`, …).
 - `run_end(run_id, outcome)` writes `run.end`: `ok`, the error code when not ok, `elapsed_ms`.
-- Every `send` / `send_batch` takes `run_id`, and the session row carries it. That link is how a run finds its sessions; the run records do not repeat session data.
+- Every `send` / `send_batch` takes `run_id`, and the session row carries the `run_id` of the run that created it. A run does not find its sessions through that field: a cache hit returns an older row created by another run. The run's result lines and walk steps, each carrying `run_id` and `session_id`, are the link; the run records do not repeat session data.
 - The client template wraps this as one call: `with client.run(mode=…, model=…) as run:`. A run that raises or is cancelled still writes `run.end` with its error code (`CANCELED` included).
 - judge-jev and plan-anchor call it once per subcommand that sends to a model.
 
@@ -161,7 +170,7 @@ Rust builds these from the same per-kind structs it uses for the TypeSafe API (o
 
 Tree-walk events move from judge-jev's `jev_judge.py` into the client template, so any tool walking any injected tree writes the same records:
 
-- `walk.start`: `walk_id` (ULID), `run_id`, `tree_id`, `tree_sha256`, `subject_id`.
+- `walk.start`: `walk_id` (ULID), `run_id`, `tree_id`, `tree_sha256`. The tool's own record links the walk to what it judged (judge-jev's record id).
 - `walk.step`, one per node visited: `walk_id`, `seq`, `prev_seq`, `node_id`, the `session_id`s it sent (one per statement in a per-statement wave), `matched_rule`, `next_node`, and `verdict` when the walk ends there.
 - `walk.end`: `walk_id`, `verdict`, `rule_rank`, the node path.
 
@@ -170,7 +179,7 @@ The tree itself is stored once per `tree_sha256` (Phase 3), so a step names its 
 ### 2.5 Same records from both tools
 
 - plan-anchor logs its batch results to its general log as judge-jev does, through one template function (`log_result_line` moves into `decidr_client.py.j2`).
-- plan-anchor's `tournament-<run>.jsonl` and run files stay where they are until Phase 3 moves them.
+- plan-anchor's `tournament-<run>.jsonl` and run files stay where they are until Phase 3 moves them. Their `results[]` drop `answers`, `model_answered` and `attempts` and reference `session_id` (j-3).
 - judge-jev's `compare` and `drift` events and plan-anchor's run summary use the 2.1 header.
 
 ## Phase 3: per-repo SQLite
@@ -193,16 +202,16 @@ Each repo gets one append-only database, `~/.sc-agent/sessions/<repo-id>/audit.s
 | `schema_versions` | `(owner, major, minor)` | `ddl_sha256`, `applied_ulid` | Schema versioning |
 | `run_starts` | `run_id` | `tool`, `tool_version`, `mode`, `model`, `project`, `agent_role` | 2.2 |
 | `run_ends` | `run_id` → `run_starts` | `ok`, `error_code`, `elapsed_ms` | 2.2 |
-| `sessions` | `session_id` | `run_id`, `project`, `agent_role`, `model_requested`, `provider`, `model_answered`, `ok`, `error_id`, `error_category`, `error_message`, `attempts`, `usage_input_tokens`, `usage_output_tokens`, `request` (JSON) | 1.3, 2.3 |
-| `session_questions` | `(session_id, question_id)` | `kind`, `question_sha256`, `model_answered` | cache index `(question_sha256, model_answered)` |
+| `sessions` | `session_id` | `run_id`, `tool`, `tool_version`, `request_sha256`, `project`, `agent_role`, `model_requested`, `provider`, `model_answered`, `ok`, `error_id`, `error_category`, `error_message`, `attempts`, `usage_input_tokens`, `usage_output_tokens`, `request` (JSON) | 1.3, 2.3 |
+| `session_questions` | `(session_id, question_id)` | `kind`, `question_sha256`, `model_answered` | per-question comparison across models |
 | `session_answers` | `(session_id, question_id)` | `kind`, `noul`, `choice`, `confidence`, `score`, `top`, `bottom`, `left`, `right`, `probabilities` (JSON), `legend` (JSON) | 2.3; one CHECK per kind |
-| `batch_results` | `(run_id, request_id)` | `session_id`, `item_id`, `subject_id`, `candidate_id`, `repeat`, `roles` (JSON), `kind`, `threshold`, `verdict`, `min_confidence`, `leaning`, `ok`, `error_code` | 1.6 |
+| `batch_results` | `(run_id, request_id)` | `session_id`, `tool`, `tool_version`, `project`, `agent_role`, `threshold`, `verdict`, `min_confidence`, `leaning`, `ok`, `error_code` | 1.6 |
 | `trees` | `tree_sha256` | `tree_id`, `kind`, `definition` (JSON or text, as given) | 2.4 |
-| `walks` | `walk_id` | `run_id`, `tree_sha256`, `subject_id`, `verdict`, `rule_rank` | 2.4 |
+| `walks` | `walk_id` | `run_id`, `tree_sha256`, `verdict`, `rule_rank` | 2.4 |
 | `walk_steps` | `(walk_id, seq)` | `prev_seq`, `node_id`, `matched_rule`, `next_node`, `verdict` | 2.4 |
 | `step_sessions` | `(walk_id, seq, session_id)` | `statement_index` | 2.4 |
 
-- `session_questions` copies `model_answered` from its session so the cache lookup is one indexed read. The copy is safe because rows never change.
+- The result cache (1.4) is one indexed read on `sessions (request_sha256, model_requested)`. `session_questions` copies `model_answered` from its session for per-question comparison; the copy is safe because rows never change.
 - Every core table has an `ext` JSON column, null by default, for data a minor version has not yet given a typed column.
 - `batch_results`, the tree tables and the run tables are core because the client template writes them for every tool.
 
@@ -211,6 +220,8 @@ Each repo gets one append-only database, `~/.sc-agent/sessions/<repo-id>/audit.s
 - A tool registers its tables under its own prefix, `<tool>__<name>`, so a tool can own any number of them. A tool never alters a core table or another tool's.
 - Extension rows carry the 2.1 header as columns (`run_id`, `session_id` when tied to one query) with foreign keys into the core tables, plus typed columns and an `ext` JSON column.
 - Tools can add extensions after release: a new tool version ships its migrations and the database applies them the next time that tool opens it (see Schema versioning).
+
+Tool-specific fields of a batch line (plan-anchor `item_id`, `anchor_id`, `candidate_id`, `repeat`, `roles`, `kind`; judge-jev's record id) go in a tool table keyed by `(run_id, request_id)` that references `session_id`.
 
 First extensions, one table per record type in Current state:
 
@@ -304,16 +315,26 @@ The work is 13 sprints in phase order. The REQ/ADR changes land on develop befor
 
 ### Record changes
 
-| Record | Change | Sprint |
-| --- | --- | --- |
-| ADR-SAG-0021 | Session rows go through an sc-observability Logger; add run start/end and the ULID `run_id`; drop "appended directly" | S2, S4 |
-| REQ-SAG-0003 | The session log is written in Rust through sc-observability | S2 |
-| REQ-SAG-0005 | Session row fields: model, provider, usage, `run_id`, typed answers; later the database path | S2, S5, S8 |
-| REQ-SAG-0018 | Template: run context, `jev-batch-result/2`, session lookup helper, tree-walk records, `audit.insert` | S3, S4, S6, S9 |
-| new ADR | Per-repo audit database: location, WAL, immutability, Rust as the one writer | S7 |
-| new ADR | Schema versioning: core major, tool minor, open-time checks | S7 |
-| new REQ | Each report is rendered by sc-compose from the database | S13 |
-| plan-anchor README, references | `anchor-runs/` replaced by the database | S11 |
+Phase j runs the Phase 1 records as sprints j-1 (sc-agent), j-2 (client template), j-3 (plan-anchor) and j-4 (judge-jev). `docs/plans/phase-j/records-audit.md` lists each conflicting record line by line.
+
+| Record | Change | Sprint | Phase j |
+| --- | --- | --- | --- |
+| ADR-SAG-0021 | Session rows go through an sc-observability Logger; always on; oversize or failed write gives no row and `log.session_write`; add run start/end and the ULID `run_id`; drop "appended directly" | S2, S4 | j-1 |
+| REQ-SAG-0003 | The session log is written in Rust through sc-observability, by a sink that never rotates or prunes | S2 | j-1 |
+| REQ-SAG-0004 | Every row carries `tool` and `tool_version` | S2 | j-1 |
+| REQ-SAG-0005 | Session row fields: schema tag, model, provider, usage, `run_id`, typed answers; one row per query; 1 MiB rule; no row on a cache hit; later the database path | S2, S5, S8 | j-1 |
+| REQ-SAG-0008 | Session rows written through sc-agent's own session Logger, not "appended directly" | S2 | j-1 |
+| REQ-SAG-0202 | Caching points to REQ-SAG-0703; the digest stays content-only | S2 | j-1 |
+| REQ-SAG-0701 | A cache hit returns the holding row's `session_id` | S2 | j-1 |
+| new REQ-SAG-0703 | Result cache (1.4) | S2 | j-1 |
+| REQ-SAG-0018 | Template: run context, `jev-batch-result/2` generic fields, dry-run rule, `cache` pass-through, session lookup helper, tree-walk records, `audit.insert` | S3, S4, S6, S9 | j-2 |
+| plan-anchor REQ-010, REQ-013, REQ-017, REQ-038, REQ-043, REQ-076, ADR-010, ADR-011, skill references | Results reference `session_id`; repeats and confirmation pass `cache=False`; dry runs write no run file; stand-in queries go through sc-decidr | S3 | j-3 |
+| judge-jev REQ-JEV-0002, 0008, 0101, 0208, 0211, ADR-JEV-0001, 0007, skill references | `jev-batch-result/2`; log result events with `session_id`, not requests or answers; dry run writes nothing; drop the 65536-byte rule | S1, S3 | j-4 |
+| sc-agent `sc-sanity-jev` agent and `jev_client.py` | Call Jev through the client template; keep only `session_id` and the derived choice | S3 | none yet (closest j-2) |
+| new ADR | Per-repo audit database: location, WAL, immutability, Rust as the one writer | S7 | later phase |
+| new ADR | Schema versioning: core major, tool minor, open-time checks | S7 | later phase |
+| new REQ | Each report is rendered by sc-compose from the database | S13 | later phase |
+| plan-anchor README, references | `anchor-runs/` replaced by the database | S11 | later phase |
 
 ### Sprints
 
@@ -321,7 +342,7 @@ The work is 13 sprints in phase order. The REQ/ADR changes land on develop befor
 
 1. **S1** judge-jev stale text (1.1). judge-jev only.
 2. **S2** Session log through sc-observability, plus model, provider and usage in the row (1.2, 1.3, 1.4). sc-agent; sc-observability first if its API needs the non-rotating sink.
-3. **S3** ULID `run_id`, `subject_id`, `jev-batch-result/2`, session lookup helper (1.5, 1.6). Template, then both tools.
+3. **S3** ULID `run_id`, `jev-batch-result/2` with tool ids moved to tool records, dry-run rule, session lookup helper (1.5, 1.6). Template, then both tools.
 
 **Phase 2: log clean-up**
 
@@ -344,7 +365,7 @@ S10 and S11 can run in parallel after S9. Sprint N names sprint N−1's output a
 ### Open items for the owner
 
 - After the dual-write period, does the JSONL session log stay as a second copy, or is SQLite the only session record?
-- Should the run start record carry a session id? As designed, sessions point to their run through `run_id`, because a run's sessions do not exist yet when it starts.
+- Should the run start record carry a session id? As designed, a run's result and step records carry its `session_id`s, because a run's sessions do not exist yet when it starts and a cache hit returns an older session.
 - Does a purely additive core change (a new core table) stay a core major bump, as written, or may core also take minor versions?
 - Should the importer (S12) load all history, or only what the reports need?
 
@@ -355,3 +376,8 @@ S10 and S11 can run in parallel after S9. Sprint N names sprint N−1's output a
 - The 2.1 standard header lands in `jev-batch-result/2` (one schema bump, not two).
 - Result cache: a flag, default on. Before each model call, if the sha256 of the full text sent to Jev and the model already have a session row, that row's result is returned and no API call is made. It applies per item for batches and streamed input: if items 2 and 5 of 10 changed, only 2 API queries are made.
 - No concurrent-writer tests: a test that SQLite is configured correctly (WAL, busy timeout, `BEGIN IMMEDIATE`) is enough.
+- Result cache detail: the flag is a config key and a per-call `cache=` argument on `send` and `send_batch` (per job in a batch). The key is the full-request sha256 and the requested model, within the same session log. A hit returns `cached: true` and the existing row's `session_id`, and writes no row. Intentional resends pass `cache=False`.
+- The shared result line holds generic fields only; tool ids live in tool records that reference `session_id`. No `subject_id`.
+- `session_id` is known only after the send returns, and a cache hit returns an older one, so a run's result and step records hold the link from the run to its queries.
+- A dry run checks that the input composes into a valid request and shows it; it writes nothing to the session log, the general log as results, or any run or result store.
+- The 65536-byte figure in judge-jev is an sc-observability wheel limit, not a judge-jev rule.

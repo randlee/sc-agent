@@ -1,20 +1,20 @@
-# Requirement: Session log identity: repo, agent role and project
+# Requirement: Session log identity: repo, agent role, project and tool
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-18  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
 
-## REQ-SAG-0004: Session log identity: repo, agent role and project
+## REQ-SAG-0004: Session log identity: repo, agent role, project and tool
 
 **Status:** Approved  
 
 ### Requirement Statement
 
-Definitions: `repo` identifies the repository a session ran in. `project` is a caller-supplied project or phase name, a block of time related to major changes. `agent_role` is a caller-supplied name for the type of work done or the agent that did it, such as `plan-anchor`, `judge-jev` or `sanity`; it is one field (agent role and agent name are the same). A consumer's product name is, for example, `plan-anchor` or `judge-jev`. `session_id` is the session's ULID. PyO3 bindings are the Python bindings of sc-agent. A slug is lowercase text using only `a-z`, `0-9`, `.`, `_` and `-`.
+Definitions: `repo` identifies the repository a session ran in. `project` is a caller-supplied project or phase name, a block of time related to major changes. `agent_role` is a caller-supplied name for the type of work done or the agent that did it, such as `plan-anchor`, `judge-jev` or `sanity`; it is one field (agent role and agent name are the same). A consumer's product name is, for example, `plan-anchor` or `judge-jev`. `session_id` is the session's ULID. `tool` is the name of the program that sent the query: a generated consumer client's product name, or `decidr` for the CLI. `tool_version` is that program's released version. PyO3 bindings are the Python bindings of sc-agent. A slug is lowercase text using only `a-z`, `0-9`, `.`, `_` and `-`.
 
 **MUST statements:**
 
@@ -22,6 +22,11 @@ Definitions: `repo` identifies the repository a session ran in. `project` is a c
 - Every session log row MUST carry `repo`.
 - Every session log row MUST carry `project`.
 - Every session log row MUST carry `agent_role`.
+- Every session log row MUST carry `tool`.
+- Every session log row MUST carry `tool_version`.
+- The `decidr` CLI MUST set `tool` to `decidr` and `tool_version` to its own version.
+- A generated consumer client MUST set `tool` to the consumer's product name and `tool_version` to the consumer's released version.
+- `tool` and `tool_version` MUST be accepted from the caller through the PyO3 bindings.
 - `repo` MUST be the repository's git `origin` URL normalized to `<host>/<owner>/<repo>`.
 - `repo` MUST have no scheme.
 - `repo` MUST have no `.git` suffix.
@@ -47,7 +52,7 @@ Definitions: `repo` identifies the repository a session ran in. `project` is a c
 
 ### Rationale
 
-Session logs are separated and analysed by repository, by type of work and by project or phase, and later synced to a server where repositories from many machines and owners meet.
+Session logs are separated and analysed by repository, by type of work and by project or phase, and each row traces back to the tool and version that sent it, and later synced to a server where repositories from many machines and owners meet.
 
 ### Success Criteria
 
@@ -59,6 +64,7 @@ Session logs are separated and analysed by repository, by type of work and by pr
 - [ ] A `project` of `Phase B` is rejected with an error and no row is written.
 - [ ] A request with no `agent_role` is rejected with an error and no row is written.
 - [ ] Every session written by the plan-anchor generated client carries `agent_role` `plan-anchor`, and every session written by the judge-jev generated client carries `agent_role` `judge-jev`.
+- [ ] A `decidr send` row carries `tool` `decidr` and the CLI's version; a row written by the judge-jev generated client carries `tool` `judge-jev` and judge-jev's released version.
 
 ### Dependencies
 
