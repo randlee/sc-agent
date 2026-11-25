@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: `Cancel` is the Rust type in the `sc-agent` crate that carries one cancellation signal; code cancels it, and every operation holding it stops. An operation is a call `sc-agent` is running. A crate is a Rust package in this repository. A command-line tool built on `sc-agent` is a binary in this repository that calls the `sc-agent` crate; today `decidr` and `sitr`. PyO3 is the Rust library that builds the `sc_agent` Python module from Rust code; the PyO3 bindings are that module. A user interrupts a command-line tool by pressing Ctrl-C or sending it SIGTERM.
+Definitions: `Cancel` is the Rust type in the `sc-agent` crate that carries one cancellation signal; code cancels it, and every operation holding it stops. An operation is a call `sc-agent` is running. An operation stops when it returns the `decision.cancelled` error without finishing its work. A crate is a Rust package in this repository. A command-line tool built on `sc-agent` is a binary in this repository that calls the `sc-agent` crate; today `decidr` and `sitr`. PyO3 is the Rust library that builds the `sc_agent` Python module from Rust code; the PyO3 bindings are that module. A user interrupts a command-line tool by pressing Ctrl-C or sending it SIGTERM.
 
 **MUST statements:**
 
