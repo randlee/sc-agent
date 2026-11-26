@@ -261,7 +261,7 @@ fn req_sag_0002_0016_0017_errors_have_stable_ids_categories_and_omit_unset_attem
 #[test]
 fn req_sag_0101_models_use_provider_tables_and_reseller_passthrough() -> Test {
     for (name, provider, id) in [
-        ("jev", None, "jev-1.14.0"),
+        ("jev", None, "jev-latest"),
         ("haiku", None, "claude-haiku-5-5"),
         ("gpt-6-luna", None, "gpt-6-luna"),
         ("haiku", Some("openrouter"), "anthropic/claude-haiku-5.5"),

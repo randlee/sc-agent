@@ -595,7 +595,7 @@ pub static PROVIDERS: &[Provider] = &[
         url: "https://api.typesafe.ai/v1",
         key: "TYPESAFE_API_KEY",
         wire: "systemone",
-        models: &[("jev", "jev-1.14.0", "2026-10-14")],
+        models: &[("jev", "jev-latest", "2026-10-14")],
     },
     Provider {
         name: "anthropic",
