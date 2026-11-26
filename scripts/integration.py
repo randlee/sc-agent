@@ -11,8 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def credential_variables():
-    source = ROOT / "crates/sc-agent/src/lib.rs"
-    return {name: name for name in re.findall(r'\bkey:\s*"([A-Z][A-Z0-9_]+)"', source.read_text())}
+    source = ROOT / "crates/sc-agent/src/providers.rs"
+    return {name: name for name in re.findall(r'\bSome\("([A-Z][A-Z0-9_]+)"\)', source.read_text())}
 
 
 def key_for(provider, variable):

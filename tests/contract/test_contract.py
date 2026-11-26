@@ -404,7 +404,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                  ("openai", "luna", {"choices": [{"message": {"content": json.dumps(ANSWER)}}]}, "/v1/chat/completions"),
                  ("openrouter", "haiku", {"choices": [{"message": {"content": json.dumps(ANSWER)}}]}, "/v1/chat/completions"),
                  ("together", "luna", {"choices": [{"message": {"content": json.dumps(ANSWER)}}]}, "/v1/chat/completions"),
-                 ("nous", "custom-id", {"choices": [{"message": {"content": json.dumps(ANSWER)}}]}, "/v1/chat/completions"))
+                 ("nous", "luna", {"choices": [{"message": {"content": json.dumps(ANSWER)}}]}, "/v1/chat/completions"))
         for provider, model, answer, path in cases:
             with self.subTest(provider=provider), tempfile.TemporaryDirectory() as directory, server([(200, {}, answer)]) as (url, received):
                 with patch.dict(os.environ, {"DECIDR_LOG_ROOT": directory, provider.upper() + "_API_KEY": "contract-secret"}):
@@ -414,7 +414,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 self.assertEqual(result["value"]["answers"], ANSWER["answers"])
                 self.assertEqual(received[0][0], path)
                 body = received[0][2]
-                expected = {"typesafe": "jev-latest", "anthropic": "claude-haiku-5-5", "openai": "gpt-6-luna", "openrouter": "anthropic/claude-haiku-5.5", "together": "openai/gpt-6-luna", "nous": "custom-id"}
+                expected = {"typesafe": "jev-latest", "anthropic": "claude-haiku-5-5", "openai": "gpt-6-luna", "openrouter": "anthropic/claude-haiku-5.5", "together": "openai/gpt-6-luna", "nous": "openai/gpt-6-luna"}
                 self.assertEqual(body["model"], expected[provider])
                 if provider == "anthropic":
                     self.assertIn("output_config", body)
@@ -640,7 +640,7 @@ class Cli(Isolated):
     def test_cli_size_and_worker_refusals_keep_typed_ids(self):
         # REQ-SAG-0014/0702: CLI refusals preserve the core error id.
         binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
-        Path(self.directory.name, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": 1, "model": "local"}}))
+        Path(self.directory.name, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": 1}}))
         cases = [(["--batch", "--workers", str(workers)], "{}", "decidr.invalid_workers") for workers in (-1, 0)]
         cases.append(([], json.dumps({**REQUEST, "state": "x" * (8 * 1024 * 1024)}), "decision.request_too_large"))
         for flags, text, expected in cases:
@@ -742,7 +742,7 @@ class Cli(Isolated):
     def test_doctor_environment_sources(self):
         root = Path(self.directory.name).resolve()
         (root / "global").mkdir()
-        (root / "global/decidr.json").write_text('{"laya":{"host":"localhost","port":1,"model":"test"}}')
+        (root / "global/decidr.json").write_text('{"laya":{"host":"localhost","port":1}}')
         got = self.doctor(root, {"SC_PROJECT": "phase-d", "DECIDR_WORKERS": "3", "DECIDR_LAYA__PORT": "9000"})
         self.assertEqual(got.returncode, 0, got.stdout)
         rows = {row["path"]: row for row in json.loads(got.stdout)["value"]["settings"]}
@@ -818,10 +818,10 @@ class Cli(Isolated):
 
     def test_send_and_doctor(self):
         binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
-        with tempfile.TemporaryDirectory() as folder, server([(200, {}, ANSWER)]) as (url, received):
+        with tempfile.TemporaryDirectory() as folder, server([(200, {}, {**ANSWER, "model": "laya:en"})]) as (url, received):
             port = int(url.split(":")[2].split("/")[0])
             config = Path(folder) / "decidr.json"
-            config.write_text(json.dumps({"project": "contract", "workers": 2, "laya": {"host": "127.0.0.1", "port": port, "model": "laya"}}))
+            config.write_text(json.dumps({"project": "contract", "workers": 2, "laya": {"host": "127.0.0.1", "port": port}}))
             env = {"PATH": os.defpath, "DECIDR_LOG_ROOT": folder,
                    "GIT_CEILING_DIRECTORIES": str(Path(folder).parent.resolve())}
             doctor = subprocess.run([str(binary), "--config-dir", folder, "doctor"], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
@@ -866,7 +866,7 @@ class Cli(Isolated):
                     return 429, {"Retry-After": "600"}, {}
                 with server([None], respond) as (url, received):
                     port = int(url.split(":")[2].split("/")[0])
-                    Path(folder, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": port, "model": "laya"}}))
+                    Path(folder, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": port}}))
                     env = {"PATH": os.defpath, "DECIDR_LOG_ROOT": folder,
                    "GIT_CEILING_DIRECTORIES": str(Path(folder).parent.resolve())}
                     process = subprocess.Popen([str(binary), "--config-dir", folder, "send", "--model", "laya",

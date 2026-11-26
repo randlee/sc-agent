@@ -22,7 +22,7 @@ from check_consumer_template import render_consumers
 
 
 REQUEST = {"state": "ok", "questions": {"q": {"type": "noul", "instructions": "score", "criteria": ["score"]}}}
-ANSWER = {"model": "loopback", "answers": {"q": {"type": "noul", "noul": 0.75}}}
+ANSWER = {"model": "laya:en", "answers": {"q": {"type": "noul", "noul": 0.75}}}
 
 
 class Runner:
@@ -102,7 +102,7 @@ class RenderedWheelLoopback(unittest.TestCase):
 
     def config(self, root, address):
         host, port = address
-        config = {"project": "phase-i-loopback", "laya": {"host": host, "port": port, "model": "loopback"}}
+        config = {"project": "phase-i-loopback", "laya": {"host": host, "port": port}}
         (root / "decidr.json").write_text(json.dumps(config))
 
     def load_clients(self, root):
@@ -239,8 +239,8 @@ class RenderedWheelLoopback(unittest.TestCase):
                         self.assertEqual(failure["error"].code, "TEST.AUTH")
                         self.assertEqual(
                             runner.received,
-                            [("/v1/systemone", {**REQUEST, "model": "loopback"}),
-                             ("/v1/systemone", {**REQUEST, "state": "unauthorized", "model": "loopback"})],
+                            [("/v1/systemone", {**REQUEST, "model": "laya:en"}),
+                             ("/v1/systemone", {**REQUEST, "state": "unauthorized", "model": "laya:en"})],
                             "loopback runner received unexpected requests",
                         )
                         self.assertEqual(callable(getattr(client, "extract", None)), client.CLIENT_NAME == "judge-jev")
@@ -299,7 +299,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                 self.assertTrue(result["ok"], result)
                 self.assertEqual(
                     runner.received,
-                    [("/v1/systemone", {**request, "model": "loopback"})],
+                    [("/v1/systemone", {**request, "model": "laya:en"})],
                     "extracted sitr text did not reach the offline prompt",
                 )
                 received_prompt = runner.received[0][1]["questions"]["q"]["instructions"]
@@ -337,7 +337,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                 )
                 self.assertEqual(
                     runner.received,
-                    [("/v1/systemone", {**REQUEST, "model": "loopback"})],
+                    [("/v1/systemone", {**REQUEST, "model": "laya:en"})],
                     "cancelled batch sent a surplus loopback request",
                 )
                 self.assertTrue(batch["ok"], batch)

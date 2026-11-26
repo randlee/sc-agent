@@ -280,8 +280,10 @@ pub struct Credential {
     pub source: Source,
 }
 #[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Source {
     Environment,
+    #[serde(rename = ".env")]
     DotEnv,
     Keyring,
 }
@@ -372,7 +374,7 @@ pub fn doctor_key_rows(keys: &KeySources) -> Vec<Value> {
     provider_keys().into_iter().filter_map(|name| match keys.find(name) {
         Ok(Some(key)) => Some(json!({"name":name,"source":key.source})),
         Ok(None) => None,
-        Err(e) => Some(json!({"name":name,"source":"keyring","error":{"id":e.id(),"category":e.category(),"action":"Unlock or repair the platform keyring, or set the variable in the environment or .env."}})),
+        Err(Error::Failure {id,category,..}) => Some(json!({"name":name,"source":"keyring","error":{"id":id,"category":category,"action":"Unlock or repair the platform keyring, or set the variable in the environment or .env."}})),
     }).collect()
 }
 pub fn redact<'a>(text: &'a str, key: &str) -> Cow<'a, str> {

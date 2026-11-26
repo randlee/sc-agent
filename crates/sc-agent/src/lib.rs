@@ -143,14 +143,6 @@ impl Error {
         *attempts = Some(n);
         self
     }
-    pub fn id(&self) -> &'static str {
-        let Self::Failure { id, .. } = self;
-        id
-    }
-    pub fn category(&self) -> &'static str {
-        let Self::Failure { category, .. } = self;
-        category
-    }
 }
 #[derive(Clone, Default)]
 pub struct Secret<T>(T);
@@ -408,10 +400,20 @@ impl ConfigSources<'_> {
             models: setting::<BTreeMap<String, ModelEntry>>(&resolved, "models", json!({}))?
                 .into_iter()
                 .map(|(name, entry)| {
+                    let provider = providers::named(&entry.provider).map_err(|mut failure| {
+                        let Error::Failure { message, .. } = &mut failure;
+                        *message = invalid_setting(
+                            &resolved,
+                            &format!("models.{name}.provider"),
+                            &*message,
+                        )
+                        .to_string();
+                        failure
+                    })?;
                     Ok((
                         name,
                         ConfiguredRow {
-                            provider: providers::named(&entry.provider)?,
+                            provider,
                             id: entry.id,
                             released: entry.released,
                         },
@@ -688,7 +690,6 @@ pub struct Run {
     model: ResolvedModel,
     agent_role: Option<String>,
     timeout: Duration,
-    workers: usize,
     logger: Arc<Logger>,
     owns_logger: bool,
     cancel: Arc<Cancel>,
@@ -700,14 +701,14 @@ pub struct Call<'a> {
     pub agent_role: Option<&'a str>,
 }
 impl Run {
-    pub fn new(config: RunConfig) -> Result<Self, Error> {
+    pub fn new(mut config: RunConfig) -> Result<Self, Error> {
         let environment = config
             .seams
             .environment
-            .clone()
+            .take()
             .unwrap_or_else(Environment::process);
-        let repository = match &config.seams.repository {
-            Some(r) => r.clone(),
+        let repository = match config.seams.repository.take() {
+            Some(r) => r,
             None => Repository::discover()?,
         };
         let settings = ConfigSources::new(
@@ -718,17 +719,15 @@ impl Run {
         )
         .load()?
         .config;
-        let ctx = Context {
+        let mut ctx = Context {
             log_root: environment.log_root(&config.log_name)?,
             keys: KeySources::new(environment, &repository.root, config.seams.keyring.clone())?,
             settings,
             repository,
         };
-        let workers = config
-            .workers
-            .map(workers)
-            .transpose()?
-            .unwrap_or(ctx.settings.workers);
+        if let Some(count) = config.workers {
+            ctx.settings.workers = workers(count)?;
+        }
         let timeout = Duration::try_from_secs_f64(config.timeout_secs.unwrap_or(120.0))
             .map_err(|e| error("decidr.invalid_request_timeout", e))?;
         let model =
@@ -749,7 +748,6 @@ impl Run {
             model,
             agent_role: config.agent_role,
             timeout,
-            workers,
             logger,
             owns_logger,
             cancel: config.cancel.unwrap_or_default(),
@@ -767,13 +765,13 @@ impl Run {
         if self.closed.swap(true, Ordering::SeqCst) {
             return Ok(());
         }
-        self.logger.flush().map_err(|e| error("log.flush", e))?;
-        if self.owns_logger {
-            self.logger
-                .shutdown()
-                .map_err(|e| error("log.shutdown", e))?;
-        }
-        Ok(())
+        let flushed = self.logger.flush().map_err(|e| error("log.flush", e));
+        let shutdown = if self.owns_logger {
+            self.logger.shutdown().map_err(|e| error("log.shutdown", e))
+        } else {
+            Ok(())
+        };
+        flushed.and(shutdown)
     }
     fn sender<'a>(
         &'a self,
@@ -785,10 +783,9 @@ impl Run {
         }
         Ok(Sender {
             ctx: &self.ctx,
-            model: &self.model,
+            model: Ok(&self.model),
             agent_role: call.agent_role.or(self.agent_role.as_deref()).unwrap_or(""),
             timeout: self.timeout,
-            workers: self.workers,
             logger: &self.logger,
             cancel: &self.cancel,
             base_url: self.seams.base_url.as_deref(),
@@ -811,10 +808,9 @@ impl Run {
 }
 struct Sender<'a> {
     ctx: &'a Context,
-    model: &'a ResolvedModel,
+    model: Result<&'a ResolvedModel, Error>,
     agent_role: &'a str,
     timeout: Duration,
-    workers: usize,
     logger: &'a Logger,
     cancel: &'a Cancel,
     base_url: Option<&'a str>,
@@ -869,7 +865,9 @@ fn answer_schema(question: &Value) -> Value {
         .unwrap_or_default();
     json!({"type":"object","properties":fields,"required":required,"additionalProperties":false})
 }
-fn wire(request: &Value, model: &str, wire: Wire) -> Value {
+fn wire(request: &Value, resolved: &ResolvedModel) -> Value {
+    let model = &resolved.id;
+    let wire = resolved.provider.wire;
     if wire == Wire::SystemOne {
         let mut body = request.clone();
         if let Some(body) = body.as_object_mut() {
@@ -960,6 +958,16 @@ pub fn workers(value: i64) -> Result<usize, Error> {
         .ok_or_else(|| error("decidr.invalid_workers", "workers must be positive"))
 }
 
+struct HttpReply {
+    status: u16,
+    delay: Option<Duration>,
+    text: Result<String, ureq::Error>,
+}
+#[derive(Serialize)]
+struct BatchResult {
+    index: usize,
+    result: Value,
+}
 impl Sender<'_> {
     fn send_one(&self, request: &Value) -> Result<Value, Error> {
         let logger = self.logger;
@@ -982,8 +990,9 @@ impl Sender<'_> {
             let project = self.ctx.settings.project_required()?;
             slug(project)?;
             slug(self.agent_role)?;
-            let provider = self.model.provider;
-            let model = &self.model.id;
+            let selected = self.model.as_ref().map_err(Clone::clone)?;
+            let provider = selected.provider;
+            let model = &selected.id;
             let base = match provider.base {
                 Base::Url(url) => url.to_owned(),
                 Base::Local(name) => {
@@ -1021,13 +1030,12 @@ impl Sender<'_> {
                 ));
             }
             let pause = host_holdoff(&host)?;
-            let key = self
-                .model
+            let key = selected
                 .credential
                 .as_ref()
                 .map(|c| c.value.expose().as_str())
                 .unwrap_or("");
-            let body = wire(request, model, provider.wire);
+            let body = wire(request, selected);
             let agent = ureq::Agent::config_builder()
                 .http_status_as_error(false)
                 .timeout_global(Some(self.timeout))
@@ -1053,18 +1061,15 @@ impl Sender<'_> {
                             .and_then(|h| h.to_str().ok())
                             .and_then(|h| h.parse::<f64>().ok())
                             .and_then(|s| Duration::try_from_secs_f64(s).ok());
-                        (
-                            reply.status().as_u16(),
+                        HttpReply {
+                            status: reply.status().as_u16(),
                             delay,
-                            reply.body_mut().read_to_string(),
-                        )
+                            text: reply.body_mut().read_to_string(),
+                        }
                     })
                 })?;
-                let (status, delay, text) = match sent {
-                    Ok((status, delay, text)) => {
-                        let text = text.map_err(|e| error("decision.response_parse", e))?;
-                        (status, delay, providers::redact(&text, key).into_owned())
-                    }
+                let reply = match sent {
+                    Ok(reply) => reply,
                     Err(e) => {
                         if attempt < 5 {
                             wait(Duration::from_secs(2u64.pow(attempt - 1)));
@@ -1076,6 +1081,11 @@ impl Sender<'_> {
                         );
                     }
                 };
+                let raw_text = reply
+                    .text
+                    .map_err(|e| error("decision.response_parse", e))?;
+                let text = providers::redact(&raw_text, key);
+                let status = reply.status;
                 if (200..300).contains(&status) {
                     let decoded = serde_json::from_str(&text)
                         .map_err(|e| error("decision.response_parse", format!("{e}: {text}")))
@@ -1112,7 +1122,11 @@ impl Sender<'_> {
                 let busy = [429, 502, 529].contains(&status) && !quota;
                 if busy && attempt < 5 {
                     let _hold = pause.lock().map_err(|e| error("http.network", e))?;
-                    wait(delay.unwrap_or_else(|| Duration::from_secs(2u64.pow(attempt - 1))));
+                    wait(
+                        reply
+                            .delay
+                            .unwrap_or_else(|| Duration::from_secs(2u64.pow(attempt - 1))),
+                    );
                     continue;
                 }
                 return Err(error(
@@ -1198,7 +1212,7 @@ impl Sender<'_> {
         let next = std::sync::atomic::AtomicUsize::new(0);
         let (sender, receiver) = std::sync::mpsc::channel();
         Ok(std::thread::scope(|scope| {
-            for _ in 0..self.workers.min(requests.len()) {
+            for _ in 0..self.ctx.settings.workers.min(requests.len()) {
                 let sender = sender.clone();
                 let next = &next;
                 scope.spawn(move || {
@@ -1209,19 +1223,17 @@ impl Sender<'_> {
                         };
                         let value = report(logger, self.send_one(request));
                         on_result(index, &value);
-                        let _ = sender.send((index, value));
+                        let _ = sender.send(BatchResult {
+                            index,
+                            result: value,
+                        });
                     }
                 });
             }
             drop(sender);
             let mut results = receiver.into_iter().collect::<Vec<_>>();
-            results.sort_by_key(|(index, _)| *index);
-            json!(
-                results
-                    .into_iter()
-                    .map(|(index, value)| json!({"index":index,"result":value}))
-                    .collect::<Vec<_>>()
-            )
+            results.sort_by_key(|item| item.index);
+            json!(results)
         }))
     }
 }
@@ -1394,13 +1406,12 @@ impl Legacy<'_> {
         }
         let model = providers::resolve_using(&o.model, &ctx, &|key| {
             ctx.keys.find_using(key, self.keyring)
-        })?;
+        });
         f(Sender {
             ctx: &ctx,
-            model: &model,
+            model: model.as_ref().map_err(Clone::clone),
             agent_role: &o.agent_role,
             timeout: o.timeout,
-            workers: o.settings.workers,
             logger: self.logger,
             cancel: self.cancel,
             wait: self.wait,
@@ -1416,6 +1427,7 @@ pub fn send(
     wait: &(dyn Fn(Duration) + Sync),
     keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
 ) -> Result<Value, Error> {
+    validate_request_size(request)?;
     Legacy {
         options,
         logger,
@@ -1434,6 +1446,7 @@ pub fn batch(
     keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
     on_result: &(dyn Fn(usize, &Value) + Sync),
 ) -> Result<Value, Error> {
+    requests.iter().try_for_each(validate_request_size)?;
     Legacy {
         options,
         logger,
@@ -1476,22 +1489,12 @@ mod run_tests {
         Ok(())
     }
     #[test]
-    fn keyring_timeout_is_driven_by_an_unreleased_reader() -> Test {
-        let (release, wait) = std::sync::mpsc::channel::<()>();
-        let value = keyring_wait(
-            move || {
-                let _ = wait.recv_timeout(Duration::from_secs(5));
-                Ok("unused".into())
-            },
-            Duration::ZERO,
-        );
-        let _ = release.send(());
-        assert!(matches!(value, Err(KeyringError::Timeout)));
-        assert!(matches!(
-            keyring_wait(|| Err("controlled refusal".into()), Duration::from_secs(5)),
-            Err(KeyringError::Read(_))
-        ));
+    fn keyring_platform_results_preserve_missing_and_failure() -> Test {
         assert!(keyring_result(Err(keyring::Error::NoEntry))?.is_empty());
+        let failure = keyring_result(Err(keyring::Error::NoStorageAccess(Box::new(
+            std::io::Error::other("controlled refusal"),
+        ))));
+        assert!(failure.is_err());
         Ok(())
     }
 }

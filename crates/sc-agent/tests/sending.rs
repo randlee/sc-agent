@@ -365,7 +365,7 @@ fn req_sag_0011_precancel_never_reads_a_key_and_invalid_tags_write_no_row() -> T
             .send(&Call::default(), &request())
             .err()
             .ok_or("invalid tag accepted")?;
-        assert_eq!(error.id(), "log.invalid_slug");
+        assert_eq!(error_id(&error), "log.invalid_slug");
         assert!(!isolated.0.join("sessions").exists());
         run.close()?;
     }
@@ -415,7 +415,7 @@ fn req_sag_0702_two_workers_complete_before_either_callback_is_released() -> Tes
                 run.send_batch(&Call::default(), &vec![request(); 2], &|_, _| {
                     let _ = arrivals.send(std::thread::current().id());
                     if let Ok(rx) = permits.lock() {
-                        let _ = rx.recv_timeout(Duration::from_secs(5));
+                        let _ = rx.recv(); // The coordinator always supplies permits, including on its guard-error path.
                     }
                 })
             });
@@ -520,8 +520,8 @@ fn run_snapshots_configuration_and_owns_or_borrows_one_logger() -> Test {
         .send(&Call::default(), &request())
         .err()
         .ok_or("closed run sent")?;
-    assert_eq!(failure.id(), "decision.run_closed");
-    assert_eq!(failure.category(), "validation");
+    assert_eq!(error_id(&failure), "decision.run_closed");
+    assert_eq!(error_category(&failure), "validation");
     assert_eq!(rows(&root)?.len(), 2);
     assert_eq!(stub.finish()?.len(), 2);
     logger.shutdown()?;
@@ -540,10 +540,11 @@ fn missing_project_is_a_call_error_and_cancellation_is_channel_driven() -> Test 
     fs::write(root.0.join("sc-agent.json"), "{}")?;
     let run = Run::new(run_config(&root, &stub)?)?;
     assert_eq!(
-        run.send(&Call::default(), &request())
-            .err()
-            .ok_or("missing project sent")?
-            .id(),
+        error_id(
+            &run.send(&Call::default(), &request())
+                .err()
+                .ok_or("missing project sent")?
+        ),
         "config.missing_project"
     );
     run.close()?;
@@ -551,20 +552,25 @@ fn missing_project_is_a_call_error_and_cancellation_is_channel_driven() -> Test 
     let cancel = Arc::new(Cancel::default());
     let (started, arrived) = mpsc::channel();
     let (release, wait) = mpsc::channel();
+    let (finished, result) = mpsc::channel();
     std::thread::scope(|scope| -> Test {
         let active = cancel.clone();
         let worker = scope.spawn(move || {
-            active.run(move || {
+            let outcome = active.run(move || {
                 let _ = started.send(());
-                let _ = wait.recv_timeout(Duration::from_secs(5));
-            })
+                let _ = wait.recv();
+            });
+            let _ = finished.send(outcome);
         });
-        arrived.recv_timeout(Duration::from_secs(5))?;
+        let arrival = arrived.recv_timeout(Duration::from_secs(5));
         cancel.cancel();
-        let result = worker.join().map_err(|_| "cancel worker panicked")?;
+        let outcome = result.recv_timeout(Duration::from_secs(5));
+        // Cleanup precedes every assertion/error propagation: even a broken cancel implementation cannot strand the closure.
         let _ = release.send(());
+        worker.join().map_err(|_| "cancel worker panicked")?;
+        arrival?;
         assert_eq!(
-            result.err().ok_or("cancelled closure succeeded")?.id(),
+            error_id(&outcome?.err().ok_or("cancelled closure succeeded")?),
             "decision.cancelled"
         );
         Ok(())
@@ -580,11 +586,28 @@ fn missing_project_is_a_call_error_and_cancellation_is_channel_driven() -> Test 
     cfg.cancel = Some(flag);
     let run = Run::new(cfg)?;
     assert_eq!(
-        run.send(&Call::default(), &request())
-            .err()
-            .ok_or("cancelled send succeeded")?
-            .id(),
+        error_id(
+            &run.send(&Call::default(), &request())
+                .err()
+                .ok_or("cancelled send succeeded")?
+        ),
         "decision.cancelled"
+    );
+    assert_eq!(stub.finish()?.len(), 1);
+    run.close()?;
+    Ok(())
+}
+
+#[test]
+fn req_sag_0007_confidence_is_not_rounded_or_cast() -> Test {
+    let root = Temp::new()?;
+    let response = json!({"model":"jev-1.14.0","answers":{"q":{"type":"choice","choice":"yes","confidence":0.875,"probabilities":{"yes":0.875,"no":0.125}}}});
+    let input = json!({"state":"evidence","questions":{"q":{"type":"choice","criteria":{"yes":"true","no":"false"}}}});
+    let stub = Stub::new(vec![http(200, response)])?;
+    let run = Run::new(run_config(&root, &stub)?)?;
+    assert_eq!(
+        run.send(&Call::default(), &input)?["answers"]["q"]["confidence"],
+        0.875
     );
     assert_eq!(stub.finish()?.len(), 1);
     run.close()?;

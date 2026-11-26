@@ -207,3 +207,12 @@ pub fn rows(root: &Temp) -> Result<Vec<Value>, Box<dyn std::error::Error + Send 
         .map(|line| serde_json::from_str(line).map_err(Into::into))
         .collect()
 }
+
+pub fn error_id(error: &sc_agent::Error) -> &'static str {
+    let sc_agent::Error::Failure { id, .. } = error;
+    id
+}
+pub fn error_category(error: &sc_agent::Error) -> &'static str {
+    let sc_agent::Error::Failure { category, .. } = error;
+    category
+}

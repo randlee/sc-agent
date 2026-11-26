@@ -266,6 +266,8 @@ fn req_sag_0101_configured_model_with_unknown_provider_is_rejected() -> Test {
         .err()
         .ok_or("unknown provider accepted")?;
     assert!(failure.to_string().contains("types.unknown_provider"));
+    assert!(failure.to_string().contains("models.x.provider"));
+    assert!(failure.to_string().contains("sc-agent.json"));
     Ok(())
 }
 
