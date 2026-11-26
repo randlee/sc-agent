@@ -48,7 +48,7 @@ class RenderedClient(unittest.TestCase):
                     error = client.ClientError("TEST.ERROR", "failed call", attempts=2)
                     failed = {"ok": False, "error": error, "attempts": 2}
                     job = client.BatchJob("item", None, "candidate", 1, "request", {}, {}, {}, "directive")
-                    settings = client.BatchSettings("plan", "jev", 1, "prefix", 0.6, 1, 1, 100, False)
+                    settings = client.BatchSettings("plan", "jev", 1, "prefix", 0.6, 1, 1, False)
                     line = client.result_line(job, settings, failed, [], None, False)
                     self.assertFalse(line["ok"])
                     self.assertIsNone(line["answers"])

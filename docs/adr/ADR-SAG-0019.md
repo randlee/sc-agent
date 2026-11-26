@@ -1,7 +1,7 @@
 # Decision: sc-decidr is the one Python decision harness: error values with a stored category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 1.10.0  
+**Version:** 2.0.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-26  
 **Owner:** Rand Lee  
