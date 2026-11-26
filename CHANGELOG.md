@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0
+## 0.4.1
 
 - Add the `models` configuration setting mapping a model name to a built-in `provider` and wire `id`; a configured name wins over the built-in table, and the built-in `jev` now resolves to `jev-latest`.
 
@@ -22,7 +22,7 @@
 - For plan-anchor and judge-jev, render the shared `consumer.py.j2` template from the installed, pinned sc-decidr wheel with the consumer's `client_name` and `sitr` settings. Handle returned errors instead of catching client exceptions.
 - Obtain the logger handle from `sc_agent.logger`'s success value and pass that same handle as `general_log` to decision, batch and sitr calls; use the wheel's logging API for consumer events.
 - Replace `CancelToken` with `sc_agent.Cancel` and call its `cancel()` method to stop work.
-- `jev` is the Jev name the client accepts; the client sends the row's model id to TypeSafe (`jev-latest` since 0.5.0), never `jev` itself.
+- `jev` is the Jev name the client accepts; the client sends the row's model id to TypeSafe (`jev-latest` since 0.4.1), never `jev` itself.
 
 ## 0.2.9
 
