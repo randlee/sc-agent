@@ -1,4 +1,4 @@
-# Requirement: Model catalog: static provider tables
+# Requirement: Model catalog: built-in and configured model rows
 
 **Status:** Approved  
 **Version:** 0.8.0  
@@ -8,7 +8,7 @@
 
 ---
 
-## REQ-SAG-0102: Model catalog: static provider tables
+## REQ-SAG-0102: Model catalog: built-in and configured model rows
 
 **Status:** Approved  
 
