@@ -32,7 +32,6 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Acceptance Criteria:**
 
-- [ ] Each of the nine short names resolves to the newest model of its line in the provider tables.
 - [ ] A unit test resolves each cloud short name to a model in the provider tables.
 - [ ] A unit test resolves each local short name to a local model in the model table.
 - [ ] A specific version id from the catalog parses and resolves to itself.

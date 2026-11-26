@@ -32,7 +32,7 @@ Jev, local Jev-compatible runners, Haiku and Luna must answer the same decision 
 
 For decision requests, every provider (Jev, local Jev-compatible runners, Haiku, Luna) receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, with one implementation per wire format (Jev SystemOne, OpenAI-compatible chat/completions, Anthropic-compatible Messages). A provider row names its wire format and uses that format's implementation, so adding a provider needs no new code. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them. There is no wrapper request type.
 
-`sc-agent` also provides an LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider of that format, so callers reach any LLM through one interface. LLM requests are not Jev API request bodies; the one request form applies to decision requests only.
+`sc-agent` also provides an LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider of that format, so callers reach any LLM through one interface.
 
 **Key Principles:**
 
