@@ -1,7 +1,7 @@
 # Requirement: Every error has a stable id and a stored category, and busy and network errors are retryable
 
 **Status:** Approved  
-**Version:** 0.5.3  
+**Version:** 0.5.2  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-26  
 **Owner:** Rand Lee  
@@ -18,7 +18,6 @@ Definitions:
 
 - An id is stable when the same error gives the same id each time.
 - `integration_cases` and `validate_integration_results` are former integration validation functions (ADR-SAG-0019).
-- The published decidr crate is the Rust crate named `decidr` (`crates/decidr`) as released to crates.io. To export a name is to make it reachable from outside the package, as a public item or a re-export.
 - The `sc-decidr` Python wheel contains the decidr and sitr Python APIs (REQ-SAG-0018).
 
 - A busy error and a network error are errors in the `busy` and `network` categories, respectively. The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`.

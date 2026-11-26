@@ -26,7 +26,7 @@ sc-agent sends decisions to Jev, to local runners that serve the Jev API, and to
 
 **Problem Statement:**
 
-Jev, local Jev-compatible runners, Haiku and Luna must answer the same decision request so their answers can be compared, without shared crates knowing how any one backend adapts it.
+Jev, local Jev-compatible runners, Haiku and Luna must answer the same decision so their answers can be compared, without shared crates knowing how any one backend adapts it.
 
 ### Decision
 
@@ -42,7 +42,7 @@ Beside the decision pattern, `sc-agent` provides one LLM trait for the LLM patte
 
 ### Rationale
 
-When every backend receives the same decision request, their answers are comparable by construction, and shared code stays free of provider-specific types.
+When every backend receives the same data, their answers are comparable by construction, and shared code stays free of provider-specific types.
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 

@@ -14,11 +14,11 @@
 
 ### Requirement Statement
 
-Definitions: A consumer application is any program, other than sc-agent itself, that depends on sc-agent; plan-anchor and judge-jev are two. A consumer-specific item is a Rust type, field or constant whose name includes the name of a consumer application, or that exactly one consumer application uses.
+Definitions: A consumer application is a program built on sc-agent, such as plan-anchor or judge-jev.
 
 **MUST NOT statements:**
 
-- A crate in the `crates/` folder MUST NOT contain a consumer-specific item.
+- `sc-agent` MUST NOT contain types specific to plan-anchor, judge-jev or any other consumer application.
 
 ### Rationale
 
