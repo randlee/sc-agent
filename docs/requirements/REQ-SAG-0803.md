@@ -14,10 +14,13 @@
 
 ### Requirement Statement
 
+Definitions: A release rehearsal runs in continuous integration or follows a documented procedure on a local machine. It runs `cargo publish --dry-run` for every crates.io crate marked publishable, in the order specified by `release/publish-artifacts.toml`, and builds the **sc-decidr** Python Package Index wheel with maturin.
+
+Production registry uploads and version tags remain out of scope until the owner dispatches a release.
+
 **MUST statements:**
 
-- The release process MUST prove `cargo publish --dry-run` in manifest publish order for every crates.io crate declared publishable and the maturin wheel build for the **sc-decidr** PyPI package in CI or a documented local recipe.
-- Production registry uploads and version tags remain out of scope until the owner dispatches a release.
+- The release process MUST run the release rehearsal without error.
 
 ### Rationale
 

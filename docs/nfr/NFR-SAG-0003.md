@@ -1,9 +1,9 @@
 # Requirement: One Python floor for sc-agent's wheel and its consumers
 
 **Status:** Approved  
-**Version:** 0.4.0  
+**Version:** 0.4.1  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -37,7 +37,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Acceptance Criteria:**
 
-- [ ] The built sc-decidr wheel declares Python 3.11 or newer.
+- [ ] An inspection of the built sc-decidr wheel package metadata confirms it declares Python 3.11 or newer.
 
 ### Dependencies
 

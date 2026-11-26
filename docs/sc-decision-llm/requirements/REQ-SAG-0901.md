@@ -14,14 +14,17 @@
 
 ### Requirement Statement
 
-Definitions: Decider mode is an LLM such as Haiku or Luna answering a decision request in place of a decision model. The required schema is the Jev API answer schema for each question type, including `probabilities` and `confidence` where Jev returns them.
+Definitions: Decider mode uses a large language model, such as Haiku or Luna, to answer a decision request in place of a decision model. The covered models are Haiku and Luna. The provider is the service to which the decision request is sent. The required schema is the Jev decision API's answer schema for the requested question type, including `probabilities` and `confidence` where Jev returns them. The provider's structured-output feature lets a request specify the schema the provider's answer must follow. A `decision.schema_mismatch` error identifies what in the provider response failed to match the required schema.
 
 **MUST statements:**
 
-- In decider mode, Haiku and Luna MUST produce the probabilities and confidence themselves and return answers in the required schema.
-- Each request MUST ask the provider for the required schema through the provider's structured-output feature.
-- A response that does not match the required schema MUST be returned as `decision.schema_mismatch` with what did not match.
-- Haiku and Luna MUST pass the request's inputs to the provider; an input the provider rejects MUST return the provider's error.
+- In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.
+- In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.
+- In decider mode, answers from each covered model MUST conform to the required schema.
+- Each decision request MUST specify the required schema through the provider's structured-output feature.
+- If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.
+- The covered model handling the decision request MUST pass the request's inputs to the provider.
+- If the provider rejects a request input, the decision backend MUST return the provider's error.
 
 ### Rationale
 
