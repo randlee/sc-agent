@@ -1,9 +1,9 @@
 # Requirement: Interrupt cancels cleanly
 
 **Status:** Approved  
-**Version:** 0.4.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -14,34 +14,35 @@
 
 ### Requirement Statement
 
-Definitions: An interrupt is Ctrl-C, SIGINT or SIGTERM delivered to `decidr`, or a `KeyboardInterrupt` raised in Python while `sc-agent-py` is running.
+Definitions: `decidr` is the decision CLI, and `sc-agent-py` is the Python wheel that holds the decidr API. An interrupt is Ctrl-C, SIGINT or SIGTERM delivered to `decidr`, or a `KeyboardInterrupt` raised in Python while `sc-agent-py` is running. The session log is the JSONL file `sessions.jsonl` that holds one row for each request sent to a model (REQ-SAG-0005). A batch is the set of requests sent by one `decidr` command or one `sc-agent-py` call. The Python call is the `sc-agent-py` call that sent the batch. An unfinished request is a request of the batch that has no result when the interrupt arrives. `decision.cancelled` is the error id given to a cancelled request.
 
 **MUST statements:**
 
-- Ctrl-C, SIGINT or SIGTERM received by `decidr` MUST cancel the `Cancel` flag of the running work.
-- A `KeyboardInterrupt` in `sc-agent-py` MUST cancel the `Cancel` flag of the running work.
-- Every request not finished when the interrupt arrives MUST end with `decision.cancelled`.
-- The session log MUST be flushed before `decidr` exits or the Python call returns.
-- A `KeyboardInterrupt` in `sc-agent-py` MUST be caught; the Python call MUST return its results, with every unfinished request as a `decision.cancelled` error value.
+- When `decidr` receives an interrupt, it MUST cancel the batch.
+- When a `KeyboardInterrupt` is raised in `sc-agent-py`, it MUST cancel the batch.
+- After an interrupt, every unfinished request MUST end with `decision.cancelled`.
+- The session log MUST hold the row of every request that finished before the interrupt when `decidr` exits or the Python call returns.
+- A `KeyboardInterrupt` in `sc-agent-py` MUST be caught inside the Python call.
+- After a `KeyboardInterrupt`, the Python call MUST return one result per request of the batch.
 - `decidr` MUST exit non-zero after an interrupt.
 
 ### Rationale
 
 An interrupted batch must leave a complete, readable session log and a clear failure status instead of lost rows and a silent exit.
 
-Owner ruling (2026-11-20), Rand Lee: "Python exceptions need to be caught (return error) so app doesn't crash."
-
-Owner ruling (2026-11-21), Rand Lee: "always return descriminated unions w/ error info"
-
-Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
-
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] Sending SIGINT to `decidr` during a batch makes every unfinished request end with `decision.cancelled`, flushes the session log, and exits non-zero.
-- [ ] Sending SIGTERM to `decidr` during a batch has the same result as SIGINT.
-- [ ] Raising `KeyboardInterrupt` during an `sc-agent-py` batch cancels the flag, ends unfinished requests with `decision.cancelled`, flushes the session log, and returns the results without raising.
+- [ ] CLI run: sending SIGINT to `decidr` during a batch stops the in-flight requests.
+- [ ] CLI run: sending SIGTERM to `decidr` during a batch stops the in-flight requests.
+- [ ] CLI run: after SIGINT, and in a separate run after SIGTERM, during a batch, every unfinished request in the output ends with `decision.cancelled`.
+- [ ] CLI run: after SIGINT, and in a separate run after SIGTERM, during a batch, the session log holds a row for every request that finished before the signal.
+- [ ] Unit test: raising `KeyboardInterrupt` during an `sc-agent-py` batch stops the in-flight requests.
+- [ ] Unit test: raising `KeyboardInterrupt` during an `sc-agent-py` batch does not raise out of the call.
+- [ ] Unit test: after `KeyboardInterrupt` during an `sc-agent-py` batch, the session log holds a row for every request that finished before the interrupt.
+- [ ] Unit test: after `KeyboardInterrupt` during an `sc-agent-py` batch, the call returns one result per request, each unfinished one a `decision.cancelled` error value.
+- [ ] CLI run: `decidr` exits non-zero after SIGINT, and in a separate run after SIGTERM, during a batch.
 
 ### Dependencies
 

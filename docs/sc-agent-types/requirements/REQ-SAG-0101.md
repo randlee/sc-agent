@@ -1,9 +1,9 @@
 # Requirement: Model short names
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -14,13 +14,14 @@
 
 ### Requirement Statement
 
-Definitions: A short name is a model name without a version. A line is the series of releases of one model.
+Definitions: A short name is a model name without a version. A line is the series of releases of one model. The cloud short names are `jev`, `haiku`, `sonnet`, `opus`, `fable`, `luna`, `terra`, `sol` and `astra`. The local short names are `laya` and `decider`. The model table (the provider tables) is the list of model rows in `sc-agent`; each row maps a model id to a provider. A local model is a row whose provider is an endpoint on a computer the user runs. A specific model version is a model id that includes its version.
 
 **MUST statements:**
 
-- The provider tables in `sc-agent` MUST define the short names `jev`, `haiku`, `sonnet`, `opus`, `fable`, `luna`, `terra`, `sol` and `astra`.
+- Each cloud short name MUST resolve to a model in the `sc-agent` provider tables.
 - Each short name MUST select the latest model of its line.
 - `jev` MUST select the latest Jev model.
+- Each local short name MUST resolve to a local model in the model table.
 - A caller MUST be able to select a specific model version instead of a short name.
 
 ### Rationale
@@ -34,6 +35,9 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 **Acceptance Criteria:**
 
 - [ ] Each of the nine short names resolves to the newest model of its line in the provider tables.
+- [ ] A unit test resolves each cloud short name to a model in the provider tables.
+- [ ] A unit test resolves `jev` to the newest Jev model.
+- [ ] A unit test resolves each local short name to a local model in the model table.
 - [ ] A specific version id from the catalog parses and resolves to itself.
 
 ### Dependencies

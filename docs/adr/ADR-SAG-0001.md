@@ -1,9 +1,9 @@
 # Decision: Every provider receives one request form
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
 
@@ -30,7 +30,7 @@ Jev, local Jev-compatible runners, Haiku and Luna must answer the same decision 
 
 ### Decision
 
-Every provider (Jev, local Jev-compatible runners, Haiku, Luna) receives the same Jev API request body. `sc-agent` holds one static table per provider, and each table names its request shape: SystemOne, Messages or chat/completions. Before a send, the request is adapted to the provider's request shape; the reply is decoded back into a Jev API response. Callers use two functions, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them. There are no traits and no wrapper request type.
+Every provider (Jev, local Jev-compatible runners, Haiku, Luna) receives the same Jev API request body. `sc-agent` holds one static provider table and one static model table; each provider names its request shape: SystemOne, Messages or chat/completions. Before a send, the request is adapted to the provider's request shape; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them. There are no traits and no wrapper request type.
 
 **Key Principles:**
 

@@ -1,9 +1,9 @@
 # Requirement: Provider and model are separate
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-25  
 **Owner:** Rand Lee  
 
 ---
@@ -14,19 +14,23 @@
 
 ### Requirement Statement
 
-Definitions: A provider is the service a request is sent to, such as OpenRouter, Nous, Together, OpenAI or Anthropic. A model is what that provider runs.
+Definitions: sc-agent is this project's client library and command-line tool that sends model requests. A provider is the service a request is sent to, such as OpenRouter, Nous, Together, OpenAI or Anthropic. A model is what that provider runs. A model id is the name a provider uses for a model, such as `anthropic/claude-haiku-5.5` at OpenRouter. A short name is the name a caller uses for a model, such as `haiku`. The model table is the list of models sc-agent can send to, one row per model and provider (REQ-SAG-0102). A key is the secret credential a provider requires before it accepts a request; a keyless provider requires none. The OpenAI API is the request service run by OpenAI.
 
 **MUST statements:**
 
-- Provider and model MUST be separate values; a catalog model id MUST NOT encode its provider.
-- Each provider MUST map a catalog model id to the id that provider uses for that model.
-- sc-agent MUST be able to send requests through Together and OpenRouter as well as the direct providers.
-- When no provider is named, sc-agent MUST use the first provider table, in list order, that has the selected model.
-- The provider for models served by the OpenAI API MUST be named `openai`.
+- A model-table row MUST store its provider in a field separate from its model.
+- A request MUST carry the model id stored in the selected model-table row.
+- sc-agent MUST be able to send requests through Together.
+- sc-agent MUST be able to send requests through OpenRouter.
+- When configuration names a provider for a model, sc-agent MUST send that model's requests to that provider.
+- When no provider is configured for a model, sc-agent MUST prefer a provider that needs no key over one that needs a key.
+- When no provider is configured for a model and every provider serving it needs a key, sc-agent MUST use the first of them whose key is found.
+- The provider that sends requests to the OpenAI API MUST have the name `openai`.
 
 **MUST NOT statements:**
 
-- sc-agent MUST NOT require the caller to name a provider.
+- A short name MUST NOT encode its provider.
+- A request MUST NOT require the caller to name a provider.
 
 ### Rationale
 
@@ -38,6 +42,12 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Acceptance Criteria:**
 
-- [ ] One catalog model id selects the same model through two different providers; each provider sends the id that provider uses for it (for example OpenRouter's `anthropic/claude-haiku-5.5` for `claude-haiku-5-5`).
-- [ ] With no provider argument, a `haiku` request goes to the first provider table in list order that has `haiku`.
-- [ ] The provider list contains `openai` for models served by the OpenAI API.
+- [ ] Unit test: every model-table row stores its provider in a field separate from its model.
+- [ ] Unit test: a short name served by two providers is the same string for both rows.
+- [ ] Unit test: the short name `haiku` selects the same model through two different providers, and each sends its own id: `claude-haiku-5-5` through `anthropic` and `anthropic/claude-haiku-5.5` through `openrouter`.
+- [ ] Unit test: with `openrouter` configured for `haiku` and the `anthropic` key also found, a `haiku` request goes to `openrouter`.
+- [ ] Unit test: with no provider configured, a model served by a keyless provider and a keyed provider goes to the keyless one.
+- [ ] Unit test: with no provider configured and only the `openrouter` key found, a `haiku` request goes to `openrouter`.
+- [ ] Unit test: requests can be sent through `together` and through `openrouter`.
+- [ ] Unit test: a request that names only a model, with no provider, is sent.
+- [ ] Unit test: the provider that sends to the OpenAI API is named `openai`.

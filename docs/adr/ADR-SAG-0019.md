@@ -1,9 +1,9 @@
 # Decision: sc-decidr is the one Python decision harness: error values with a stored category, per-call limits and a generated consumer module
 
 **Status:** Approved  
-**Version:** 1.0.0  
+**Version:** 1.10.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-22  
+**Last Updated:** 2026-11-26  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-14  
 
@@ -15,7 +15,7 @@
 
 ### Related Documents
 
-New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category table), REQ-SAG-0702 (per-call limits), REQ-SAG-0018 (the generated consumer module), and NFR-SAG-0003 (one Python floor). REQ-SAG-0007 covers decision values. REQ-SAG-0601 and REQ-SAG-0602 cover resends. REQ-SAG-0701, REQ-SAG-0013 and REQ-SAG-0015 set the configured worker count and timeouts. ADR-SAG-0004 sets the crate layering and that errors are `Result<T, E>`.
+New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (categories), REQ-SAG-0702 (limits and batch order), REQ-SAG-0018 (the generated consumer module) and NFR-SAG-0003 (one Python floor). Decisions 13 to 15 were added, and decisions 1 and 14 amended, on 2026-11-24: model resolution is REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0103 and REQ-SAG-0801, configuration is REQ-SAG-0019, session rows, run log and cache are REQ-SAG-0005 and REQ-SAG-0703, the session-row reader is REQ-SAG-0022, and one owner is NFR-SAG-0004. ADR-SAG-0004 sets the crate layering and that errors are `Result<T, E>`; ADR-SAG-0021 sets the log paths and the session sink.
 
 **Requirements:**
 
@@ -31,185 +31,114 @@ New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (the category
 - REQ-SAG-0701
 - REQ-SAG-0013
 - REQ-SAG-0015
+- REQ-SAG-0005
+- REQ-SAG-0703
+- REQ-SAG-0101
+- REQ-SAG-0102
+- REQ-SAG-0103
+- REQ-SAG-0801
+- REQ-SAG-0019
+- REQ-SAG-0022
+- NFR-SAG-0004
 
 **Architecture Decisions:**
 
 - ADR-SAG-0004
+- ADR-SAG-0021
 
 ### Context
 
-sc-decidr is the one harness through which sc-agent's Python consumers reach decision models: Jev, decider, Laya, Haiku and Luna. It owns model selection, API-key lookup, session logging (one record per query and response), the injectable general logger, resends and errors.
+sc-decidr is the harness through which sc-agent's Python consumers reach decision models (Jev, decider, Laya, Haiku, Luna). The owner requires judge-jev, plan-anchor and every later consumer to integrate identically for errors, API keys, model selection, the injectable general logger and session logging, differing only in prompt authoring and result handling.
 
-The owner requires that judge-jev, plan-anchor and every later Python consumer have identical integration for errors, API keys, model selection, the injectable general logger and session logging. They differ only in prompt authoring and in processing results and decision trees.
-
-The two existing consumers each rebuilt the wheel boundary, and the copies diverged:
-
-- **Errors.** judge-jev pins the original id list and falls back to `JEV.UNMAPPED`. plan-anchor matches message text (`"http 401"`).
-- **Model.** judge-jev passes the model selector unchanged. plan-anchor pins `provider="typesafe"`, which disables Haiku and Luna.
-- **Order.** Both re-sort `send_batch` results into input order.
-- **Timeout.** judge-jev refuses `--timeout`. plan-anchor calls the unreleased `timeout_secs`.
-
-Two gaps remained: consumers had no category to branch on, so they pinned id lists; and there was no per-call worker count or CLI timeout flag.
+The two existing consumers each rebuilt the wheel boundary, and the copies diverged: judge-jev pins an id list with a `JEV.UNMAPPED` fallback while plan-anchor matches message text (`"http 401"`); plan-anchor pins `provider="typesafe"`, disabling Haiku and Luna; both re-sort `send_batch` results; judge-jev refuses `--timeout` while plan-anchor calls the unreleased `timeout_secs`. Consumers had no category to branch on and no per-call worker count or timeout.
 
 ### Decision
 
-sc-decidr makes the wheel the one consumer boundary for Python decision consumers, through these decisions. Decision numbers are stable; there is no decision 3.
+The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.
 
-1. **The wheel is the consumer boundary.**
+1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection (decision 13), API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Neither session logging nor the injected general logger is optional (REQ-SAG-0008, REQ-SAG-0022). Session logging is always on: one row per query sent to a model, at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path. The generated client gets one Logger from the wheel, named after the client and writing `~/.sc-agent/logs/<client>.log.jsonl`, and gives it to its Run and every sitr call (REQ-SAG-0022).
 
-   Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr.
+   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`, shipped as package data; the wheel moves to maturin's mixed layout and `import sc_agent` is unchanged.
 
-   | Concern | Provided by sc-decidr | Consumer does |
-   | --- | --- | --- |
-   | Model and provider | `model=` takes a short name or a full model id. With `provider=None` the first provider table, in list order, that has the name is used; among rows that share a short name the most recent wins. | Pass the selector unchanged. Never set `provider`. |
-   | API keys | The environment, then the repo-root `.env`, then the OS keyring. | Nothing. |
-   | Session log | One record per query and response, always written to the wheel's default location, tagged with `project` and `agent_role`. | Pass `project` and `agent_role`. Sessions are appended to the default session files (REQ-SAG-0008, ADR-SAG-0021); no session Logger is injected. |
-   | General log | The generated client obtains one Logger from the sc-decidr wheel, named after the client and writing `~/.sc-agent/logs/<client>.log.jsonl`, and injects it into every sc-decidr and sitr call (REQ-SAG-0022, ADR-SAG-0021). | Log its own records to the client's Logger, or pass its own Logger to the client. |
-   | Errors | The returned error value: `id`, `message`, `action`, a stored `category` and the send count (decisions 2, 5 and 6). | Map a category to its own codes. Never parse message text. |
-   | Limits | `timeout_secs`, `workers`, a fixed resend count and cancellation (decision 7). | Pass its own flags through. |
-   | Batch order | `send_batch` returns one result per request, each with its input position (decision 8). | Nothing. |
+   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping.
+   - Its variables are `client_name`, `tool_version`, `sitr` (`true` or `false`) and `sc_decidr_version`; model selectors are Run arguments.
+   - A result line holds only the generic result fields (schema, tool, tool_version, run_id, session_id, request_id, project, agent_role, threshold, verdict, min_confidence, leaning, ok, error); session data stays in the session row. The module reads session rows only through `sc_agent.session_rows`, finding a run's queries through its link records or the session_ids in its result lines, and never computes a session-log path.
+   - Python results are typed values, not dicts.
+   - sc-compose is an external render tool, not a wheel dependency; the template's front matter declares its sc-compose minimum (`requires.cli`), declared, not enforced.
 
-   **The integration artifact is a generated module** (REQ-SAG-0018). The wheel ships an sc-compose template, `sc_agent/templates/consumer.py.j2`, as package data, and each consumer renders its integration module from it. To carry the file, the wheel moves to maturin's mixed layout; `import sc_agent` is unchanged.
+   **The lower-level API stays the contract.** `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public, and the generated code uses only them and the standard library.
 
-   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping. Prompt authoring and result processing stay in the consumer.
-   - Its variables are `client_name`, `sitr` (`true` or `false`) and `sc_decidr_version`; model selectors are call arguments. Session logging and the injected general logger are not optional (REQ-SAG-0008, REQ-SAG-0022).
-   - sc-compose is an external render tool, not a dependency of the wheel. The template's front matter declares its sc-compose minimum (`requires.cli`); the minimum is declared, not enforced.
-   - All Jev queries and responses go to the session log, so every consumer's Jev data takes the same path and can be filtered by repository and agent.
+2. **Typed fields: `attempts` and `category`.** An error value carries at least `id`, `message` and `action`, plus `attempts` (sends made, the first included) and `category` (decision 6) when they apply; unset fields are not written (REQ-SAG-0016). Retry-After is read as a Duration and used for the wait before a resend (REQ-SAG-0601).
 
-   **The lower-level API stays the contract.** `send`, `send_batch`, `digest`, `logger`, `log`, `flush`, `Cancel` and `sc_agent.sitr` are public. The generated code uses only them and the standard library.
+4. **Breaking minor release.** The error type and call API change, which breaks SemVer for Rust; below 1.0 a minor bump is the breaking bump, and for Python the change only adds things. All workspace crate and wheel versions move together (`[workspace.package].version` in `Cargo.toml`), enforced by `verify-version-lockstep`; sc-decidr is the one wheel and holds the sitr API, so decidr and sitr always share a version.
 
-2. **Typed fields: `attempts` and `category`.**
+5. **Python errors.** Every wheel call returns ok with a value or an error with its id and message; nothing raises (REQ-SAG-0016).
 
-   An error value carries at least `id`, `message` and `action`, and the typed fields below when they apply. It may carry more fields. Unset is not written.
+6. **The category is stored when the error is built.** The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`. Every error has a stable id and stores its category, which Python reads from the `category` field (REQ-SAG-0017). Retryable means worth resubmitting as a new call later, after the wheel's own resends have run out; it is true for `busy` and `network` only, and a consumer that resubmits waits first rather than wrapping the wheel in an immediate retry loop.
 
-   | Field | Meaning |
-   | --- | --- |
-   | `attempts` | The sends made for this request, the first one included. |
-   | `category` | The error's category (decision 6). |
+7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run's calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout. The timeout defaults to 120 s; a send that times out is resent up to 5 sends in all, the first included (REQ-SAG-0601); busy and network errors are resent up to a fixed count. REQ-SAG-0702 holds the rules.
 
-   REQ-SAG-0016 holds the requirements.
+8. **`send_batch` returns one result per request, each with its input position**, while `on_result` still receives each line as it finishes (REQ-SAG-0702).
 
-   **Retry-After is read as a Duration** and used for the wait before a resend.
+9. **Verification is the contract tests and the consumers' suites; the integration gate is removed.** `decidr::integration_gate`, its re-exports `integration_cases` and `validate_integration_results`, the matching `sc_agent` functions and the report and gate tooling are removed before 0.2.0; `decidr.integration_evidence` is not an error id. Contract tests run at the product boundary against a local HTTP server, with no network, no real home and no sleeps; the work is done when they and plan-anchor's and judge-jev's suites pass against the new wheel. REQ-SAG-0133 is superseded.
 
-4. **Breaking minor release.**
+10. **Category assignments are not locked** (owner ruling 2026-11-20).
 
-   The Rust change breaks SemVer: the error type and the call API change. Below 1.0 a minor bump is the breaking bump. For Python the change only adds things.
+11. **sitr is an optional, separate section of the consumer template.** It uses `sc_agent.sitr` only (ADR-SAG-0005, ADR-SAG-0021) and is kept separate from the decision call: extraction runs outside the decision path, and its output feeds the consumer's prompt authoring. In this phase one offline test shows extraction output reaching a dry-run request.
 
-   All workspace crate and wheel versions move together (`[workspace.package].version` in `Cargo.toml`); `verify-version-lockstep` enforces this. sc-decidr is the one wheel and holds the sitr API, so decidr and sitr always have the same version in Python.
+12. **One Python floor (NFR-SAG-0003).** `floors.toml` at the repository root records the Python floor (`[python] floor`) and the sc-compose minimum (`[tools] sc-compose`); the pyo3 abi3 feature of `sc-agent-py` follows the floor so the wheel tag matches its `requires-python`. Until sc-compose can read `floors.toml`, the template carries these values as literals.
 
-5. **Python errors.**
+13. **A provider is an endpoint; models are rows that reference it.** A provider is a base address (a fixed URL, or a configured host and port for the local `laya` and `decider` endpoints), a wire and an optional credential name; the model table has one row per model with a fixed model id, local endpoints included, and sc-agent never branches on a provider's or model's name, so adding a model is one row plus configuration. Configuration `models.<alias>` entries add rows; a configured entry overrides the model its name selects (owner ruling 2026-11-25; REQ-SAG-0019), and otherwise short names resolve over the built-in rows sorted newest first (REQ-SAG-0102, REQ-SAG-0103, REQ-SAG-0019; local endpoints: REQ-SAG-0801). laya (`laya:en`) and decider are rows on keyless local endpoints whose host and port come from configuration (`<endpoint>.host`, `<endpoint>.port`); they differ only by connection string. decider has two rows, `decider-4b-v2.1` (port 18001) before `decider-2b-v11` (port 18000), both released 2026-09-24, so `decider` resolves to 4b; the decider servers ignore `model`, but every request carries the resolved id. Built-in rows sharing a release date keep table order. The `nous` provider serves `haiku` as `anthropic/claude-haiku-5.5` and `luna` as `openai/gpt-6-luna`, tying with the first-party rows on release date. A local reply whose `model` differs from the resolved id is returned to the caller as `decision.model_mismatch`. Logging is a separate layer: the session log records what happened, the model that responded included (REQ-SAG-0005). When several providers serve a model, the configured provider is used, then one that needs no key, then the first whose key is found. Configuration can add a local model on another computer but cannot change where a paid API's key is sent. A selection is resolved once, at the CLI flag or Run creation, into one typed value holding alias, id and provider; there is no `provider` argument or `--provider` flag. The Run holds its model, with no per-call model; consumers take the selector from their caller and never name a model in code.
 
-   Every wheel call returns ok with a value or an error with its id and message; nothing raises.
+14. **A run is a context object.** `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`); creating it mints the run's ULID `run_id` in Rust (as are `session_id` ULIDs), readable as `run.run_id`.
 
-6. **The category is stored when the error is built.**
+    - Everything that does not change between a command's calls is resolved once at creation and held by the Run: tool identity, model, cache policy, project/phase, configuration, worker count, send timeout, log root and credential sources. The Run owns the general Logger or borrows the one given, and flushes after each call and on exit.
+    - The cancel flag belongs to the Run. An interrupt (Ctrl-C, SIGINT, SIGTERM in decidr; KeyboardInterrupt in sc-agent-py) cancels the Run whose call is running; Python has no separate cancel object.
+    - The model, and optionally a default `agent_role`, are set on the Run. `run.cancel()` cancels the Run's calls.
+    - The request hash is the SHA-256 digest (sc-sha) of the exact request body bytes sent. The Run's cache policy is the configuration key `cache` unless `Run(cache=)` overrides it; a call's `cache` override applies to that call only, every job included, and each batch job is a hit or a miss on its own (REQ-SAG-0703).
+    - One send path: `send` and `send_batch` call one private sender, and `decidr` creates one Run per command.
 
-   The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`.
-
-   - Every error has a stable id.
-   - Every error stores its category.
-
-   Python reads the `category` field of the returned error value.
-
-   **Retryable means "worth resubmitting as a new call later, after the wheel's own resends have run out."** It is true for `busy` and `network` only. A consumer that resubmits waits first and does not wrap the wheel in an immediate retry loop.
-
-7. **Per-call limits: `timeout_secs` (exists) and `workers` (new).**
-
-   `send` and `send_batch` take an optional timeout (a Duration) and an optional worker count; each applies to that call only; a bad value is an error value.
-
-   - Python: `send_batch(workers=, timeout_secs=)` and `send(timeout_secs=)`. CLI: `--workers N` and `--timeout-secs SECS`.
-   - A limit applies to its own call only. `None` means the configured value. A `workers` value below or above the configured count is honored.
-   - `timeout_secs` replaces the default 120 s send timeout for every send of the call.
-   - Every send gets the full timeout, resends included. Busy and network errors are resent up to a fixed count.
-
-   REQ-SAG-0702 holds the requirements.
-
-8. **`send_batch` returns one result per request, each with its input position.**
-
-   `on_result` still receives each line as it finishes.
-
-9. **Verification is the contract tests and the consumers' suites; the integration gate is removed.**
-
-   `decidr::integration_gate`, its re-exports `integration_cases` and `validate_integration_results`, the matching `sc_agent` functions and the surrounding report and gate tooling are removed before 0.2.0. `decidr.integration_evidence` is not an error id.
-
-   Contract tests run at the product boundary against a local HTTP server in the test, with no network, no real home and no sleeps. The work is done when they pass and plan-anchor's and judge-jev's suites pass against the new wheel. REQ-SAG-0133 is superseded by this decision.
-
-10. **Category assignments are not locked.**
-
-    Rand Lee (2026-11-20): "schema isn't locked yet ... No hand built checks."
-
-11. **sitr is an optional, separate section of the consumer template.**
-
-    sitr's Python API is `sc_agent.sitr`, inside the sc-decidr wheel (ADR-SAG-0005, ADR-SAG-0021). The template's sitr section is kept separate from the decision call: extraction runs outside the decision path, and its output is passed into the consumer's prompt authoring. The section uses `sc_agent.sitr` only. In this phase one offline test shows extraction output reaching a dry-run request; sitr is not used beyond that yet.
-
-12. **One Python floor (NFR-SAG-0003).**
-
-    - `floors.toml` at the repository root writes down the Python floor (`[python] floor`) and the sc-compose minimum (`[tools] sc-compose`). It only records values.
-    - The pyo3 abi3 feature in `sc-agent-py` moves to the abi3 feature of the Python floor, so the wheel tag matches the `requires-python` the wheel declares.
-    - Until sc-compose can read `floors.toml`, the template carries these values as literals.
+15. **One owner (NFR-SAG-0004).** ULID minting, the provider table and its credential list, the model table and the session-log layout are owned by the sc-agent Rust crate and exposed through the decidr CLI and the wheel, which exports the provider-key list, the session-row reader and the Run that mints `run_id`; the consumer template and every consumer call them and hold no copy.
 
 ### Rationale
 
-Two consumers rebuilt the wheel boundary and the copies diverged, so every concern except prompt authoring and result interpretation moves into sc-decidr, and the integration code is generated from one template. A stored category and the send count replace message-text parsing and pinned id lists. Storing the category when the error is built needs no lookup. Per-call limits and position-tagged batch results remove the consumer code that worked around their absence. Prerelease tooling leaves the product API so it does not freeze into the error contract.
+Two consumers rebuilt the boundary and diverged, so the boundary moves into the wheel and integration code is generated from one template. A stored category and the send count replace message parsing and pinned id lists, and per-run limits and position-tagged results remove consumer workarounds; prerelease tooling leaves the product API so it does not freeze into the error contract.
 
-Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
-
-Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiring subnanosecond rounding for a http call." "Use time structs for time." "always return descriminated unions w/ error info" "I do not require results in request order." "No hand built checks."
+Owner ruling 2026-11-24 on a model mismatch: "Session log logs what happened. It has no control over a misconfigured computer."
 
 ### Consequences
 
 **Positive:**
 
-- Every Python consumer renders the same integration module and contains only its own prompts and result handling.
-- No consumer parses error text or pins id lists.
-- All Jev data from every consumer takes one session-log path.
+- Every Python consumer renders the same integration module and holds only its prompts and result handling.
+- No consumer parses error text or pins id lists, and all Jev data takes one session-log path.
 - Prerelease tooling no longer ships in the product crate or wheel.
 
 **Negative:**
 
-- This is a breaking release for Rust dependents: the error type and the call API change.
+- A breaking release for Rust dependents: the error type and call API change.
 - The wheel moves to maturin's mixed layout.
 
 ### Alternatives Considered
 
 #### Alternative 1: A separate `server` category for 500, 503 and 504
 
-**Description:**
+**Description:** Count these final replies as `server` instead of `busy`.
 
-Add a `server` category instead of counting these final replies as `busy`.
-
-**Why Rejected:**
-
-It would extend the fixed category set for a distinction no consumer acts on; `busy` already means "resubmit later".
+**Why Rejected:** It extends the fixed set for a distinction no consumer acts on; `busy` already means "resubmit later".
 
 #### Alternative 2: A "Consumer integration" recipe in the README
 
-**Description:**
+**Description:** Document the integration for each consumer to copy.
 
-Document the integration as a recipe for each consumer to copy.
-
-**Why Rejected:**
-
-A recipe is copied by hand, and two hand-written copies already diverged.
+**Why Rejected:** Hand copies already diverged.
 
 #### Alternative 3: An import-time version check in the consumer module
 
-**Description:**
+**Description:** Raise on import when the generated header's versions differ from the installed sc-decidr or sitr.
 
-Raise on import when the versions recorded in the generated header differ from the installed sc-decidr or sitr.
-
-**Why Rejected:**
-
-A fail-fast check makes troubleshooting and development harder. Mixed versions are documented as unsupported, not enforced.
+**Why Rejected:** It hinders troubleshooting and development; mixed versions are documented as unsupported, not enforced.
 
 ### Implementation
 
-The work lands on one branch, `rewrite/v1`, and merges into `develop` in one PR. The tests are the acceptance criteria of REQ-SAG-0016, REQ-SAG-0017, REQ-SAG-0018, REQ-SAG-0702 and NFR-SAG-0003.
-
-Deliverables beyond the code:
-
-- `CHANGELOG.md` (new), with "Breaking" and "Consumer migration" sections. The migration section names what judge-jev and plan-anchor delete: pinned id lists, `JEV.UNMAPPED`, message-text status parsing, the `--timeout` refusal, the ignored `--max-workers`, the `provider="typesafe"` pin, result re-sorting, their own retry loops and their hand-written integration glue.
-- The consumer template and the `sc_agent/__init__.pyi` stub.
-- `floors.toml`.
-- The sc-decidr wheel, holding the decidr and sitr APIs, released to PyPI.
-
-Changes inside judge-jev, plan-anchor and other consumer repositories are out of scope.
+The work lands on `rewrite/v1` and merges into `develop` in one PR; the tests are the acceptance criteria of REQ-SAG-0016, REQ-SAG-0017, REQ-SAG-0018, REQ-SAG-0702 and NFR-SAG-0003. Beyond the code: `CHANGELOG.md` (new) with "Breaking" and "Consumer migration" sections, the migration naming what judge-jev and plan-anchor delete (pinned id lists, `JEV.UNMAPPED`, message-text parsing, the `--timeout` refusal, the ignored `--max-workers`, the `provider="typesafe"` pin, result re-sorting, their retry loops and hand-written glue); the consumer template, `sc_agent/testing.py` and `sc_agent/__init__.pyi`; `floors.toml`; and the sc-decidr wheel, with the decidr and sitr APIs, on PyPI. Consumer-repository changes are out of scope.

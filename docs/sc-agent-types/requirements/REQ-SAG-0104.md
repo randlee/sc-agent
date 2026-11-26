@@ -1,9 +1,9 @@
 # Requirement: Cancel token
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-25  
 **Owner:** Rand Lee  
 
 ---
@@ -14,14 +14,18 @@
 
 ### Requirement Statement
 
+Definitions: `Cancel` is the Rust type in the `sc-agent` crate that carries one cancellation signal; code cancels it, and every operation holding it stops. An operation is a call `sc-agent` is running. An operation stops when it returns the `decision.cancelled` error without finishing its work. A crate is a Rust package in this repository. A command-line tool built on `sc-agent` is a binary in this repository that calls the `sc-agent` crate; today `decidr` and `sitr`. PyO3 is the Rust library that builds the `sc_agent` Python module from Rust code; the PyO3 bindings are that module. A user interrupts a command-line tool by pressing Ctrl-C or sending it SIGTERM.
+
 **MUST statements:**
 
-- `sc-agent` MUST provide the cancel flag type, `Cancel`.
-- The cancel flag MUST be usable from the CLI and the PyO3 bindings.
+- `sc-agent` MUST provide a `Cancel` type.
+- Cancelling a `Cancel` MUST stop an operation that holds it and runs in another crate.
+- When the user interrupts a command-line tool built on `sc-agent`, that tool MUST cancel the `Cancel` its operation holds.
+- The PyO3 bindings MUST let Python code cancel the `Cancel` an operation holds.
 
 ### Rationale
 
-Streaming and launches in several crates must agree on one cancellation signal.
+Every crate that runs an `sc-agent` call must agree on one cancellation signal, so a cancel from a command-line tool or from Python reaches every crate doing the work.
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
@@ -29,5 +33,6 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Acceptance Criteria:**
 
-- [ ] A cancel flag created in one crate stops an operation in another crate when cancelled.
-- [ ] A cancel flag cancelled from Python stops the operation it was passed to.
+- [ ] A unit test creates a `Cancel` in one crate, cancels it, and shows an operation in another crate stops.
+- [ ] A CLI run interrupted by the user stops its running operation and exits.
+- [ ] A Python test cancels a running operation through the bindings and shows it stops.

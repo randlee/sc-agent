@@ -261,6 +261,8 @@ def _node_json(tree: TreeGraph, node) -> dict:
     if _one(tree, node, "per") is not None:
         out["per"] = _one(tree, node, "per")
         out["statements"] = _one(tree, node, "statements")
+        if _one(tree, node, "onlyMatched"):
+            out["only_matched"] = True
     modals = sorted(_value(m) for m in _objects(tree, node, "modal"))
     if modals:
         out["modals"] = modals

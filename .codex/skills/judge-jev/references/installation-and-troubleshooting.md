@@ -1,6 +1,6 @@
 ---
 name: installation-and-troubleshooting
-version: 0.7.0
+version: 0.8.0
 description: Installing judge-jev into a repository or a parent folder with the judge-jev-installer skill (install.py), per-repository overrides and per-folder upgrades, the CLIs and credentials judge-jev depends on (python3, PyYAML, TypeSafe API key), minimum versions, PATH issues in Claude Code, Codex and Cursor environment policy, and known issues.
 ---
 

@@ -11,9 +11,9 @@ t:quality-req a jj:Tree ;
     jj:kind "req" ;
     jj:version 1 ;
     jj:approved true ;
-    jj:note "wave-1 wording approved by Rand Lee, 2026-11-08" ;
+    jj:note "gate questions checkable, term (yes/no) and joined_by as a second step: wording set by Rand Lee in issue #137, 2026-11-25" ;
     jj:start t:quality-req:wave-1 ;
-    jj:node t:quality-req:wave-1 .
+    jj:node t:quality-req:wave-1 , t:quality-req:wave-2 , t:quality-req:yes , t:quality-req:no .
 
 t:quality-req:wave-1 a jj:Wave ;
     jj:id "wave-1" ;
@@ -21,30 +21,62 @@ t:quality-req:wave-1 a jj:Wave ;
     jj:statements "requirement_statement.statements" ;
     jj:modal "Must" ;
     jj:modal "MustNot" ;
-    jj:asks q:req.obligations , q:req.joined_by , q:req.term , q:req.check ;
-    jj:rule t:quality-req:wave-1:rule-1 , t:quality-req:wave-1:rule-2 , t:quality-req:wave-1:rule-3 .
+    jj:asks q:req.obligations , q:req.term , q:req.checkable , q:req.d_term_kind , q:req.d_check_method ;
+    jj:rule t:quality-req:wave-1:rule-1 , t:quality-req:wave-1:rule-2 , t:quality-req:wave-1:rule-3 , t:quality-req:wave-1:rule-4 .
 
-t:quality-req:wave-1:rule-1 a jj:VerdictRule ;
+t:quality-req:wave-1:rule-1 a jj:BranchRule ;
     jj:rank 1 ;
-    jj:verdict "no" ;
+    jj:goto t:quality-req:no ;
+    jj:whenAll
+        [ a jj:Condition ; jj:question q:req.term ;
+          jj:choice o:req.term:no ] .
+
+t:quality-req:wave-1:rule-2 a jj:BranchRule ;
+    jj:rank 2 ;
+    jj:goto t:quality-req:no ;
+    jj:whenAll
+        [ a jj:Condition ; jj:question q:req.checkable ;
+          jj:choice o:req.checkable:needs-a-measure , o:req.checkable:no ] .
+
+t:quality-req:wave-1:rule-3 a jj:BranchRule ;
+    jj:rank 3 ;
+    jj:goto t:quality-req:wave-2 ;
     jj:whenAll
         [ a jj:Condition ; jj:question q:req.obligations ;
-          jj:choice o:req.obligations:2 , o:req.obligations:3 , o:req.obligations:4 ] ,
+          jj:choice o:req.obligations:2 , o:req.obligations:3 , o:req.obligations:4 ] .
+
+t:quality-req:wave-1:rule-4 a jj:BranchRule ;
+    jj:rank 4 ;
+    jj:goto t:quality-req:yes .
+
+t:quality-req:wave-2 a jj:Wave ;
+    jj:id "wave-2" ;
+    jj:per "statement" ;
+    jj:statements "requirement_statement.statements" ;
+    jj:modal "Must" ;
+    jj:modal "MustNot" ;
+    jj:onlyMatched true ;
+    jj:asks q:req.joined_by ;
+    jj:rule t:quality-req:wave-2:rule-1 , t:quality-req:wave-2:rule-2 .
+
+t:quality-req:wave-2:rule-1 a jj:VerdictRule ;
+    jj:rank 1 ;
+    jj:verdict "no" ;
+    jj:whenAny
         [ a jj:Condition ; jj:question q:req.joined_by ;
           jj:choice o:req.joined_by:and-list , o:req.joined_by:alternatives , o:req.joined_by:obligation-rationale ] .
 
-t:quality-req:wave-1:rule-2 a jj:VerdictRule ;
+t:quality-req:wave-2:rule-2 a jj:VerdictRule ;
     jj:rank 2 ;
-    jj:verdict "no" ;
-    jj:whenAny
-        [ a jj:Condition ; jj:question q:req.term ;
-          jj:choice o:req.term:project-term-defined-nowhere , o:req.term:vague-qualifier , o:req.term:undefined-acronym ] ,
-        [ a jj:Condition ; jj:question q:req.check ;
-          jj:choice o:req.check:needs-a-measure , o:req.check:none ] .
-
-t:quality-req:wave-1:rule-3 a jj:VerdictRule ;
-    jj:rank 3 ;
     jj:verdict "yes" .
+
+t:quality-req:yes a jj:Leaf ;
+    jj:id "yes" ;
+    jj:verdict "yes" .
+
+t:quality-req:no a jj:Leaf ;
+    jj:id "no" ;
+    jj:verdict "no" .
 
 q:req.obligations a jj:Question ;
     jj:id "obligations" ;
@@ -65,9 +97,82 @@ o:req.obligations:4 a jj:Option ; jj:rank 4 ;
     jj:label "4+" ;
     jj:criterion "Four or more independent obligations." .
 
+q:req.term a jj:Question ;
+    jj:id "term" ;
+    jj:rank 2 ;
+    jj:instructions "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the requirement record in `record`. Judge only `statement`; use `record` as context. Is every term in this statement common usage, defined in this record, or defined in a linked record?" ;
+    jj:option o:req.term:yes , o:req.term:no .
+
+o:req.term:yes a jj:Option ; jj:rank 1 ;
+    jj:label "yes" ;
+    jj:criterion "Every term is common usage, defined in this record, or defined in a linked record." .
+o:req.term:no a jj:Option ; jj:rank 2 ;
+    jj:label "no" ;
+    jj:criterion "At least one term is none of these." .
+
+q:req.checkable a jj:Question ;
+    jj:id "checkable" ;
+    jj:rank 3 ;
+    jj:instructions "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the requirement record in `record`. Judge only `statement`; use `record` as context. Can a tester decide whether this statement holds?" ;
+    jj:option o:req.checkable:yes , o:req.checkable:needs-a-measure , o:req.checkable:no .
+
+o:req.checkable:yes a jj:Option ; jj:rank 1 ;
+    jj:label "yes" ;
+    jj:criterion "Yes, by a test, a command run, or reading files." .
+o:req.checkable:needs-a-measure a jj:Option ; jj:rank 2 ;
+    jj:label "needs a measure" ;
+    jj:criterion "A check exists only once a measure is stated." .
+o:req.checkable:no a jj:Option ; jj:rank 3 ;
+    jj:label "no" ;
+    jj:criterion "Nothing could check it." .
+
+q:req.d_term_kind a jj:Question ;
+    jj:id "d_term_kind" ;
+    jj:rank 4 ;
+    jj:instructions "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the requirement record in `record`. Judge only `statement`; use `record` as context. What kind of term in this statement is unclear?" ;
+    jj:option o:req.d_term_kind:none , o:req.d_term_kind:project-term-defined-in-a-linked-record , o:req.d_term_kind:project-term-defined-nowhere , o:req.d_term_kind:vague-qualifier , o:req.d_term_kind:undefined-acronym .
+
+o:req.d_term_kind:none a jj:Option ; jj:rank 1 ;
+    jj:label "none" ;
+    jj:criterion "Every term is common usage or defined in the record." .
+o:req.d_term_kind:project-term-defined-in-a-linked-record a jj:Option ; jj:rank 2 ;
+    jj:label "project term defined in a linked record" ;
+    jj:criterion "A project term defined in a record this one links. Acceptable." .
+o:req.d_term_kind:project-term-defined-nowhere a jj:Option ; jj:rank 3 ;
+    jj:label "project term defined nowhere" ;
+    jj:criterion "A project term defined neither here nor in a linked record. Fix: define it or link the record." .
+o:req.d_term_kind:vague-qualifier a jj:Option ; jj:rank 4 ;
+    jj:label "vague qualifier" ;
+    jj:criterion "A qualifier such as fast, clear or robust with no measure. Fix: replace it with a measure." .
+o:req.d_term_kind:undefined-acronym a jj:Option ; jj:rank 5 ;
+    jj:label "undefined acronym" ;
+    jj:criterion "An acronym that is never expanded or defined. Fix: define the acronym." .
+
+q:req.d_check_method a jj:Question ;
+    jj:id "d_check_method" ;
+    jj:rank 5 ;
+    jj:instructions "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the requirement record in `record`. Judge only `statement`; use `record` as context. What would check this statement?" ;
+    jj:option o:req.d_check_method:unit-test , o:req.d_check_method:cli-run , o:req.d_check_method:inspection-or-grep , o:req.d_check_method:needs-a-measure , o:req.d_check_method:none .
+
+o:req.d_check_method:unit-test a jj:Option ; jj:rank 1 ;
+    jj:label "unit test" ;
+    jj:criterion "A unit or integration test." .
+o:req.d_check_method:cli-run a jj:Option ; jj:rank 2 ;
+    jj:label "CLI run" ;
+    jj:criterion "Running a command and reading its output or exit code." .
+o:req.d_check_method:inspection-or-grep a jj:Option ; jj:rank 3 ;
+    jj:label "inspection or grep" ;
+    jj:criterion "Reading or searching files or output." .
+o:req.d_check_method:needs-a-measure a jj:Option ; jj:rank 4 ;
+    jj:label "needs a measure" ;
+    jj:criterion "A check exists only once a number is given. Fix: add a threshold." .
+o:req.d_check_method:none a jj:Option ; jj:rank 5 ;
+    jj:label "none" ;
+    jj:criterion "Nothing could check it. Fix: rewrite as an outcome." .
+
 q:req.joined_by a jj:Question ;
     jj:id "joined_by" ;
-    jj:rank 2 ;
+    jj:rank 6 ;
     jj:instructions "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the requirement record in `record`. Judge only `statement`; use `record` as context. What joins its obligations?" ;
     jj:option o:req.joined_by:none , o:req.joined_by:and-list , o:req.joined_by:condition-obligation , o:req.joined_by:alternatives , o:req.joined_by:obligation-rationale .
 
@@ -86,47 +191,3 @@ o:req.joined_by:alternatives a jj:Option ; jj:rank 4 ;
 o:req.joined_by:obligation-rationale a jj:Option ; jj:rank 5 ;
     jj:label "obligation+rationale" ;
     jj:criterion "An obligation plus its reason or purpose. Fix: move the rationale to Rationale." .
-
-q:req.term a jj:Question ;
-    jj:id "term" ;
-    jj:rank 3 ;
-    jj:instructions "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the requirement record in `record`. Judge only `statement`; use `record` as context. What kind of term in this statement is unclear?" ;
-    jj:option o:req.term:none , o:req.term:project-term-defined-in-a-linked-record , o:req.term:project-term-defined-nowhere , o:req.term:vague-qualifier , o:req.term:undefined-acronym .
-
-o:req.term:none a jj:Option ; jj:rank 1 ;
-    jj:label "none" ;
-    jj:criterion "Every term is common usage or defined in the record." .
-o:req.term:project-term-defined-in-a-linked-record a jj:Option ; jj:rank 2 ;
-    jj:label "project term defined in a linked record" ;
-    jj:criterion "A project term defined in a record this one links. Acceptable." .
-o:req.term:project-term-defined-nowhere a jj:Option ; jj:rank 3 ;
-    jj:label "project term defined nowhere" ;
-    jj:criterion "A project term defined neither here nor in a linked record. Fix: define it or link the record." .
-o:req.term:vague-qualifier a jj:Option ; jj:rank 4 ;
-    jj:label "vague qualifier" ;
-    jj:criterion "A qualifier such as fast, clear or robust with no measure. Fix: replace it with a measure." .
-o:req.term:undefined-acronym a jj:Option ; jj:rank 5 ;
-    jj:label "undefined acronym" ;
-    jj:criterion "An acronym that is never expanded or defined. Fix: define the acronym." .
-
-q:req.check a jj:Question ;
-    jj:id "check" ;
-    jj:rank 4 ;
-    jj:instructions "`item.text` is JSON: `statement` is one MUST or MUST NOT statement of the requirement record in `record`. Judge only `statement`; use `record` as context. What would check this statement?" ;
-    jj:option o:req.check:unit-test , o:req.check:cli-run , o:req.check:inspection-or-grep , o:req.check:needs-a-measure , o:req.check:none .
-
-o:req.check:unit-test a jj:Option ; jj:rank 1 ;
-    jj:label "unit test" ;
-    jj:criterion "A unit or integration test." .
-o:req.check:cli-run a jj:Option ; jj:rank 2 ;
-    jj:label "CLI run" ;
-    jj:criterion "Running a command and reading its output or exit code." .
-o:req.check:inspection-or-grep a jj:Option ; jj:rank 3 ;
-    jj:label "inspection or grep" ;
-    jj:criterion "Reading or searching files or output." .
-o:req.check:needs-a-measure a jj:Option ; jj:rank 4 ;
-    jj:label "needs a measure" ;
-    jj:criterion "A check exists only once a number is given. Fix: add a threshold." .
-o:req.check:none a jj:Option ; jj:rank 5 ;
-    jj:label "none" ;
-    jj:criterion "Nothing could check it. Fix: rewrite as an outcome." .

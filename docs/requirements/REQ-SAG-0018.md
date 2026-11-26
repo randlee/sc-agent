@@ -1,9 +1,9 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
 **Status:** Approved  
-**Version:** 0.7.0  
+**Version:** 1.8.0  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-22  
+**Last Updated:** 2026-11-25  
 **Owner:** Rand Lee  
 
 ---
@@ -14,86 +14,96 @@
 
 ### Requirement Statement
 
-Definitions:
+Definitions (how the template is built: ADR-SAG-0019 decision 1):
 
-- The consumer template is the sc-compose template `sc_agent/templates/consumer.py.j2`, which ships inside the sc-decidr wheel. It is rendered with sc-compose at or above the sc-compose minimum. sc-compose is an external tool, not a dependency of either wheel.
-- The sc-compose minimum is the `minimum_version` of the `sc-compose` entry under `requires.cli` in the consumer template's front matter. It is declared, not enforced.
-- The sc-decidr wheel holds both the decidr and the sitr Python API (ADR-SAG-0021), so they always have the same version.
-- The consumer module is the Python file a consumer renders from the consumer template.
-- The template variables are `client_name`, `sitr` (`true` or `false`, selecting the syntax-query section), and `sc_decidr_version`. Model selectors are passed unchanged as call arguments.
-- The client name is the template variable `client_name`. It names the consumer module's Logger and is the `agent_role` the module passes.
-- The public API is `send`, `send_batch`, `digest`, `logger`, `log`, `flush` and `Cancel`, as REQ-SAG-0016, REQ-SAG-0017 and REQ-SAG-0702 define them, plus `sc_agent.sitr` for the sitr section.
-- The session tags are the `project` and `agent_role` arguments of `send` and `send_batch`. They tag each session-log record with the consumer's repository and the calling agent's role.
-- The session log is the wheel's record of every query and response, written to the wheel's default location.
-- The logging wiring is the consumer module's code that obtains one Logger with `logger(client name)`, or takes the consumer's own Logger, and passes it to every public-API call.
-- The error mapping is the consumer module's code that reads an error value's `category` and maps that category to a consumer code through a category-to-code map the consumer passes in.
-- The sitr section is the part of the consumer module that runs tree-sitter extraction; its output is passed into the consumer's prompt authoring.
-- Consumer logic is prompt authoring and the processing of results and decision trees. It stays in the consumer.
-- The shared consumer code is what the wheel does not support and both consumers share: fixture loading and coverage, batch settings and ids, result-line encoding, attempt counting and the remote-judge consent gate.
-- An extension point is a template variable or a named block of the consumer template. Consumer-specific values reach the consumer module only through extension points, so later consumers can use the same template.
-- The wheel README is `crates/sc-agent-py/README.md`.
-- A decision call is a call to `send` or `send_batch`.
-- A covered release is an sc-agent release of version 0.2.0 or later.
-- The permitted API is the public API, the Python standard library, and the consumer's own modules named through an extension point (such as the consent settings module).
-- `provider` is the keyword argument of `send` and `send_batch` that forces a provider instead of resolving it from the model selector.
-- PyPI is the Python Package Index, pypi.org.
+- A consumer is a Python tool that makes Jev decision calls through the sc-decidr wheel; plan-anchor and judge-jev are the first two.
+- The consumer template is `sc_agent/templates/consumer.py.j2`. A consumer module is the Python file a consumer renders from it.
+- A consumer-specific value is a value that differs between consumers, such as a client name, a prompt or a result format.
+- The sc-decidr wheel is the Python wheel that ships the `sc_agent` package.
+- An extension point is a template variable or a named block of the consumer template.
+- Prompt authoring is building the text sent to the model. Result processing is handling the returned results and decision trees. Consumer logic is prompt authoring together with result processing.
+- A decision call is a Run's `send` or `send_batch`. The sitr section is the part of a consumer module that runs tree-sitter extraction.
+- A covered release is an sc-agent release of version 0.2.0 or later. PyPI is the Python Package Index, pypi.org.
+- The shared consumer code is fixture loading and coverage, batch settings and ids, result-line encoding and the consent gate.
+- The error mapping maps an error's `category` (REQ-SAG-0017) to a consumer code through the consumer's map.
+- The public API is the names the sc-decidr wheel exports to consumers. The wheel README is `crates/sc-agent-py/README.md`.
+- The session tags are the `project` and `agent_role` values a decision call records in the session log.
+- The logging wiring passes one Logger, the consumer's or `logger(client name)`, to every decision call.
+- The permitted API is the names ADR-SAG-0019 decision 1 makes public: `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr`, plus the Python standard library and the consumer's own modules named through an extension point.
+- A dry run composes a consumer's requests without sending them. A record is a session-log row, a result line, a tool record, a link record or a general-log entry.
+- The consent gate is the consumer module's `allow_remote_judge` check before a decision call.
+- `haiku` and `luna` are model selectors (REQ-SAG-0016). The TypeSafe key is `TYPESAFE_API_KEY`.
 
 **MUST statements:**
 
-- The consumer template MUST ship in the sc-decidr wheel as package data.
-- The consumer module MUST make the decision call through `send` or `send_batch`.
-- The consumer module MUST pass the model selector through unchanged.
-- Every decision call in the consumer module MUST pass the session tags.
-- The consumer module MUST contain the logging wiring.
-- The consumer module MUST contain the error mapping.
+- Every consumer MUST make its decision calls from code in its consumer module.
+- A consumer-specific value MUST reach the consumer module only through an extension point.
 - Extension points MUST be the only template inputs that change the consumer module's code.
 - The consumer template MUST carry the shared consumer code.
-- A consumer-specific value MUST reach the consumer module only through an extension point.
+- The consumer module MUST contain the error mapping.
 - The consumer template MUST be tested against the sc-decidr wheel of the same release.
+- The consumer module MUST call only the permitted API.
+- The consumer module MUST pass the model selector through unchanged.
+- The sc-decidr wheel's package data MUST include the consumer template.
 - PyPI MUST hold the sc-decidr wheel of every covered release.
 - The consumer module MUST use `sc_agent.sitr` only inside the sitr section.
 - The sitr section MUST stay separate from the decision call.
-- The consumer module MUST call only the permitted API.
-- Every decision call in the consumer module MUST pass a `Cancel`.
-- The consumer module MUST cancel that `Cancel` on `KeyboardInterrupt`.
 - The public API MUST stay documented in `sc_agent/__init__.pyi`.
 - The public API MUST stay documented in the wheel README.
-- The wheel README MUST name the consumer template.
 - The wheel README MUST give the consumer template's render command.
+- Every decision call in the consumer module MUST pass the session tags.
+- The consumer module MUST contain the logging wiring.
+- The consumer module MUST cancel its running Run on `KeyboardInterrupt`.
+- The sitr section's extraction output MUST reach the consumer's prompt.
+- The wheel README MUST name the consumer template.
+- A dry run MUST check that its input and arguments compose into a valid request.
+- The consent gate MUST ask for consent only when the Run's provider is TypeSafe.
 
 **MUST NOT statements:**
 
+- A consumer's decision call with `haiku` MUST NOT need the TypeSafe key.
+- A consumer's decision call with `luna` MUST NOT need the TypeSafe key.
 - The consumer module MUST NOT contain consumer logic.
-- The consumer module MUST NOT set `provider`.
+- The consumer module MUST NOT pass a `provider` argument to a decision call.
 - The consumer module MUST NOT parse error message text.
+- A dry run MUST NOT write any record.
 
 ### Rationale
 
-The owner requires judge-jev, plan-anchor and every later Python consumer to integrate identically for errors, API keys, model selection (the jev, haiku, luna, decider and laya alternates), the injectable general logger and session logging. They differ only in prompt authoring and in processing results and decision trees. Session logging is always on and always at the wheel's default location, so every consumer's Jev data takes the same path and can be filtered by repository and agent. A hand-copied recipe already diverged between two consumers (ADR-SAG-0019, Context). One template rendered by every consumer removes that divergence. Shipping the template as package data makes its version the installed wheel's version. Leaving `provider` unset keeps the jev, haiku, luna, decider and laya alternates available.
-
-Owner ruling (2026-11-20), Rand Lee: "Keyring is super basic."
-
-Owner ruling (2026-11-21), Rand Lee: the shared template carries what the wheel does not support and both consumers share (fixture loading and coverage, batch settings and ids, result-line encoding, attempt counting, the remote-judge consent gate), with consumer-specific values only through template variables or named blocks, as extension points for future consumers.
-
-Owner ruling (2026-11-21), Rand Lee: "No hand built checks." "Keyring is super basic." "always return descriminated unions w/ error info"
-
-Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+The owner requires every Python consumer to integrate identically, for errors, API keys, model selection, logging and session logging, and to differ only in prompt authoring and in processing results and decision trees. A hand-copied recipe already diverged between two consumers (ADR-SAG-0019, Context); one shipped template removes that divergence. Shipping the template in the wheel makes its version the installed wheel's version.
 
 ### Success Criteria
 
 **Acceptance Criteria:**
 
-- [ ] A sc-agent test renders the consumer template with the plan-anchor (`sitr=false`) and judge-jev (`sitr=true`) configurations, using `client_name` and the installed `sc_decidr_version` and runs each rendered module against the loopback runner (`crates/sc-agent-py/tests/loopback.py`):
-  - a success returns the response;
-  - an error returns the consumer code from the passed map for its category;
-  - the session log has one record per query and response, carrying the session tags the call was given;
-  - the injected Logger receives the call's events.
-- [ ] The sc-decidr wheel of the released version is installable from PyPI.
-- [ ] An offline test renders with `sitr` true: extraction output from a checked-in source file reaches a dry-run request's prompt.
-- [ ] A rendered module with `sitr` false makes no `sc_agent.sitr` call.
-- [ ] A `KeyboardInterrupt` during a rendered module's batch cancels the `Cancel` passed to its decision call.
-- [ ] Scanning both rendered modules finds only wheel references to the permitted API: `send`, `send_batch`, `digest`, `logger`, `log`, `flush`, `Cancel`, and `sc_agent.sitr`.
-- [ ] The README of `crates/sc-agent-py` names the template and its render command.
+- [ ] A unit test scans plan-anchor and judge-jev and finds every decision call inside a module rendered from the consumer template.
+- [ ] Inspection of `sc_agent/templates/consumer.py.j2` finds no plan-anchor or judge-jev value outside its extension points.
+- [ ] A unit test renders plan-anchor and judge-jev and finds the two modules identical outside their extension points.
+- [ ] Inspection of `sc_agent/templates/consumer.py.j2` finds each part of the shared consumer code.
+- [ ] A loopback unit test of each rendered module returns the mapped consumer code for an error's category.
+- [ ] A loopback test runs each rendered module against the wheel built from the same commit and gets a success response with one session-log record per query.
+- [ ] Scanning both rendered modules finds only wheel references to the permitted API: `Run`, `send`, `send_batch`, `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr`.
+- [ ] A loopback unit test passes `haiku` to each rendered module and finds `haiku` as the model selector of its decision call.
+- [ ] A unit test finds the consumer template in the built wheel's package data.
+- [ ] A CLI run of `pip download sc-decidr==<release> --no-deps` fetches the released wheel from PyPI.
+- [ ] A unit test renders with `sitr` false and finds no `sc_agent.sitr` call.
+- [ ] A unit test scans the `sitr` true render and finds no decision call inside the sitr section.
+- [ ] Inspection of `crates/sc-agent-py/python/sc_agent/__init__.pyi` finds every public-API name.
+- [ ] Inspection of `crates/sc-agent-py/README.md` finds every public-API name.
+- [ ] Inspection of `crates/sc-agent-py/README.md` finds the consumer template's render command.
+- [ ] A loopback test finds each query's session-log record carrying the session tags its call was given.
+- [ ] A loopback unit test finds the call's events in the injected Logger.
+- [ ] A loopback test raises `KeyboardInterrupt` during a batch and finds the Run cancelled.
+- [ ] An offline unit test renders with `sitr` true and finds extraction output from a checked-in source file in a dry-run request's prompt.
+- [ ] Inspection of `crates/sc-agent-py/README.md` finds the consumer template's path.
+- [ ] A unit test gives a dry run a malformed input and finds it reported invalid.
+- [ ] A CLI run of each consumer with the TypeSafe key unset and `--model haiku` completes.
+- [ ] A CLI run of each consumer with the TypeSafe key unset and `--model luna` completes.
+- [ ] A loopback test finds consent asked for a TypeSafe Run and not asked for a `haiku` Run.
+- [ ] Inspection of `sc_agent/templates/consumer.py.j2` finds no prompt text or result handling outside its extension points.
+- [ ] Inspection of `sc_agent/templates/consumer.py.j2` finds no provider argument.
+- [ ] Inspection of `sc_agent/templates/consumer.py.j2` finds no read of an error's message.
+- [ ] A unit test finds no new record after a dry run.
 
 ### Dependencies
 
@@ -103,4 +113,7 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 - REQ-SAG-0016
 - REQ-SAG-0017
 - REQ-SAG-0702
+- REQ-SAG-0703
 - NFR-SAG-0003
+- NFR-SAG-0004
+- REQ-SAG-0005

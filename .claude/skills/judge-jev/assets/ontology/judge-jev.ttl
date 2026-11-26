@@ -90,6 +90,11 @@ jj:statements a owl:DatatypeProperty ;
     rdfs:comment "The dotted path of the record field holding the statements of a per-statement wave." ;
     rdfs:domain jj:Wave ; rdfs:range xsd:string .
 
+jj:onlyMatched a owl:DatatypeProperty ;
+    rdfs:label "onlyMatched" ;
+    rdfs:comment "true: a per-statement wave reached by a branch rule asks only the statements that rule matched." ;
+    rdfs:domain jj:Wave ; rdfs:range xsd:boolean .
+
 jj:modal a owl:DatatypeProperty ;
     rdfs:label "modal" ;
     rdfs:comment "A statement modal a per-statement wave judges (for example \"Must\"); with none, all statements are judged." ;

@@ -1,6 +1,6 @@
 ---
 name: write-records
-version: 0.7.0
+version: 0.8.0
 description: How to get a REQ, NFR or ADR record written from a list of what it requires, in place of editing its text - when to use it, the two prompt templates, who fills them, how the candidates are measured and accepted.
 ---
 

@@ -87,7 +87,7 @@ jjs:WaveShape a sh:NodeShape ;
     sh:nodeKind sh:IRI ;
     sh:closed true ;
     sh:ignoredProperties ( rdf:type ) ;
-    sh:message "a jj:Wave is an IRI and has only the properties jj:id, jj:asks, jj:rule, jj:per, jj:statements, jj:modal" ;
+    sh:message "a jj:Wave is an IRI and has only the properties jj:id, jj:asks, jj:rule, jj:per, jj:statements, jj:modal, jj:onlyMatched" ;
     sh:property [ sh:path jj:id ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
                   sh:pattern "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$" ;
                   sh:message "a wave has exactly one jj:id of letters, digits and _.:- only" ] ;
@@ -102,6 +102,8 @@ jjs:WaveShape a sh:NodeShape ;
     sh:property [ sh:path jj:per ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:in ( "statement" ) ;
                   sh:message "jj:per must be \"statement\"" ] ;
     sh:property [ sh:path jj:statements ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path jj:onlyMatched ; sh:maxCount 1 ; sh:datatype xsd:boolean ;
+                  sh:message "jj:onlyMatched is at most one boolean" ] ;
     sh:property [ sh:path jj:modal ; sh:datatype xsd:string ;
                   sh:message "jj:modal must be a plain string such as \"Must\"" ] ;
     sh:sparql jjs:WaveRulesSameKind ;
@@ -182,10 +184,10 @@ jjs:WavePerNeedsStatements a sh:SPARQLConstraint ;
 
 jjs:WaveStatementsNeedPer a sh:SPARQLConstraint ;
     sh:prefixes jjs:Prefixes ;
-    sh:message "a wave has jj:statements or jj:modal without jj:per" ;
+    sh:message "a wave has jj:statements, jj:modal or jj:onlyMatched without jj:per" ;
     sh:select """
         SELECT DISTINCT $this WHERE {
-            { $this jj:statements ?x } UNION { $this jj:modal ?x }
+            { $this jj:statements ?x } UNION { $this jj:modal ?x } UNION { $this jj:onlyMatched ?x }
             FILTER NOT EXISTS { $this jj:per ?p }
         }""" .
 
