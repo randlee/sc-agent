@@ -414,7 +414,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 self.assertEqual(result["value"]["answers"], ANSWER["answers"])
                 self.assertEqual(received[0][0], path)
                 body = received[0][2]
-                expected = {"typesafe": "jev-1.14.0", "anthropic": "claude-haiku-5-5", "openai": "gpt-6-luna", "openrouter": "anthropic/claude-haiku-5.5", "together": "openai/gpt-6-luna", "nous": "custom-id"}
+                expected = {"typesafe": "jev-latest", "anthropic": "claude-haiku-5-5", "openai": "gpt-6-luna", "openrouter": "anthropic/claude-haiku-5.5", "together": "openai/gpt-6-luna", "nous": "custom-id"}
                 self.assertEqual(body["model"], expected[provider])
                 if provider == "anthropic":
                     self.assertIn("output_config", body)
