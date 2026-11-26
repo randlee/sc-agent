@@ -1,9 +1,9 @@
 # Requirement: Session log rows and run links
 
 **Status:** Approved  
-**Version:** 0.8.1  
+**Version:** 0.8.2  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-24  
+**Last Updated:** 2026-11-25  
 **Owner:** Rand Lee  
 
 ---
@@ -39,7 +39,7 @@ Every query from every tool lands in the session log, so a tool references a row
 - [ ] One Python `sc_agent.send` adds one row to a `sessions.jsonl` under `<log_root>/sessions/`: tests/contract/test_contract.py:135 `test_session_and_general_log_share_fixed_root`.
 - [ ] A `decidr` CLI send with `repo` `github.com/randlee/sc-agent`, `agent_role` `rust-developer` and `project` `phase-b` adds one row to `sessions.jsonl` in that session directory: CLI run in crates/decidr/tests/cli.rs, planned in agt-phase-j.1.
 - [ ] A query sent four times after three busy responses adds one row: crates/sc-agent/tests/sending.rs:186 `req_sag_0601_busy_resends_unchanged_retry_after_and_exponential_backoff`.
-- [ ] A batch of 3 through a Run adds 3 link records to `runs.jsonl` in the same directory: unit test planned in agt-j-2 deliverable J2-5.
+- [ ] A batch of 3 through a Run adds 3 link records to `runs.jsonl` in the same directory: unit test planned in agt-j-3 deliverable J3-5.
 
 ### Dependencies
 

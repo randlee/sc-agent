@@ -1,7 +1,7 @@
 # Requirement: Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel
 
 **Status:** Approved  
-**Version:** 1.7.0  
+**Version:** 1.8.0  
 **Created:** 2026-11-14  
 **Last Updated:** 2026-11-25  
 **Owner:** Rand Lee  
@@ -29,7 +29,7 @@ Definitions (how the template is built: ADR-SAG-0019 decision 1):
 - The public API is the names the sc-decidr wheel exports to consumers. The wheel README is `crates/sc-agent-py/README.md`.
 - The session tags are the `project` and `agent_role` values a decision call records in the session log.
 - The logging wiring passes one Logger, the consumer's or `logger(client name)`, to every decision call.
-- The permitted API is `send`, `send_batch`, `digest`, `logger`, `log`, `flush`, `Cancel` and `sc_agent.sitr`, plus the Python standard library and the consumer's own modules named through an extension point.
+- The permitted API is the names ADR-SAG-0019 decision 1 makes public: `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr`, plus the Python standard library and the consumer's own modules named through an extension point.
 - A dry run composes a consumer's requests without sending them. A record is a session-log row, a result line, a tool record, a link record or a general-log entry.
 - The consent gate is the consumer module's `allow_remote_judge` check before a decision call.
 - `haiku` and `luna` are model selectors (REQ-SAG-0016). The TypeSafe key is `TYPESAFE_API_KEY`.
@@ -82,7 +82,7 @@ The owner requires every Python consumer to integrate identically, for errors, A
 - [ ] Inspection of `sc_agent/templates/consumer.py.j2` finds each part of the shared consumer code.
 - [ ] A loopback unit test of each rendered module returns the mapped consumer code for an error's category.
 - [ ] A loopback test runs each rendered module against the wheel built from the same commit and gets a success response with one session-log record per query.
-- [ ] Scanning both rendered modules finds only wheel references to the permitted API: `send`, `send_batch`, `digest`, `logger`, `log`, `flush`, `Cancel`, and `sc_agent.sitr`.
+- [ ] Scanning both rendered modules finds only wheel references to the permitted API: `Run`, `send`, `send_batch`, `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr`.
 - [ ] A loopback unit test passes `haiku` to each rendered module and finds `haiku` as the model selector of its decision call.
 - [ ] A unit test finds the consumer template in the built wheel's package data.
 - [ ] A CLI run of `pip download sc-decidr==<release> --no-deps` fetches the released wheel from PyPI.
