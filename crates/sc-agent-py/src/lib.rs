@@ -155,7 +155,6 @@ fn options(
         option::<String>(named, "agent_role")?.ok_or_else(|| invalid("agent_role is required"))?;
     let model = option::<String>(named, "model")?.unwrap_or_else(|| "jev".into());
     let provider = option::<String>(named, "provider")?;
-    sc_agent::model(&model, provider.as_deref())?;
     let (root, repo) = sc_agent::repository()?;
     let global = option::<String>(named, "config_dir")?.map(PathBuf::from);
     let project = option::<String>(named, "project")?;
@@ -169,6 +168,7 @@ fn options(
         project.as_deref(),
     )?
     .config;
+    sc_agent::model_with(&model, provider.as_deref(), &settings.models)?;
     if let Some(workers) = workers {
         settings.workers = workers;
     }

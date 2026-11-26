@@ -2,7 +2,7 @@
 name: judge-jev
 description: Judge whether REQ, NFR and ADR records are well written with TypeSafe's Jev, reading them through Raptor, and fix failing records until they pass without changing what they require. Use when the user asks to check, judge, score, tune or fix requirements, NFRs or ADRs, asks whether a record is testable, vague or well written, or asks to add or test a definition for a record's term. Also use when asked whether a prompt, skill, agent, task template or code meets its REQ, NFR or ADR; that mode is not in this release, and the skill says so. Not for parsing records (Raptor does that) and not for general code review.
 metadata:
-  version: "0.2.0"
+  version: "0.7.0"
 ---
 
 # judge-jev
@@ -18,7 +18,13 @@ which uv && uv --version
 which jq && jq --version
 J="<this skill's directory>/scripts/jev_judge.py"
 uv run --script "$J" --help >/dev/null && echo "judge-jev ok"
-test -n "$TYPESAFE_API_KEY" && echo "TYPESAFE_API_KEY set" || echo "TYPESAFE_API_KEY missing"
+if [ -f .env ]; then
+  echo "repository .env present (key not verified)"
+elif [ -n "${TYPESAFE_API_KEY:-}" ]; then
+  echo "process key set"
+else
+  echo "sc-agent may use the platform credential store"
+fi
 uv run -q --no-project --with pyyaml python "<this skill's directory>/scripts/judge_jev_settings.py" show | jq '.data.allow_remote_judge'   # true, false, or null
 ```
 
@@ -26,11 +32,12 @@ Run `jev_judge.py` only with `uv run --script "$J"`: its inline metadata supplie
 
 `allow_remote_judge` in the committed `.sc/judge-jev/settings.yaml` is the user's answer to whether record text may be sent to TypeSafe (Jev). `true`: continue. `false`: live calls are refused with `POLICY.REMOTE_JUDGE_DISABLED`; tell the user and work offline only (`--dry-run`, `validate`, `doctor`). `null`: ask the user once, record the answer with the same command and `set allow_remote_judge true|false`, and commit the file. Never infer consent from run files or other repositories.
 
-Raptor, once per machine (needs a Rust toolchain; it builds the `raptor_schema` PyO3 module):
+Raptor, once per machine (needs a Rust toolchain; it builds the `raptor_schema` PyO3 module). Set `RAPTOR` to a relative path for the checkout (for example `raptor`); the install command uses `./$RAPTOR` so uv installs this checkout, not the unrelated PyPI package named `raptor`:
 
 ```bash
-git clone -b integration/judge-jev https://github.com/randlee/raptor "$RAPTOR"
-uv venv "$RAPTOR/.venv" -p 3.11 && uv pip install -p "$RAPTOR/.venv/bin/python" "$RAPTOR" markdown
+git clone https://github.com/randlee/raptor "$RAPTOR"
+git -C "$RAPTOR" checkout 8ce2be8363318be2f7c2e2b79d1f646399cab2fd
+uv venv "$RAPTOR/.venv" -p 3.11 && uv pip install -p "$RAPTOR/.venv/bin/python" "./$RAPTOR" markdown
 ```
 
 The repository needs a `.raptor/` inventory naming its record files (Raptor's README). New records are written from Raptor's templates (`$RAPTOR/templates/README.md`).
@@ -50,6 +57,8 @@ Exit 0 with `"issues": 0` means every record imported. Otherwise fix each diagno
 | Mode | Question | Read |
 | --- | --- | --- |
 | quality | Is a REQ, NFR or ADR well written? Judge it, and fix it if it fails. | `references/quality-workflow.md`; to fix, also `references/fix-strategy.md` |
+| write | Write a record's text from a list of what it requires, when editing will not fix it or the record is new. | `references/write-records.md`, after `references/fix-strategy.md` step 0 |
+| drift | Does a rewritten REQ, NFR or ADR still require exactly what the original did? | `jev_judge.py drift --old-index <a> --new-index <b> --changed`; `jev_judge.py drift --help`. It points a reviewer at likely drift; it never accepts or rejects a record. Read every record yourself; treat verdicts as leads, and as measurements only when `valid` is true. |
 | compliance | Does a prompt, skill, agent, task template or code meet its REQ, NFR or ADR? | Not in this release: judge-jev has no `check` command yet. Tell the user so and stop. Do not judge it another way. |
 
 ## Agent
@@ -68,8 +77,9 @@ You apply and measure every candidate; a proposer never edits a file or calls Je
 - Never edit a gate question, criterion, verdict rule or threshold. Diagnostic questions are appended only.
 - Never delete a record or a statement to make a record pass.
 - Never answer for Jev. A failed call is rerun once, then reported with its code and verbatim message; it is never a verdict.
-- A record passes only on the gate: three runs of identical text, every gate answer's median at or above the threshold (`scripts/jev_gate.py`). One passing run is not a pass.
+- Never report a judged failure without Jev's reasons: quote each failing or weak answer's per-run choice, confidence, criterion, runner-up, probability and criterion (including `Fix:`), and the `d_*` answers. Mark missing fields unavailable; never guess the word.
+- A record passes only when three identical runs give at least two `yes` verdicts and every gate-answer median is at least `T` (default 0.6; `scripts/jev_gate.py`).
 - An accepted record is frozen: do not judge it again unless its text changes.
-- Keep the run files and `.sc/judge-jev/accepted.jsonl`. Every request and answer is logged under `~/.judge-jev/<repository name>/<UTC date>/logs/`; never delete or move it.
+- Keep the run files and `.sc/judge-jev/accepted.jsonl`. The log is `~/.sc-agent/logs/judge-jev.log.jsonl` and contains whole requests and record text. Pruning follows the sc-observability retention policy.
 
 Jev request format, limits and every error code: `references/jev-api.md`.

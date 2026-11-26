@@ -29,7 +29,7 @@ Short names run the latest model, so the catalog must keep up with what provider
 
 Owner ruling (2026-11-20), Rand Lee, on showing where a key came from: "I think this will help if there is key issue."
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "No hand built checks."
+Owner ruling (2026-11-21), Rand Lee: "No hand built checks."
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 

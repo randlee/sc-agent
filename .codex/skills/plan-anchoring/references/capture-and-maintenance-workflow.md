@@ -1,5 +1,5 @@
 ---
-version: 0.11.0
+version: 0.13.0
 ---
 
 # Capture and maintenance workflow
@@ -12,8 +12,9 @@ version: 0.11.0
 | Anchor | ANC-NNN | One testable requirement written from something the user said; the exact words are kept as its `quote` | The user, via the orchestrator, approved by the user |
 | Requirement | REQ-* | A numbered technical requirement | Existing register |
 | ADR | ADR-* | A numbered architectural decision record | Existing register |
+| Repository guidelines | none | Optional owner notes for plan-anchor work in this repository | `.sc/plan-anchor/plan-anchor-repo-guidelines.md` |
 
-All three ID'd kinds become Jev questions and are judged the same way. Details: `references/anchor-document.md`.
+All three ID'd kinds become Jev questions and are judged the same way. Details: `references/anchor-document.md`. Follow the repository guidelines, when present, while capturing and maintaining (`references/anchor-document.md`, Repository guidelines).
 
 ## Layout
 

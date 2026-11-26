@@ -28,8 +28,6 @@ Definitions: A task is one caller run. A session is one model request with its o
 
 The owner analyses 10,000 to 20,000 or more decisions at a time to tune consumer code, and one task has already produced 40,000 sessions.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting."
-
 ### Success Criteria
 
 **Acceptance Criteria:**

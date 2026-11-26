@@ -36,7 +36,7 @@ Consumers that branch on error ids pin their own lists and add fallbacks today. 
 
 NFR-SAG-0002 is withdrawn (2026-11-20). Rand Lee: "schema isn't locked yet ... No hand built checks."
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "always return descriminated unions w/ error info" "No hand built checks."
+Owner ruling (2026-11-21), Rand Lee: "always return descriminated unions w/ error info" "No hand built checks."
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 

@@ -92,7 +92,7 @@ def canceled_envelope() -> dict:
             "code": "CANCELED",
             "message": "interrupted before the command finished",
             "recoverable": True,
-            "suggested_action": "Rerun the command; nothing is reported as done that did not finish.",
+            "suggested_action": "Rerun the command; nothing partial was reported as complete.",
         },
     }
 

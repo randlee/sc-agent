@@ -33,7 +33,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "judge-jev/jev-batch-result/1"
+      "const": "jev-batch-result/1"
     },
     "request_id": {
       "type": "string",
@@ -151,9 +151,11 @@
       ]
     },
     "retry_count": {
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 1
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
     },
     "attempts": {
       "type": "array",
@@ -217,10 +219,21 @@
             },
             "recoverable": {
               "type": "boolean"
+            },
+            "suggested_action": {
+              "type": "string"
             }
           }
         }
       ]
+    },
+    "sends": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Observed wheel sends, or null when unknown (including controlled fixture records)."
     }
   }
 }

@@ -307,7 +307,7 @@ dependencies = [
 
 [[package]]
 name = "decidr"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "clap",
  "ctrlc",
@@ -1050,7 +1050,7 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "sc-agent"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "dotenvy",
  "keyring",
@@ -1066,7 +1066,7 @@ dependencies = [
 
 [[package]]
 name = "sc-agent-py"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "pyo3",
  "sc-agent",
@@ -1143,7 +1143,7 @@ dependencies = [
 
 [[package]]
 name = "sc-treesitter"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "sc-agent",
  "serde_json",
@@ -1258,7 +1258,7 @@ checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
 
 [[package]]
 name = "sitr"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "clap",
  "sc-agent",

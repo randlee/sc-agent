@@ -29,7 +29,7 @@ Definitions:
 
 The declared Python floor and the pyo3 abi3 tag disagreed, so the wheel tag claimed support the package metadata refused. One floor value, written down in `floors.toml`, removes that mismatch and makes raising the floor a one-line change. `floors.toml` records the value; nothing in sc-agent checks it.
 
-Owner ruling (2026-11-21), Rand Lee: "My words are what I want, not excess control resulting." "No hand built checks."
+Owner ruling (2026-11-21), Rand Lee: "No hand built checks."
 
 Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 

@@ -1,6 +1,6 @@
 ---
 name: change-report
-version: 0.11.0
+version: 0.13.0
 description: The owner's HTML report of one planning round - every anchor and plan-item change with scores before and after, and the drift review as a table - rendered by change_report.py from local files, git and the tracker.
 ---
 
@@ -48,4 +48,4 @@ Each panel has Copy JSON and Copy Context buttons; the page has a table of conte
 
 Two templates, as the sc-compose html-report pattern prescribes: each panel is one strict, render-checked `sc-compose render` of `templates/sprint-panel.xhtml.j2`, `templates/anchor-panel.xhtml.j2` or `templates/drift-panel.xhtml.j2`; the page is one render of `templates/change-report.html.j2`, which receives only top-level arrays and the rendered panels. The script assembles no HTML except the word-diff fragments (escaped text inside `<del>` and `<ins>`). The sidecar holds the whole data model, item texts included.
 
-Send the user the page and say where the sidecar is. Commit both beside the plan with the drift review JSON when the plan is committed.
+Showing the user the page is mandatory: the round is not finished until they have it. Send the page and say where the sidecar is. In the same message, list in prose every ADR, REQ, NFR and ANC change by id with what changed, or say there are none. Commit both beside the plan with the drift review JSON when the plan is committed.
