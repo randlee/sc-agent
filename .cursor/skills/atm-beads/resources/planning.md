@@ -188,6 +188,31 @@ says so) that runs each child with a background subagent, merges every
 result into its own worktree, and closes every child before closing its own bead;
 the lead never dispatches them.
 
+#### Ordered steps
+
+When a sprint's work must happen in a fixed order, write the order as beads,
+not prose. Each step is a `stage:subtask` child of the sprint's dev bead
+(`<dev bead>.step-<n>`), and each step blocks the next
+(`bd dep add <dev bead>.step-<n+1> --blocked-by <dev bead>.step-<n>`), so
+`bd ready` releases them one at a time. A typical code sprint:
+
+1. `step-1` delete: remove the code the design lists for deletion (paths,
+   functions, tests). Close with the size gate's line.
+2. `step-2` signatures: add every signature, type and field in the design's
+   signature table, bodies `todo!()`; the workspace builds. Nothing outside
+   the table.
+3. `step-3` bodies and tests: write the bodies and the named tests; the test
+   command passes; the size gate's line is within the sprint's budget.
+4. `step-4` simplify: a simplification subagent reviews the diff against the
+   sprint's goal and its records and removes unneeded or duplicated code; the
+   dev applies the cuts, reruns the tests, and records the final size line.
+
+Each step's description names its deliverables and its done check (a
+command and its expected result). The dev closes each step with the check's
+output before starting the next, and closes the dev bead only after the
+last step. A step whose check fails stays open: the dev fixes it or closes
+the task refused, naming the step. The lead never dispatches steps.
+
 `requirements` and `adrs` are never left empty. The dev reads each listed id
 before coding, QA checks the change against each one, and plan review
 rejects a list that is missing, names an id that does not exist or does not
