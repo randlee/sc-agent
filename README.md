@@ -4,6 +4,8 @@ sc-agent provides one synchronous Rust core for decision requests, provider sele
 
 It ships the `decidr` and `sitr` CLIs and one Python wheel, `sc-decidr` (`import sc_agent`, including `sc_agent.sitr`).
 
+Documentation, CLI reference and release announcements: https://randlee.github.io/sc-agent/
+
 ## Install
 
 For Python 3.11 or newer, install the wheel containing both the decision and syntax-query APIs:
