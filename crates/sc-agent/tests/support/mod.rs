@@ -1,4 +1,4 @@
-use sc_agent::{Options, Settings};
+use sc_agent::{Environment, Repository, RunConfig, Secret};
 use sc_observability::{LoggerConfig, ServiceName, v2::Logger};
 use serde_json::{Value, json};
 use std::{
@@ -9,7 +9,6 @@ use std::{
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, Receiver, Sender},
     },
     thread::JoinHandle,
     time::Duration,
@@ -33,28 +32,32 @@ pub fn logger(root: &Temp) -> Result<Logger, Box<dyn std::error::Error + Send + 
     config.enable_console_sink = false;
     Ok(Logger::new(config)?)
 }
-pub fn options(root: &Temp, url: &str) -> Options {
-    Options {
-        environment: vec![
-            ("TYPESAFE_API_KEY".into(), "test-secret".into()),
-            ("ANTHROPIC_API_KEY".into(), "test-secret".into()),
-            ("OPENAI_API_KEY".into(), "test-secret".into()),
-        ],
-        settings: Settings {
-            project: Some("phase-b".into()),
-            workers: 1,
-            models: Default::default(),
-            laya: None,
-        },
-        model: "jev".into(),
-        provider: None,
-        agent_role: "rust-developer".into(),
-        timeout: Duration::from_secs(5),
-        base_url: Some(url.into()),
-        root: root.0.clone(),
-        log_root: root.0.clone(),
-        repo: "github.com/randlee/sc-agent".into(),
+pub fn run_config(
+    root: &Temp,
+    stub: &Stub,
+) -> Result<RunConfig, Box<dyn std::error::Error + Send + Sync>> {
+    let file = root.0.join("sc-agent.json");
+    if !file.exists() {
+        fs::write(&file, json!({"project":"phase-b","workers":1}).to_string())?;
     }
+    let mut config = RunConfig::new("rust-test", "test");
+    config.config_dir = Some(root.0.clone());
+    config.agent_role = Some("rust-developer".into());
+    config.timeout_secs = Some(5.0);
+    config.seams.base_url = Some(stub.url.clone());
+    config.seams.repository = Some(Repository {
+        root: root.0.clone(),
+        identity: "github.com/randlee/sc-agent".into(),
+    });
+    config.seams.environment = Some(Environment(Secret::new(vec![
+        ("TYPESAFE_API_KEY".into(), "test-secret".into()),
+        ("ANTHROPIC_API_KEY".into(), "test-secret".into()),
+        ("OPENAI_API_KEY".into(), "test-secret".into()),
+        ("DECIDR_LOG_ROOT".into(), root.0.as_os_str().to_owned()),
+    ])));
+    config.seams.keyring = Arc::new(keyring);
+    config.seams.wait = Arc::new(|_, _| {});
+    Ok(config)
 }
 pub fn request() -> Value {
     json!({"state":"evidence", "questions":{"q":{"type":"noul"}}})
@@ -64,9 +67,8 @@ pub fn answer() -> Value {
 }
 pub enum Reply {
     Http(u16, Vec<(&'static str, &'static str)>, String),
-    HttpIfComplete(u16, Vec<(&'static str, &'static str)>, String),
     Disconnect,
-    Never,
+    Respond(Box<dyn FnOnce(&Request) -> Reply + Send>),
 }
 pub fn http(status: u16, body: Value) -> Reply {
     Reply::Http(status, vec![], body.to_string())
@@ -119,8 +121,6 @@ pub struct Stub {
     listener: TcpListener,
     stop: Arc<AtomicBool>,
     worker: Option<JoinHandle<CapturedRequests>>,
-    observed: Receiver<()>,
-    notify: Sender<()>,
 }
 impl Stub {
     pub fn new(replies: Vec<Reply>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
@@ -129,11 +129,8 @@ impl Stub {
         let owned_listener = listener.try_clone()?;
         let stop = Arc::new(AtomicBool::new(false));
         let stopped = stop.clone();
-        let (notify, observed) = mpsc::channel();
-        let server_notify = notify.clone();
         let worker = std::thread::spawn(move || {
             let mut seen = vec![];
-            let mut unanswered = vec![];
             for reply in replies {
                 let (mut stream, _) = listener.accept()?;
                 if stopped.load(Ordering::SeqCst) {
@@ -142,27 +139,16 @@ impl Stub {
                 // Deadlines are hang guards only; no test waits for or asserts on elapsed time.
                 stream.set_read_timeout(Some(Duration::from_secs(5)))?;
                 stream.set_write_timeout(Some(Duration::from_secs(5)))?;
-                let request = match read_request(&mut stream) {
-                    Ok(request) => request,
-                    Err(_) if matches!(&reply, Reply::Never | Reply::HttpIfComplete(..)) => {
-                        // A timeout during connect/write is still an attempted send.
-                        seen.push(Request {
-                            path: String::new(),
-                            headers: vec![],
-                            body: Value::Null,
-                        });
-                        let _ = server_notify.send(());
-                        continue;
-                    }
-                    Err(error) => return Err(error),
+                let request = read_request(&mut stream)?;
+                let reply = match reply {
+                    Reply::Respond(f) => f(&request),
+                    reply => reply,
                 };
                 seen.push(request);
-                let _ = server_notify.send(());
                 match reply {
                     Reply::Disconnect => stream.shutdown(std::net::Shutdown::Both)?,
-                    Reply::Never => unanswered.push(stream),
-                    Reply::Http(status, headers, body)
-                    | Reply::HttpIfComplete(status, headers, body) => {
+                    Reply::Respond(_) => return Err("nested response callback".into()),
+                    Reply::Http(status, headers, body) => {
                         write!(
                             stream,
                             "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n",
@@ -175,7 +161,6 @@ impl Stub {
                     }
                 }
             }
-            drop(unanswered);
             Ok(seen)
         });
         Ok(Self {
@@ -183,15 +168,7 @@ impl Stub {
             listener: owned_listener,
             stop,
             worker: Some(worker),
-            observed,
-            notify,
         })
-    }
-    pub fn wait_for_request(&self) -> Result<(), mpsc::RecvError> {
-        self.observed.recv()
-    }
-    pub fn request_signal(&self) -> Sender<()> {
-        self.notify.clone()
     }
     pub fn finish(mut self) -> Result<Vec<Request>, Box<dyn std::error::Error + Send + Sync>> {
         self.stop();
@@ -221,7 +198,6 @@ pub fn keyring(_: &str) -> Result<String, sc_agent::KeyringError> {
         "test must not access keyring".into(),
     ))
 }
-pub fn no_wait(_: Duration) {}
 pub fn rows(root: &Temp) -> Result<Vec<Value>, Box<dyn std::error::Error + Send + Sync>> {
     let path = root
         .0

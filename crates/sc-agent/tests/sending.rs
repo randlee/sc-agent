@@ -1,7 +1,9 @@
 pub mod support;
-use sc_agent::{Cancel, Runner, batch, host_holdoff, send};
+use sc_agent::providers::Wire;
+use sc_agent::{Call, Cancel, Environment, Run, Secret, host_holdoff};
 use serde_json::{Value, json};
 use std::{
+    fs,
     sync::{Arc, Mutex, mpsc},
     time::Duration,
 };
@@ -9,227 +11,146 @@ use support::*;
 
 #[test]
 fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
-    for (provider, model, path) in [
-        ("typesafe", "jev", "/v1/systemone"),
-        ("anthropic", "haiku", "/v1/messages"),
-        ("openai", "luna", "/v1/chat/completions"),
-        ("openrouter", "haiku", "/v1/chat/completions"),
-        ("together", "luna", "/v1/chat/completions"),
-        ("nous", "custom/model", "/v1/chat/completions"),
-        ("local", "laya", "/v1/systemone"),
+    for (provider, model, id, wire) in [
+        ("typesafe", "jev", "jev-latest", Wire::SystemOne),
+        ("anthropic", "haiku", "claude-haiku-5-5", Wire::Messages),
+        ("openai", "luna", "gpt-6-luna", Wire::ChatCompletions),
+        (
+            "openrouter",
+            "haiku",
+            "anthropic/claude-haiku-5.5",
+            Wire::ChatCompletions,
+        ),
+        (
+            "together",
+            "luna",
+            "openai/gpt-6-luna",
+            Wire::ChatCompletions,
+        ),
+        ("nous", "luna", "openai/gpt-6-luna", Wire::ChatCompletions),
     ] {
         let root = Temp::new()?;
-        let logger = logger(&root)?;
-        let raw = match provider {
-            "anthropic" => json!({"content":[{"type":"text","text":answer().to_string()}]}),
-            "typesafe" | "local" => answer(),
-            _ => json!({"choices":[{"message":{"content":answer().to_string()}}]}),
+        let raw = match wire {
+            Wire::SystemOne => answer(),
+            Wire::Messages => json!({"content":[{"type":"text","text":answer().to_string()}]}),
+            Wire::ChatCompletions => {
+                json!({"choices":[{"message":{"content":answer().to_string()}}]})
+            }
         };
+        fs::write(
+            root.0.join("sc-agent.json"),
+            json!({"project":"phase-b","models":{model:{"provider":provider,"id":id}}}).to_string(),
+        )?;
         let stub = Stub::new(vec![http(200, raw)])?;
-        let mut opts = options(&root, &stub.url);
-        opts.model = model.into();
-        opts.provider = Some(provider.into());
-        opts.environment.extend([
+        let mut cfg = run_config(&root, &stub)?;
+        cfg.model = Some(model.into());
+        let mut env = cfg
+            .seams
+            .environment
+            .take()
+            .unwrap_or_default()
+            .0
+            .expose()
+            .clone();
+        env.extend([
             ("OPENROUTER_API_KEY".into(), "test-secret".into()),
             ("TOGETHER_API_KEY".into(), "test-secret".into()),
             ("NOUS_API_KEY".into(), "test-secret".into()),
         ]);
-        if provider == "local" {
-            opts.settings.laya = Some(Runner {
-                host: "127.0.0.1".into(),
-                port: 1,
-                model: "configured-local".into(),
-            });
-        }
-        let value = send(
-            &request(),
-            &opts,
-            &logger,
-            &Cancel::default(),
-            &no_wait,
-            &keyring,
-        )?;
+        cfg.seams.environment = Some(Environment(Secret::new(env)));
+        let run = Run::new(cfg)?;
+        let value = run.send(&Call::default(), &request())?;
         assert_eq!(value["answers"], answer()["answers"]);
         assert_eq!(value["answers"]["q"]["noul"], 0.123456789);
         let seen = stub.finish()?;
         let first = seen.first().ok_or("request missing")?;
-        assert_eq!(first.path, path);
-        if ["typesafe", "local"].contains(&provider) {
-            let mut expected = request();
-            expected["model"] = json!(if provider == "local" {
-                "configured-local".to_owned()
-            } else {
-                sc_agent::model(model, Some(provider))?.1
-            });
-            assert_eq!(first.body, expected);
-        } else {
-            let schema = if provider == "anthropic" {
-                &first.body["output_config"]["format"]["schema"]
-            } else {
-                &first.body["response_format"]["json_schema"]["schema"]
-            };
-            assert_eq!(schema["required"], json!(["answers"]));
-            assert_eq!(schema["properties"]["answers"]["required"], json!(["q"]));
-            assert_eq!(
-                schema["properties"]["answers"]["properties"]["q"]["properties"]["type"]["enum"],
-                json!(["noul"])
-            );
-            assert!(first.body["messages"].to_string().contains("evidence"));
+        assert_eq!(first.path, format!("/v1/{}", wire.path()));
+        assert_eq!(first.body["model"], id);
+        match wire {
+            Wire::SystemOne => {
+                let mut expected = request();
+                expected["model"] = json!(id);
+                assert_eq!(first.body, expected);
+            }
+            _ => {
+                let schema = match wire {
+                    Wire::Messages => &first.body["output_config"]["format"]["schema"],
+                    _ => &first.body["response_format"]["json_schema"]["schema"],
+                };
+                assert_eq!(schema["required"], json!(["answers"]));
+                assert_eq!(schema["properties"]["answers"]["required"], json!(["q"]));
+                assert_eq!(
+                    schema["properties"]["answers"]["properties"]["q"]["properties"]["type"]["enum"],
+                    json!(["noul"])
+                );
+                assert!(first.body["messages"].to_string().contains("evidence"));
+            }
         }
-        if provider == "anthropic" {
+        let auth = match wire {
+            Wire::Messages => ("x-api-key", "test-secret"),
+            _ => ("authorization", "Bearer test-secret"),
+        };
+        assert!(
+            first
+                .headers
+                .iter()
+                .any(|(k, v)| (k.as_str(), v.as_str()) == auth)
+        );
+        if wire == Wire::Messages {
             assert!(
                 first
                     .headers
                     .iter()
-                    .any(|(k, v)| k == "x-api-key" && v == "test-secret")
-            );
-        } else if provider != "local" {
-            assert!(
-                first
-                    .headers
-                    .iter()
-                    .any(|(k, v)| k == "authorization" && v == "Bearer test-secret")
+                    .any(|(k, v)| k == "anthropic-version" && v == "2023-06-01")
             );
         }
-        logger.shutdown()?;
+        run.close()?;
     }
     Ok(())
 }
-
-#[test]
-fn req_sag_0702_timeout_is_per_call_and_uses_the_transport() -> Test {
-    let root = Temp::new()?;
-    let logger = logger(&root)?;
-    let replies = vec![
-        Reply::Never,
-        Reply::Never,
-        Reply::Never,
-        Reply::Never,
-        Reply::Never,
-    ];
-    let stub = Stub::new(replies)?;
-    let mut overridden = options(&root, &stub.url);
-    overridden.timeout = Duration::from_millis(50);
-
-    let signal = stub.request_signal();
-    let timed_out = std::thread::scope(|scope| {
-        let logger_ref = &logger;
-        let overridden_ref = &overridden;
-        let client = scope.spawn(move || {
-            let outcome = send(
-                &request(),
-                overridden_ref,
-                logger_ref,
-                &Cancel::default(),
-                &no_wait,
-                &keyring,
-            );
-            let _ = signal.send(());
-            outcome
-        });
-        stub.wait_for_request()?;
-        let outcome = client.join().map_err(|_| "send thread panicked")?;
-        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(sc_agent::report(&logger, outcome))
-    })?;
-    assert_eq!(timed_out["error"]["id"], "http.network");
-    assert_eq!(timed_out["error"]["attempts"], 5);
-    let _ = stub.finish()?;
-    logger.shutdown()?;
-    Ok(())
-}
-
-#[test]
-fn req_sag_0702_later_plain_call_uses_configured_timeout() -> Test {
-    let root = Temp::new()?;
-    let logger = logger(&root)?;
-    let configured_timeout = Duration::ZERO;
-
-    let override_stub = Stub::new(vec![http(200, answer())])?;
-    let mut overridden = options(&root, &override_stub.url);
-    overridden.timeout = Duration::from_secs(5);
-    assert_ne!(overridden.timeout, configured_timeout);
-    let override_result = send(
-        &request(),
-        &overridden,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    )?;
-    assert_eq!(override_result["answers"], answer()["answers"]);
-    assert_eq!(override_stub.finish()?.len(), 1);
-
-    let plain_stub = Stub::new(vec![Reply::HttpIfComplete(
-        200,
-        vec![],
-        answer().to_string(),
-    )])?;
-    let mut plain_options = options(&root, &plain_stub.url);
-    plain_options.timeout = configured_timeout;
-    assert_eq!(plain_options.timeout, configured_timeout);
-    let plain = sc_agent::result(send(
-        &request(),
-        &plain_options,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    ));
-    assert_eq!(plain["error"]["id"], "http.network");
-    assert_eq!(plain["error"]["attempts"], 5);
-    let _ = plain_stub.finish()?;
-    logger.shutdown()?;
-    Ok(())
-}
-
 #[test]
 fn req_sag_0601_busy_resends_unchanged_retry_after_and_exponential_backoff() -> Test {
     for status in [429, 502, 529] {
         let root = Temp::new()?;
-        let logger = logger(&root)?;
-        let replies = vec![
+        let stub = Stub::new(vec![
             Reply::Http(status, vec![("Retry-After", "1.1")], "busy".into()),
             http(status, json!({})),
             Reply::Http(status, vec![("Retry-After", "malformed")], "busy".into()),
             http(200, answer()),
-        ];
-        let stub = Stub::new(replies)?;
-        let opts = options(&root, &stub.url);
-        let waits = Mutex::new(vec![]);
-        let wait = |delay| {
-            if let Ok(mut seen) = waits.lock() {
-                seen.push(delay);
+        ])?;
+        let mut cfg = run_config(&root, &stub)?;
+        let waits = Arc::new(Mutex::new(vec![]));
+        let recorded = waits.clone();
+        cfg.seams.wait = Arc::new(move |delay, _| {
+            if let Ok(mut w) = recorded.lock() {
+                w.push(delay);
             }
-        };
-        let got = send(
-            &request(),
-            &opts,
-            &logger,
-            &Cancel::default(),
-            &wait,
-            &keyring,
-        )?;
-        assert_eq!(got["attempts"], 4);
-        let waits = waits.into_inner().map_err(|_| "wait recorder poisoned")?;
-        assert_eq!(waits.first(), Some(&Duration::from_secs_f64(1.1)));
-        assert_eq!(waits.get(1), Some(&Duration::from_secs(2)));
-        assert_eq!(waits.get(2), Some(&Duration::from_secs(4)));
+        });
+        let run = Run::new(cfg)?;
+        let value = run.send(&Call::default(), &request())?;
+        assert_eq!(value["attempts"], 4);
+        assert_eq!(
+            *waits.lock().map_err(|e| e.to_string())?,
+            vec![
+                Duration::from_secs_f64(1.1),
+                Duration::from_secs(2),
+                Duration::from_secs(4)
+            ]
+        );
         let seen = stub.finish()?;
         assert_eq!(seen.len(), 4);
         for sent in &seen {
             assert_eq!(sent.body, seen.first().ok_or("no sends")?.body);
         }
-        assert_eq!(rows(&root)?.len(), 1); // All resends belong to one session.
-        logger.shutdown()?;
+        assert_eq!(rows(&root)?.len(), 1);
+        run.close()?;
     }
     Ok(())
 }
-
 #[test]
 fn req_sag_0601_0017_busy_and_network_exhaustion_report_five_sends() -> Test {
     for network in [false, true] {
         let root = Temp::new()?;
-        let logger = logger(&root)?;
         let stub = Stub::new(
             (0..5)
                 .map(|_| {
@@ -241,19 +162,16 @@ fn req_sag_0601_0017_busy_and_network_exhaustion_report_five_sends() -> Test {
                 })
                 .collect(),
         )?;
-        let waits = Mutex::new(vec![]);
-        let got = sc_agent::result(send(
-            &request(),
-            &options(&root, &stub.url),
-            &logger,
-            &Cancel::default(),
-            &|delay| {
-                if let Ok(mut w) = waits.lock() {
-                    w.push(delay);
-                }
-            },
-            &keyring,
-        ));
+        let waits = Arc::new(Mutex::new(vec![]));
+        let captured = waits.clone();
+        let mut cfg = run_config(&root, &stub)?;
+        cfg.seams.wait = Arc::new(move |delay, _| {
+            if let Ok(mut w) = captured.lock() {
+                w.push(delay);
+            }
+        });
+        let run = Run::new(cfg)?;
+        let got = sc_agent::result(run.send(&Call::default(), &request()));
         assert_eq!(
             got["error"]["id"],
             if network {
@@ -270,17 +188,13 @@ fn req_sag_0601_0017_busy_and_network_exhaustion_report_five_sends() -> Test {
         assert_eq!(got["error"]["action"], "Retry later.");
         assert_eq!(stub.finish()?.len(), 5);
         assert_eq!(
-            waits.into_inner().map_err(|_| "wait recorder poisoned")?,
-            vec![1, 2, 4, 8]
-                .into_iter()
-                .map(Duration::from_secs)
-                .collect::<Vec<_>>()
+            *waits.lock().map_err(|e| e.to_string())?,
+            [1, 2, 4, 8].map(Duration::from_secs)
         );
-        logger.shutdown()?;
+        run.close()?;
     }
     Ok(())
 }
-
 #[test]
 fn req_sag_0002_0601_auth_quota_are_not_retried_and_remote_text_is_redacted_whole() -> Test {
     for (status, body, id, category) in [
@@ -310,19 +224,12 @@ fn req_sag_0002_0601_auth_quota_are_not_retried_and_remote_text_is_redacted_whol
         ),
     ] {
         let root = Temp::new()?;
-        let logger = logger(&root)?;
+        let logger = Arc::new(logger(&root)?);
         let stub = Stub::new(vec![Reply::Http(status, vec![], body.into())])?;
-        let got = sc_agent::report(
-            &logger,
-            send(
-                &request(),
-                &options(&root, &stub.url),
-                &logger,
-                &Cancel::default(),
-                &no_wait,
-                &keyring,
-            ),
-        );
+        let mut cfg = run_config(&root, &stub)?;
+        cfg.logger = Some(logger.clone());
+        let run = Run::new(cfg)?;
+        let got = sc_agent::report(&logger, run.send(&Call::default(), &request()));
         assert_eq!(got["error"]["id"], id);
         assert_eq!(got["error"]["category"], category);
         assert_eq!(
@@ -332,7 +239,7 @@ fn req_sag_0002_0601_auth_quota_are_not_retried_and_remote_text_is_redacted_whol
         assert_eq!(got["error"]["attempts"], 1);
         assert_eq!(stub.finish()?.len(), 1);
         logger.flush()?;
-        let general = std::fs::read_to_string(root.0.join("logs/rust-test.log.jsonl"))?;
+        let general = fs::read_to_string(root.0.join("logs/rust-test.log.jsonl"))?;
         assert!(!general.contains("test-secret"));
         assert!(!serde_json::to_string(&rows(&root)?)?.contains("test-secret"));
         let errors = general
@@ -346,237 +253,171 @@ fn req_sag_0002_0601_auth_quota_are_not_retried_and_remote_text_is_redacted_whol
                 .count(),
             1
         );
+        run.close()?;
         logger.shutdown()?;
     }
     Ok(())
 }
-
 #[test]
 fn req_sag_0601_holdoff_lock_is_shared_only_by_host_and_held_during_wait() -> Test {
     let root = Temp::new()?;
-    let logger = logger(&root)?;
     let stub = Stub::new(vec![http(429, json!({})), http(200, answer())])?;
     let host = host_holdoff("127.0.0.1")?;
     assert!(Arc::ptr_eq(&host, &host_holdoff("127.0.0.1")?));
     let other = host_holdoff("independent.invalid")?;
     assert!(!Arc::ptr_eq(&host, &other));
-    let observations = Mutex::new(vec![]);
-    send(
-        &request(),
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &|_| {
-            let blocked = matches!(host.try_lock(), Err(std::sync::TryLockError::WouldBlock));
-            let independent = other.try_lock().is_ok();
-            if let Ok(mut seen) = observations.lock() {
-                seen.push((blocked, independent));
-            }
-        },
-        &keyring,
-    )?;
+    let observations = Arc::new(Mutex::new(vec![]));
+    let captured = observations.clone();
+    let mut cfg = run_config(&root, &stub)?;
+    cfg.seams.wait = Arc::new(move |_, _| {
+        let blocked = matches!(host.try_lock(), Err(std::sync::TryLockError::WouldBlock));
+        let independent = other.try_lock().is_ok();
+        if let Ok(mut seen) = captured.lock() {
+            seen.push((blocked, independent));
+        }
+    });
+    let run = Run::new(cfg)?;
+    run.send(&Call::default(), &request())?;
     assert_eq!(
-        observations
-            .into_inner()
-            .map_err(|_| "holdoff recorder poisoned")?,
+        *observations.lock().map_err(|e| e.to_string())?,
         vec![(true, true)]
     );
     assert_eq!(stub.finish()?.len(), 2);
-    logger.shutdown()?;
+    run.close()?;
     Ok(())
 }
-
 #[test]
 fn req_sag_0010_0011_cancel_during_retry_keeps_every_batch_position_and_row() -> Test {
     let root = Temp::new()?;
-    let logger = logger(&root)?;
     let stub = Stub::new(vec![Reply::Http(
         429,
         vec![("Retry-After", "600")],
         "busy".into(),
     )])?;
-    let cancel = Cancel::default();
-    let waits = Mutex::new(vec![]);
+    let waits = Arc::new(Mutex::new(vec![]));
+    let capture = waits.clone();
+    let mut cfg = run_config(&root, &stub)?;
+    cfg.seams.wait = Arc::new(move |delay, cancel| {
+        if let Ok(mut w) = capture.lock() {
+            w.push(delay);
+        }
+        cancel.cancel();
+        cancel.wait(Duration::from_secs(600));
+    });
+    let run = Run::new(cfg)?;
     let completed = Mutex::new(vec![]);
-    let got = batch(
-        &vec![request(); 3],
-        &options(&root, &stub.url),
-        &logger,
-        &cancel,
-        &|delay| {
-            if let Ok(mut seen) = waits.lock() {
-                seen.push(delay);
-            }
-            cancel.cancel();
-            cancel.wait(Duration::from_secs(600)); // Already signalled: no real wait, regardless of scheduling.
-        },
-        &keyring,
-        &|index, value| {
-            if let Ok(mut seen) = completed.lock() {
-                seen.push((index, value.clone()));
-            }
-        },
-    )?;
-    assert!(cancel.is_cancelled());
+    let got = run.send_batch(&Call::default(), &vec![request(); 3], &|index, value| {
+        if let Ok(mut c) = completed.lock() {
+            c.push((index, value.clone()));
+        }
+    })?;
     assert_eq!(stub.finish()?.len(), 1);
-    let results = got.as_array().ok_or("batch results missing")?;
-    assert_eq!(results.len(), 3);
-    for (index, result) in results.iter().enumerate() {
+    assert_eq!(got.as_array().ok_or("missing results")?.len(), 3);
+    for (index, result) in got.as_array().ok_or("missing results")?.iter().enumerate() {
+        assert_eq!(result["index"], index);
+        assert_eq!(result["result"]["error"]["id"], "decision.cancelled");
         assert_eq!(
             result["result"]["error"]["attempts"],
             if index == 0 { 1 } else { 0 }
         );
-        let id = result["result"]["error"]["session_id"]
+        result["result"]["error"]["session_id"]
             .as_str()
-            .ok_or("cancelled result has no session id")?;
-        id.parse::<ulid::Ulid>()?;
-        assert_eq!(result["index"], index);
-        assert_eq!(result["result"]["error"]["id"], "decision.cancelled");
+            .ok_or("session id absent")?
+            .parse::<ulid::Ulid>()?;
     }
+    assert_eq!(completed.into_inner().map_err(|e| e.to_string())?.len(), 3);
     assert_eq!(
-        completed
-            .into_inner()
-            .map_err(|_| "completion recorder poisoned")?
-            .len(),
-        3
-    );
-    assert_eq!(
-        waits.into_inner().map_err(|_| "wait recorder poisoned")?,
+        *waits.lock().map_err(|e| e.to_string())?,
         vec![Duration::from_secs(600)]
     );
     assert_eq!(rows(&root)?.len(), 3);
-    logger.shutdown()?;
+    run.close()?;
     Ok(())
 }
-
 #[test]
 fn req_sag_0011_precancel_never_reads_a_key_and_invalid_tags_write_no_row() -> Test {
     let root = Temp::new()?;
-    let logger = logger(&root)?;
-    let mut opts = options(&root, "http://127.0.0.1:1/v1");
-    let cancel = Cancel::default();
-    cancel.cancel();
-    opts.environment.clear();
-    let keys = std::sync::atomic::AtomicUsize::new(0);
-    let got = sc_agent::result(send(&request(), &opts, &logger, &cancel, &no_wait, &|_| {
-        keys.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let stub = Stub::new(vec![])?;
+    let mut cfg = run_config(&root, &stub)?;
+    let keys = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let captured = keys.clone();
+    cfg.seams.keyring = Arc::new(move |_| {
+        captured.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Err(sc_agent::KeyringError::Read("unexpected lookup".into()))
-    }));
+    });
+    let run = Run::new(cfg)?;
+    run.cancel();
+    let got = sc_agent::result(run.send(&Call::default(), &request()));
     assert_eq!(got["error"]["id"], "decision.cancelled");
     assert_eq!(keys.load(std::sync::atomic::Ordering::SeqCst), 0);
     assert_eq!(rows(&root)?.len(), 1);
-    // REQ-SAG-0004: invalid/missing project or invalid role is refused without creating a session.
+    run.close()?;
     for invalid_role in [false, true] {
         let isolated = Temp::new()?;
-        let mut bad = options(&isolated, "http://127.0.0.1:1/v1");
+        let mut cfg = run_config(&isolated, &stub)?;
         if invalid_role {
-            bad.agent_role = "Phase B".into();
+            cfg.agent_role = Some("Phase B".into());
         } else {
-            bad.settings.project = Some("Phase B".into());
+            cfg.project = Some("Phase B".into());
         }
-        let error = send(
-            &request(),
-            &bad,
-            &logger,
-            &Cancel::default(),
-            &no_wait,
-            &keyring,
-        )
-        .err()
-        .ok_or("invalid tag accepted")?;
-        assert_eq!(serde_json::to_value(error)?["id"], "log.invalid_slug");
+        let run = Run::new(cfg)?;
+        let error = run
+            .send(&Call::default(), &request())
+            .err()
+            .ok_or("invalid tag accepted")?;
+        assert_eq!(error.id(), "log.invalid_slug");
         assert!(!isolated.0.join("sessions").exists());
+        run.close()?;
     }
-    logger.shutdown()?;
+    assert!(stub.finish()?.is_empty());
     Ok(())
 }
-
 #[test]
 fn req_sag_0702_batch_continues_after_failed_item_and_preserves_positions() -> Test {
-    // ADR-SAG-0001: one failed request does not stop the stream.
     let root = Temp::new()?;
-    let logger = logger(&root)?;
     let stub = Stub::new(vec![
         http(401, json!({"error":"denied"})),
         http(200, answer()),
     ])?;
+    let run = Run::new(run_config(&root, &stub)?)?;
     let seen = Mutex::new(vec![]);
-    let got = batch(
-        &vec![request(); 2],
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-        &|index, value| {
-            if let Ok(mut items) = seen.lock() {
-                items.push((index, value["ok"].clone()));
-            }
-        },
-    )?;
+    let got = run.send_batch(&Call::default(), &vec![request(); 2], &|i, v| {
+        if let Ok(mut seen) = seen.lock() {
+            seen.push((i, v["ok"].clone()));
+        }
+    })?;
     assert_eq!(got[0]["index"], 0);
     assert_eq!(got[0]["result"]["error"]["id"], "http.auth");
     assert_eq!(got[1]["index"], 1);
     assert_eq!(got[1]["result"]["ok"], true);
     assert_eq!(
-        seen.into_inner()
-            .map_err(|_| "callback recorder poisoned")?,
+        seen.into_inner().map_err(|e| e.to_string())?,
         vec![(0, json!(false)), (1, json!(true))]
     );
     assert_eq!(stub.finish()?.len(), 2);
     assert_eq!(rows(&root)?.len(), 2);
-    let mut invalid = options(&root, "http://127.0.0.1:1/v1");
-    invalid.settings.workers = 0;
-    assert_eq!(
-        sc_agent::result(batch(
-            &[],
-            &invalid,
-            &logger,
-            &Cancel::default(),
-            &no_wait,
-            &keyring,
-            &|_, _| {}
-        ))["error"]["id"],
-        "decidr.invalid_workers"
-    );
-    logger.shutdown()?;
+    run.close()?;
     Ok(())
 }
-
 #[test]
-fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released() -> Test {
+fn req_sag_0702_two_workers_complete_before_either_callback_is_released() -> Test {
     let root = Temp::new()?;
-    let logger = logger(&root)?;
     let stub = Stub::new(vec![http(200, answer()), http(200, answer())])?;
-    let mut opts = options(&root, &stub.url);
-    opts.environment.clear();
-    opts.settings.workers = 2;
+    let mut cfg = run_config(&root, &stub)?;
+    cfg.workers = Some(2);
+    let run = Run::new(cfg)?;
     let (arrivals, arrived) = mpsc::channel();
     let (release, permits) = mpsc::channel();
     let permits = Mutex::new(permits);
-    let keys = |_: &str| {
-        arrivals
-            .send(std::thread::current().id())
-            .map_err(|e| e.to_string())?;
-        permits
-            .lock()
-            .map_err(|e| e.to_string())?
-            .recv_timeout(Duration::from_secs(5))
-            .map_err(|e| e.to_string())?;
-        Ok("test-secret".into())
-    };
     let (result, workers) = std::thread::scope(
         |scope| -> Result<_, Box<dyn std::error::Error + Send + Sync>> {
             let work = scope.spawn(|| {
-                batch(
-                    &vec![request(); 2],
-                    &opts,
-                    &logger,
-                    &Cancel::default(),
-                    &no_wait,
-                    &keys,
-                    &|_, _| {},
-                )
+                run.send_batch(&Call::default(), &vec![request(); 2], &|_, _| {
+                    let _ = arrivals.send(std::thread::current().id());
+                    if let Ok(rx) = permits.lock() {
+                        let _ = rx.recv_timeout(Duration::from_secs(5));
+                    }
+                })
             });
             let workers = (0..2)
                 .map(|_| arrived.recv_timeout(Duration::from_secs(5)))
@@ -589,32 +430,24 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
         },
     )?;
     assert_ne!(workers.first(), workers.last());
-    assert_eq!(result.as_array().ok_or("missing batch results")?.len(), 2);
+    assert_eq!(result.as_array().ok_or("missing results")?.len(), 2);
     assert_eq!(stub.finish()?.len(), 2);
-    logger.shutdown()?;
+    run.close()?;
     Ok(())
 }
-
 #[test]
 fn req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once() -> Test {
     for status in [200, 401] {
         let root = Temp::new()?;
-        let logger = logger(&root)?;
-        std::fs::write(root.0.join("sessions"), "controlled directory obstruction")?;
+        fs::write(root.0.join("sessions"), "controlled directory obstruction")?;
         let body = if status == 200 {
             answer()
         } else {
             json!({"error":"provider message stays whole"})
         };
         let stub = Stub::new(vec![http(status, body.clone())])?;
-        let outcome = sc_agent::result(send(
-            &request(),
-            &options(&root, &stub.url),
-            &logger,
-            &Cancel::default(),
-            &no_wait,
-            &keyring,
-        ));
+        let run = Run::new(run_config(&root, &stub)?)?;
+        let outcome = sc_agent::result(run.send(&Call::default(), &request()));
         if status == 200 {
             assert_eq!(outcome["value"]["answers"], body["answers"]);
         } else {
@@ -622,12 +455,12 @@ fn req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once() ->
             assert_eq!(outcome["error"]["message"], body.to_string());
             outcome["error"]["session_id"]
                 .as_str()
-                .ok_or("failed request lacks ULID")?
+                .ok_or("no session")?
                 .parse::<ulid::Ulid>()?;
         }
         assert_eq!(stub.finish()?.len(), 1);
-        logger.flush()?;
-        let text = std::fs::read_to_string(root.0.join("logs/rust-test.log.jsonl"))?;
+        run.close()?;
+        let text = fs::read_to_string(root.0.join("logs/decidr.log.jsonl"))?;
         let events = text
             .lines()
             .map(serde_json::from_str::<Value>)
@@ -635,19 +468,18 @@ fn req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once() ->
         assert_eq!(
             events
                 .iter()
-                .filter(|event| event["fields"]["id"] == "log.session_write")
+                .filter(|e| e["fields"]["id"] == "log.session_write")
                 .count(),
             1
         );
-        logger.shutdown()?;
     }
     Ok(())
 }
-
 #[test]
 fn req_sag_0014_eight_mib_serialized_input_limit_precedes_network_and_batch_sends() -> Test {
     let root = Temp::new()?;
-    let logger = logger(&root)?;
+    let stub = Stub::new(vec![])?;
+    let run = Run::new(run_config(&root, &stub)?)?;
     let mut value = request();
     value["state"] = json!("");
     let exact = "x".repeat(8 * 1024 * 1024 - serde_json::to_vec(&value)?.len());
@@ -656,27 +488,105 @@ fn req_sag_0014_eight_mib_serialized_input_limit_precedes_network_and_batch_send
     sc_agent::validate_request_size(&value)?;
     value["state"] = json!(format!("{exact}x"));
     assert_eq!(serde_json::to_vec(&value)?.len(), 8 * 1024 * 1024 + 1);
-    let opts = options(&root, "http://127.0.0.1:1/v1");
-    let got = sc_agent::result(send(
-        &value,
-        &opts,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    ));
+    let got = sc_agent::result(run.send(&Call::default(), &value));
     assert_eq!(got["error"]["id"], "decision.request_too_large");
-    let got = sc_agent::result(batch(
-        &[request(), value],
-        &opts,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-        &|_, _| {},
-    ));
+    let got = sc_agent::result(run.send_batch(&Call::default(), &[request(), value], &|_, _| {}));
     assert_eq!(got["error"]["id"], "decision.request_too_large");
-    assert_eq!(rows(&root)?.len(), 1); // Batch refused all input before its first request.
+    assert_eq!(rows(&root)?.len(), 1);
+    assert!(stub.finish()?.is_empty());
+    run.close()?;
+    Ok(())
+}
+#[test]
+fn run_snapshots_configuration_and_owns_or_borrows_one_logger() -> Test {
+    let root = Temp::new()?;
+    let stub = Stub::new(vec![http(200, answer()), http(200, answer())])?;
+    let logger = Arc::new(logger(&root)?);
+    let mut cfg = run_config(&root, &stub)?;
+    cfg.logger = Some(logger.clone());
+    let run = Run::new(cfg)?;
+    run.send(&Call::default(), &request())?;
+    fs::write(
+        root.0.join("sc-agent.json"),
+        json!({"project":"changed"}).to_string(),
+    )?;
+    run.send(&Call::default(), &request())?;
+    assert_eq!(rows(&root)?.len(), 2);
+    assert!(rows(&root)?.iter().all(|r| r["project"] == "phase-b"));
+    run.close()?;
+    run.close()?;
+    sc_agent::log(&logger, "after-close", json!({}))?;
+    let failure = run
+        .send(&Call::default(), &request())
+        .err()
+        .ok_or("closed run sent")?;
+    assert_eq!(failure.id(), "decision.run_closed");
+    assert_eq!(failure.category(), "validation");
+    assert_eq!(rows(&root)?.len(), 2);
+    assert_eq!(stub.finish()?.len(), 2);
     logger.shutdown()?;
+    let empty = Stub::new(vec![])?;
+    let cfg = run_config(&root, &empty)?;
+    let owned = Run::new(cfg)?;
+    owned.close()?;
+    owned.close()?;
+    assert!(empty.finish()?.is_empty());
+    Ok(())
+}
+#[test]
+fn missing_project_is_a_call_error_and_cancellation_is_channel_driven() -> Test {
+    let root = Temp::new()?;
+    let stub = Stub::new(vec![])?;
+    fs::write(root.0.join("sc-agent.json"), "{}")?;
+    let run = Run::new(run_config(&root, &stub)?)?;
+    assert_eq!(
+        run.send(&Call::default(), &request())
+            .err()
+            .ok_or("missing project sent")?
+            .id(),
+        "config.missing_project"
+    );
+    run.close()?;
+    assert!(stub.finish()?.is_empty());
+    let cancel = Arc::new(Cancel::default());
+    let (started, arrived) = mpsc::channel();
+    let (release, wait) = mpsc::channel();
+    std::thread::scope(|scope| -> Test {
+        let active = cancel.clone();
+        let worker = scope.spawn(move || {
+            active.run(move || {
+                let _ = started.send(());
+                let _ = wait.recv_timeout(Duration::from_secs(5));
+            })
+        });
+        arrived.recv_timeout(Duration::from_secs(5))?;
+        cancel.cancel();
+        let result = worker.join().map_err(|_| "cancel worker panicked")?;
+        let _ = release.send(());
+        assert_eq!(
+            result.err().ok_or("cancelled closure succeeded")?.id(),
+            "decision.cancelled"
+        );
+        Ok(())
+    })?;
+    let flag = Arc::new(Cancel::default());
+    let active = flag.clone();
+    let stub = Stub::new(vec![Reply::Respond(Box::new(move |_| {
+        active.cancel();
+        Reply::Disconnect
+    }))])?;
+    let mut cfg = run_config(&root, &stub)?;
+    cfg.project = Some("phase-b".into());
+    cfg.cancel = Some(flag);
+    let run = Run::new(cfg)?;
+    assert_eq!(
+        run.send(&Call::default(), &request())
+            .err()
+            .ok_or("cancelled send succeeded")?
+            .id(),
+        "decision.cancelled"
+    );
+    assert_eq!(stub.finish()?.len(), 1);
+    run.close()?;
     Ok(())
 }

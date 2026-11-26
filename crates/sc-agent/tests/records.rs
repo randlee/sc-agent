@@ -1,24 +1,27 @@
 pub mod support;
-use sc_agent::{Cancel, send};
+use sc_agent::{Call, Cancel, Run};
 use serde_json::{Value, json};
+use std::sync::Arc;
 use support::*;
 
 #[test]
 fn req_sag_0001_0004_0005_session_rows_append_with_distinct_ulids() -> Test {
     // REQ-SAG-0202 / NFR-SAG-0001: one digest per question; one file, distinct session ids.
     let root = Temp::new()?;
-    let logger = logger(&root)?;
+    let logger = Arc::new(logger(&root)?);
     let stub = Stub::new((0..3).map(|_| http(200, answer())).collect())?;
-    let opts = options(&root, &stub.url);
+    let opts = run_config(&root, &stub)?;
     for _ in 0..3 {
-        send(
-            &request(),
-            &opts,
-            &logger,
-            &Cancel::default(),
-            &no_wait,
-            &keyring,
-        )?;
+        {
+            let mut cfg = (opts).clone();
+            cfg.logger = Some(logger.clone());
+            cfg.cancel = Some(Arc::new(Cancel::default()));
+            Run::new(cfg).and_then(|run| {
+                let result = run.send(&Call::default(), &request());
+                let closed = run.close();
+                result.and_then(|value| closed.map(|()| value))
+            })
+        }?;
     }
     let seen = stub.finish()?;
     assert_eq!(seen.len(), 3);
@@ -37,7 +40,7 @@ fn req_sag_0001_0004_0005_session_rows_append_with_distinct_ulids() -> Test {
         )?;
     assert_eq!(ids.len(), 3);
     for row in &rows {
-        assert_eq!(row["repo"], opts.repo);
+        assert_eq!(row["repo"], "github.com/randlee/sc-agent");
         assert_eq!(row["project"], "phase-b");
         assert_eq!(row["agent_role"], "rust-developer");
         assert_eq!(row["request"], request());
@@ -59,21 +62,23 @@ fn req_sag_0001_0004_0005_session_rows_append_with_distinct_ulids() -> Test {
 fn req_sag_0005_one_mib_request_is_recorded_whole() -> Test {
     // Owner 2026-11-21: accept a 1 MiB request and read the session row back whole.
     let root = Temp::new()?;
-    let logger = logger(&root)?;
+    let logger = Arc::new(logger(&root)?);
     let stub = Stub::new(vec![http(200, answer())])?;
     let mut input = request();
     input["state"] = json!("");
     let payload = "x".repeat(1024 * 1024 - serde_json::to_vec(&input)?.len());
     input["state"] = json!(payload);
     assert_eq!(serde_json::to_vec(&input)?.len(), 1024 * 1024);
-    send(
-        &input,
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    )?;
+    {
+        let mut cfg = (run_config(&root, &stub)?).clone();
+        cfg.logger = Some(logger.clone());
+        cfg.cancel = Some(Arc::new(Cancel::default()));
+        Run::new(cfg).and_then(|run| {
+            let result = run.send(&Call::default(), &input);
+            let closed = run.close();
+            result.and_then(|value| closed.map(|()| value))
+        })
+    }?;
     assert_eq!(
         stub.finish()?.first().ok_or("request not sent")?.body["state"],
         input["state"]
@@ -90,7 +95,7 @@ fn req_sag_0005_one_mib_request_is_recorded_whole() -> Test {
 fn req_sag_0008_one_mib_jsonl_limit_preserves_accepted_event_and_decision() -> Test {
     // Owner 2026-11-21: exercise sc-observability 1.5.0 directly; propagate its exact error.
     let root = Temp::new()?;
-    let logger = logger(&root)?;
+    let logger = Arc::new(logger(&root)?);
     let mut event: sc_observability::LogEvent = serde_json::from_value(
         json!({"version":"v1","timestamp":sc_observability::Timestamp::now_utc(),
         "identity":sc_observability::ProcessIdentity::default(), "service":logger.service_name(),
@@ -130,14 +135,16 @@ fn req_sag_0008_one_mib_jsonl_limit_preserves_accepted_event_and_decision() -> T
             .clone()
     );
     let stub = Stub::new(vec![http(200, answer())])?;
-    let value = send(
-        &request(),
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    )?;
+    let value = {
+        let mut cfg = (run_config(&root, &stub)?).clone();
+        cfg.logger = Some(logger.clone());
+        cfg.cancel = Some(Arc::new(Cancel::default()));
+        Run::new(cfg).and_then(|run| {
+            let result = run.send(&Call::default(), &request());
+            let closed = run.close();
+            result.and_then(|value| closed.map(|()| value))
+        })
+    }?;
     assert_eq!(value["answers"], answer()["answers"]);
     assert_eq!(stub.finish()?.len(), 1);
     assert_eq!(
@@ -151,18 +158,20 @@ fn req_sag_0008_one_mib_jsonl_limit_preserves_accepted_event_and_decision() -> T
 #[test]
 fn adr_sag_0021_send_and_report_return_logger_failures() -> Test {
     let root = Temp::new()?;
-    let logger = logger(&root)?;
+    let logger = Arc::new(logger(&root)?);
     logger.shutdown()?;
-    let cancelled = Cancel::default();
+    let cancelled = Arc::new(Cancel::default());
     cancelled.cancel();
-    let outcome = send(
-        &request(),
-        &options(&root, "http://127.0.0.1:1"),
-        &logger,
-        &cancelled,
-        &no_wait,
-        &|_| panic!("cancelled send read a key"),
-    );
+    let outcome = {
+        let mut cfg = (run_config(&root, &Stub::new(vec![])?)?).clone();
+        cfg.logger = Some(logger.clone());
+        cfg.cancel = Some(cancelled.clone());
+        Run::new(cfg).and_then(|run| {
+            let result = run.send(&Call::default(), &request());
+            let closed = run.close();
+            result.and_then(|value| closed.map(|()| value))
+        })
+    };
     let failure = sc_agent::result(outcome);
     assert_eq!(failure["error"]["id"], "log.flush");
     let original = logger
@@ -185,17 +194,19 @@ fn adr_sag_0021_send_and_report_return_logger_failures() -> Test {
 #[test]
 fn req_sag_0019_missing_runner_names_its_setting_layers() -> Test {
     let root = Temp::new()?;
-    let logger = logger(&root)?;
-    let mut opts = options(&root, "http://127.0.0.1:1");
-    opts.model = "laya".into();
-    let failure = sc_agent::result(send(
-        &request(),
-        &opts,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    ));
+    let logger = Arc::new(logger(&root)?);
+    let mut opts = run_config(&root, &Stub::new(vec![])?)?;
+    opts.model = Some("laya".into());
+    let failure = sc_agent::result({
+        let mut cfg = (opts).clone();
+        cfg.logger = Some(logger.clone());
+        cfg.cancel = Some(Arc::new(Cancel::default()));
+        Run::new(cfg).and_then(|run| {
+            let result = run.send(&Call::default(), &request());
+            let closed = run.close();
+            result.and_then(|value| closed.map(|()| value))
+        })
+    });
     assert_eq!(failure["error"]["id"], "config.missing_setting");
     let message = failure["error"]["message"]
         .as_str()
@@ -217,17 +228,19 @@ fn req_sag_0019_missing_runner_names_its_setting_layers() -> Test {
 #[test]
 fn failed_general_logger_preserves_the_successful_session() -> Test {
     let root = Temp::new()?;
-    let logger = logger(&root)?;
+    let logger = Arc::new(logger(&root)?);
     logger.shutdown()?;
     let stub = Stub::new(vec![http(200, answer())])?;
-    let failure = sc_agent::result(send(
-        &request(),
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    ));
+    let failure = sc_agent::result({
+        let mut cfg = (run_config(&root, &stub)?).clone();
+        cfg.logger = Some(logger.clone());
+        cfg.cancel = Some(Arc::new(Cancel::default()));
+        Run::new(cfg).and_then(|run| {
+            let result = run.send(&Call::default(), &request());
+            let closed = run.close();
+            result.and_then(|value| closed.map(|()| value))
+        })
+    });
     assert_eq!(failure["error"]["id"], "log.write");
     assert_eq!(stub.finish()?.len(), 1);
     let sessions = rows(&root)?;
@@ -251,16 +264,18 @@ fn old_session_file_survives_a_new_decision_unchanged() -> Test {
         .open(&old)?
         .set_times(std::fs::FileTimes::new().set_modified(std::time::UNIX_EPOCH))?;
     let modified = std::fs::metadata(&old)?.modified()?;
-    let logger = logger(&root)?;
+    let logger = Arc::new(logger(&root)?);
     let stub = Stub::new(vec![http(200, answer())])?;
-    send(
-        &request(),
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    )?;
+    {
+        let mut cfg = (run_config(&root, &stub)?).clone();
+        cfg.logger = Some(logger.clone());
+        cfg.cancel = Some(Arc::new(Cancel::default()));
+        Run::new(cfg).and_then(|run| {
+            let result = run.send(&Call::default(), &request());
+            let closed = run.close();
+            result.and_then(|value| closed.map(|()| value))
+        })
+    }?;
     assert_eq!(stub.finish()?.len(), 1);
     assert_eq!(std::fs::read_to_string(&old)?, "{\"old\":true}\n");
     assert_eq!(std::fs::metadata(&old)?.modified()?, modified);
@@ -318,16 +333,18 @@ fn injected_test_sink_receives_every_general_record_without_default_file() -> Te
     config.enable_console_sink = false;
     let mut builder = sc_observability::v2::Logger::builder(config)?;
     builder.register_sink(sc_observability::SinkRegistration::typed(sink.clone()));
-    let logger = builder.build()?;
+    let logger = Arc::new(builder.build()?);
     let stub = Stub::new(vec![http(200, answer())])?;
-    send(
-        &request(),
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    )?;
+    {
+        let mut cfg = (run_config(&root, &stub)?).clone();
+        cfg.logger = Some(logger.clone());
+        cfg.cancel = Some(Arc::new(Cancel::default()));
+        Run::new(cfg).and_then(|run| {
+            let result = run.send(&Call::default(), &request());
+            let closed = run.close();
+            result.and_then(|value| closed.map(|()| value))
+        })
+    }?;
     assert_eq!(stub.finish()?.len(), 1);
     sc_agent::report(
         &logger,

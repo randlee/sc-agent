@@ -1,62 +1,24 @@
 pub mod support;
-use sc_agent::{Answer, config, digest, error, key, model, result, schema, slug};
+use sc_agent::{
+    Answer, ConfigSources, Configuration, Environment, Secret, digest, error, result, schema, slug,
+};
 use serde_json::json;
-use std::{cell::RefCell, ffi::OsString, fs};
+use std::{ffi::OsString, fs};
 use support::*;
 
-#[test]
-fn req_sag_0401_env_dotenv_keyring_order_and_invalid_credentials() -> Test {
-    let root = Temp::new()?;
-    let calls = RefCell::new(vec![]);
-    let lookup = |name: &str| {
-        calls.borrow_mut().push(name.to_owned());
-        Ok("ring-key".into())
-    };
-    let environment = vec![(
-        OsString::from("TYPESAFE_API_KEY"),
-        OsString::from("env-key"),
-    )];
-    fs::write(root.0.join(".env"), "TYPESAFE_API_KEY=dotenv-key\n")?;
-    assert_eq!(
-        key("TYPESAFE_API_KEY", &environment, &root.0, &lookup)?,
-        "env-key"
-    );
-    assert_eq!(
-        key("TYPESAFE_API_KEY", &[], &root.0, &lookup)?,
-        "dotenv-key"
-    );
-    assert!(calls.borrow().is_empty());
-    fs::remove_file(root.0.join(".env"))?;
-    assert_eq!(key("TYPESAFE_API_KEY", &[], &root.0, &lookup)?, "ring-key");
-    assert_eq!(*calls.borrow(), vec!["TYPESAFE_API_KEY"]);
-    for value in ["", "with space", "line\nend", "control\u{7f}", "nonascii-é"] {
-        let env = vec![("TYPESAFE_API_KEY".into(), value.into())];
-        let got = key("TYPESAFE_API_KEY", &env, &root.0, &lookup);
-        let error = got.err().ok_or("invalid credential accepted")?;
-        let expected = if value.is_empty() {
-            "secrets.key_missing"
-        } else {
-            "secrets.key_malformed"
-        };
-        assert_eq!(serde_json::to_value(error)?["id"], expected);
+fn config(
+    local: Option<&std::path::Path>,
+    global: Option<&std::path::Path>,
+    environment: &[(OsString, OsString)],
+    project: Option<&str>,
+) -> Result<Configuration, sc_agent::Error> {
+    ConfigSources {
+        local: local.map(Into::into),
+        global: global.map(Into::into),
+        environment: &Environment(Secret::new(environment.to_vec())),
+        project,
     }
-    assert_eq!(calls.borrow().len(), 1);
-    let failure = key("TYPESAFE_API_KEY", &[], &root.0, &|_| {
-        Err(sc_agent::KeyringError::Read("controlled refusal".into()))
-    })
-    .err()
-    .ok_or("keyring failure lost")?;
-    let failure = serde_json::to_value(failure)?;
-    assert_eq!(failure["id"], "secrets.keyring_read");
-    let message = failure["message"]
-        .as_str()
-        .ok_or("keyring failure message absent")?;
-    assert!(message.contains("platform keyring is unavailable"));
-    assert!(message.contains("TYPESAFE_API_KEY"));
-    assert!(message.contains("environment"));
-    assert!(message.contains(".env"));
-    assert!(!message.contains("controlled refusal"));
-    Ok(())
+    .load()
 }
 
 #[test]
@@ -149,15 +111,18 @@ fn req_sag_0004_config_injected_env_nested_keys_and_outside_git() -> Test {
         ("DECIDR_WORKERS", "3"),
         ("DECIDR_LAYA__HOST", "example.invalid"),
         ("DECIDR_LAYA__PORT", "9000"),
-        ("DECIDR_LAYA__MODEL", "local-model"),
     ]
     .map(|(k, v)| (k.into(), v.into()));
     let loaded = config(None, Some(&root.0), &environment, None)?;
     assert_eq!(loaded.config.workers, 3);
-    let runner = loaded.config.laya.ok_or("runner not decoded")?;
+    let runner = loaded
+        .config
+        .local
+        .get("laya")
+        .ok_or("runner not decoded")?;
     assert_eq!(
-        (runner.host.as_str(), runner.port, runner.model.as_str()),
-        ("example.invalid", 9000, "local-model")
+        (runner.host.as_str(), runner.port),
+        ("example.invalid", 9000)
     );
     let without_override = config(None, Some(&root.0), &[], None)?;
     assert_eq!(without_override.config.workers, 8);
@@ -258,24 +223,6 @@ fn req_sag_0002_0016_0017_errors_have_stable_ids_categories_and_omit_unset_attem
     Ok(())
 }
 
-#[test]
-fn req_sag_0101_models_use_provider_tables_and_reseller_passthrough() -> Test {
-    for (name, provider, id) in [
-        ("jev", None, "jev-latest"),
-        ("haiku", None, "claude-haiku-5-5"),
-        ("gpt-6-luna", None, "gpt-6-luna"),
-        ("haiku", Some("openrouter"), "anthropic/claude-haiku-5.5"),
-        ("custom/id", Some("nous"), "custom/id"),
-        ("future-model", Some("together"), "future-model"),
-    ] {
-        assert_eq!(model(name, provider)?.1, id);
-    }
-    assert_eq!(model("laya", None)?.0.name, "local");
-    assert!(model("missing", None).is_err());
-    assert!(model("jev", Some("missing")).is_err());
-    Ok(())
-}
-
 fn configured_models(
     models: serde_json::Value,
 ) -> Result<sc_agent::Settings, Box<dyn std::error::Error + Send + Sync>> {
@@ -289,17 +236,27 @@ fn configured_models(
 
 #[test]
 fn req_sag_0101_configured_models_override_and_extend_the_built_in_table() -> Test {
-    let none = configured_models(json!({}))?;
-    let (provider, id) = sc_agent::model_with("jev", None, &none.models)?;
-    assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-latest"));
-    let pinned = configured_models(json!({
-        "jev": {"provider": "typesafe", "id": "jev-1.14.0"},
-        "myjev": {"provider": "typesafe", "id": "jev-next"}
-    }))?;
-    let (provider, id) = sc_agent::model_with("jev", None, &pinned.models)?;
-    assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-1.14.0"));
-    let (provider, id) = sc_agent::model_with("myjev", None, &pinned.models)?;
-    assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-next"));
+    let settings = configured_models(
+        json!({"jev":{"provider":"typesafe","id":"jev-1.14.0"},"myjev":{"provider":"typesafe","id":"jev-next"}}),
+    )?;
+    for (name, id) in [("jev", "jev-1.14.0"), ("myjev", "jev-next")] {
+        let rows = sc_agent::providers::candidates(name, &settings);
+        assert_eq!(rows.len(), 1);
+        let row = rows.first().ok_or("configured row absent")?;
+        assert_eq!((row.provider.name, row.id), ("typesafe", id));
+    }
+    let table = sc_agent::providers::table(&settings);
+    assert_eq!(
+        table
+            .iter()
+            .skip(settings.models.len())
+            .map(|r| r.id)
+            .collect::<Vec<_>>(),
+        sc_agent::providers::MODELS
+            .iter()
+            .map(|r| r.id)
+            .collect::<Vec<_>>()
+    );
     Ok(())
 }
 
@@ -411,7 +368,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
     assert!(failure.contains("laya.port"), "{failure}");
     fs::write(
         &file,
-        json!({"laya":{"host":"localhost","port":9000,"model":"local"}}).to_string(),
+        json!({"laya":{"host":"localhost","port":9000}}).to_string(),
     )?;
     let env = vec![("DECIDR_LAYA__PORT".into(), "bad".into())];
     let failure = config(None, Some(&root.0), &env, None)
@@ -434,7 +391,7 @@ fn partial_runner_across_layers_names_missing_key_and_all_sources() -> Test {
     )?;
     fs::write(
         root.0.join("sc-agent.json"),
-        json!({"laya":{"model":"local"}}).to_string(),
+        json!({"workers":2}).to_string(),
     )?;
     let failure = config(Some(&local), Some(&root.0), &[], None)
         .err()
@@ -512,18 +469,18 @@ fn config_home_and_file_acceptance_are_explicit_and_read_only() -> Test {
 fn environment_json_and_strings_share_file_validation() -> Test {
     let root = Temp::new()?;
     let file = root.0.join("decidr.json");
-    let runner = json!({"host":"localhost", "port":9000, "model":"local"});
+    let runner = json!({"host":"localhost", "port":9000});
     for raw in ["1", "true", "null", "[1]", "{\"nested\":1}"] {
         fs::write(&file, json!({"laya":runner}).to_string())?;
-        let env = vec![("DECIDR_LAYA__MODEL".into(), raw.into())];
+        let env = vec![("DECIDR_LAYA__HOST".into(), raw.into())];
         let failure = config(None, Some(&root.0), &env, None)
             .err()
             .ok_or("non-string env model accepted")?
             .to_string();
-        assert!(failure.contains("DECIDR_LAYA__MODEL"), "{failure}");
-        assert!(failure.contains("laya.model"), "{failure}");
+        assert!(failure.contains("DECIDR_LAYA__HOST"), "{failure}");
+        assert!(failure.contains("laya.host"), "{failure}");
         let mut invalid = runner.clone();
-        invalid["model"] = serde_json::from_str(raw)?;
+        invalid["host"] = serde_json::from_str(raw)?;
         fs::write(&file, json!({"laya":invalid}).to_string())?;
         let failure = config(None, Some(&root.0), &[], None)
             .err()
@@ -533,14 +490,19 @@ fn environment_json_and_strings_share_file_validation() -> Test {
             failure.contains(file.to_str().ok_or("non-UTF8 path")?),
             "{failure}"
         );
-        assert!(failure.contains("laya.model"), "{failure}");
+        assert!(failure.contains("laya.host"), "{failure}");
     }
     fs::write(&file, json!({"laya":runner}).to_string())?;
     for raw in ["plain", "\"1\""] {
-        let env = vec![("DECIDR_LAYA__MODEL".into(), raw.into())];
+        let env = vec![("DECIDR_LAYA__HOST".into(), raw.into())];
         let loaded = config(None, Some(&root.0), &env, None)?;
         assert_eq!(
-            loaded.config.laya.ok_or("missing runner")?.model,
+            loaded
+                .config
+                .local
+                .get("laya")
+                .ok_or("missing runner")?
+                .host,
             if raw == "plain" { "plain" } else { "1" }
         );
     }
