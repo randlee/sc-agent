@@ -48,7 +48,15 @@ class RenderedClient(unittest.TestCase):
                     error = client.ClientError("TEST.ERROR", "failed call", attempts=2)
                     failed = {"ok": False, "error": error, "attempts": 2}
                     job = client.BatchJob("item", None, "candidate", 1, "request", {}, {}, {}, "directive")
-                    settings = client.BatchSettings("plan", "jev", 1, "prefix", 0.6, 1, 1, 100, False)
+                    settings = client.BatchSettings("plan", "jev", 1, "prefix", 0.6, 1, 1, False)
+                    # Requests have no size cap (phase-j ANC-004): no cap setting and no cap hook.
+                    self.assertNotIn("max_request_bytes", client.BatchSettings._fields)
+                    args = type("Args", (), {"gate": "plan", "repeat": 1, "max_workers": 1, "threshold": 0.6,
+                                             "model": "jev", "timeout": 1, "dry_run": False})()
+                    built = client.batch_settings(args, "prefix",
+                                                  check_threshold=lambda value: type("R", (), {"ok": True, "value": value})())
+                    self.assertTrue(built["ok"])
+                    self.assertEqual(built["value"], settings)
                     line = client.result_line(job, settings, failed, [], None, False)
                     self.assertFalse(line["ok"])
                     self.assertIsNone(line["answers"])
