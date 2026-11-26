@@ -1,9 +1,9 @@
 # Requirement: Provider-wide busy pause
 
 **Status:** Approved  
-**Version:** 0.2.0  
+**Version:** 0.2.1  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -14,13 +14,14 @@
 
 ### Requirement Statement
 
-Definitions: A provider endpoint is one host reached through one `HttpClient`. The not-before time is the earliest moment a send to that endpoint may start.
+Definitions: A provider endpoint is one host reached through one `HttpClient`. The not-before time is the earliest moment a send to that endpoint may start. A busy reply is a non-quota HTTP 429, 502 or 529. `Retry-After` is the HTTP response header giving the wait in seconds. The fallback wait is an exponentially increasing delay before a retry (REQ-SAG-0601); its values are not fixed.
 
 **MUST statements:**
 
-- A busy reply from a provider endpoint MUST set a not-before time shared by every send through that `HttpClient` to that host.
-- Every later send to that endpoint MUST wait until its not-before time.
-- A busy reply MUST hold off every sender on that client until its Retry-After, or an exponential backoff when there is none.
+- When an `HttpClient` receives a busy reply from a host, the `HttpClient` MUST set a not-before time shared by every send through that client to that host.
+- Every later send to the provider endpoint MUST wait until the endpoint's not-before time.
+- When a busy reply includes `Retry-After`, every sender using that `HttpClient` MUST wait the specified number of seconds.
+- When a busy reply has no `Retry-After`, every sender using that `HttpClient` MUST wait for the fallback wait.
 
 ### Rationale
 

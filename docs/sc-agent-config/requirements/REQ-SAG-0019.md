@@ -1,9 +1,9 @@
 # Requirement: Configuration file locations and lookup order
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.3.1  
 **Created:** 2026-11-18  
-**Last Updated:** 2026-11-22  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -29,12 +29,18 @@ Definitions: A CLI is an sc-agent command-line program that reads configuration,
   8. `sc-agent.json` in the global folder;
   9. the built-in default.
 - When a required setting has no built-in default and no layer sets it, the CLI MUST fail with a missing-setting error.
-- `sc-agent.json` MUST accept the shared defaults for `project`, `workers` and the optional `laya` runner; a CLI file may override them.
-- `<cli>.json` and `<cli>.local.json` MUST accept that CLI's settings and the shared settings; an unknown file key MUST produce a typed error naming that file and key path.
+- `sc-agent.json` MUST accept the shared default for `project`.
+- `sc-agent.json` MUST accept the shared default for `workers`.
+- `sc-agent.json` MUST accept the shared default for the optional `laya` runner.
+- `<cli>.json` MUST accept that CLI's settings.
+- `<cli>.local.json` MUST accept that CLI's settings.
+- `<cli>.json` MUST accept the shared settings.
+- `<cli>.local.json` MUST accept the shared settings.
+- An unknown file key MUST produce a typed error naming that file and key path.
 - `<cli>.json` in the local folder MUST accept the same keys as `<cli>.json` in the global folder.
 - `sc-agent.json` in the local folder MUST accept the same keys as `sc-agent.json` in the global folder.
 - When the CLI does not run inside a git work tree, layers 3 through 5 MUST be skipped.
-- Configuration files MUST be JSON.
+- Each configuration file MUST use JSON format.
 - Each CLI MUST have a `<cli> doctor` command (`decidr doctor`).
 - `<cli> doctor` MUST report the settings table.
 - In each row of the settings table, the `source` cell MUST show the source of that row's value.

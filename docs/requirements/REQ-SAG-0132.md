@@ -14,14 +14,23 @@
 
 ### Requirement Statement
 
+`release-preflight` is the release gate installed by the sc-publish kit. The release candidate is the version proposed for release. Release credential checks verify the credentials required for that release. Repository-defined preflight checks are the consumer checks declared in `release/publish-preflight.toml`. Release-gating checks are the release credential checks and repository-defined preflight checks.
+
 **MUST statements:**
 
-- The installed `release-preflight` workflow MUST run on every release candidate and fail closed when credentials or consumer checks fail.
-- Consumer-owned checks declared in `release/publish-preflight.toml` (including optional **docli** CLI HTML drift for **decidr** and **sitr**) MUST run through `.github/scripts/run-consumer-preflight.sh` without hand-editing kit workflow YAML for repo-only gates.
+- The installed `release-preflight` workflow MUST run for every release candidate.
+- The installed `release-preflight` workflow MUST block release when any release-gating check fails.
+- Every repository-defined preflight check declared in `release/publish-preflight.toml` MUST run through `.github/scripts/run-consumer-preflight.sh`.
+
+**MUST NOT statements:**
+
+- Repository-defined preflight checks MUST NOT be added by manually editing the workflow files that the sc-publish kit installs in `.github/workflows`.
 
 ### Rationale
 
 Preflight is the sole authority on whether a tag may ship; consumer extensions must use the kit seam, not forked workflows.
+
+The optional **docli** check compares regenerated command-line reference HTML for **decidr** and **sitr** with the committed HTML.
 
 ### Success Criteria
 

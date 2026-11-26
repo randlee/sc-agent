@@ -1,14 +1,14 @@
-# Requirement: Return values are not rounded
+# Requirement: Preserve returned decision values
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.3.1  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
 
-## REQ-SAG-0007: Return values are not rounded
+## REQ-SAG-0007: Preserve returned decision values
 
 **Status:** Approved  
 
@@ -18,15 +18,16 @@ Definitions: A decision value is a value a decision model returns (a Jev probabi
 
 **MUST statements:**
 
-- sc-agent MUST return decision values at the precision it received or computed them, using floating-point types where values are fractional.
+- sc-agent MUST return each decision value from the model unchanged.
 
 **MUST NOT statements:**
 
 - sc-agent MUST NOT round any decision value it returns.
+- sc-agent MUST NOT cast any decision value it returns to an integer.
 
 ### Rationale
 
-Rounding is the consumer's concern. A value rounded inside sc-agent loses information no consumer can recover.
+Consumers need the decision values returned by the model. Rounding or casting a value to an integer inside sc-agent can lose information no consumer can recover.
 
 Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiring subnanosecond rounding for a http call." "Don't round % to int."
 
@@ -34,5 +35,5 @@ Owner ruling (2026-11-21), Rand Lee: "I would never create a requirement requiri
 
 **Acceptance Criteria:**
 
-- [ ] A Jev probability of 0.123456789 is returned as 0.123456789 by the Rust API, the CLI and the PyO3 bindings.
-- [ ] A workspace search finds no rounding of returned decision values.
+- [ ] A unit test verifies that a Jev probability of 0.123456789 is returned as 0.123456789 by the Rust API, the CLI and the PyO3 bindings.
+- [ ] A unit test verifies that returned decision values are neither rounded nor cast to integers.

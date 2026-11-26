@@ -1,9 +1,9 @@
 # Requirement: Created ids are ULIDs
 
 **Status:** Approved  
-**Version:** 0.1.0  
+**Version:** 0.1.1  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-09  
+**Last Updated:** 2026-11-24  
 **Owner:** Rand Lee  
 
 ---
@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: An id is any identifier sc-agent generates, such as a session id or a send id. ULID is the 26-character Crockford base32 Universally Unique Lexicographically Sortable Identifier.
+Definitions: An id is any identifier sc-agent generates, such as a session id or a send id. ULID is the 26-character Crockford base32 Universally Unique Lexicographically Sortable Identifier. UUID means universally unique identifier. API means application programming interface.
 
 **MUST statements:**
 
@@ -33,7 +33,7 @@ One sortable id format across all session logs lets rows from every crate and ma
 
 **Acceptance Criteria:**
 
-- [ ] Every id written to a session log by sc-agent parses as a ULID.
+- [ ] A unit test verifies that every id written to a session log by sc-agent parses as a ULID.
 - [ ] A workspace search finds UUID generation only at call sites that build a request for an external API that defines a UUID.
 
 ### Product Applicability
