@@ -39,17 +39,17 @@ Session logs are separated and analysed by repository, by type of work and by pr
 
 **Acceptance Criteria:**
 
-- [ ] Unit test `crates/sc-agent/tests/records.rs`: a written session row carries `session_id`, repository, project, agent role, program name and program version.
-- [ ] Unit test `crates/sc-agent/tests/sending.rs`: a query with a missing part or a non-slug project or agent role returns an error, makes no model call and writes no row.
-- [ ] Unit test `crates/sc-agent/tests/config_and_values.rs`: origin `https://github.com/randlee/sc-agent.git` gives repository `github.com/randlee/sc-agent`.
-- [ ] Unit test `crates/sc-agent/tests/config_and_values.rs`: folder `work` on host `m5` outside git gives repository `local/m5/work`.
+- [ ] Unit test: a written session row carries `session_id`, repository, project, agent role, program name and program version.
+- [ ] Unit test: a query with a missing part or a non-slug project or agent role returns an error, makes no model call and writes no row.
+- [ ] Unit test: origin `https://github.com/randlee/sc-agent.git` gives repository `github.com/randlee/sc-agent`.
+- [ ] Unit test: folder `work` on host `m5` outside git gives repository `local/m5/work`.
 - [ ] Unit test of project resolution: the project a row carries is the one REQ-SAG-0021 resolves.
 - [ ] CLI run: `decidr send --agent-role sanity` writes a row with agent role `sanity`.
-- [ ] Unit test `tests/contract/test_contract.py`: a Python bindings call with agent role `sanity` writes a row with that agent role.
+- [ ] Unit test: a Python bindings call with agent role `sanity` writes a row with that agent role.
 - [ ] Unit test of the generated plan-anchor client: its rows carry agent role `plan-anchor`.
-- [ ] Unit test `crates/sc-agent/tests/config_and_values.rs`: a `project` of `Phase B` is refused and no row is written.
-- [ ] Unit test `tests/contract/test_contract.py`: `decidr send` with no agent role is refused and no row is written.
-- [ ] Unit test `tests/contract/test_contract.py`: a CLI call and a Python bindings call with the same `project` and `agent_role` write rows with the same values in those fields.
+- [ ] Unit test: a `project` of `Phase B` is refused and no row is written.
+- [ ] Unit test: `decidr send` with no agent role is refused and no row is written.
+- [ ] Unit test: a CLI call and a Python bindings call with the same `project` and `agent_role` write rows with the same values in those fields.
 - [ ] Unit test of the generated judge-jev client: its rows carry agent role `judge-jev`.
 - [ ] Unit test of the generated plan-anchor client: its call signature has no agent role parameter.
 
