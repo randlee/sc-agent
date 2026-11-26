@@ -37,4 +37,3 @@ Owner ruling (2026-11-20), Rand Lee: "No sleep (is async requirement)."
 **Related:**
 
 - REQ-SAG-0601
-- REQ-SAG-0104
