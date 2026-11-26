@@ -20,18 +20,11 @@ coverage is reconciled into the phase closeout record.
 - `REQ-SAG-0006`
 - `REQ-SAG-0008`
 - `REQ-SAG-0010`
-- `REQ-SAG-0014`
-- `REQ-SAG-0104`
-- `REQ-SAG-0130`
-- `REQ-SAG-0131`
-- `REQ-SAG-0132`
-- `REQ-SAG-0134`
 - `REQ-SAG-0201`
 - `REQ-SAG-0501`
 - `REQ-SAG-0601`
 - `REQ-SAG-0602`
 - `REQ-SAG-0401`
-- `REQ-SAG-0012`
 - `REQ-SAG-0001`
 - `REQ-SAG-0009`
 - `REQ-SAG-0101`
@@ -43,7 +36,6 @@ coverage is reconciled into the phase closeout record.
 - `REQ-SAG-0503`
 - `REQ-SAG-0504`
 - `REQ-SAG-0303`
-- `REQ-SAG-0803`
 - `REQ-SAG-0013`
 - `REQ-SAG-0901`
 

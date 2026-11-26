@@ -17,9 +17,6 @@
 
 **Requirements:**
 
-- REQ-SAG-0130
-- REQ-SAG-0131
-- REQ-SAG-0132
 
 ### Context
 

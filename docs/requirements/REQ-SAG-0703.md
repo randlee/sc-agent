@@ -50,7 +50,6 @@ Tools resend the same request often; answering it from the session log saves the
 - REQ-SAG-0005
 - REQ-SAG-0016
 - REQ-SAG-0019
-- REQ-SAG-0022
 - REQ-SAG-0702
 - REQ-SAG-0801
 - ADR-SAG-0019
