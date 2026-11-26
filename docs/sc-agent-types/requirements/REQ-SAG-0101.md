@@ -1,9 +1,9 @@
 # Requirement: Model short names
 
 **Status:** Approved  
-**Version:** 0.3.0  
+**Version:** 0.4.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-24  
+**Last Updated:** 2026-11-26  
 **Owner:** Rand Lee  
 
 ---
@@ -19,8 +19,6 @@ Definitions: A short name is a model name without a version. A line is the serie
 **MUST statements:**
 
 - Each cloud short name MUST resolve to a model in the `sc-agent` provider tables.
-- Each short name MUST select the latest model of its line.
-- `jev` MUST select the latest Jev model.
 - Each local short name MUST resolve to a local model in the model table.
 - A caller MUST be able to select a specific model version instead of a short name.
 
@@ -36,7 +34,6 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 - [ ] Each of the nine short names resolves to the newest model of its line in the provider tables.
 - [ ] A unit test resolves each cloud short name to a model in the provider tables.
-- [ ] A unit test resolves `jev` to the newest Jev model.
 - [ ] A unit test resolves each local short name to a local model in the model table.
 - [ ] A specific version id from the catalog parses and resolves to itself.
 
