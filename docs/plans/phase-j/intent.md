@@ -10,23 +10,23 @@ The design supports two call patterns through one small interface each:
 Design shape (owner-approved 2026-11-26):
 
 ```rust
-// JSON in, JSON out. One impl per wire format, shared by every compatible provider.
-pub trait Llm {
-    fn call(&self, req: &LlmRequest) -> Result<serde_json::Value, Error>; // messages + optional JSON schema
-}
-pub struct OpenAiCompat { /* base url, key env, model */ }    // chat/completions
-pub struct AnthropicCompat { /* base url, key env, model */ } // Messages
-impl Llm for OpenAiCompat { … }
-impl Llm for AnthropicCompat { … }
-
-// Decision pattern.
 pub trait Decision {
     fn decide(&self, req: &DecisionRequest) -> Result<DecisionResult, Error>;
 }
-pub struct Jev { … }                                             // TypeSafe systemone
+pub trait Llm {
+    // JSON in, JSON out
+    fn call(&self, req: &LlmRequest) -> Result<serde_json::Value, Error>; // messages + optional JSON schema
+}
+
+pub struct Jev { … }             // TypeSafe SystemOne
+pub struct OpenAiCompat { … }    // chat/completions; base url, key env, model
+pub struct AnthropicCompat { … } // Messages; base url, key env, model
+
 impl Decision for Jev { … }
-pub struct LlmDecision<L: Llm> { llm: L, system_prompt: String } // Jev's answer schema + system prompt
-impl<L: Llm> Decision for LlmDecision<L> { … }                   // haiku/luna act as Jev
+impl Decision for OpenAiCompat { … }    // Jev answer schema + system prompt (ANC-014)
+impl Llm      for OpenAiCompat { … }
+impl Decision for AnthropicCompat { … } // Jev answer schema + system prompt (ANC-014)
+impl Llm      for AnthropicCompat { … }
 ```
 
 - The LLM-as-Jev system prompt has a built-in default; `decidr.luna-system-prompt` and `decidr.haiku-system-prompt` override it from config (ANC-014).
