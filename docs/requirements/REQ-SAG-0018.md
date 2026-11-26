@@ -22,7 +22,6 @@ Definitions (how the template is built: ADR-SAG-0019 decision 1):
 - Prompt authoring is building the text sent to the model. Result processing is handling the returned results and decision trees. Consumer logic is prompt authoring together with result processing.
 - A decision call is a Run's `send` or `send_batch`.
 - The consent gate is the consumer module's `allow_remote_judge` check before a decision call.
-- `haiku` and `luna` are model selectors (REQ-SAG-0016).
 
 **MUST statements:**
 
