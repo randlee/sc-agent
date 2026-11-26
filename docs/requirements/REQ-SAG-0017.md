@@ -1,9 +1,9 @@
 # Requirement: Every error has a stable id and a stored category, and busy and network errors are retryable
 
 **Status:** Approved  
-**Version:** 0.5.1  
+**Version:** 0.5.2  
 **Created:** 2026-11-14  
-**Last Updated:** 2026-11-24  
+**Last Updated:** 2026-11-26  
 **Owner:** Rand Lee  
 
 ---
@@ -40,8 +40,6 @@ Definitions:
 ### Rationale
 
 Consumers that branch on error ids pin their own lists and add fallbacks today. A category stored when the error is built removes both problems without a lookup.
-
-NFR-SAG-0002 is withdrawn (2026-11-20). Rand Lee: "schema isn't locked yet ... No hand built checks."
 
 Owner ruling (2026-11-21), Rand Lee: "always return descriminated unions w/ error info" "No hand built checks."
 

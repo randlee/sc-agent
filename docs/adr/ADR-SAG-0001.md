@@ -1,9 +1,9 @@
 # Decision: Every provider receives one request form
 
 **Status:** Approved  
-**Version:** 0.4.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-24  
+**Last Updated:** 2026-11-26  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
 
@@ -30,12 +30,12 @@ Jev, local Jev-compatible runners, Haiku and Luna must answer the same decision 
 
 ### Decision
 
-Every provider (Jev, local Jev-compatible runners, Haiku, Luna) receives the same Jev API request body. `sc-agent` holds one static provider table and one static model table; each provider names its request shape: SystemOne, Messages or chat/completions. Before a send, the request is adapted to the provider's request shape; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them. There are no traits and no wrapper request type.
+Every provider (Jev, local Jev-compatible runners, Haiku, Luna) receives the same Jev API request body. `sc-agent` holds one static provider table and one model table made of built-in rows plus rows added from config, so a new model works without waiting for a release (ANC-009; Rand Lee: "hard-coded rows will get stale quickly and often"). Each provider names its wire format: Jev TypeSafe systemone, OpenAI-compatible chat/completions or Anthropic-compatible Messages. Decision providers implement one decision trait, with one implementation per wire format, and every provider that speaks a wire format uses that format's implementation, so adding a provider needs no new code or hard-coding (ANC-012). `sc-agent` also provides one LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider speaking that format, so callers reach any LLM through one interface (ANC-013). Rand Lee, 2026-11-26: "there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation." Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them. There is no wrapper request type.
 
 **Key Principles:**
 
 - There is one request form: the Jev API request body.
-- Adaptation knowledge lives only in the request-shape adaptation.
+- Adaptation knowledge lives only in the wire-format implementations.
 - `send_batch` returns each result as it is ready, tagged with its session ULID and input position; a failed request is returned in its result and the batch continues.
 
 ### Rationale
@@ -50,11 +50,11 @@ Owner ruling (2026-11-21), Rand Lee: "I do not require results in request order.
 
 **Positive:**
 
-- A new provider is added as a table row, with no change to shared types.
+- A new provider that speaks an existing wire format is added as a table row, with no new code; a new model is added as a config row.
 
 **Negative:**
 
-- Each request shape must translate the full Jev request.
+- Each wire-format implementation must translate the full Jev request.
 
 ### Alternatives Considered
 
