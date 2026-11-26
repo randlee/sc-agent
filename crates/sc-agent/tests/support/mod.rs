@@ -43,6 +43,7 @@ pub fn options(root: &Temp, url: &str) -> Options {
         settings: Settings {
             project: Some("phase-b".into()),
             workers: 1,
+            models: Default::default(),
             laya: None,
         },
         model: "jev".into(),

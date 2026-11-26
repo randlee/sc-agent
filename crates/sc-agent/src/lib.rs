@@ -102,10 +102,19 @@ pub struct Runner {
     pub port: u16,
     pub model: String,
 }
+/// A configured model: the built-in provider it belongs to and the id sent on the wire.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ModelEntry {
+    pub provider: String,
+    pub id: String,
+}
 #[derive(Clone, Debug, Serialize)]
 pub struct Settings {
     pub project: Option<String>,
     pub workers: usize,
+    /// Configured model names; an entry wins over the built-in table.
+    pub models: BTreeMap<String, ModelEntry>,
     pub laya: Option<Runner>,
 }
 fn missing_setting(path: &str) -> Error {
@@ -136,7 +145,14 @@ impl Settings {
         self.project.as_deref().filter(|s| !s.is_empty()).ok_or_else(||error("config.missing_project", "Set project/phase through --project, SC_PROJECT, local decidr.local.json, local decidr.json, local sc-agent.json, global decidr.local.json, global decidr.json, or global sc-agent.json"))
     }
 }
-const KEYS: &[&str] = &["project", "workers", "laya.host", "laya.port", "laya.model"];
+const KEYS: &[&str] = &[
+    "project",
+    "workers",
+    "models",
+    "laya.host",
+    "laya.port",
+    "laya.model",
+];
 pub struct Configuration {
     pub config: Settings,
     pub rows: Vec<Value>,
@@ -235,6 +251,7 @@ pub fn config(
     let config = Settings {
         project: setting(&resolved, "project", Value::Null)?,
         workers: setting(&resolved, "workers", json!(8))?,
+        models: setting(&resolved, "models", json!({}))?,
         laya: if resolved.value.get("laya").is_some_and(Value::is_object) {
             Some(Runner {
                 host: setting(&resolved, "laya.host", Value::Null)?,
@@ -247,6 +264,9 @@ pub fn config(
     };
     if config.workers == 0 {
         return Err(invalid_setting(&resolved, "workers", "must be positive"));
+    }
+    for entry in config.models.values() {
+        provider_named(&entry.provider)?;
     }
     let provenance = resolved.rows();
     let rows = KEYS
@@ -658,7 +678,29 @@ pub static PROVIDERS: &[Provider] = &[
         models: &[("laya", "laya", "")],
     },
 ];
+fn provider_named(name: &str) -> Result<&'static Provider, Error> {
+    PROVIDERS
+        .iter()
+        .find(|p| p.name == name)
+        .ok_or_else(|| error("types.unknown_provider", name))
+}
+/// Resolve a model name using only the built-in tables.
 pub fn model(name: &str, provider: Option<&str>) -> Result<(&'static Provider, String), Error> {
+    model_with(name, provider, &BTreeMap::new())
+}
+/// Resolve a model name; a configured entry for `name` wins over the built-in
+/// tables unless an explicit `provider` names a different provider.
+pub fn model_with(
+    name: &str,
+    provider: Option<&str>,
+    configured: &BTreeMap<String, ModelEntry>,
+) -> Result<(&'static Provider, String), Error> {
+    if let Some(entry) = configured.get(name) {
+        let p = provider_named(&entry.provider)?;
+        if provider.is_none_or(|requested| requested == entry.provider) {
+            return Ok((p, entry.id.clone()));
+        }
+    }
     let rows = |p: &Provider| {
         p.models
             .iter()
@@ -952,7 +994,11 @@ pub fn send(
         let project = options.settings.project_required()?;
         slug(project)?;
         slug(&options.agent_role)?;
-        let (provider, model) = model(&options.model, options.provider.as_deref())?;
+        let (provider, model) = model_with(
+            &options.model,
+            options.provider.as_deref(),
+            &options.settings.models,
+        )?;
         let (base, model) = if provider.name == "local" {
             let runner = options
                 .settings

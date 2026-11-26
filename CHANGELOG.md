@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add the `models` configuration setting mapping a model name to a built-in `provider` and wire `id`; a configured name wins over the built-in table, and the built-in `jev` now resolves to `jev-latest`.
+
 ## 0.4.0
 
 - Fixed: restore the sc-decidr wheel's MIT license metadata, bundled license file and package summary.

@@ -276,6 +276,42 @@ fn req_sag_0101_models_use_provider_tables_and_reseller_passthrough() -> Test {
     Ok(())
 }
 
+fn configured_models(
+    models: serde_json::Value,
+) -> Result<sc_agent::Settings, Box<dyn std::error::Error + Send + Sync>> {
+    let root = Temp::new()?;
+    fs::write(
+        root.0.join("sc-agent.json"),
+        json!({"models": models}).to_string(),
+    )?;
+    Ok(config(None, Some(&root.0), &[], None)?.config)
+}
+
+#[test]
+fn req_sag_0101_configured_models_override_and_extend_the_built_in_table() -> Test {
+    let none = configured_models(json!({}))?;
+    let (provider, id) = sc_agent::model_with("jev", None, &none.models)?;
+    assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-latest"));
+    let pinned = configured_models(json!({
+        "jev": {"provider": "typesafe", "id": "jev-1.14.0"},
+        "myjev": {"provider": "typesafe", "id": "jev-next"}
+    }))?;
+    let (provider, id) = sc_agent::model_with("jev", None, &pinned.models)?;
+    assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-1.14.0"));
+    let (provider, id) = sc_agent::model_with("myjev", None, &pinned.models)?;
+    assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-next"));
+    Ok(())
+}
+
+#[test]
+fn req_sag_0101_configured_model_with_unknown_provider_is_rejected() -> Test {
+    let failure = configured_models(json!({"x": {"provider": "nowhere", "id": "x-1"}}))
+        .err()
+        .ok_or("unknown provider accepted")?;
+    assert!(failure.to_string().contains("types.unknown_provider"));
+    Ok(())
+}
+
 #[test]
 fn req_sag_0004_repository_identity_normalizes_origins_and_local_fallback() -> Test {
     for origin in [
