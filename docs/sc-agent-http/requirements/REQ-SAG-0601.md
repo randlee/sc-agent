@@ -20,7 +20,7 @@ Definitions: A busy response is a non-quota HTTP 429, 502 or 529. A send is one 
 
 - A request that receives a busy response MUST be resent unchanged.
 - A request whose send has a network failure MUST be resent unchanged, counting toward the same maximum number of sends.
-- The maximum number of sends per request MUST be a fixed count of 5.
+- The maximum number of sends per request MUST be a configurable maximum, 5 by default.
 - When an `HttpClient` receives a busy reply from a host, the `HttpClient` MUST set a not-before time shared by every send through that client to that host.
 - Every later send to the provider endpoint MUST wait until the endpoint's not-before time.
 - When the provider gives a `Retry-After`, it MUST set the holdoff.
