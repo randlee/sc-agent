@@ -12,7 +12,7 @@ Premise found in the code: j-1 @f8bb024a has no `Run`, no `Model`, no J1-13 comp
 
 | file | holds |
 |---|---|
-| crates/sc-agent/src/lib.rs | `Run` (struct, new, logger, close, send, send_batch); `Options` without `provider`; `TYPESAFE` |
+| crates/sc-agent/src/lib.rs | `Run` (struct, new, logger, close, send, send_batch, sends_to); `Options` without `provider`; `TYPESAFE` |
 | crates/decidr/src/{main,cli}.rs | decidr on one `Run` per send; `--provider` removed |
 | crates/sc-agent-py/src/lib.rs | pyclasses `Logger`, `Run`; helpers; `provider_keys`; module `TYPESAFE` |
 | crates/sc-agent-py/python/sc_agent/{__init__.py,__init__.pyi,_native.pyi} | the Python contract |
@@ -58,19 +58,19 @@ pub struct Run {
     pub cancel: Arc<Cancel>,
     pub wait: Box<dyn Fn(Duration) + Send + Sync>,     // test seam; default set by from_options: cancel.wait
     pub keyring: Box<dyn Fn(&str) -> Result<String, KeyringError> + Send + Sync>, // test seam; default: os_keyring
-    provider: &'static Provider,
-    model: String,                    // the resolved wire id (differs from options.model)
+    found: Vec<(&'static Provider, String)>,   // j-1 `candidates(options.model)`, validated once; the provider and wire id are chosen per send by j-1 `resolve` (keyless first, then the first held key)
     logger: Arc<Logger>,
     owned: bool,
 }
 impl Run {
     /// The library way: runs `load` (layered config), applies the overrides (decidr.invalid_workers,
     /// decidr.invalid_request_timeout), reads the process environment, derives log_root from the logger's service
-    /// name (or `tool`), resolves the model once. `None` logger: owns `default_logger(&args.tool)`.
+    /// name (or `tool`), validates the model name once (`candidates`: types.unknown_short_name / types.unknown_provider). `None` logger: owns `default_logger(&args.tool)`.
     pub fn new(args: RunArgs, logger: Option<Arc<Logger>>, cancel: Arc<Cancel>) -> Result<Self, Error>;
     /// Test seam: a fully built Options (injected environment, root, log_root, repo); same defaults for wait/keyring.
     pub fn from_options(options: Options, tool: String, logger: Option<Arc<Logger>>, cancel: Arc<Cancel>) -> Result<Self, Error>;
-    pub fn provider(&self) -> &'static Provider;
+    /// True when the next send resolves to the named provider (j-1 `resolve`: keyless first, then the first held key); false when resolution fails. Replaces any stored provider; `send` uses the same private `resolve`.
+    pub fn sends_to(&self, provider: &str) -> bool;
     pub fn logger(&self) -> &Logger;
     /// flush; shut down only an owned logger (an injected one is never changed, ANC-006).
     pub fn close(&self) -> Result<(), Error>;
@@ -116,7 +116,7 @@ fn respond_value(given: Option<&Bound<'_, PyAny>>, name: &str, run: impl FnOnce(
            rest: Option<&Bound<'_, PyDict>>) -> Self;     // never raises; failure is logged once and stored
     fn __enter__(slf: Py<Self>) -> Py<Self>;
     fn __exit__(&self, kind: &Bound<'_, PyAny>, value: &Bound<'_, PyAny>, traceback: &Bound<'_, PyAny>) -> bool; // Run::close; False
-    #[getter] fn provider(&self) -> Option<&'static str>;  // Run::provider().name; None when creation failed
+    fn sends_to(&self, provider: &str) -> bool;            // Run::sends_to; False when creation failed
     #[pyo3(signature=(request=None, *extra, **rest))]
     fn send(&self, py: Python<'_>, request: Option<&Bound<'_, PyAny>>, extra: &Bound<'_, PyTuple>, rest: Option<&Bound<'_, PyDict>>) -> Py<PyAny>;
     #[pyo3(signature=(requests=None, *extra, on_result=None, **rest))]
@@ -130,15 +130,15 @@ fn respond_value(given: Option<&Bound<'_, PyAny>>, name: &str, run: impl FnOnce(
 ```
 Python (names frozen after j-2; `tool` is a Run keyword now because Run::new needs it; j-3 adds `run_id`, `session_rows`, and the Run keywords `tool_version`, `cache` together with the code that stores them, so no stub declares a name the native module lacks):
 - `__init__.py`: `from ._native import Logger, Run, TYPESAFE, digest, flush, log, logger, provider_keys`; `__all__ = ["Logger","Run","TYPESAFE","digest","flush","log","logger","provider_keys","sitr"]`; `from . import sitr`.
-- `_native.pyi`: `class Run: __init__(self, *, tool: str|None=None, model=None, project=None, agent_role=None, config_dir=None, general_log: Logger|None=None, timeout_secs=None, workers=None, base_url=None, sleep=None, keyring_lookup=None) -> None; __enter__ -> Self; __exit__(...) -> bool; provider: str|None; cancel() -> Envelope; send(request: Request) -> Envelope; send_batch(requests: Iterable[Request], *, on_result: Callable[[int, Envelope], object]|None=None) -> Envelope`; `class Logger`; `TYPESAFE: str`; `provider_keys() -> list[str]`; the unchanged logger/log/flush/digest/sitr stubs. Not declared: module send/send_batch, Cancel, `_new_cancel`, `_cancel`, TestSeams, Run.close, Run.project, Model, seed_session.
+- `_native.pyi`: `class Run: __init__(self, *, tool: str|None=None, model=None, project=None, agent_role=None, config_dir=None, general_log: Logger|None=None, timeout_secs=None, workers=None, base_url=None, sleep=None, keyring_lookup=None) -> None; __enter__ -> Self; __exit__(...) -> bool; sends_to(provider: str) -> bool; cancel() -> Envelope; send(request: Request) -> Envelope; send_batch(requests: Iterable[Request], *, on_result: Callable[[int, Envelope], object]|None=None) -> Envelope`; `class Logger`; `TYPESAFE: str`; `provider_keys() -> list[str]`; the unchanged logger/log/flush/digest/sitr stubs. Not declared: module send/send_batch, Cancel, `_new_cancel`, `_cancel`, TestSeams, Run.close, Run.project, Model, seed_session.
 
 ## Replaces (item -> existing construct; what is deleted with it)
 
 | item | replaces | deleted with it |
 |---|---|---|
-| `RunArgs`, `Run::new`, `from_options`, `provider`, `logger`, `close` | the repeated `(options, logger, cancel, wait, keyring)` parameters of `send` lib.rs:1272 and `batch` :1378; decidr main.rs:41-49 (`load`), :62-67 (workers), :80-92 (Options literal, `log_root`, `vars_os`); PyO3 `options` :144-179 and its `log_root` call :166 | the 5 parameters in 2 signatures; the 3 hand-built wirings; `Options` literals outside tests |
+| `RunArgs`, `Run::new`, `from_options`, `logger`, `close` | the repeated `(options, logger, cancel, wait, keyring)` parameters of `send` lib.rs:1272 and `batch` :1378; decidr main.rs:41-49 (`load`), :62-67 (workers), :80-92 (Options literal, `log_root`, `vars_os`); PyO3 `options` :144-179 and its `log_root` call :166 | the 5 parameters in 2 signatures; the 3 hand-built wirings; `Options` literals outside tests |
 | `config`, `load`, `doctor` take `tool`; `Settings.tool` | hard-coded names in `config` lib.rs:201, :209, :262, `doctor` :1490, the texts :146 and :170 | the literals; none of ADR-SAG-0020's names change for decidr |
-| `PyRun.__enter__`, `__exit__`, `provider` getter | none (ADR-SAG-0019 d14: `with sc_agent.Run(...)`; `run.provider`); new capability | - |
+| `PyRun.__enter__`, `__exit__`, `sends_to` | none (ADR-SAG-0019 d14: `with sc_agent.Run(...)`); new capability | - |
 | `Run::send` | `pub fn send` lib.rs:1272 | free fn |
 | `Run::send_batch` | `pub fn batch` lib.rs:1378 | free fn |
 | `Options` minus `provider` | `Options.provider` :949; `candidates(&options.model, options.provider.as_deref(), ..)` call in send :1298; decidr `--provider` cli.rs:19; PyO3 `provider` keyword. REQ-SAG-0103: no caller names a provider; config `models.<name>.provider` does | the field, flag, keyword |
@@ -151,7 +151,7 @@ Python (names frozen after j-2; `tool` is a Run keyword now because Run::new nee
 | decidr on `Run` | main.rs: free `send`/`batch` calls :60-110, `provider` binding, local logger clone | `--provider`, per-call param lists |
 | template call sites | consumer.py.j2:249-302 `cancel`/`sc_agent.Cancel()`/`sc_agent.send*`; :221 `_abort_if_selected(.., cancel: Cancel)` -> `Run`; :40 TYPE_CHECKING import | `cancel` params x2, `cancel = cancel or sc_agent.Cancel()` x2, Cancel import |
 | `integration.py` names from `decidr models` | regex over lib.rs :15 and hard-coded `("typesafe","anthropic","openai")` :35, "TypeSafe key is required" :37 | both, the error |
-| new capability (counted apart): `TYPESAFE`, `provider_keys`, `Run.provider` getter | none; ADR-SAG-0019 d1 lists `provider_keys` and `TYPESAFE` as public, j-4's consent gate keys on `run.provider == TYPESAFE` | - |
+| new capability (counted apart): `TYPESAFE`, `provider_keys`, `Run.sends_to` | none; ADR-SAG-0019 d1 lists `provider_keys` and `TYPESAFE` as public; j-4's consent gate asks `run.sends_to(TYPESAFE)`, the library's own resolution, not a first-candidate guess | - |
 
 ## External contracts (examples)
 
@@ -163,7 +163,7 @@ with sc_agent.Run(model="haiku", project="p", agent_role="r", timeout_secs=30, w
                   general_log=sc_agent.logger("my-tool")["value"]) as run:
     one = run.send({"questions": {...}})                         # {"ok": True, "value": {...}} | {"ok": False, "error": {...}}
     many = run.send_batch([r1, r2], on_result=lambda i, v: ...)  # {"ok": True, "value": [{"index": 0, "result": {...}}, ...]}
-    run.cancel(); run.provider   # "anthropic"
+    run.cancel(); run.sends_to(sc_agent.TYPESAFE)   # False for haiku with a nous row or no TypeSafe key
 sc_agent.provider_keys()  # ["TYPESAFE_API_KEY","ANTHROPIC_API_KEY",...]; sc_agent.TYPESAFE == "typesafe"
 ```
 Nothing raises. Bad or extra argument, wrong type, bad `timeout_secs`/`workers`, unknown model: the Run is created, the error is logged once and stored, and `send`, `send_batch`, `cancel` return it (`sc_agent_py.invalid_option` message names the argument; `decidr.invalid_request_timeout`; `decidr.invalid_workers`; `types.unknown_short_name`; `config.missing_project` at send). `run.send(r, "x")`, `run.send(r, model="m")`, `run.send_batch([r], workers=2)`, `run.cancel(1)` -> `sc_agent_py.invalid_option`. Per-call overrides stay refused (REQ-SAG-0702). Callback exception -> `sc_agent_py.callback`; KeyboardInterrupt in `sleep`/`keyring_lookup`/`on_result` cancels the Run.
@@ -191,11 +191,11 @@ Paths: default logger `<DECIDR_LOG_ROOT|~/.sc-agent>/logs/decidr.log.jsonl`; ses
 
 | | lines | basis |
 |---|---|---|
-| Restructure: sc-agent `RunArgs`, `Run`, `new`, `from_options`, close, provider, minus send/batch parameter lists incl. the `tool` parameter of config/load/doctor (lib.rs 1315 -> 1432) | +117 | measured on this branch |
+| Restructure: sc-agent `RunArgs`, `Run`, `new`, `from_options`, close, minus send/batch parameter lists incl. the `tool` parameter of config/load/doctor (lib.rs 1315 -> 1432) | +117 | measured on this branch |
 | Restructure: decidr main.rs 144 -> 128, cli.rs 33 -> 31 | -18 | measured (decidr no longer calls load, vars_os, log_root, workers) |
 | Restructure: PyO3 lib.rs 562 -> about 450 (module send/send_batch/Cancel/capsule/options/wait/lookup out, PyRun/PyLogger in) | about -110 | estimate, not yet built |
 | **Restructure net** | **about -12** (target <= 0) | |
-| New capability: `TYPESAFE` +1, `provider_keys` +5, `PyRun.provider` getter +3, `__enter__`/`__exit__` +6 | about +15 | estimate |
+| New capability: `TYPESAFE` +1, `provider_keys` +5, `PyRun.sends_to` +3, `__enter__`/`__exit__` +6 | about +15 | estimate |
 | **Sprint total** | **about 2,408 / 2,500** (worst case 2,427) | |
 Python (uncounted by the gate): __init__.py 28 -> about 9, stubs about +30, template net <= +4, integration.py net about 0. Docs uncapped. No per-function counts.
 
@@ -204,8 +204,8 @@ Python (uncounted by the gate): __init__.py 28 -> about 9, stubs about +30, temp
 - Build: `RUSTUP_TOOLCHAIN=1.98.1 cargo build --workspace --locked`; `cargo clippy --workspace --all-targets --all-features -- -D warnings`; `cargo fmt --check --all`.
 - Gate: `RUSTUP_TOOLCHAIN=1.98.1 python3 scripts/gate/rewrite.py` all PASS; Rust source <= 2,404 + new capability (about 2,419); the config tests pass `tool`; fails the sprint above 2,427.
 - Greps: `grep -rn 'PyCapsule\|unsafe\|invalid_call\|_new_cancel' crates/sc-agent-py/src` none; `grep -n 'pub fn send(\|pub fn batch(\|provider: Option' crates/sc-agent/src crates/decidr/src` none; `grep -rn 'recv_timeout' crates/decidr/src` none; `grep -rnE 'seed_session|TestSeams|def close|Cancel' crates/sc-agent-py/python/sc_agent/*.pyi` none.
-- Rust tests (ported to `Run`; `support::run(opts, &logger)` helper): sending.rs and records.rs existing names kept; new `run_new_resolves_the_model_once_and_rejects_unknown` (REQ-SAG-0101), `run_close_shuts_down_only_an_owned_logger` (ANC-006), `run_timeout_and_workers_apply_to_every_call` (REQ-SAG-0702), `run_with_invalid_timeout_or_workers_is_an_error` (REQ-SAG-0702); wires.rs unchanged; decidr cli.rs: `send_provider_flag_is_a_usage_error`, `local_timeout_default_is_120_seconds`.
-- Python (`python3 -m unittest discover -s tests/contract`, loopback.py, strict pyright, `check_consumer_template.py`): existing wheel tests ported by call shape (names unchanged); new `test_run_sends_through_loopback_and_closes`, `test_run_cancel_from_on_result_cancels_the_rest`, `test_run_invalid_arguments_return_invalid_option`, `test_module_exports_only_the_run_api`, `test_run_model_errors`, `test_provider_keys_typesafe_and_run_provider`, `test_native_stub_declares_every_export`; integration: `test_export_uses_current_provider_variables_and_injected_lookup` (rewritten), `test_export_with_only_an_anthropic_key`, `test_export_refuses_before_writing_without_credentials`. All deterministic (stub replies on events, sleep seam, barrier).
+- Rust tests (ported to `Run`; `support::run(opts, &logger)` helper): sending.rs and records.rs existing names kept; new `run_new_rejects_unknown_model_and_send_resolves_per_call` (REQ-SAG-0101), `run_close_shuts_down_only_an_owned_logger` (ANC-006), `run_timeout_and_workers_apply_to_every_call` (REQ-SAG-0702), `run_with_invalid_timeout_or_workers_is_an_error` (REQ-SAG-0702); wires.rs unchanged; decidr cli.rs: `send_provider_flag_is_a_usage_error`, `local_timeout_default_is_120_seconds`.
+- Python (`python3 -m unittest discover -s tests/contract`, loopback.py, strict pyright, `check_consumer_template.py`): existing wheel tests ported by call shape (names unchanged); new `test_run_sends_through_loopback_and_closes`, `test_run_cancel_from_on_result_cancels_the_rest`, `test_run_invalid_arguments_return_invalid_option`, `test_module_exports_only_the_run_api`, `test_run_model_errors`, `test_provider_keys_typesafe_and_run_sends_to`, `test_native_stub_declares_every_export`; integration: `test_export_uses_current_provider_variables_and_injected_lookup` (rewritten), `test_export_with_only_an_anthropic_key`, `test_export_refuses_before_writing_without_credentials`. All deterministic (stub replies on events, sleep seam, barrier).
 - Docs: wheel README (Run API, no Cancel/send), root README stale `--provider`/model lines, CHANGELOG Breaking entry (removed `send`, `send_batch`, `Cancel`, `provider=`, `--provider`, `invalid_call`), prerelease.md haiku/luna cases.
 
 ## Assumptions
