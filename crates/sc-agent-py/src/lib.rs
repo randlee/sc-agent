@@ -594,12 +594,13 @@ fn session_rows(
 }
 
 #[pyfunction]
-fn provider_keys() -> Vec<&'static str> {
-    sc_agent::PROVIDERS
+fn provider_keys(py: Python<'_>) -> Py<PyAny> {
+    let keys = sc_agent::PROVIDERS
         .iter()
         .map(|p| p.key)
         .filter(|k| !k.is_empty())
-        .collect()
+        .collect::<Vec<_>>();
+    raw(py, sc_agent::result(Ok(json!(keys))))
 }
 #[pyfunction]
 fn models(py: Python<'_>) -> Py<PyAny> {
