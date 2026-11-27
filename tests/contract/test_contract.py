@@ -888,8 +888,7 @@ class Cli(Isolated):
                 release = threading.Event()
                 def respond(body):
                     process.send_signal(interrupt)
-                    if not release.wait(20):
-                        return 500, {}, {"error": "child did not exit while reply was withheld"}
+                    release.wait()
                     return 200, {}, ANSWER
                 with server([None], respond) as (url, received):
                     port = int(url.split(":")[2].split("/")[0])
@@ -900,11 +899,20 @@ class Cli(Isolated):
                                                  "--agent-role", "contract", "--batch", "--workers", "1"],
                                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=folder, env=env)
                     try:
-                        stdout, stderr = process.communicate("\n".join([json.dumps(REQUEST)] * 3), timeout=20)
-                    finally:
-                        if process.poll() is None:
+                        try:
+                            stdout, stderr = process.communicate("\n".join([json.dumps(REQUEST)] * 3), timeout=20)
+                        except subprocess.TimeoutExpired as deadline:
                             process.kill()
-                            process.communicate()
+                            try:
+                                stdout, stderr = process.communicate(timeout=5)
+                            except subprocess.TimeoutExpired as drain_deadline:
+                                stdout = drain_deadline.output or deadline.output or ""
+                                stderr = drain_deadline.stderr or deadline.stderr or ""
+                            self.fail(
+                                f"{interrupt.name} cancellation deadline expired; "
+                                f"received={received!r}; stdout={stdout!r}; stderr={stderr!r}"
+                            )
+                    finally:
                         release.set()
                 self.assertNotEqual(process.returncode, 0, stdout + stderr)
                 results = json.loads(stdout)
