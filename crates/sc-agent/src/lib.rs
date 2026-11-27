@@ -2059,16 +2059,27 @@ pub mod route_tests {
 
     #[test]
     fn cancelled_operations_do_not_wait_for_a_locked_mutex() -> Test {
-        let cancel = Cancel::default();
-        let mutex = Mutex::new(());
+        let cancel = Arc::new(Cancel::default());
+        let mutex = Arc::new(Mutex::new(()));
         let _held = mutex.lock().map_err(|_| "mutex poisoned")?;
         cancel.cancel();
-        let failure = cancel
-            .lock(&mutex)
-            .err()
-            .ok_or("cancelled lock succeeded")?;
-        assert_eq!(result(Err(failure))["error"]["id"], "decision.cancelled");
-        cancel.wait(Duration::MAX)?;
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let (worker_cancel, worker_mutex) = (Arc::clone(&cancel), Arc::clone(&mutex));
+        std::thread::spawn(move || {
+            let locked = worker_cancel.lock(&worker_mutex).map(|_| Value::Null);
+            let _ = sender.send(result(locked));
+            let waited = worker_cancel.wait(Duration::MAX).map(|()| Value::Null);
+            let _ = sender.send(result(waited));
+        });
+        // The deadlines are failure-only backstops: both calls must return at once.
+        let locked = receiver
+            .recv_timeout(Duration::from_secs(20))
+            .map_err(|e| format!("cancel.lock did not return: {e}"))?;
+        assert_eq!(locked["error"]["id"], "decision.cancelled");
+        let waited = receiver
+            .recv_timeout(Duration::from_secs(20))
+            .map_err(|e| format!("cancel.wait(Duration::MAX) did not return: {e}"))?;
+        assert_eq!(waited["ok"], true, "{waited}");
         assert!(cancel.is_cancelled());
         Ok(())
     }
