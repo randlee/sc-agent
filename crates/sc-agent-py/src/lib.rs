@@ -349,10 +349,7 @@ impl PyRun {
                         match call_back::<_, Py<PyAny>>(&callback, delay.as_secs_f64(), &flag) {
                             Ok(_) => Ok(()),
                             Err(e) if e.is_instance_of::<PyKeyboardInterrupt>(py) => Ok(()),
-                            Err(e) => {
-                                py.detach(|| flag.wait(delay))?;
-                                Err(error("sc_agent_py.callback", e))
-                            }
+                            Err(e) => Err(error("sc_agent_py.callback", e)),
                         }
                     })
                 });

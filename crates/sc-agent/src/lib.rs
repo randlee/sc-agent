@@ -1350,13 +1350,6 @@ impl Route<'_> {
                 .iter()
                 .any(|needle| low.contains(needle));
             let busy = [429, 502, 529].contains(&status) && !quota;
-            if (busy || status == 0) && attempt < max {
-                let _hold = (status != 0).then(|| cancel.lock(&pause)).transpose()?;
-                let delay =
-                    delay.unwrap_or_else(|| Duration::from_secs(2u64.saturating_pow(attempt - 1)));
-                (self.wait)(delay)?;
-                continue;
-            }
             let id = match status {
                 _ if quota => "http.quota_exhausted",
                 _ if busy => "http.provider_busy",
@@ -1364,6 +1357,13 @@ impl Route<'_> {
                 401 => "http.auth",
                 _ => "decision.api_status",
             };
+            if (busy || status == 0) && attempt < max {
+                let _hold = (status != 0).then(|| cancel.lock(&pause)).transpose()?;
+                let delay =
+                    delay.unwrap_or_else(|| Duration::from_secs(2u64.saturating_pow(attempt - 1)));
+                (self.wait)(delay).map_err(|e| contextual(error(id, text.clone()), e, None))?;
+                continue;
+            }
             return Err(error(id, text));
         }
         Err(error("http.network", "send count exhausted"))

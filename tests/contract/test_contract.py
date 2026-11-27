@@ -556,7 +556,8 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         def rejected(delay):
             waits.append(delay)
             raise ValueError("controlled sleep callback refusal")
-        replies = [(429, {"Retry-After": "0"}, {}), (200, {}, ANSWER)]
+        replies = [(429, {"Retry-After": "0"}, {"error": "provider busy lower body"}),
+                   (200, {}, ANSWER)]
         with server(replies) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
             with self.api.Run(tool="decidr", workers=1, project="contract", agent_role="contract",
                               config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"],
@@ -565,13 +566,35 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         self.assertTrue(result["ok"], result)
         first, second = [item["result"] for item in result["value"]]
         error = self.error(first)
-        self.assertEqual(error["id"], "sc_agent_py.callback")
+        self.assertEqual(error["id"], "http.provider_busy")
         self.assertEqual(error["attempts"], 1)
         self.assertTrue(error["session_id"])
+        self.assertIn("provider busy lower body", error["message"])
         self.assertIn("controlled sleep callback refusal", error["message"])
         self.assertTrue(second["ok"], second)
         self.assertEqual(waits, [0.0])
         self.assertEqual(len(received), 2)
+        rows = [json.loads(line) for path in Path(self.directory.name).rglob("sessions.jsonl")
+                for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 1)
+
+    def test_sleep_callback_failure_preserves_send_error_without_session_row(self):
+        def rejected(_):
+            raise ValueError("controlled sleep callback refusal")
+        with server([(429, {"Retry-After": "0"}, {"error": "provider busy lower body"})]) as (url, received), \
+                patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract",
+                              config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"],
+                              base_url=url, sleep=rejected) as run:
+                result = run.send(REQUEST)
+        error = self.error(result)
+        self.assertEqual(error["id"], "http.provider_busy")
+        self.assertEqual(error["attempts"], 1)
+        self.assertTrue(error["session_id"])
+        self.assertIn("provider busy lower body", error["message"])
+        self.assertIn("controlled sleep callback refusal", error["message"])
+        self.assertEqual(len(received), 1)
+        self.assertEqual(list(Path(self.directory.name).rglob("sessions.jsonl")), [])
 
     def test_busy_holdoff_is_per_host_and_exponential(self):
         entered, finished = threading.Event(), threading.Event()
