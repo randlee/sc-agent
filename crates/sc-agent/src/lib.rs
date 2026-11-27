@@ -1260,7 +1260,9 @@ impl Route<'_> {
             let busy = [429, 502, 529].contains(&status) && !quota;
             if (busy || status == 0) && attempt < max {
                 let _hold = (status != 0).then(|| cancel.lock(&pause)).transpose()?;
-                (self.wait)(delay.unwrap_or_else(|| Duration::from_secs(2u64.pow(attempt - 1))));
+                (self.wait)(
+                    delay.unwrap_or_else(|| Duration::from_secs(2u64.saturating_pow(attempt - 1))),
+                );
                 continue;
             }
             let id = match status {

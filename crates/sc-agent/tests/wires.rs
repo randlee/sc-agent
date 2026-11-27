@@ -524,3 +524,39 @@ fn cancel_ends_a_wait_on_the_host_holdoff() -> Test {
         Ok(())
     })
 }
+
+#[test]
+fn configurable_send_count_does_not_overflow_the_backoff() -> Test {
+    use std::{sync::Mutex, time::Duration};
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let stub = Stub::new(
+        (0..66)
+            .map(|_| http(502, json!({"error":"busy"})))
+            .collect(),
+    )?;
+    let mut opts = options(&root, &stub.url);
+    opts.settings.max_sends = 66;
+    let waits = Mutex::new(Vec::new());
+    let failure = result(send(
+        &request(),
+        &opts,
+        &logger,
+        &Cancel::default(),
+        &|delay| {
+            if let Ok(mut waits) = waits.lock() {
+                waits.push(delay);
+            }
+        },
+        &keyring,
+    ));
+    assert_eq!(failure["error"]["id"], "http.provider_busy");
+    assert_eq!(failure["error"]["attempts"], 66);
+    assert_eq!(stub.finish()?.len(), 66);
+    let waits = waits.into_inner().map_err(|_| "waits recorder poisoned")?;
+    assert_eq!(waits.len(), 65);
+    assert_eq!(waits.last(), Some(&Duration::from_secs(u64::MAX)));
+    assert!(waits.windows(2).all(|pair| pair[0] < pair[1]));
+    logger.shutdown()?;
+    Ok(())
+}
