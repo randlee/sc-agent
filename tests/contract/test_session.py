@@ -124,4 +124,4 @@ class Session(Isolated):
         self.assertEqual(rendered.returncode, 0, rendered.stderr)
         source = output.read_text()
         self.assertIn('TOOL_VERSION = "1.2.3"', source)
-        self.assertEqual(source.count("tool_version=TOOL_VERSION"), 2)
+        self.assertEqual(source.count("tool_version=TOOL_VERSION"), 1)

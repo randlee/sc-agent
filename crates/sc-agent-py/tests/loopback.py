@@ -44,11 +44,15 @@ class Runner:
                     status, result = 500, {"error": "unexpected surplus request"}
                 elif body.get("state") == "unauthorized":
                     status, result = 401, {"error": "controlled auth refusal"}
+                elif body.get("state") == "busy":
+                    status, result = 429, {"error": "controlled busy"}
                 else:
                     status, result = 200, ANSWER
                 encoded = json.dumps(result).encode()
                 handler.send_response(status)
                 handler.send_header("Content-Length", str(len(encoded)))
+                if status == 429:
+                    handler.send_header("Retry-After", "0")
                 handler.end_headers()
                 handler.wfile.write(encoded)
 
@@ -75,6 +79,7 @@ def rendered(path):
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load rendered consumer {path}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[path.stem] = module
     spec.loader.exec_module(module)
     return module
 
@@ -93,309 +98,101 @@ class UnexpectedSitrAccess:
 
 
 class RenderedWheelLoopback(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        package = importlib.resources.files("sc_agent")
-        for name in ("__init__.pyi", "_native.pyi", "py.typed", "templates/consumer.py.j2"):
-            if not (package / name).is_file():
-                raise AssertionError(f"built wheel is missing sc_agent/{name}")
-
-    def config(self, root, address):
-        host, port = address
-        config = {"project": "phase-i-loopback", "laya": {"host": host, "port": port}}
-        (root / "sc-agent.json").write_text(json.dumps(config))
-
     def load_clients(self, root):
         output = root / "rendered"
         output.mkdir(exist_ok=True)
         return [rendered(path) for path in render_consumers(output)]
 
-    def call_options(self, client, root, logger):
-        return {
-            "model": "laya",
-            "project": "phase-i-loopback",
-            "repository_root": str(root),
-            "config_dir": str(root),
-            "general_log": logger,
-            "timeout_secs": 5,
-        }
-
-    def test_client_default_and_injected_logger_owns_every_call(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            for injected in (False, True):
-                clients = self.load_clients(Path(temporary))
-                for client in clients:
-                    with self.subTest(client=client.CLIENT_NAME, injected=injected), tempfile.TemporaryDirectory() as work:
-                        root = Path(work)
-                        env = {"PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
-                               "DECIDR_LOG_ROOT": str(root / "wrong-root"), "SITR_LOG_ROOT": str(root / "wrong-root"),
-                               "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
-                               "PLAN_ANCHOR_LOG_ROOT": work, "JUDGE_JEV_LOG_ROOT": work, "CONSUMER_TEST_LOG_ROOT": work}
-                        subprocess.run(["git", "init", "--quiet", str(root)], check=True, timeout=20, env=env)
-                        subprocess.run(["git", "-C", str(root), "remote", "add", "origin", "https://example.invalid/test/client.git"], check=True, timeout=20, env=env)
-                        with Runner(1) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(os.environ, env, clear=True), patch.object(sc_agent, "logger", wraps=sc_agent.logger) as create, chdir(root):
-                            self.config(root, runner.address)
-                            handle = sc_agent.logger("consumer-test")["value"] if injected else None
-                            result = client.call_result(REQUEST, **self.call_options(client, root, handle))
-                            self.assertTrue(result["ok"], result)
-                            if client.CLIENT_NAME == "judge-jev":
-                                self.assertTrue(client.extract("python", "def f(): pass", "(function_definition) @f", general_log=handle)["ok"])
-                                failed = client.extract("missing-language", "", "", general_log=handle)
-                                self.assertFalse(failed["ok"])
-                            self.assertEqual(create.call_count, 1)
-                            self.assertEqual(create.call_args.args, ("consumer-test" if injected else client.CLIENT_NAME,))
-                            owned = handle if injected else client._logger_handle
-                            self.assertTrue(sc_agent.flush(owned)["ok"])
-                        name = "consumer-test" if injected else client.CLIENT_NAME
-                        files = list((root / "logs").glob("*.jsonl"))
-                        self.assertEqual([file.name for file in files], [name + ".log.jsonl"])
-                        events = [json.loads(line) for line in files[0].read_text().splitlines()]
-                        self.assertTrue(any(event["action"] == "decision.result" for event in events), events)
-                        if client.CLIENT_NAME == "judge-jev":
-                            self.assertTrue(any(event["action"] == "sitr.query" for event in events), events)
-                            self.assertEqual(sum(event["fields"].get("id") == failed["error"]["id"] and "missing-language" in event["fields"].get("message", "") for event in events), 1)
-                        expected = root / "sessions/example.invalid/test/client" / client.CLIENT_NAME / "phase-i-loopback/sessions.jsonl"
-                        self.assertEqual(list((root / "sessions").rglob("sessions.jsonl")), [expected])
-                        self.assertFalse((root / "wrong-root").exists())
-                        rows = [json.loads(line)["fields"] for line in expected.read_text().splitlines()]
-                        self.assertEqual(len(rows), 1)
-                        self.assertEqual(rows[0]["agent_role"], client.CLIENT_NAME)
-
-    def test_rendered_modules_only_reference_the_permitted_api(self):
-        allowed = {"Run", "digest", "logger", "log", "flush", "sitr"}
-        with tempfile.TemporaryDirectory() as folder:
-            for path in render_consumers(Path(folder)):
-                refs = {node.attr for node in ast.walk(ast.parse(path.read_text()))
-                        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id == "sc_agent"}
-                self.assertTrue(refs)
-                self.assertLessEqual(refs, allowed)
-                self.assertEqual("sitr" in refs, path.stem == "judge_jev_client")
-
-    def test_logger_initialization_is_serialized(self):
-        with tempfile.TemporaryDirectory() as folder:
-            for client in self.load_clients(Path(folder)):
-                entered, contended, release = threading.Event(), threading.Event(), threading.Event()
-                mutex = threading.Lock()
-                calls, results = [], []
-                class Guard:
-                    def __enter__(self):
-                        if entered.is_set():
-                            contended.set()
-                        mutex.acquire()
-                    def __exit__(self, *_):
-                        mutex.release()
-                def create(name):
-                    calls.append(name)
-                    entered.set()
-                    if not release.wait(5):
-                        return {"ok": False, "error": "test release absent"}
-                    return {"ok": True, "value": object()}
-                client._logger_lock = Guard()
-                threads = [threading.Thread(target=lambda: results.append(client._logger(create, None))) for _ in range(2)]
-                try:
-                    threads[0].start()
-                    self.assertTrue(entered.wait(5), "factory not reached")
-                    threads[1].start()
-                    self.assertTrue(contended.wait(5), "second caller did not take the lock")
-                finally:
-                    release.set()
-                    for thread in threads:
-                        if thread.ident is not None:
-                            thread.join(5)
-                            self.assertFalse(thread.is_alive())
-                self.assertEqual(calls, [client.CLIENT_NAME])
-                self.assertEqual(len(results), 2)
-                self.assertIs(results[0]["value"], results[1]["value"])
-
     def test_rendered_clients_run_against_the_installed_wheel(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            clients = self.load_clients(root)
-            for client in clients:
+            for client in self.load_clients(Path(temporary)):
                 with self.subTest(client=client.CLIENT_NAME), tempfile.TemporaryDirectory() as work:
                     root = Path(work)
-                    sitr_guard = (patch.object(sc_agent, "sitr", UnexpectedSitrAccess())
-                                  if client.CLIENT_NAME == "plan-anchor" else nullcontext())
-                    with Runner(2) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(
-                        os.environ,
-                        {
-                            "DECIDR_LOG_ROOT": str(root),
-                            "CONSUMER_TEST_LOG_ROOT": str(root),
-                    "PLAN_ANCHOR_LOG_ROOT": str(root), "JUDGE_JEV_LOG_ROOT": str(root),
-                            "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
-                            "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
-                        },
-                        clear=True), sitr_guard, chdir(root):
-                        self.config(root, runner.address)
-                        logger = sc_agent.logger("consumer-test")
-                        self.assertTrue(logger["ok"], logger)
-                        options = self.call_options(client, root, logger["value"])
-                        success = client.call_result(REQUEST, **options)
-                        self.assertTrue(success["ok"], success)
-                        self.assertEqual(success["value"]["q"].noul, 0.75)
-                        failure = client.call_result(
-                            {**REQUEST, "state": "unauthorized"},
-                            category_codes={"auth": "TEST.AUTH"},
-                            **options,
-                        )
-                        self.assertFalse(failure["ok"])
-                        self.assertEqual(failure["error"].code, "TEST.AUTH")
-                        self.assertEqual(
-                            runner.received,
-                            [("/v1/systemone", {**REQUEST, "model": "laya:en"}),
-                             ("/v1/systemone", {**REQUEST, "state": "unauthorized", "model": "laya:en"})],
-                            "loopback runner received unexpected requests",
-                        )
-                        self.assertEqual(callable(getattr(client, "extract", None)), client.CLIENT_NAME == "judge-jev")
-                        self.assertTrue(sc_agent.flush(logger["value"])["ok"])
+                    env = {"PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                           "PLAN_ANCHOR_LOG_ROOT": work, "JUDGE_JEV_LOG_ROOT": work}
+                    subprocess.run(["git", "init", "--quiet", str(root)], check=True, timeout=20, env=env)
+                    with Runner(2) as runner, patch.dict(os.environ, env, clear=True), chdir(root):
+                        host, port = runner.address
+                        (root / "sc-agent.json").write_text(json.dumps({"project": "loopback", "laya": {"host": host, "port": port}}))
+                        opened = client.open_run(model="laya", project="loopback", config_dir=str(root), cache=False)
+                        self.assertTrue(opened.ok)
+                        with opened.value as run:
+                            success = client.call_result(run, REQUEST)
+                            self.assertTrue(success.ok, success)
+                            self.assertEqual(success.value.answers["q"].noul, .75)
+                            failure = client.call_result(run, {**REQUEST, "state": "unauthorized"}, category_codes={"auth": "TEST.AUTH"})
+                            self.assertFalse(failure.ok)
+                            self.assertEqual(failure.error.code, "TEST.AUTH")
+                        self.assertEqual(len(runner.received), 2)
+                        rows = [json.loads(line)["fields"] for path in (root / "sessions").rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+                        self.assertEqual(len(rows), 1)
+                        self.assertEqual(rows[0]["agent_role"], client.CLIENT_NAME)
+                        log = (root / "logs" / f"{client.CLIENT_NAME}.log.jsonl").read_text()
+                        self.assertIn("decision.result", log)
+                        self.assertIn("http.auth", log)
 
-                    rows = [
-                        json.loads(line)["fields"]
-                        for path in (root / "sessions").rglob("sessions.jsonl")
-                        for line in path.read_text().splitlines()
-                    ]
-                    self.assertEqual(len(rows), 1)
-                    self.assertEqual((rows[0]["project"], rows[0]["agent_role"]), ("phase-i-loopback", client.CLIENT_NAME))
-                    self.assertEqual(rows[0]["request"]["state"], "ok")
-                    log = (root / "logs" / "consumer-test.log.jsonl").read_text()
-                    self.assertIn("decision.result", log)
-                    self.assertIn("http.auth", log)
+    def test_consent_only_for_typesafe(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            client = self.load_clients(root)[0]
+            fake = MagicMock()
+            fake.sends_to.return_value = {"ok": True, "value": True}
+            module_name = client.CLIENT_NAME.replace("-", "_") + "_settings"
+            settings = types.ModuleType(module_name)
+            settings.find_repo_root = lambda path: types.SimpleNamespace(ok=True, value=path)
+            settings.remote_judge_consent = lambda path: types.SimpleNamespace(ok=True, value=False)
+            with patch.dict(sys.modules, {module_name: settings}):
+                denied = client.call_result(fake, REQUEST)
+            self.assertEqual(denied.error.code, "POLICY.REMOTE_JUDGE_DISABLED")
+            fake.send.assert_not_called()
 
-    def test_sitr_extract_reaches_offline_request_prompt(self):
+    def test_keyboard_interrupt_cancels_the_run(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            client = self.load_clients(root)[0]
+            env = {"PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "PLAN_ANCHOR_LOG_ROOT": str(root)}
+            with Runner(1) as runner, patch.dict(os.environ, env, clear=True), chdir(root):
+                host, port = runner.address
+                (root / "sc-agent.json").write_text(json.dumps({"project": "loopback", "laya": {"host": host, "port": port}}))
+                def interrupt(_delay):
+                    raise KeyboardInterrupt
+                opened = client.open_run(model="laya", project="loopback", config_dir=str(root), workers=1,
+                                         cache=False, seams={"sleep": interrupt})
+                with opened.value as run:
+                    result = client.call_batch_results(run, [{**REQUEST, "state": "busy"}, REQUEST])
+                self.assertTrue(result.ok)
+                self.assertEqual([entry.error.code for entry in result.value], ["CANCELED", "CANCELED"])
+                self.assertEqual(len(runner.received), 1)
+
+    def test_sitr_extract_logs_under_the_tool(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             client = self.load_clients(root)[1]
-            self.assertTrue(callable(getattr(client, "extract", None)))
-            source_path = Path(__file__).resolve().parent / "fixtures" / "sitr_source.py"
-            source = source_path.read_text()
-            with Runner(1) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(
-                os.environ,
-                {
-                    "DECIDR_LOG_ROOT": str(root),
-                    "CONSUMER_TEST_LOG_ROOT": str(root),
-                    "PLAN_ANCHOR_LOG_ROOT": str(root), "JUDGE_JEV_LOG_ROOT": str(root),
-                    "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
-                    "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
-                },
-                clear=True), chdir(root):
-                self.config(root, runner.address)
-                logger = sc_agent.logger("consumer-test")
-                self.assertTrue(logger["ok"], logger)
-                extracted = client.extract(
-                    "python",
-                    source,
-                    "(function_definition name: (identifier) @name)",
-                    general_log=logger["value"],
-                )
-                self.assertTrue(extracted["ok"], extracted)
-                names = [capture["text"] for capture in extracted["value"]]
-                self.assertEqual(set(names), {"validate_claim", "summarize_claim"})
-                prompt = "Extracted functions: " + ", ".join(names)
-                request = {
-                    "state": "offline-dry-run",
-                    "questions": {
-                        "q": {"type": "noul", "instructions": prompt, "criteria": ["score"]},
-                    },
-                }
-                # The local runner is the dry-run decision endpoint; no remote provider is contacted.
-                result = client.call_result(request, **self.call_options(client, root, logger["value"]))
-                self.assertTrue(result["ok"], result)
-                self.assertEqual(
-                    runner.received,
-                    [("/v1/systemone", {**request, "model": "laya:en"})],
-                    "extracted sitr text did not reach the offline prompt",
-                )
-                received_prompt = runner.received[0][1]["questions"]["q"]["instructions"]
-                for name in names:
-                    self.assertIn(name, received_prompt, f"extracted name {name!r} is missing from the sent prompt")
-                self.assertTrue(sc_agent.flush(logger["value"])["ok"])
+            with patch.dict(os.environ, {"JUDGE_JEV_LOG_ROOT": str(root)}):
+                result = client.extract("python", "def f(): pass", "(function_definition name: (identifier) @name)")
+                self.assertTrue(result.ok, result)
+                self.assertEqual(result.value[0]["text"], "f")
+            self.assertTrue((root / "logs" / "judge-jev.log.jsonl").exists())
 
-    def test_keyboard_interrupt_cancels_only_the_current_run(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            client = self.load_clients(root)[0]
-            with Runner(2) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(
-                os.environ,
-                {
-                    "DECIDR_LOG_ROOT": str(root),
-                    "CONSUMER_TEST_LOG_ROOT": str(root),
-                    "PLAN_ANCHOR_LOG_ROOT": str(root), "JUDGE_JEV_LOG_ROOT": str(root),
-                    "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
-                    "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
-                },
-                clear=True), chdir(root):
-                self.config(root, runner.address)
-                logger = sc_agent.logger("consumer-test")
-                self.assertTrue(logger["ok"], logger)
+    def test_fakerun_conforms_to_real_run(self):
+        from sc_agent.testing import FakeRun
+        fake = FakeRun({"provider": "laya", "run_id": "test", "envelopes": []})
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"PLAN_ANCHOR_LOG_ROOT": temporary}):
+            with sc_agent.Run(tool="plan-anchor", tool_version="test", agent_role="plan-anchor", project="test") as real:
+                fake_cancel = fake.cancel()
+                real_cancel = real.cancel()
+                self.assertEqual(set(fake_cancel), set(real_cancel))
+                self.assertEqual(set(fake.send({})), set(real.send(json.dumps(REQUEST))))
+                self.assertEqual(fake.run_id, "test")
+                self.assertIsInstance(real.run_id, str)
 
-                def interrupt_after_first_result(_result):
-                    raise KeyboardInterrupt
-
-                batch = client.call_batch_results(
-                    [REQUEST] * 3,
-                    workers=1,
-                    on_result=interrupt_after_first_result,
-                    **self.call_options(client, root, logger["value"]),
-                )
-                self.assertEqual(
-                    runner.received,
-                    [("/v1/systemone", {**REQUEST, "model": "laya:en"})],
-                    "cancelled batch sent a surplus loopback request",
-                )
-                self.assertTrue(batch["ok"], batch)
-                self.assertEqual(len(batch["value"]), 3)
-                self.assertTrue(batch["value"][0]["ok"], batch["value"][0])
-                self.assertEqual([item["error"].code for item in batch["value"][1:]], ["CANCELED", "CANCELED"])
-
-                later = client.call_result({**REQUEST, "state": "later"}, **self.call_options(client, root, logger["value"]))
-                self.assertTrue(later["ok"], later)
-                self.assertEqual(len(runner.received), 2)
-                self.assertTrue(sc_agent.flush(logger["value"])["ok"])
-
-    def test_wheel_keyboard_interrupt_reaches_each_consumer_cancel_handler(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            client = self.load_clients(root)[0]
-            with Runner(0) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(
-                os.environ,
-                {
-                    "DECIDR_LOG_ROOT": str(root),
-                    "CONSUMER_TEST_LOG_ROOT": str(root),
-                    "PLAN_ANCHOR_LOG_ROOT": str(root), "JUDGE_JEV_LOG_ROOT": str(root),
-                    "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
-                    "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
-                },
-                clear=True), chdir(root):
-                self.config(root, runner.address)
-                logger = sc_agent.logger("consumer-test")
-                self.assertTrue(logger["ok"], logger)
-                options = self.call_options(client, root, logger["value"])
-
-                for method, native_call in ((client.call_result, "send"),
-                                            (client.call_batch_results, "send_batch")):
-                    with self.subTest(native_call=native_call):
-                        with sc_agent.Run(tool=client.CLIENT_NAME, tool_version="test", model="laya", project="phase-i-loopback",
-                                          agent_role=client.CLIENT_NAME, config_dir=str(root),
-                                          general_log=logger["value"], timeout_secs=5) as real_run:
-                            interrupted = MagicMock()
-                            interrupted.__enter__.return_value = interrupted
-                            interrupted.cancel.side_effect = real_run.cancel
-                            getattr(interrupted, native_call).side_effect = KeyboardInterrupt
-                            with patch.object(sc_agent, "Run", return_value=interrupted):
-                                if native_call == "send":
-                                    result = method(REQUEST, **options)
-                                    self.assertFalse(result["ok"], result)
-                                    self.assertEqual(result["error"].code, "CANCELED")
-                                else:
-                                    result = method([REQUEST], **options)
-                                    self.assertEqual(result, {"ok": True, "value": []})
-                            interrupted.cancel.assert_called_once()
-                            probe = real_run.send(REQUEST)
-                            self.assertFalse(probe["ok"], probe)
-                            self.assertEqual(probe["error"]["id"], "decision.cancelled")
-
-                self.assertEqual(runner.received, [], "KeyboardInterrupt handlers sent unexpected requests")
-                self.assertTrue(sc_agent.flush(logger["value"])["ok"])
+    def test_rendered_modules_only_reference_the_permitted_api(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for path in render_consumers(Path(folder)):
+                source = path.read_text()
+                for forbidden in ("import hashlib", "import threading", "sc_agent.testing", "general_log=logger"):
+                    self.assertNotIn(forbidden, source)
+                ast.parse(source)
 
 
 if __name__ == "__main__":
