@@ -165,12 +165,12 @@ def load_wheel():
     return sc_agent
 
 
-def _logger(create: Callable[[str], Record], injected: Any) -> Record:
+def _logger(create: Callable[..., Record], injected: Any) -> Record:
     """The caller's Logger, else this client's one Logger, created on first use."""
     global _logger_handle
     with _logger_lock:
         if injected is None and _logger_handle is None:
-            created = create(CLIENT_NAME)
+            created = create(CLIENT_NAME, tool=CLIENT_NAME)
             if not created["ok"]:
                 return created
             _logger_handle = created["value"]

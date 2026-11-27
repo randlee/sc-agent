@@ -171,6 +171,22 @@ class RenderedWheelLoopback(unittest.TestCase):
                 self.assertLessEqual(refs, allowed)
                 self.assertEqual("sitr" in refs, path.stem == "judge_jev_client")
 
+    def test_logger_creation_error_uses_client_tool(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for client in self.load_clients(Path(folder)):
+                client._logger_handle = None
+                name = client.CLIENT_NAME
+                env_name = name.upper().replace("-", "_") + "_LOG_ROOT"
+                original = sc_agent.logger
+                with patch.dict(os.environ, {env_name: folder, "DECIDR_LOG_ROOT": folder}), \
+                        patch.object(sc_agent, "logger", side_effect=lambda _name, *, tool: original(None, tool=tool)):
+                    result = client._logger(sc_agent.logger, None)
+                self.assertFalse(result["ok"])
+                log = Path(folder) / "logs" / f"{name}.log.jsonl"
+                events = [json.loads(line) for line in log.read_text().splitlines()]
+                self.assertTrue(any(event["service"] == name for event in events))
+                self.assertFalse((Path(folder) / "logs/decidr.log.jsonl").exists())
+
     def test_logger_initialization_is_serialized(self):
         with tempfile.TemporaryDirectory() as folder:
             for client in self.load_clients(Path(folder)):
@@ -184,8 +200,8 @@ class RenderedWheelLoopback(unittest.TestCase):
                         mutex.acquire()
                     def __exit__(self, *_):
                         mutex.release()
-                def create(name):
-                    calls.append(name)
+                def create(name, *, tool):
+                    calls.append((name, tool))
                     entered.set()
                     if not release.wait(5):
                         return {"ok": False, "error": "test release absent"}
@@ -203,7 +219,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                         if thread.ident is not None:
                             thread.join(5)
                             self.assertFalse(thread.is_alive())
-                self.assertEqual(calls, [client.CLIENT_NAME])
+                self.assertEqual(calls, [(client.CLIENT_NAME, client.CLIENT_NAME)])
                 self.assertEqual(len(results), 2)
                 self.assertIs(results[0]["value"], results[1]["value"])
 
