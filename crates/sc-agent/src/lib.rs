@@ -952,17 +952,7 @@ fn resolve(
             }
         }
     }
-    let mut names = found.iter().map(|(p, _)| p.key).collect::<Vec<_>>();
-    names.dedup();
-    Err(last.unwrap_or_else(|| {
-        error(
-            "secrets.key_missing",
-            format!(
-                "No key was found for {} in the environment, repository .env, or platform keyring.",
-                names.join(", ")
-            ),
-        )
-    }))
+    Err(last.unwrap_or_else(|| error("types.unknown_short_name", &options.model)))
 }
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Bounds {
@@ -1003,10 +993,15 @@ pub fn schema(request: &Value, response: &Value) -> Result<(), Error> {
                 format!("{path}: value is outside requested choices"),
             ));
         }
-        if let (Some(fields), Some(properties)) = (
-            value.as_object(),
-            shape.get("properties").and_then(Value::as_object),
-        ) {
+        if let Some(properties) = shape.get("properties").and_then(Value::as_object)
+            && !value.is_null()
+        {
+            let fields = value.as_object().ok_or_else(|| {
+                error(
+                    "decision.schema_mismatch",
+                    format!("{path}: expected an object"),
+                )
+            })?;
             for key in shape
                 .get("required")
                 .and_then(Value::as_array)
@@ -1053,16 +1048,6 @@ pub fn schema(request: &Value, response: &Value) -> Result<(), Error> {
         let answer = answers
             .get(id)
             .ok_or_else(|| error("decision.schema_mismatch", format!("missing answer {id}")))?;
-        if !answer.is_object()
-            || answer
-                .get("box")
-                .is_some_and(|bounds| !bounds.is_object() && !bounds.is_null())
-        {
-            return Err(error(
-                "decision.schema_mismatch",
-                format!("{id}: answer and non-null box must be objects"),
-            ));
-        }
         let _: Answer = serde_json::from_value(answer.clone())
             .map_err(|e| error("decision.schema_mismatch", format!("{id}: {e}")))?;
         check_shape(answer, &answer_schema(question), id)?;
