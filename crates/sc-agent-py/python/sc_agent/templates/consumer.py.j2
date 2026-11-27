@@ -5,6 +5,7 @@ format: python
 description: Shared decision client with optional syntax queries and overridable consent policy.
 required_variables:
   - client_name
+  - tool_version
   - sitr
   - sc_decidr_version
 requires:
@@ -41,6 +42,7 @@ if TYPE_CHECKING:
 
 SC_DECIDR_VERSION = "{{ sc_decidr_version }}"
 CLIENT_NAME = "{{ client_name }}"
+TOOL_VERSION = "{{ tool_version }}"
 Record = dict[str, Any]
 _logger_handle: Any = None
 _logger_lock = threading.Lock()
@@ -256,7 +258,7 @@ def call_result(request: str | Record, *, model: str, project: str | None = None
     logger = _logger(sc_agent.logger, general_log)
     if not logger["ok"]:
         return decode_result(logger, category_codes=category_codes)
-    with sc_agent.Run(tool=CLIENT_NAME, model=model, project=project, agent_role=CLIENT_NAME,
+    with sc_agent.Run(tool=CLIENT_NAME, tool_version=TOOL_VERSION, model=model, project=project, agent_role=CLIENT_NAME,
                       config_dir=config_dir, general_log=logger["value"], timeout_secs=timeout_secs) as run:
         try:
             line: Any = run.send(_as_text(request))
@@ -280,7 +282,7 @@ def call_batch_results(requests: Sequence[str | Record], *, model: str, project:
     logger = _logger(sc_agent.logger, general_log)
     if not logger["ok"]:
         return decode_result(logger, category_codes=category_codes)
-    with sc_agent.Run(tool=CLIENT_NAME, model=model, project=project, agent_role=CLIENT_NAME,
+    with sc_agent.Run(tool=CLIENT_NAME, tool_version=TOOL_VERSION, model=model, project=project, agent_role=CLIENT_NAME,
                       config_dir=config_dir, general_log=logger["value"], timeout_secs=timeout_secs, workers=workers) as run:
         finished: list[Record] = []
 

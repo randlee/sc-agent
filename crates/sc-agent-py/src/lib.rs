@@ -100,12 +100,15 @@ fn respond_value(
     }
 }
 fn finish(logger: &Logger, owned: bool, value: Value) -> Value {
-    match (
-        logger.flush(),
-        if owned { logger.shutdown() } else { Ok(()) },
-    ) {
-        (Err(e), _) => sc_agent::result(Err(error("log.flush", e))),
-        (Ok(()), shutdown) => sc_agent::after_shutdown(value, shutdown),
+    let flush = logger.flush();
+    let shutdown = if owned { logger.shutdown() } else { Ok(()) };
+    if value.get("ok").and_then(Value::as_bool) == Some(false) {
+        value
+    } else {
+        match flush {
+            Err(e) => sc_agent::result(Err(error("log.flush", e))),
+            Ok(()) => sc_agent::after_shutdown(value, shutdown),
+        }
     }
 }
 
@@ -298,10 +301,12 @@ impl PyRun {
         clippy::too_many_arguments,
         reason = "PyO3 needs a parameter per public keyword"
     )]
-    #[pyo3(signature=(*extra, tool=None, model=None, project=None, agent_role=None, config_dir=None, general_log=None, timeout_secs=None, workers=None, base_url=None, sleep=None, keyring_lookup=None, **rest))]
+    #[pyo3(signature=(*extra, tool=None, tool_version=None, cache=None, model=None, project=None, agent_role=None, config_dir=None, general_log=None, timeout_secs=None, workers=None, base_url=None, sleep=None, keyring_lookup=None, **rest))]
     fn new(
         extra: &Bound<'_, PyTuple>,
         tool: Option<&Bound<'_, PyAny>>,
+        tool_version: Option<&Bound<'_, PyAny>>,
+        cache: Option<&Bound<'_, PyAny>>,
         model: Option<&Bound<'_, PyAny>>,
         project: Option<&Bound<'_, PyAny>>,
         agent_role: Option<&Bound<'_, PyAny>>,
@@ -314,17 +319,30 @@ impl PyRun {
         keyring_lookup: Option<&Bound<'_, PyAny>>,
         rest: Option<&Bound<'_, PyDict>>,
     ) -> Self {
-        let tool = match arg::<String>(tool, "tool").and_then(|v| {
-            v.filter(|v| !v.is_empty())
-                .ok_or_else(|| invalid("tool is required"))
-        }) {
-            Ok(tool) => tool,
+        let tool = match arg::<String>(tool, "tool") {
+            Ok(tool) => tool.unwrap_or_default(),
             Err(e) => return Self(Err(sc_agent::result(Err(e)))),
         };
+        let tool_version = match arg::<String>(tool_version, "tool_version") {
+            Ok(version) => version.unwrap_or_default(),
+            Err(e) => return Self(Err(sc_agent::result(Err(e)))),
+        };
+        if tool.is_empty() || tool_version.is_empty() {
+            let args = sc_agent::RunArgs {
+                tool,
+                tool_version,
+                ..Default::default()
+            };
+            let result = sc_agent::Run::new(args, None, Arc::new(sc_agent::Cancel::default()))
+                .map(|_| Value::Null);
+            return Self(Err(sc_agent::result(result)));
+        }
         let created = (|| {
             extras(extra, rest)?;
             let args = sc_agent::RunArgs {
                 tool: tool.clone(),
+                tool_version,
+                cache: arg(cache, "cache")?,
                 model: arg(model, "model")?,
                 project: arg(project, "project")?,
                 agent_role: arg(agent_role, "agent_role")?
@@ -367,6 +385,57 @@ impl PyRun {
         })();
         Self(created.map_err(|e| respond_value(general_log, &tool, |_| Err(e))))
     }
+    #[getter]
+    fn run_id(&self) -> Option<String> {
+        self.0.as_ref().ok().map(|run| run.run_id.to_string())
+    }
+    #[pyo3(signature=(event=None, *extra, **rest))]
+    fn log(
+        &self,
+        py: Python<'_>,
+        event: Option<&Bound<'_, PyAny>>,
+        extra: &Bound<'_, PyTuple>,
+        rest: Option<&Bound<'_, PyDict>>,
+    ) -> Py<PyAny> {
+        self.with(py, |run| {
+            extras(extra, rest)?;
+            let event = required(event)?.cast::<PyDict>().map_err(invalid)?;
+            let target = event
+                .get_item("target")
+                .map_err(invalid)?
+                .ok_or_else(|| invalid("target is required"))?
+                .extract::<String>()
+                .map_err(invalid)?;
+            let action = event
+                .get_item("action")
+                .map_err(invalid)?
+                .ok_or_else(|| invalid("action is required"))?
+                .extract::<String>()
+                .map_err(invalid)?;
+            let correlation_id = event
+                .get_item("correlation_id")
+                .map_err(invalid)?
+                .filter(|v| !v.is_none())
+                .map(|v| v.extract::<String>().map_err(invalid))
+                .transpose()?;
+            let fields = event
+                .get_item("fields")
+                .map_err(invalid)?
+                .ok_or_else(|| invalid("fields is required"))?;
+            if !fields.is_instance_of::<PyDict>() {
+                return Err(invalid("fields must be a dict"));
+            }
+            sc_agent::log_as(
+                run.logger(),
+                &target,
+                &action,
+                correlation_id.as_deref(),
+                decode(&fields)?,
+            )?;
+            run.logger().flush().map_err(|e| error("log.flush", e))?;
+            Ok(Value::Null)
+        })
+    }
     fn __enter__(slf: Py<Self>) -> Py<Self> {
         slf
     }
@@ -396,26 +465,29 @@ impl PyRun {
             run.sends_to(&provider).map(Value::Bool)
         })
     }
-    #[pyo3(signature=(request=None,*extra,**rest))]
+    #[pyo3(signature=(request=None,*extra,cache=None,**rest))]
     fn send(
         &self,
         py: Python<'_>,
         request: Option<&Bound<'_, PyAny>>,
         extra: &Bound<'_, PyTuple>,
+        cache: Option<&Bound<'_, PyAny>>,
         rest: Option<&Bound<'_, PyDict>>,
     ) -> Py<PyAny> {
         self.with(py, |run| {
             extras(extra, rest)?;
             let value = self::request(request)?;
-            interruptible(py, &run.cancel, || run.send(&value))
+            let cache = arg(cache, "cache")?;
+            interruptible(py, &run.cancel, || run.send(&value, cache))
         })
     }
-    #[pyo3(signature=(requests=None,*extra,on_result=None,**rest))]
+    #[pyo3(signature=(requests=None,*extra,cache=None,on_result=None,**rest))]
     fn send_batch(
         &self,
         py: Python<'_>,
         requests: Option<&Bound<'_, PyAny>>,
         extra: &Bound<'_, PyTuple>,
+        cache: Option<&Bound<'_, PyAny>>,
         on_result: Option<&Bound<'_, PyAny>>,
         rest: Option<&Bound<'_, PyDict>>,
     ) -> Py<PyAny> {
@@ -426,6 +498,7 @@ impl PyRun {
                 .map_err(invalid)?
                 .map(|v| v.map_err(invalid).and_then(|v| request(Some(&v))))
                 .collect::<Result<Vec<_>, _>>()?;
+            let cache = arg(cache, "cache")?;
             let completed = callback(on_result)?;
             let callback_error = Mutex::new(None);
             let on_result = |index, value: &Value| {
@@ -443,7 +516,9 @@ impl PyRun {
                     });
                 }
             };
-            let result = interruptible(py, &run.cancel, || run.send_batch(&requests, &on_result));
+            let result = interruptible(py, &run.cancel, || {
+                run.send_batch(&requests, cache, &on_result)
+            });
             callback_result(callback_error, result)
         })
     }
@@ -462,6 +537,32 @@ impl PyRun {
         })
     }
 }
+#[pyfunction(signature=(session_ids=None, *extra, agent_role=None, project=None, **rest))]
+fn session_rows(
+    py: Python<'_>,
+    session_ids: Option<&Bound<'_, PyAny>>,
+    extra: &Bound<'_, PyTuple>,
+    agent_role: Option<&Bound<'_, PyAny>>,
+    project: Option<&Bound<'_, PyAny>>,
+    rest: Option<&Bound<'_, PyDict>>,
+) -> Py<PyAny> {
+    let role = match arg::<String>(agent_role, "agent_role") {
+        Ok(Some(value)) => value,
+        Ok(None) => return raw(py, sc_agent::result(Err(invalid("agent_role is required")))),
+        Err(e) => return raw(py, sc_agent::result(Err(e))),
+    };
+    respond(py, None, &role, |_| {
+        extras(extra, rest)?;
+        let ids = required(session_ids)?
+            .try_iter()
+            .map_err(invalid)?
+            .map(|item| item.map_err(invalid)?.extract::<String>().map_err(invalid))
+            .collect::<Result<Vec<_>, _>>()?;
+        let project = arg::<String>(project, "project")?;
+        sc_agent::session_rows(&ids, &role, project.as_deref())
+    })
+}
+
 #[pyfunction]
 fn provider_keys() -> Vec<&'static str> {
     sc_agent::PROVIDERS
@@ -474,56 +575,83 @@ fn provider_keys() -> Vec<&'static str> {
 fn models(py: Python<'_>) -> Py<PyAny> {
     raw(py, sc_agent::result(Ok(json!(sc_agent::PROVIDERS))))
 }
-#[pyfunction(signature=(*,general_log=None))]
-fn languages(py: Python<'_>, general_log: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
-    respond(py, general_log, "sitr", |logger| {
-        sc_agent::log(logger, "sitr.languages", json!({}))?;
-        Ok(sc_treesitter::languages())
-    })
+#[pyfunction(signature=(*,general_log=None,tool=None))]
+fn languages(
+    py: Python<'_>,
+    general_log: Option<&Bound<'_, PyAny>>,
+    tool: Option<String>,
+) -> Py<PyAny> {
+    respond(
+        py,
+        general_log,
+        tool.as_deref().unwrap_or("sitr"),
+        |logger| {
+            sc_agent::log(logger, "sitr.languages", json!({}))?;
+            Ok(sc_treesitter::languages())
+        },
+    )
 }
-#[pyfunction(signature=(language=None,*,general_log=None))]
+#[pyfunction(signature=(language=None,*,general_log=None,tool=None))]
 fn queries(
     py: Python<'_>,
     language: Option<&Bound<'_, PyAny>>,
     general_log: Option<&Bound<'_, PyAny>>,
+    tool: Option<String>,
 ) -> Py<PyAny> {
-    respond(py, general_log, "sitr", |logger| {
-        let value = sc_treesitter::queries(&text(language)?)?;
-        sc_agent::log(logger, "sitr.queries", json!({}))?;
-        Ok(value)
-    })
+    respond(
+        py,
+        general_log,
+        tool.as_deref().unwrap_or("sitr"),
+        |logger| {
+            let value = sc_treesitter::queries(&text(language)?)?;
+            sc_agent::log(logger, "sitr.queries", json!({}))?;
+            Ok(value)
+        },
+    )
 }
-#[pyfunction(signature=(language=None,source=None,query=None,*,general_log=None))]
+#[pyfunction(signature=(language=None,source=None,query=None,*,general_log=None,tool=None))]
 fn query(
     py: Python<'_>,
     language: Option<&Bound<'_, PyAny>>,
     source: Option<&Bound<'_, PyAny>>,
     query: Option<&Bound<'_, PyAny>>,
     general_log: Option<&Bound<'_, PyAny>>,
+    tool: Option<String>,
 ) -> Py<PyAny> {
-    respond(py, general_log, "sitr", |logger| {
-        let value = sc_treesitter::query(
-            &sc_treesitter::language(&text(language)?)?,
-            &text(source)?,
-            &text(query)?,
-        )?;
-        sc_agent::log(logger, "sitr.query", json!({}))?;
-        Ok(value)
-    })
+    respond(
+        py,
+        general_log,
+        tool.as_deref().unwrap_or("sitr"),
+        |logger| {
+            let value = sc_treesitter::query(
+                &sc_treesitter::language(&text(language)?)?,
+                &text(source)?,
+                &text(query)?,
+            )?;
+            sc_agent::log(logger, "sitr.query", json!({}))?;
+            Ok(value)
+        },
+    )
 }
-#[pyfunction(signature=(language=None,name=None,source=None,*,general_log=None))]
+#[pyfunction(signature=(language=None,name=None,source=None,*,general_log=None,tool=None))]
 fn run(
     py: Python<'_>,
     language: Option<&Bound<'_, PyAny>>,
     name: Option<&Bound<'_, PyAny>>,
     source: Option<&Bound<'_, PyAny>>,
     general_log: Option<&Bound<'_, PyAny>>,
+    tool: Option<String>,
 ) -> Py<PyAny> {
-    respond(py, general_log, "sitr", |logger| {
-        let value = sc_treesitter::predefined(&text(language)?, &text(name)?, &text(source)?)?;
-        sc_agent::log(logger, "sitr.run", json!({}))?;
-        Ok(value)
-    })
+    respond(
+        py,
+        general_log,
+        tool.as_deref().unwrap_or("sitr"),
+        |logger| {
+            let value = sc_treesitter::predefined(&text(language)?, &text(name)?, &text(source)?)?;
+            sc_agent::log(logger, "sitr.run", json!({}))?;
+            Ok(value)
+        },
+    )
 }
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -548,7 +676,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     }
     register!(
         logger => c"logger", log => c"log", flush => c"flush", digest => c"digest",
-        provider_keys => c"provider_keys", models => c"models", languages => c"languages", queries => c"queries",
+        provider_keys => c"provider_keys", models => c"models", session_rows => c"session_rows", languages => c"languages", queries => c"queries",
         query => c"query", run => c"run",
     );
     module.add_class::<PyLogger>()?;
@@ -600,6 +728,8 @@ mod tests {
         config.enable_console_sink = false;
         let logger = Logger::new(config)?;
         logger.shutdown()?;
+        let original = sc_agent::result(Err(error("http.auth", "original error")));
+        assert_eq!(finish(&logger, false, original.clone()), original);
         let failure = finish(&logger, false, sc_agent::result(Ok(json!("success"))));
         assert_eq!(failure["error"]["id"], "log.flush");
         assert_eq!(

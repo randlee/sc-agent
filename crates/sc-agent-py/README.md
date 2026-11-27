@@ -13,7 +13,7 @@ Create one Run for a command and use it as a context manager:
 ```python
 import sc_agent
 
-with sc_agent.Run(tool="my-tool", model="haiku", project="phase", agent_role="my-tool",
+with sc_agent.Run(tool="my-tool", tool_version="1.0.0", model="haiku", project="phase", agent_role="my-tool",
                   timeout_secs=30, workers=2) as run:
     result = run.send({"questions": {"q": {"type": "noul"}}})
     batch = run.send_batch([{"questions": {"q": {"type": "noul"}}}],
@@ -63,8 +63,8 @@ The shared client template is `sc_agent/templates/consumer.py.j2`. Render it fro
 ```bash
 template_root="$(python3 -c 'import importlib.resources; print(importlib.resources.files("sc_agent") / "templates")')"
 sc-compose render --root "$template_root" --file consumer.py.j2 --strict \
-  --var client_name='"my-tool"' --var sitr=true \
-  --var sc_decidr_version="\"$(python3 -c 'import importlib.metadata; print(importlib.metadata.version("sc-decidr"))')\"" \
+  --var client_name=my-tool --var tool_version=1.0.0 --var sitr=true \
+  --var sc_decidr_version="$(python3 -c 'import importlib.metadata; print(importlib.metadata.version("sc-decidr"))')" \
   --output decidr_client.py
 ```
 

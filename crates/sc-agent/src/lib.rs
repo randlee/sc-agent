@@ -2,11 +2,11 @@ use sc_config::{
     AppName, ConfigError, EnvSource, FileSource, Resolved, Slot, SourceKind, StandardContext,
     StandardLayers,
 };
-use sc_observability::{LoggerConfig, ServiceName, v2::Logger};
+use sc_observability::{LogEvent, LoggerConfig, ServiceName, v2::Logger};
 use serde::{Deserialize, Serialize, de::Error as DeError};
 use serde_json::{Value, json};
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     collections::BTreeMap,
     ffi::OsString,
     path::{Path, PathBuf},
@@ -131,7 +131,9 @@ pub fn error(id: &'static str, message: impl ToString) -> Error {
         "http.quota_exhausted" => ("quota", fix_input),
         "decision.cancelled" => ("cancelled", fix_input),
         "decision.response_parse" | "decision.schema_mismatch" => ("response_invalid", fix_input),
-        s if s.starts_with("log.") => ("log", fix_input),
+        "log.write" | "log.flush" | "log.shutdown" | "log.session_write" | "session.unreadable" => {
+            ("log", fix_input)
+        }
         s if s.starts_with("config.") => ("config", fix_input),
         _ => ("validation", fix_input),
     };
@@ -192,6 +194,7 @@ fn deserialize_model_release<'de, D: serde::Deserializer<'de>>(
 pub struct Settings {
     pub project: Option<String>,
     pub workers: usize,
+    pub cache: bool,
     /// Configured model names; an entry wins over the built-in table.
     pub models: BTreeMap<String, ModelEntry>,
     pub local: BTreeMap<String, Runner>,
@@ -256,6 +259,7 @@ impl Settings {
 const KEYS: &[&str] = &[
     "project",
     "workers",
+    "cache",
     "models",
     "max_sends",
     "decidr.luna-system-prompt",
@@ -332,7 +336,8 @@ pub fn config(
         vec![],
         vec![],
     );
-    let mut layers = StandardLayers::new(context).defaults(json!({"workers":8,"max_sends":5}));
+    let mut layers =
+        StandardLayers::new(context).defaults(json!({"workers":8,"max_sends":5,"cache":true}));
     let mut files = Vec::new();
     for (slot, folder) in [(Slot::User, Some(global.as_path())), (Slot::Local, local)] {
         if let Some(folder) = folder {
@@ -378,6 +383,7 @@ pub fn config(
     let config = Settings {
         project: setting(tool, &resolved, "project", Value::Null)?,
         workers: setting(tool, &resolved, "workers", json!(8))?,
+        cache: setting(tool, &resolved, "cache", json!(true))?,
         models: setting(tool, &resolved, "models", json!({}))?,
         local,
         max_sends: setting(tool, &resolved, "max_sends", json!(5))?,
@@ -565,10 +571,12 @@ mod resolve_test {
     fn a_keyless_candidate_beats_a_keyed_one_and_is_never_looked_up() {
         let seam = |_: &str| -> Result<String, KeyringError> { Err(KeyringError::Timeout) };
         let options = Options {
+            tool_version: "test".into(),
             environment: vec![("ANTHROPIC_API_KEY".into(), "held".into())],
             settings: Settings {
                 project: None,
                 workers: 1,
+                cache: true,
                 models: BTreeMap::new(),
                 local: BTreeMap::new(),
                 max_sends: 1,
@@ -1047,8 +1055,11 @@ pub fn digest(request: &Value, question: &str) -> Result<String, Error> {
         .ok_or_else(|| error("decision.request_parse", "question id missing"))?;
     input.insert("questions".into(), json!({question:selected}));
     let text = serde_json::to_vec(&input).map_err(|e| error("decision.encode", e))?;
+    sha(&text)
+}
+fn sha(bytes: &[u8]) -> Result<String, Error> {
     sc_sha::calculate_hash(sc_sha::HashInput::TextFileBytes {
-        utf8_file_bytes: &text,
+        utf8_file_bytes: bytes,
     })
     .map(|h| h.template().to_string())
     .map_err(|e| error("decision.encode", e))
@@ -1056,6 +1067,7 @@ pub fn digest(request: &Value, question: &str) -> Result<String, Error> {
 
 #[derive(Clone)]
 pub struct Options {
+    pub tool_version: String,
     pub environment: Vec<(OsString, OsString)>,
     pub settings: Settings,
     pub model: String,
@@ -1066,11 +1078,36 @@ pub struct Options {
     pub log_root: PathBuf,
     pub repo: String,
 }
+fn event(
+    service: &ServiceName,
+    target: &str,
+    action: &str,
+    correlation_id: Option<&str>,
+    fields: Value,
+) -> Result<LogEvent, Error> {
+    serde_json::from_value(
+        json!({"version":"v1","timestamp":sc_observability::Timestamp::now_utc(),"level":if action=="error" {sc_observability::Level::Error}else{sc_observability::Level::Info},"service":service,"target":target,"action":action,"correlation_id":correlation_id,"identity":sc_observability::ProcessIdentity::default(),"fields":fields}),
+    ).map_err(|e| error("log.invalid_event", e))
+}
+pub fn log_as(
+    logger: &Logger,
+    target: &str,
+    action: &str,
+    correlation_id: Option<&str>,
+    fields: Value,
+) -> Result<(), Error> {
+    logger
+        .log(event(
+            logger.service_name(),
+            target,
+            action,
+            correlation_id,
+            fields,
+        )?)
+        .map_err(|e| error("log.write", e))
+}
 pub fn log(logger: &Logger, action: &str, fields: Value) -> Result<(), Error> {
-    let event = serde_json::from_value(
-        json!({"version":"v1","timestamp":sc_observability::Timestamp::now_utc(),"level":if action=="error" {sc_observability::Level::Error}else{sc_observability::Level::Info},"service":logger.service_name(),"target":"sc-agent","action":action,"identity":sc_observability::ProcessIdentity::default(),"fields":fields}),
-    ).map_err(|e| error("log.invalid_event", e))?;
-    logger.log(event).map_err(|e| error("log.write", e))
+    log_as(logger, "sc-agent", action, None, fields)
 }
 
 fn answer_schema(question: &Value) -> Value {
@@ -1138,6 +1175,14 @@ const BEARER: Auth = &[("Authorization", "Bearer {}")];
 const ANTHROPIC: Auth = &[("x-api-key", "{}"), ("anthropic-version", "2023-06-01")];
 // Messages model output limit: https://platform.claude.com/docs/en/models/overview
 const ANTHROPIC_MAX_TOKENS: u32 = 128000;
+#[derive(Default)]
+pub struct Exchange {
+    pub sends: Cell<u32>,
+    pub sha: RefCell<Option<String>>,
+    pub raw: RefCell<Value>,
+    pub hit: RefCell<Option<Value>>,
+    pub cache: bool,
+}
 pub struct Route<'a> {
     pub options: &'a Options,
     pub provider: &'static Provider,
@@ -1146,7 +1191,7 @@ pub struct Route<'a> {
     pub cancel: &'a Cancel,
     pub wait: &'a (dyn Fn(Duration) -> Result<(), Error> + Sync),
     pub keyring: &'a (dyn Fn(&str) -> Result<String, KeyringError> + Sync),
-    pub sends: &'a Cell<u32>,
+    pub exchange: &'a Exchange,
 }
 pub struct Jev<'a>(pub &'a Route<'a>);
 pub struct OpenAiCompat<'a>(pub &'a Route<'a>);
@@ -1243,6 +1288,9 @@ impl Route<'_> {
             fields.retain(|_, field| !field.is_null());
         }
         let reply = self.post(path, auth, &body)?;
+        if self.exchange.hit.borrow().is_some() {
+            return Ok(reply);
+        }
         let text = reply.pointer(at).and_then(|value| {
             value.as_str().or_else(|| {
                 value
@@ -1262,6 +1310,43 @@ impl Route<'_> {
     }
     fn post(&self, path: &str, auth: Auth, body: &Value) -> Result<Value, Error> {
         let (cancel, provider, max) = (self.cancel, self.provider, self.options.settings.max_sends);
+        let bytes = Arc::new(serde_json::to_vec(body).map_err(|e| error("decision.encode", e))?);
+        let request_hash = sha(&bytes)?;
+        *self.exchange.sha.borrow_mut() = Some(request_hash.clone());
+        if self.exchange.cache {
+            let project = self.options.settings.project_required()?;
+            let path = session_dir(
+                &self.options.log_root,
+                &self.options.repo,
+                &self.options.agent_role,
+                project,
+            )
+            .join("sessions.jsonl");
+            let hit = rows(&path, |row| {
+                row.get("request_sha256").and_then(Value::as_str) == Some(request_hash.as_str())
+                    && row.get("model_requested").and_then(Value::as_str)
+                        == Some(self.model.as_str())
+                    && row.pointer("/result/ok").and_then(Value::as_bool) == Some(true)
+                    && row.get("session_id").and_then(Value::as_str).is_some()
+            })?
+            .into_iter()
+            .max_by(|a, b| {
+                a.get("session_id")
+                    .and_then(Value::as_str)
+                    .cmp(&b.get("session_id").and_then(Value::as_str))
+            });
+            if let Some(row) = hit
+                && let (Some(id), Some(mut value)) = (
+                    row.get("session_id").and_then(Value::as_str),
+                    row.pointer("/result/value").cloned(),
+                )
+                && let Some(fields) = value.as_object_mut()
+            {
+                fields.insert("session_id".into(), json!(id));
+                *self.exchange.hit.borrow_mut() = Some(value.clone());
+                return Ok(value);
+            }
+        }
         let url = format!("{}/{path}", self.base.trim_end_matches('/'));
         let uri = url
             .parse::<ureq::http::Uri>()
@@ -1308,12 +1393,12 @@ impl Route<'_> {
             for (name, value) in auth.iter().filter(|_| !key.is_empty()) {
                 post = post.header(*name, value.replace("{}", &key));
             }
-            self.sends.set(attempt);
+            self.exchange.sends.set(attempt);
             // A send in flight cannot be aborted, so on cancel it is abandoned and the request ends now.
             let (sender, receiver) = std::sync::mpsc::sync_channel(1);
-            let sending = body.clone();
+            let sending = bytes.clone();
             std::thread::spawn(move || {
-                let _ = sender.send(post.send_json(&sending).map(|mut reply| {
+                let _ = sender.send(post.send(sending.as_slice()).map(|mut reply| {
                     let delay = reply
                         .headers()
                         .get("Retry-After")
@@ -1336,8 +1421,11 @@ impl Route<'_> {
                 Ok((_, _, Err(e))) | Err(e) => (0, None, redact(e.to_string())),
             };
             if (200..300).contains(&status) {
-                return serde_json::from_str(&text)
-                    .map_err(|e| error("decision.response_parse", format!("{e}: {text}")));
+                let value: Value = serde_json::from_str(&text)
+                    .map_err(|e| error("decision.response_parse", format!("{e}: {text}")))?;
+                *self.exchange.raw.borrow_mut() =
+                    json!({"model":value.get("model"),"usage":value.get("usage")});
+                return Ok(value);
             }
             let low = text.to_lowercase();
             let quota = status == 402
@@ -1370,7 +1458,6 @@ impl Route<'_> {
     }
 }
 static HOLDOFFS: Mutex<BTreeMap<String, Arc<Mutex<()>>>> = Mutex::new(BTreeMap::new());
-static SESSION_APPEND: Mutex<()> = Mutex::new(());
 
 pub fn host_holdoff(host: &str) -> Result<Arc<Mutex<()>>, Error> {
     Ok(HOLDOFFS
@@ -1388,11 +1475,89 @@ pub fn workers(value: i64) -> Result<usize, Error> {
         .ok_or_else(|| error("decidr.invalid_workers", "workers must be positive"))
 }
 
+fn append(path: PathBuf, action: &str, fields: Value) -> Result<(), Error> {
+    use sc_observability::v2::LogSink;
+    let policy = sc_observability::RetainedLogPolicy {
+        rotation_max_bytes: sc_observability::ByteCount::from_bytes(u64::MAX),
+        rotation_max_files: sc_observability::FileCount::from_usize(usize::MAX),
+        retention_max_age: sc_observability::RetentionMaxAge::from_duration(Duration::from_secs(
+            3_153_600_000,
+        )),
+        ..Default::default()
+    };
+    let service = ServiceName::new("sc-agent").map_err(|e| error("log.session_write", e))?;
+    let sink = sc_observability::JsonlFileSink::open(path, policy)
+        .map_err(|e| error("log.session_write", e))?;
+    sink.write(&event(&service, "sc-agent", action, None, fields)?)
+        .map_err(|e| error("log.session_write", e))
+}
+fn rows(path: &Path, mut keep: impl FnMut(&Value) -> bool) -> Result<Vec<Value>, Error> {
+    let text = match std::fs::read(path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => {
+            return Err(error(
+                "session.unreadable",
+                format!("{}: {e}", path.display()),
+            ));
+        }
+    };
+    Ok(text
+        .split(|byte| *byte == b'\n')
+        .filter_map(|line| serde_json::from_slice::<Value>(line).ok())
+        .filter_map(|entry| entry.get("fields").cloned())
+        .filter(|row| keep(row))
+        .collect())
+}
+pub fn session_rows(
+    ids: &[String],
+    agent_role: &str,
+    project: Option<&str>,
+) -> Result<Value, Error> {
+    slug(agent_role)?;
+    let (loaded, _, repo) = load(agent_role, None, project)?;
+    let project = loaded.config.project_required()?;
+    slug(project)?;
+    let path =
+        session_dir(&log_root(agent_role)?, &repo, agent_role, project).join("sessions.jsonl");
+    let found = rows(&path, |row| {
+        row.get("session_id")
+            .and_then(Value::as_str)
+            .is_some_and(|id| ids.iter().any(|wanted| wanted == id))
+    })?;
+    let output = found
+        .into_iter()
+        .filter_map(|row| {
+            let id = row.get("session_id")?.as_str()?.to_owned();
+            Some((id, row))
+        })
+        .collect::<serde_json::Map<_, _>>();
+    let missing = ids
+        .iter()
+        .filter(|id| !output.contains_key(*id))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !missing.is_empty() {
+        return Err(error(
+            "session.not_found",
+            format!("missing session ids: {}", missing.join(", ")),
+        ));
+    }
+    Ok(Value::Object(output))
+}
+fn session_dir(log_root: &Path, repo: &str, agent_role: &str, project: &str) -> PathBuf {
+    log_root
+        .join("sessions")
+        .join(repo)
+        .join(agent_role)
+        .join(project)
+}
 fn after_cancel(outcome: Result<Value, Error>, cancel: &Cancel) -> Result<Value, Error> {
     outcome.and_then(|value| cancel.check().map(|()| value))
 }
 type KeyringFn = dyn Fn(&str) -> Result<String, KeyringError> + Send + Sync;
 pub struct Run {
+    pub run_id: ulid::Ulid,
     pub options: Options,
     pub cancel: Arc<Cancel>,
     pub wait: Box<dyn Fn(Duration) -> Result<(), Error> + Send + Sync>,
@@ -1404,6 +1569,8 @@ pub struct Run {
 #[derive(Default)]
 pub struct RunArgs {
     pub tool: String,
+    pub tool_version: String,
+    pub cache: Option<bool>,
     pub agent_role: String,
     pub model: Option<String>,
     pub project: Option<String>,
@@ -1412,22 +1579,36 @@ pub struct RunArgs {
     pub workers: Option<i64>,
     pub base_url: Option<String>,
 }
+fn require_tool(tool: &str, tool_version: &str) -> Result<(), Error> {
+    if tool.is_empty() || tool_version.is_empty() {
+        return Err(error(
+            "decision.missing_tool",
+            "tool and tool_version are required",
+        ));
+    }
+    Ok(())
+}
 impl Run {
     pub fn new(
         args: RunArgs,
         logger: Option<Arc<Logger>>,
         cancel: Arc<Cancel>,
     ) -> Result<Self, Error> {
+        require_tool(&args.tool, &args.tool_version)?;
         let (loaded, root, repo) = load(
             &args.tool,
             args.config_dir.as_deref(),
             args.project.as_deref(),
         )?;
         let mut settings = loaded.config;
+        if let Some(cache) = args.cache {
+            settings.cache = cache;
+        }
         if let Some(count) = args.workers {
             settings.workers = workers(count)?;
         }
         let options = Options {
+            tool_version: args.tool_version,
             environment: std::env::vars_os().collect(),
             settings,
             model: args.model.unwrap_or_else(|| "jev".into()),
@@ -1439,22 +1620,23 @@ impl Run {
             log_root: log_root(&args.tool)?,
             repo,
         };
-        Self::from_options(options, args.tool, logger, cancel)
+        Self::from_options(options, logger, cancel)
     }
     pub fn from_options(
         options: Options,
-        tool: String,
         logger: Option<Arc<Logger>>,
         cancel: Arc<Cancel>,
     ) -> Result<Self, Error> {
+        require_tool(&options.settings.tool, &options.tool_version)?;
         let found = candidates(&options.model, &options.settings.models)?;
         let owned = logger.is_none();
         let logger = match logger {
             Some(logger) => logger,
-            None => Arc::new(default_logger(&tool)?),
+            None => Arc::new(default_logger(&options.settings.tool)?),
         };
         let waiting = cancel.clone();
         Ok(Self {
+            run_id: ulid::Ulid::new(),
             options,
             cancel,
             wait: Box::new(move |delay| waiting.wait(delay)),
@@ -1483,9 +1665,9 @@ impl Run {
         };
         flushed.and(stopped)
     }
-    pub fn send(&self, request: &Value) -> Result<Value, Error> {
+    pub fn send(&self, request: &Value, cache: Option<bool>) -> Result<Value, Error> {
         let (options, logger, cancel) = (&self.options, self.logger(), &*self.cancel);
-        let session_id = ulid::Ulid::new().to_string();
+        let mut session_id = ulid::Ulid::new().to_string();
         let digests = request
             .get("questions")
             .and_then(Value::as_object)
@@ -1495,13 +1677,18 @@ impl Run {
                     .filter_map(|id| digest(request, id).ok().map(|hash| (id.clone(), hash)))
                     .collect::<BTreeMap<_, _>>()
             });
-        let sends = Cell::new(0);
+        let exchange = Exchange {
+            cache: cache.unwrap_or(options.settings.cache),
+            ..Default::default()
+        };
+        let mut identity = None;
         let outcome = (|| {
             cancel.check()?;
             let project = options.settings.project_required()?;
             slug(project)?;
             slug(&options.agent_role)?;
             let (provider, model) = self.resolve()?;
+            identity = Some((provider.name.to_owned(), model.clone()));
             let base = match options.settings.local.get(provider.name) {
                 _ if !provider.url.is_empty() => provider.url.into(),
                 Some(runner) => format!("http://{}:{}/v1", runner.host, runner.port),
@@ -1520,7 +1707,7 @@ impl Run {
                 cancel,
                 wait: &*self.wait,
                 keyring: &*self.keyring,
-                sends: &sends,
+                exchange: &exchange,
             };
             match provider.wire {
                 Wire::Messages => AnthropicCompat(&route).decide(request),
@@ -1529,6 +1716,13 @@ impl Run {
             }
         })();
         let mut outcome = after_cancel(outcome, cancel);
+        let hit = outcome.is_ok() && exchange.hit.borrow().is_some();
+        if hit
+            && let Ok(value) = &outcome
+            && let Some(id) = value.get("session_id").and_then(Value::as_str)
+        {
+            session_id = id.to_owned();
+        }
         if let Err(Error::Failure {
             session_id: id,
             attempts,
@@ -1536,66 +1730,69 @@ impl Run {
         }) = &mut outcome
         {
             *id = Some(session_id.clone());
-            *attempts = (sends.get() > 0 || cancel.is_cancelled()).then(|| sends.get());
+            *attempts =
+                (exchange.sends.get() > 0 || cancel.is_cancelled()).then(|| exchange.sends.get());
         }
         if let Ok(value) = &mut outcome
             && let Some(fields) = value.as_object_mut()
         {
-            fields.insert("attempts".into(), json!(sends.get()));
-            fields.insert("session_id".into(), json!(session_id));
-            fields.insert("question_digests".into(), json!(digests));
+            if !hit {
+                fields.insert("attempts".into(), json!(exchange.sends.get()));
+                fields.insert("session_id".into(), json!(session_id));
+                fields.insert("question_digests".into(), json!(digests));
+            }
+            fields.insert("cached".into(), json!(hit));
         }
         let mut session_failure = None;
         let attach = |failure, context| contextual(failure, context, Some(&session_id));
-        let prior = || format!("original outcome: {outcome:?}");
-        if let Ok(project) = options.settings.project_required()
+        if outcome.is_ok()
+            && (exchange.sends.get() > 0 || hit)
+            && let Ok(project) = options.settings.project_required()
             && slug(project).is_ok()
             && slug(&options.agent_role).is_ok()
         {
-            let row = json!({"session_id":session_id,"repo":options.repo,"agent_role":options.agent_role,"project":project,"request":request,"question_digests":digests,"result":match &outcome {Ok(v)=>json!({"ok":true,"value":v}),Err(e)=>json!({"ok":false,"error":e})}});
-            let path = options
-                .log_root
-                .join("sessions")
-                .join(&options.repo)
-                .join(&options.agent_role)
-                .join(project);
-            let _append = SESSION_APPEND
-                .lock()
-                .map_err(|e| attach(error("config.session", e), prior()))?;
-            let written = (|| -> std::io::Result<()> {
-                use std::io::Write;
-                std::fs::create_dir_all(&path)?;
-                writeln!(
-                    std::fs::OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open(path.join("sessions.jsonl"))?,
-                    "{row}"
-                )
-            })();
+            let path = session_dir(
+                &options.log_root,
+                &options.repo,
+                &options.agent_role,
+                project,
+            );
+            let written = if hit {
+                Ok(())
+            } else {
+                let raw = exchange.raw.borrow();
+                let row = json!({"schema":"sc-agent-session/2","session_id":session_id,"repo":options.repo,"agent_role":options.agent_role,"project":project,"tool":options.settings.tool,"tool_version":options.tool_version,"provider":identity.as_ref().map(|v| &v.0),"model_requested":identity.as_ref().map(|v| &v.1),"model_answered":raw.get("model"),"usage":raw.get("usage"),"request_sha256":*exchange.sha.borrow(),"request":request,"question_digests":digests,"result":match &outcome {Ok(v)=>json!({"ok":true,"value":v}),Err(e)=>json!({"ok":false,"error":e})}});
+                append(path.join("sessions.jsonl"), "session.row", row)
+            };
             session_failure = written
+                .and_then(|()| append(path.join("runs.jsonl"), "run.link", json!({"run_id":self.run_id.to_string(),"session_id":session_id,"cached":hit})))
                 .err()
-                .map(|e| attach(error("log.session_write", e), prior()));
-            if let Some(failure) = &session_failure
-                && let Err(log_failure) = log(logger, "error", json!(failure))
-            {
-                outcome = Err(attach(
-                    log_failure,
-                    format!("original session error: {failure}"),
-                ));
+                .map(|e| attach(e, "session log append failed".to_owned()));
+            if let Some(failure) = &session_failure {
+                let _ = log(logger, "error", json!(failure));
             }
         }
+        if outcome.is_ok()
+            && let Some(failure) = session_failure
+        {
+            outcome = Err(failure);
+        }
         let logged = match &outcome {
-            Ok(value) => log(logger, "decision.result", json!({"response":value})),
-            Err(_) => Ok(()),
+            Ok(_) => log(
+                logger,
+                "decision.result",
+                json!({"session_id":session_id,"cached":hit}),
+            ),
+            _ => Ok(()),
         };
         for failure in [logged, logger.flush().map_err(|e| error("log.flush", e))]
             .into_iter()
             .filter_map(Result::err)
         {
-            let context =
-                format!("original outcome: {outcome:?}; session error: {session_failure:?}");
-            outcome = Err(attach(failure, context));
+            if outcome.is_ok() {
+                let context = format!("original outcome: {outcome:?}");
+                outcome = Err(attach(failure, context));
+            }
         }
         outcome
     }
@@ -1603,6 +1800,7 @@ impl Run {
     pub fn send_batch(
         &self,
         requests: &[Value],
+        cache: Option<bool>,
         on_result: &(dyn Fn(usize, &Value) + Sync),
     ) -> Result<Value, Error> {
         if self.options.settings.workers == 0 {
@@ -1620,7 +1818,7 @@ impl Run {
                         let Some(request) = requests.get(index) else {
                             break;
                         };
-                        let value = report(self.logger(), self.send(request));
+                        let value = report(self.logger(), self.send(request, cache));
                         on_result(index, &value);
                         let _ = sender.send((index, value));
                     }
@@ -1724,15 +1922,17 @@ pub fn doctor(
 }
 
 pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {
+    // Run::send already logs its session-write failure; callers do not construct that id.
     if let Err(error) = &outcome
-        && let Err(failure) = log(logger, "error", json!(error))
+        && !matches!(
+            error,
+            Error::Failure {
+                id: "log.session_write",
+                ..
+            }
+        )
     {
-        let Error::Failure { session_id, .. } = error;
-        return result(Err(contextual(
-            failure,
-            format!("original error: {error}"),
-            session_id.as_deref(),
-        )));
+        let _ = log(logger, "error", json!(error));
     }
     result(outcome)
 }
@@ -1808,6 +2008,7 @@ pub mod route_tests {
         let logger = logger(&root)?;
         let args = RunArgs {
             tool: "decidr".into(),
+            tool_version: "test".into(),
             agent_role: "test".into(),
             project: Some("test".into()),
             config_dir: Some(root.0.clone()),
@@ -1848,10 +2049,16 @@ pub mod route_tests {
             )
         });
         assert!(run.sends_to("anthropic")?);
-        assert_eq!(run.send(&request())?["answers"], answer()["answers"]);
+        assert_eq!(
+            run.send(&request(), Some(false))?["answers"],
+            answer()["answers"]
+        );
         second.store(true, Ordering::SeqCst);
         assert!(run.sends_to("openrouter")?);
-        assert_eq!(run.send(&request())?["answers"], answer()["answers"]);
+        assert_eq!(
+            run.send(&request(), Some(false))?["answers"],
+            answer()["answers"]
+        );
         assert_eq!(stub.finish()?.len(), 2);
         logger.shutdown()?;
         Ok(())
@@ -1879,6 +2086,7 @@ pub mod route_tests {
         let logger = logger(&root)?;
         let args = RunArgs {
             tool: "decidr".into(),
+            tool_version: "test".into(),
             agent_role: "test".into(),
             project: Some("test".into()),
             config_dir: Some(root.0.clone()),
@@ -1889,7 +2097,7 @@ pub mod route_tests {
         let run = Run::new(args, Some(logger.clone()), Arc::new(Cancel::default()))?;
         assert_eq!(run.options.settings.workers, 2);
         let (provider, model) = model_with("jev", &BTreeMap::new())?;
-        let sends = Cell::new(0);
+        let exchange = Exchange::default();
         for _ in 0..2 {
             let route = Route {
                 options: &run.options,
@@ -1899,7 +2107,7 @@ pub mod route_tests {
                 cancel: &run.cancel,
                 wait: &*run.wait,
                 keyring: &keyring,
-                sends: &sends,
+                exchange: &exchange,
             };
             assert_eq!(
                 route.agent().config().timeouts().global,
@@ -1910,7 +2118,6 @@ pub mod route_tests {
         let configured = defaults.settings.workers;
         let next = self::super::Run::from_options(
             defaults,
-            "decidr".into(),
             Some(logger.clone()),
             Arc::new(Cancel::default()),
         )?;
@@ -1931,6 +2138,7 @@ pub mod route_tests {
         ] {
             let args = RunArgs {
                 tool: "decidr".into(),
+                tool_version: "test".into(),
                 agent_role: "test".into(),
                 project: Some("test".into()),
                 config_dir: Some(root.0.clone()),
@@ -2032,10 +2240,30 @@ pub mod route_tests {
     }
 
     #[test]
+    fn j3_rows_skip_invalid_lines_and_report_unreadable_paths() -> Test {
+        let root = Temp::new()?;
+        let file = root.0.join("rows.jsonl");
+        std::fs::write(
+            &file,
+            b"{\"fields\":{\"id\":1}}\ninvalid\xff\n{\"fields\":{\"id\":2}}\n",
+        )?;
+        let selected = super::rows(&file, |row| {
+            row.get("id").and_then(Value::as_u64) == Some(2)
+        })?;
+        assert_eq!(selected, vec![json!({"id":2})]);
+        assert!(super::rows(&root.0.join("missing"), |_| true)?.is_empty());
+        let failure = super::rows(&root.0, |_| true)
+            .err()
+            .ok_or("directory unexpectedly readable")?;
+        assert_eq!(result(Err(failure))["error"]["id"], "session.unreadable");
+        Ok(())
+    }
+
+    #[test]
     fn timeout_is_per_call_and_sets_the_transport_configuration() -> Test {
         let root = Temp::new()?;
         let cancel = Cancel::default();
-        let sends = Cell::new(0);
+        let exchange = Exchange::default();
         for timeout in [
             Duration::from_secs(120),
             Duration::from_millis(50),
@@ -2052,7 +2280,7 @@ pub mod route_tests {
                 cancel: &cancel,
                 wait: &no_wait,
                 keyring: &keyring,
-                sends: &sends,
+                exchange: &exchange,
             };
             assert_eq!(route.agent().config().timeouts().global, Some(timeout));
         }
@@ -2067,7 +2295,7 @@ pub mod route_tests {
         let stub = Stub::new(vec![http(401, body.clone())])?;
         let run = run(options(&root, &stub.url), &logger)?;
         let cancel = run.cancel.clone();
-        let lower = run.send(&request()).err().ok_or("401 accepted")?;
+        let lower = run.send(&request(), None).err().ok_or("401 accepted")?;
         assert!(!cancel.is_cancelled());
         assert_eq!(stub.finish()?.len(), 1);
         cancel.cancel();

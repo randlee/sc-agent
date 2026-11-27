@@ -910,3 +910,80 @@ fn configuration_files_environment_and_missing_project_follow_the_tool_name() ->
     assert!(failure.contains("another-tool.json"), "{failure}");
     Ok(())
 }
+
+#[test]
+fn j3_cache_setting() -> Test {
+    let root = Temp::new()?;
+    let defaults = config("decidr", None, Some(&root.0), &[], None)?;
+    assert!(defaults.config.cache);
+    let row = defaults
+        .rows
+        .iter()
+        .find(|row| row["path"] == "cache")
+        .ok_or("missing cache doctor row")?;
+    assert_eq!(row["value"], "true");
+    assert_eq!(row["source"], "default");
+    let disabled = config(
+        "decidr",
+        None,
+        Some(&root.0),
+        &[("DECIDR_CACHE".into(), "false".into())],
+        None,
+    )?;
+    assert!(!disabled.config.cache);
+    let invalid = config(
+        "decidr",
+        None,
+        Some(&root.0),
+        &[("DECIDR_CACHE".into(), "1".into())],
+        None,
+    );
+    assert_eq!(
+        serde_json::to_value(invalid.err().ok_or("invalid cache accepted")?)?["id"],
+        "config.invalid"
+    );
+    Ok(())
+}
+
+#[test]
+fn j3_missing_tool() -> Test {
+    use std::sync::Arc;
+    let root = Temp::new()?;
+    for (tool, version) in [("", "1"), ("decidr", "")] {
+        let args = sc_agent::RunArgs {
+            tool: tool.into(),
+            tool_version: version.into(),
+            agent_role: "decidr".into(),
+            config_dir: Some(root.0.clone()),
+            ..Default::default()
+        };
+        let error = sc_agent::Run::new(args, None, Arc::new(sc_agent::Cancel::default()))
+            .err()
+            .ok_or("missing identity accepted")?;
+        assert_eq!(serde_json::to_value(error)?["id"], "decision.missing_tool");
+    }
+    assert_eq!(std::fs::read_dir(root.0.clone())?.count(), 0);
+    Ok(())
+}
+
+#[test]
+fn j3_log_categories() -> Test {
+    for (id, category) in [
+        ("log.write", "log"),
+        ("log.flush", "log"),
+        ("log.shutdown", "log"),
+        ("log.session_write", "log"),
+        ("session.unreadable", "log"),
+        ("log.invalid_slug", "validation"),
+        ("log.invalid_event", "validation"),
+        ("session.not_found", "validation"),
+        ("decision.missing_tool", "validation"),
+    ] {
+        assert_eq!(
+            serde_json::to_value(error(id, "test"))?["category"],
+            category,
+            "{id}"
+        );
+    }
+    Ok(())
+}
