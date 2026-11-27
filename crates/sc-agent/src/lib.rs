@@ -1065,18 +1065,12 @@ pub fn log(logger: &Logger, action: &str, fields: Value) -> Result<(), Error> {
 
 fn answer_schema(question: &Value) -> Value {
     let kind = question.get("type").and_then(Value::as_str).unwrap_or("");
-    let names = if kind == "choice" {
-        question
-            .get("criteria")
-            .and_then(Value::as_object)
-            .map(|v| v.keys().cloned().collect::<Vec<_>>())
-            .unwrap_or_default()
-    } else {
-        question
-            .get("criteria")
-            .and_then(Value::as_array)
-            .map(|v| (0..v.len()).map(|i| i.to_string()).collect::<Vec<_>>())
-            .unwrap_or_default()
+    let names = match question.get("criteria") {
+        Some(Value::Object(values)) if kind == "choice" => values.keys().cloned().collect(),
+        Some(Value::Array(values)) if kind != "choice" => (0..values.len())
+            .map(|index| index.to_string())
+            .collect::<Vec<_>>(),
+        _ => Vec::new(),
     };
     let object = |value_type| {
         json!({
@@ -1086,36 +1080,32 @@ fn answer_schema(question: &Value) -> Value {
             "additionalProperties":false
         })
     };
-    let mut fields = json!({"type":{"type":"string","enum":[kind]}});
-    if let Some(fields) = fields.as_object_mut() {
-        match kind {
-            "choice" | "score" => {
-                fields.insert("confidence".into(), json!({"type":"number"}));
-                fields.insert("probabilities".into(), object("number"));
-                if kind == "choice" {
-                    fields.insert("choice".into(), json!({"type":"string","enum":names}));
-                } else {
-                    fields.insert("score".into(), json!({"type":"number"}));
-                    fields.insert("legend".into(), object("string"));
-                }
+    let mut fields = serde_json::Map::new();
+    fields.insert("type".into(), json!({"type":"string","enum":[kind]}));
+    match kind {
+        "choice" | "score" => {
+            fields.insert("confidence".into(), json!({"type":"number"}));
+            fields.insert("probabilities".into(), object("number"));
+            if kind == "choice" {
+                fields.insert("choice".into(), json!({"type":"string","enum":names}));
+            } else {
+                fields.insert("score".into(), json!({"type":"number"}));
+                fields.insert("legend".into(), object("string"));
             }
-            "box" => {
-                fields.insert("box".into(),json!({
+        }
+        "box" => {
+            fields.insert("box".into(),json!({
                     "type":["object","null"],
                     "properties":(["top","bottom","left","right"].into_iter().map(|name|(name,json!({"type":"number"}))).collect::<BTreeMap<_,_>>()),
                     "required":["top","bottom","left","right"],"additionalProperties":false
                 }));
-                fields.insert("confidence".into(), json!({"type":["number","null"]}));
-            }
-            _ => {
-                fields.insert("noul".into(), json!({"type":"number"}));
-            }
+            fields.insert("confidence".into(), json!({"type":["number","null"]}));
+        }
+        _ => {
+            fields.insert("noul".into(), json!({"type":"number"}));
         }
     }
-    let required = fields
-        .as_object()
-        .map(|v| v.keys().cloned().collect::<Vec<_>>())
-        .unwrap_or_default();
+    let required = fields.keys().cloned().collect::<Vec<_>>();
     json!({"type":"object","properties":fields,"required":required,"additionalProperties":false})
 }
 pub type DecisionRequest = Value;
