@@ -31,6 +31,7 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
         opts.settings.models.insert(
             opts.model.clone(),
             sc_agent::ModelEntry {
+                released: None,
                 provider: provider.into(),
                 id: sc_agent::model(&opts.model, Some(provider))?.1,
             },
