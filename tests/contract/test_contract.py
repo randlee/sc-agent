@@ -375,6 +375,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             got = self.api.sitr.languages()
         error = self.error(got)
         self.assertEqual(error["id"], "sc_agent_py.result_load")
+        self.assertEqual(set(error), {"id", "message", "action", "category"})
         self.assertIn("controlled loader failure", error["message"])
         self.assertIn('"ok":true', error["message"])
 

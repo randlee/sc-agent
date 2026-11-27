@@ -33,26 +33,30 @@ fn raw(py: Python<'_>, value: Value) -> Py<PyAny> {
         // REQ-SAG-0002: a result Python cannot load comes back as an error value
         // carrying the loader's message and the whole result text, never as None.
         Err(e) => {
-            let failure = sc_agent::error("sc_agent_py.result_load", format!("{e}: {value}"));
+            let failure = sc_agent::result(Err(sc_agent::error(
+                "sc_agent_py.result_load",
+                format!("{e}: {value}"),
+            )));
             let fields = PyDict::new(py);
-            let detail = PyDict::new(py);
-            let Error::Failure {
-                id,
-                message,
-                action,
-                category,
-                ..
-            } = failure;
-            for (key, text) in [
-                ("id", id),
-                ("message", message.as_str()),
-                ("action", action),
-                ("category", category),
-            ] {
-                let _ = detail.set_item(key, text);
+            if let Some(envelope) = failure.as_object() {
+                for (key, value) in envelope {
+                    match value {
+                        Value::Bool(value) => {
+                            let _ = fields.set_item(key, value);
+                        }
+                        Value::Object(values) => {
+                            let detail = PyDict::new(py);
+                            for (key, value) in values {
+                                if let Some(value) = value.as_str() {
+                                    let _ = detail.set_item(key, value);
+                                }
+                            }
+                            let _ = fields.set_item(key, detail);
+                        }
+                        _ => {}
+                    }
+                }
             }
-            let _ = fields.set_item("ok", false);
-            let _ = fields.set_item("error", detail);
             fields.into_any().unbind()
         }
     }
