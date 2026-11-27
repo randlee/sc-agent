@@ -51,6 +51,10 @@ def server(replies, respond=None, host="127.0.0.1", handled=None, errors=None):
         def log_message(self, *args):
             pass
 
+        def log_error(self, format, *args):
+            handler_errors.append(f"handler error: {format % args}; "
+                                  f"path={getattr(self, 'path', None)!r}; received={received!r}")
+
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             with lock:
@@ -131,6 +135,8 @@ def server(replies, respond=None, host="127.0.0.1", handled=None, errors=None):
         thread.join(15)
         if thread.is_alive():
             shutdown_failures.append("serve thread.join(15) backstop expired")
+        if handler_errors and errors is None:
+            shutdown_failures.append("handler errors")
         if shutdown_failures:
             raise AssertionError(f"{'; '.join(shutdown_failures)}; received={received!r}; "
                                  f"shutdown_thread_alive={shutdown_thread.is_alive()}; "
@@ -486,7 +492,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             if not release.wait(20):
                 expired.set()
                 expired_backstops.append("respond release.wait(20)")
-            return 200, {}, ANSWER
+            return None
         results = []
         expired_backstops = []
         with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
@@ -997,7 +1003,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 expired.set()
                 release.set()
                 return 500, {}, {"error": "send_batch did not return while reply was withheld"}
-            return 200, {}, ANSWER
+            return None
         with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
             with self.api.Run(tool="decidr", workers=1, project="contract", agent_role="contract", config_dir=self.directory.name,
                               general_log=self.api.logger("decidr")["value"], base_url=url) as run_13:
