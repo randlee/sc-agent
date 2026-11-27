@@ -1,5 +1,5 @@
 pub mod support;
-use sc_agent::{Cancel, Runner, batch, send};
+use sc_agent::{Cancel, Runner};
 use serde_json::{Value, json};
 use std::{
     sync::{Mutex, mpsc},
@@ -28,7 +28,13 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
         let stub = Stub::new(vec![http(200, raw)])?;
         let mut opts = options(&root, &stub.url);
         opts.model = model.into();
-        opts.provider = Some(provider.into());
+        opts.settings.models.insert(
+            opts.model.clone(),
+            sc_agent::ModelEntry {
+                provider: provider.into(),
+                id: sc_agent::model(&opts.model, Some(provider))?.1,
+            },
+        );
         opts.environment.extend([
             ("OPENROUTER_API_KEY".into(), "test-secret".into()),
             ("TOGETHER_API_KEY".into(), "test-secret".into()),
@@ -43,14 +49,11 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
                 },
             );
         }
-        let value = send(
-            &request(),
-            &opts,
-            &logger,
-            &Cancel::default(),
-            &no_wait,
-            &keyring,
-        )?;
+        let value = {
+            let run = run(opts.clone(), &logger)?;
+
+            run.send(&request())
+        }?;
         assert_eq!(value["answers"], answer()["answers"]);
         assert_eq!(value["answers"]["q"]["noul"], 0.123456789);
         let seen = stub.finish()?;
@@ -107,23 +110,26 @@ fn req_sag_0601_busy_resends_unchanged_retry_after_and_exponential_backoff() -> 
         ];
         let stub = Stub::new(replies)?;
         let opts = options(&root, &stub.url);
-        let waits = Mutex::new(vec![]);
-        let wait = |delay| {
-            if let Ok(mut seen) = waits.lock() {
+        let waits = std::sync::Arc::new(Mutex::new(vec![]));
+        let observed = waits.clone();
+        let wait = move |delay| {
+            if let Ok(mut seen) = observed.lock() {
                 seen.push(delay);
             }
             Ok(())
         };
-        let got = send(
-            &request(),
-            &opts,
-            &logger,
-            &Cancel::default(),
-            &wait,
-            &keyring,
-        )?;
+        let got = {
+            let mut run = run(opts.clone(), &logger)?;
+
+            run.wait = Box::new(wait);
+
+            run.send(&request())
+        }?;
         assert_eq!(got["attempts"], 4);
-        let waits = waits.into_inner().map_err(|_| "wait recorder poisoned")?;
+        let waits = waits
+            .lock()
+            .map(|v| v.clone())
+            .map_err(|_| "wait recorder poisoned")?;
         assert_eq!(waits.first(), Some(&Duration::from_secs_f64(1.1)));
         assert_eq!(waits.get(1), Some(&Duration::from_secs(2)));
         assert_eq!(waits.get(2), Some(&Duration::from_secs(4)));
@@ -154,20 +160,21 @@ fn req_sag_0601_0017_busy_and_network_exhaustion_report_five_sends() -> Test {
                 })
                 .collect(),
         )?;
-        let waits = Mutex::new(vec![]);
-        let got = sc_agent::result(send(
-            &request(),
-            &options(&root, &stub.url),
-            &logger,
-            &Cancel::default(),
-            &|delay| {
+        let waits = std::sync::Arc::new(Mutex::new(vec![]));
+        let got = sc_agent::result({
+            let mut run = run(options(&root, &stub.url), &logger)?;
+
+            let waits = waits.clone();
+            let _cancel = run.cancel.clone();
+            run.wait = Box::new(move |delay| {
                 if let Ok(mut w) = waits.lock() {
                     w.push(delay);
                 }
                 Ok(())
-            },
-            &keyring,
-        ));
+            });
+
+            run.send(&request())
+        });
         assert_eq!(
             got["error"]["id"],
             if network {
@@ -184,7 +191,10 @@ fn req_sag_0601_0017_busy_and_network_exhaustion_report_five_sends() -> Test {
         assert_eq!(got["error"]["action"], "Retry later.");
         assert_eq!(stub.finish()?.len(), 5);
         assert_eq!(
-            waits.into_inner().map_err(|_| "wait recorder poisoned")?,
+            waits
+                .lock()
+                .map(|v| v.clone())
+                .map_err(|_| "wait recorder poisoned")?,
             vec![1, 2, 4, 8]
                 .into_iter()
                 .map(Duration::from_secs)
@@ -226,17 +236,11 @@ fn req_sag_0002_0601_auth_quota_are_not_retried_and_remote_text_is_redacted_whol
         let root = Temp::new()?;
         let logger = logger(&root)?;
         let stub = Stub::new(vec![Reply::Http(status, vec![], body.into())])?;
-        let got = sc_agent::report(
-            &logger,
-            send(
-                &request(),
-                &options(&root, &stub.url),
-                &logger,
-                &Cancel::default(),
-                &no_wait,
-                &keyring,
-            ),
-        );
+        let got = sc_agent::report(&logger, {
+            let run = run(options(&root, &stub.url), &logger)?;
+
+            run.send(&request())
+        });
         assert_eq!(got["error"]["id"], id);
         assert_eq!(got["error"]["category"], category);
         assert_eq!(
@@ -342,29 +346,28 @@ fn req_sag_0010_0011_cancel_during_retry_keeps_every_batch_position_and_row() ->
         vec![("Retry-After", "600")],
         "busy".into(),
     )])?;
-    let cancel = Cancel::default();
-    let waits = Mutex::new(vec![]);
+    let cancel = std::sync::Arc::new(Cancel::default());
+    let waits = std::sync::Arc::new(Mutex::new(vec![]));
     let completed = Mutex::new(vec![]);
-    let got = batch(
-        &vec![request(); 3],
-        &options(&root, &stub.url),
-        &logger,
-        &cancel,
-        &|delay| {
+    let got = {
+        let mut run = run(options(&root, &stub.url), &logger)?;
+        run.cancel = cancel.clone();
+        let waits = waits.clone();
+        let cancel = run.cancel.clone();
+        run.wait = Box::new(move |delay| {
             if let Ok(mut seen) = waits.lock() {
                 seen.push(delay);
             }
             cancel.cancel();
-            let _ = cancel.wait(Duration::from_secs(600)); // Already signalled: no real wait, regardless of scheduling.
-            Ok(())
-        },
-        &keyring,
-        &|index, value| {
+            cancel.wait(Duration::from_secs(600)) // Already signalled: no real wait, regardless of scheduling.
+        });
+
+        run.send_batch(&vec![request(); 3], &|index, value| {
             if let Ok(mut seen) = completed.lock() {
                 seen.push((index, value.clone()));
             }
-        },
-    )?;
+        })
+    }?;
     assert!(cancel.is_cancelled());
     assert_eq!(stub.finish()?.len(), 1);
     let results = got.as_array().ok_or("batch results missing")?;
@@ -389,7 +392,10 @@ fn req_sag_0010_0011_cancel_during_retry_keeps_every_batch_position_and_row() ->
         3
     );
     assert_eq!(
-        waits.into_inner().map_err(|_| "wait recorder poisoned")?,
+        waits
+            .lock()
+            .map(|v| v.clone())
+            .map_err(|_| "wait recorder poisoned")?,
         vec![Duration::from_secs(600)]
     );
     assert_eq!(rows(&root)?.len(), 3);
@@ -402,14 +408,21 @@ fn req_sag_0011_precancel_never_reads_a_key_and_invalid_tags_write_no_row() -> T
     let root = Temp::new()?;
     let logger = logger(&root)?;
     let mut opts = options(&root, "http://127.0.0.1:1/v1");
-    let cancel = Cancel::default();
+    let cancel = std::sync::Arc::new(Cancel::default());
     cancel.cancel();
     opts.environment.clear();
-    let keys = std::sync::atomic::AtomicUsize::new(0);
-    let got = sc_agent::result(send(&request(), &opts, &logger, &cancel, &no_wait, &|_| {
-        keys.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        Err(sc_agent::KeyringError::Read("unexpected lookup".into()))
-    }));
+    let keys = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let got = sc_agent::result({
+        let mut run = run(opts.clone(), &logger)?;
+        run.cancel = cancel.clone();
+
+        let keys = keys.clone();
+        run.keyring = Box::new(move |_| {
+            keys.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Err(sc_agent::KeyringError::Read("unexpected lookup".into()))
+        });
+        run.send(&request())
+    });
     assert_eq!(got["error"]["id"], "decision.cancelled");
     assert_eq!(keys.load(std::sync::atomic::Ordering::SeqCst), 0);
     assert_eq!(rows(&root)?.len(), 1);
@@ -422,14 +435,11 @@ fn req_sag_0011_precancel_never_reads_a_key_and_invalid_tags_write_no_row() -> T
         } else {
             bad.settings.project = Some("Phase B".into());
         }
-        let error = send(
-            &request(),
-            &bad,
-            &logger,
-            &Cancel::default(),
-            &no_wait,
-            &keyring,
-        )
+        let error = {
+            let run = run(bad.clone(), &logger)?;
+
+            run.send(&request())
+        }
         .err()
         .ok_or("invalid tag accepted")?;
         assert_eq!(serde_json::to_value(error)?["id"], "log.invalid_slug");
@@ -449,19 +459,15 @@ fn req_sag_0702_batch_continues_after_failed_item_and_preserves_positions() -> T
         http(200, answer()),
     ])?;
     let seen = Mutex::new(vec![]);
-    let got = batch(
-        &vec![request(); 2],
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-        &|index, value| {
+    let got = {
+        let run = run(options(&root, &stub.url), &logger)?;
+
+        run.send_batch(&vec![request(); 2], &|index, value| {
             if let Ok(mut items) = seen.lock() {
                 items.push((index, value["ok"].clone()));
             }
-        },
-    )?;
+        })
+    }?;
     assert_eq!(got[0]["index"], 0);
     assert_eq!(got[0]["result"]["error"]["id"], "http.auth");
     assert_eq!(got[1]["index"], 1);
@@ -476,15 +482,11 @@ fn req_sag_0702_batch_continues_after_failed_item_and_preserves_positions() -> T
     let mut invalid = options(&root, "http://127.0.0.1:1/v1");
     invalid.settings.workers = 0;
     assert_eq!(
-        sc_agent::result(batch(
-            &[],
-            &invalid,
-            &logger,
-            &Cancel::default(),
-            &no_wait,
-            &keyring,
-            &|_, _| {}
-        ))["error"]["id"],
+        sc_agent::result({
+            let run = run(invalid.clone(), &logger)?;
+
+            run.send_batch(&[], &|_, _| {})
+        })["error"]["id"],
         "decidr.invalid_workers"
     );
     logger.shutdown()?;
@@ -502,13 +504,14 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
     let (arrivals, arrived) = mpsc::channel();
     let (release, permits) = mpsc::channel();
     let permits = Mutex::new(permits);
-    let permit_error = Mutex::new(None);
-    let keys = |_: &str| {
+    let permit_error = std::sync::Arc::new(Mutex::new(None));
+    let recorded_error = permit_error.clone();
+    let keys = move |_: &str| {
         arrivals
             .send(std::thread::current().id())
             .map_err(|e| e.to_string())?;
         if let Err(error) = permits.lock().map_err(|e| e.to_string())?.recv() {
-            *permit_error.lock().map_err(|e| e.to_string())? =
+            *recorded_error.lock().map_err(|e| e.to_string())? =
                 Some(format!("missing keyring release permit: {error}"));
             return Err("platform keyring is unavailable".to_owned().into());
         }
@@ -517,15 +520,10 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
     let (result, workers) = std::thread::scope(
         |scope| -> Result<_, Box<dyn std::error::Error + Send + Sync>> {
             let work = scope.spawn(|| {
-                batch(
-                    &vec![request(); 2],
-                    &opts,
-                    &logger,
-                    &Cancel::default(),
-                    &no_wait,
-                    &keys,
-                    &|_, _| {},
-                )
+                let mut run = run(opts.clone(), &logger)?;
+
+                run.keyring = Box::new(keys);
+                run.send_batch(&vec![request(); 2], &|_, _| {})
             });
             let workers = (0..2)
                 .map(|_| arrived.recv_timeout(Duration::from_secs(5)))
@@ -541,7 +539,8 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
         },
     )?;
     let permit_error = permit_error
-        .into_inner()
+        .lock()
+        .map(|value| value.clone())
         .map_err(|_| "keyring permit error recorder poisoned")?;
     let workers = workers.map_err(|error| {
         std::io::Error::other(format!(
@@ -568,14 +567,11 @@ fn req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once() ->
             json!({"error":"provider message stays whole"})
         };
         let stub = Stub::new(vec![http(status, body.clone())])?;
-        let outcome = sc_agent::result(send(
-            &request(),
-            &options(&root, &stub.url),
-            &logger,
-            &Cancel::default(),
-            &no_wait,
-            &keyring,
-        ));
+        let outcome = sc_agent::result({
+            let run = run(options(&root, &stub.url), &logger)?;
+
+            run.send(&request())
+        });
         if status == 200 {
             assert_eq!(outcome["value"]["answers"], body["answers"]);
         } else {
@@ -611,11 +607,18 @@ fn cancel_after_a_lower_layer_error_keeps_it() -> Test {
     let logger = logger(&root)?;
     let mut opts = options(&root, "http://127.0.0.1:1/v1");
     opts.environment.clear();
-    let cancel = Cancel::default();
-    let failure = sc_agent::result(send(&request(), &opts, &logger, &cancel, &no_wait, &|_| {
-        cancel.cancel();
-        Err(sc_agent::KeyringError::Read("controlled failure".into()))
-    }));
+    let cancel = std::sync::Arc::new(Cancel::default());
+    let failure = sc_agent::result({
+        let mut run = run(opts.clone(), &logger)?;
+        run.cancel = cancel.clone();
+
+        let cancel = run.cancel.clone();
+        run.keyring = Box::new(move |_| {
+            cancel.cancel();
+            Err(sc_agent::KeyringError::Read("controlled failure".into()))
+        });
+        run.send(&request())
+    });
     assert_eq!(failure["error"]["id"], "secrets.keyring_read");
     assert!(cancel.is_cancelled());
     logger.shutdown()?;

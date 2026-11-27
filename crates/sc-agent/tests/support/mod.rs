@@ -28,10 +28,10 @@ impl Drop for Temp {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
-pub fn logger(root: &Temp) -> Result<Logger, Box<dyn std::error::Error + Send + Sync>> {
+pub fn logger(root: &Temp) -> Result<Arc<Logger>, Box<dyn std::error::Error + Send + Sync>> {
     let mut config = LoggerConfig::default_for(ServiceName::new("rust-test")?, root.0.clone());
     config.enable_console_sink = false;
-    Ok(Logger::new(config)?)
+    Ok(Arc::new(Logger::new(config)?))
 }
 pub fn options(root: &Temp, url: &str) -> Options {
     Options {
@@ -41,6 +41,7 @@ pub fn options(root: &Temp, url: &str) -> Options {
             ("OPENAI_API_KEY".into(), "test-secret".into()),
         ],
         settings: Settings {
+            tool: "decidr".into(),
             project: Some("phase-b".into()),
             workers: 1,
             models: Default::default(),
@@ -49,7 +50,6 @@ pub fn options(root: &Temp, url: &str) -> Options {
             decidr: Default::default(),
         },
         model: "jev".into(),
-        provider: None,
         agent_role: "rust-developer".into(),
         timeout: Duration::from_secs(5),
         base_url: Some(url.into()),
@@ -286,4 +286,16 @@ pub fn rows(root: &Temp) -> Result<Vec<Value>, Box<dyn std::error::Error + Send 
         .lines()
         .map(|line| serde_json::from_str(line).map_err(Into::into))
         .collect()
+}
+
+pub fn run(options: Options, logger: &Arc<Logger>) -> Result<sc_agent::Run, sc_agent::Error> {
+    let mut run = sc_agent::Run::from_options(
+        options,
+        "decidr".into(),
+        Some(logger.clone()),
+        Arc::new(sc_agent::Cancel::default()),
+    )?;
+    run.wait = Box::new(no_wait);
+    run.keyring = Box::new(keyring);
+    Ok(run)
 }

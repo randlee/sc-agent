@@ -92,19 +92,19 @@ fn req_sag_0004_config_layers_sources_and_required_project() -> Test {
     }
     let env = vec![(OsString::from("SC_PROJECT"), OsString::from("environment"))];
     assert_eq!(
-        config(Some(&local), Some(&global), &env, Some("flag"))?
+        config("decidr", Some(&local), Some(&global), &env, Some("flag"))?
             .config
             .project_required()?,
         "flag"
     );
     assert_eq!(
-        config(Some(&local), Some(&global), &env, None)?
+        config("decidr", Some(&local), Some(&global), &env, None)?
             .config
             .project_required()?,
         "environment"
     );
     for (path, expected) in &places {
-        let loaded = config(Some(&local), Some(&global), &[], None)?;
+        let loaded = config("decidr", Some(&local), Some(&global), &[], None)?;
         assert_eq!(loaded.config.project_required()?, *expected);
         let resolved = loaded.rows;
         assert_eq!(
@@ -116,7 +116,7 @@ fn req_sag_0004_config_layers_sources_and_required_project() -> Test {
         );
         fs::remove_file(path)?;
     }
-    let empty = config(Some(&local), Some(&global), &[], None)?;
+    let empty = config("decidr", Some(&local), Some(&global), &[], None)?;
     assert_eq!(empty.config.workers, 8);
     let error = empty
         .config
@@ -151,7 +151,7 @@ fn req_sag_0004_config_injected_env_nested_keys_and_outside_git() -> Test {
         ("DECIDR_LAYA__PORT", "9000"),
     ]
     .map(|(k, v)| (k.into(), v.into()));
-    let loaded = config(None, Some(&root.0), &environment, None)?;
+    let loaded = config("decidr", None, Some(&root.0), &environment, None)?;
     assert_eq!(loaded.config.workers, 3);
     let runner = loaded
         .config
@@ -162,7 +162,7 @@ fn req_sag_0004_config_injected_env_nested_keys_and_outside_git() -> Test {
         (runner.host.as_str(), runner.port),
         ("example.invalid", 9000)
     );
-    let without_override = config(None, Some(&root.0), &[], None)?;
+    let without_override = config("decidr", None, Some(&root.0), &[], None)?;
     assert_eq!(without_override.config.workers, 8);
     assert!(without_override.config.project.is_none());
     assert_eq!(
@@ -170,7 +170,7 @@ fn req_sag_0004_config_injected_env_nested_keys_and_outside_git() -> Test {
         r#"{"project":"local","workers":2}"#
     );
     fs::write(root.0.join("decidr.json"), "not JSON")?;
-    let bad = config(None, Some(&root.0), &[], None)
+    let bad = config("decidr", None, Some(&root.0), &[], None)
         .err()
         .ok_or("bad config accepted")?;
     assert!(bad.to_string().contains("decidr.json"));
@@ -295,7 +295,7 @@ fn configured_models(
         root.0.join("sc-agent.json"),
         json!({"models": models}).to_string(),
     )?;
-    Ok(config(None, Some(&root.0), &[], None)?.config)
+    Ok(config("decidr", None, Some(&root.0), &[], None)?.config)
 }
 
 #[test]
@@ -414,14 +414,14 @@ fn adr_sag_0021_log_root_is_not_a_configuration_setting() -> Test {
     let root = Temp::new()?;
     let path = root.0.join("logs-from-env");
     let env = vec![("DECIDR_LOG_ROOT".into(), path.as_os_str().to_owned())];
-    let loaded = config(None, Some(&root.0), &env, None)?;
+    let loaded = config("decidr", None, Some(&root.0), &env, None)?;
     let rows = loaded.rows;
     assert!(rows.iter().all(|row| row["path"] != "log_root"));
     std::fs::write(
         root.0.join("decidr.json"),
         json!({"log_root": path}).to_string(),
     )?;
-    let failure = config(None, Some(&root.0), &env, None)
+    let failure = config("decidr", None, Some(&root.0), &env, None)
         .err()
         .ok_or("accepted log_root setting")?;
     assert!(failure.to_string().contains("log_root"));
@@ -437,7 +437,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
             "DECIDR_WORKERS".into(),
             value.to_string().trim_matches('"').into(),
         )];
-        let failure = config(None, Some(&root.0), &env, None)
+        let failure = config("decidr", None, Some(&root.0), &env, None)
             .err()
             .ok_or("accepted invalid workers")?
             .to_string();
@@ -445,7 +445,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
         assert!(failure.contains("workers"), "{failure}");
         let file = root.0.join("decidr.json");
         fs::write(&file, json!({"workers":value}).to_string())?;
-        let failure = config(None, Some(&root.0), &[], None)
+        let failure = config("decidr", None, Some(&root.0), &[], None)
             .err()
             .ok_or("accepted invalid workers file")?
             .to_string();
@@ -458,7 +458,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
     }
     let file = root.0.join("decidr.json");
     fs::write(&file, json!({"laya":{"host":"localhost"}}).to_string())?;
-    let failure = config(None, Some(&root.0), &[], None)
+    let failure = config("decidr", None, Some(&root.0), &[], None)
         .err()
         .ok_or("accepted partial runner")?
         .to_string();
@@ -472,7 +472,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
         json!({"laya":{"host":"localhost","port":9000}}).to_string(),
     )?;
     let env = vec![("DECIDR_LAYA__PORT".into(), "bad".into())];
-    let failure = config(None, Some(&root.0), &env, None)
+    let failure = config("decidr", None, Some(&root.0), &env, None)
         .err()
         .ok_or("accepted invalid port")?
         .to_string();
@@ -494,7 +494,7 @@ fn partial_runner_across_layers_names_missing_key_and_all_sources() -> Test {
         root.0.join("sc-agent.json"),
         json!({"laya":{"host":"remote"}}).to_string(),
     )?;
-    let failure = config(Some(&local), Some(&root.0), &[], None)
+    let failure = config("decidr", Some(&local), Some(&root.0), &[], None)
         .err()
         .ok_or("partial runner accepted")?
         .to_string();
@@ -527,7 +527,7 @@ fn config_home_and_file_acceptance_are_explicit_and_read_only() -> Test {
     for name in ["sc-agent.local.json", "sitr.json"] {
         fs::write(user.join(name), "invalid JSON must not be read")?;
     }
-    let loaded = config(None, None, &environment, None)?;
+    let loaded = config("decidr", None, None, &environment, None)?;
     assert_eq!(loaded.config.project_required()?, "relocated");
     assert_eq!(loaded.config.workers, 3);
     assert_eq!(loaded.files.len(), 3);
@@ -540,7 +540,7 @@ fn config_home_and_file_acceptance_are_explicit_and_read_only() -> Test {
         file.to_string_lossy().as_ref()
     );
     assert!(
-        config(None, Some(&root.0), &environment, None)?
+        config("decidr", None, Some(&root.0), &environment, None)?
             .config
             .project
             .is_none()
@@ -549,7 +549,7 @@ fn config_home_and_file_acceptance_are_explicit_and_read_only() -> Test {
         let path = user.join(name);
         let text = r#"{"laya":{"unknown":true}}"#;
         fs::write(&path, text)?;
-        let failure = config(None, None, &environment, None)
+        let failure = config("decidr", None, None, &environment, None)
             .err()
             .ok_or("unknown file key accepted")?;
         let failure = serde_json::to_value(failure)?;
@@ -574,7 +574,7 @@ fn environment_json_and_strings_share_file_validation() -> Test {
     for raw in ["1", "true", "null", "[1]", "{\"nested\":1}"] {
         fs::write(&file, json!({"laya":runner}).to_string())?;
         let env = vec![("DECIDR_LAYA__HOST".into(), raw.into())];
-        let failure = config(None, Some(&root.0), &env, None)
+        let failure = config("decidr", None, Some(&root.0), &env, None)
             .err()
             .ok_or("non-string env host accepted")?
             .to_string();
@@ -583,7 +583,7 @@ fn environment_json_and_strings_share_file_validation() -> Test {
         let mut invalid = runner.clone();
         invalid["host"] = serde_json::from_str(raw)?;
         fs::write(&file, json!({"laya":invalid}).to_string())?;
-        let failure = config(None, Some(&root.0), &[], None)
+        let failure = config("decidr", None, Some(&root.0), &[], None)
             .err()
             .ok_or("non-string file host accepted")?
             .to_string();
@@ -596,7 +596,7 @@ fn environment_json_and_strings_share_file_validation() -> Test {
     fs::write(&file, json!({"laya":runner}).to_string())?;
     for raw in ["plain", "\"1\""] {
         let env = vec![("DECIDR_LAYA__HOST".into(), raw.into())];
-        let loaded = config(None, Some(&root.0), &env, None)?;
+        let loaded = config("decidr", None, Some(&root.0), &env, None)?;
         assert_eq!(
             loaded.config.local["laya"].host,
             if raw == "plain" { "plain" } else { "1" }
@@ -608,7 +608,7 @@ fn environment_json_and_strings_share_file_validation() -> Test {
 #[test]
 fn max_sends_and_system_prompt_keys_load_default_and_report() -> Test {
     let root = Temp::new()?;
-    let defaults = config(None, Some(&root.0), &[], None)?;
+    let defaults = config("decidr", None, Some(&root.0), &[], None)?;
     assert_eq!(defaults.config.max_sends, 5);
     let row = |loaded: &sc_agent::Configuration, path: &str| {
         loaded.rows.iter().find(|row| row["path"] == path).cloned()
@@ -621,7 +621,7 @@ fn max_sends_and_system_prompt_keys_load_default_and_report() -> Test {
         root.0.join("sc-agent.json"),
         json!({"max_sends":3,"decidr":{"luna-system-prompt":"P"}}).to_string(),
     )?;
-    let loaded = config(None, Some(&root.0), &[], None)?;
+    let loaded = config("decidr", None, Some(&root.0), &[], None)?;
     assert_eq!(loaded.config.max_sends, 3);
     assert_eq!(loaded.config.decidr["luna-system-prompt"], "P");
     assert_eq!(
@@ -632,7 +632,7 @@ fn max_sends_and_system_prompt_keys_load_default_and_report() -> Test {
         root.0.join("sc-agent.json"),
         json!({"max_sends":0}).to_string(),
     )?;
-    let failure = config(None, Some(&root.0), &[], None)
+    let failure = config("decidr", None, Some(&root.0), &[], None)
         .err()
         .ok_or("zero accepted")?
         .to_string();
@@ -644,7 +644,7 @@ fn max_sends_and_system_prompt_keys_load_default_and_report() -> Test {
         root.0.join("sc-agent.json"),
         json!({"decidr":{"sonnet-system-prompt":"P"}}).to_string(),
     )?;
-    assert!(config(None, Some(&root.0), &[], None).is_err());
+    assert!(config("decidr", None, Some(&root.0), &[], None).is_err());
     Ok(())
 }
 
@@ -657,7 +657,7 @@ fn config_local_endpoints() -> Test {
         json!({"decider_4b":{"host":"h4","port":18001},"decider_2b":{"host":"h2","port":18000}})
             .to_string(),
     )?;
-    let loaded = config(None, Some(&root.0), &[], None)?;
+    let loaded = config("decidr", None, Some(&root.0), &[], None)?;
     let ports = loaded
         .config
         .local
@@ -685,7 +685,7 @@ fn config_local_endpoints() -> Test {
         &file,
         json!({"laya":{"host":"h","port":1,"model":"x"}}).to_string(),
     )?;
-    let failure = config(None, Some(&root.0), &[], None)
+    let failure = config("decidr", None, Some(&root.0), &[], None)
         .err()
         .ok_or("laya.model accepted")?
         .to_string();
@@ -845,5 +845,38 @@ fn configured_release_dates_keep_calendar_and_format_boundaries() -> Test {
             assert!(error.to_string().contains("config.invalid"), "{error}");
         }
     }
+    Ok(())
+}
+
+#[test]
+fn configuration_files_environment_and_missing_project_follow_the_tool_name() -> Test {
+    let root = Temp::new()?;
+    std::fs::write(
+        root.0.join("judge-jev.json"),
+        r#"{"project":"tool-file","workers":2}"#,
+    )?;
+    assert_eq!(
+        config("judge-jev", None, Some(&root.0), &[], None)?
+            .config
+            .project
+            .as_deref(),
+        Some("tool-file")
+    );
+    let env = vec![
+        ("SC_PROJECT".into(), "shared-env".into()),
+        ("JUDGE_JEV_WORKERS".into(), "3".into()),
+        ("DECIDR_WORKERS".into(), "5".into()),
+    ];
+    let loaded = config("judge-jev", None, Some(&root.0), &env, None)?.config;
+    assert_eq!(loaded.project.as_deref(), Some("shared-env"));
+    assert_eq!(loaded.workers, 3);
+    let absent = config("another-tool", None, Some(&root.0), &[], None)?.config;
+    let failure = absent
+        .project_required()
+        .err()
+        .ok_or("project was invented")?
+        .to_string();
+    assert!(failure.contains("SC_PROJECT"), "{failure}");
+    assert!(failure.contains("another-tool.json"), "{failure}");
     Ok(())
 }

@@ -1,5 +1,5 @@
 pub mod support;
-use sc_agent::{Cancel, host_holdoff, send};
+use sc_agent::host_holdoff;
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 use support::*;
@@ -13,25 +13,22 @@ fn req_sag_0601_holdoff_lock_is_shared_only_by_host_and_held_during_wait() -> Te
     assert!(Arc::ptr_eq(&host, &host_holdoff("127.0.0.1")?));
     let other = host_holdoff("independent.invalid")?;
     assert!(!Arc::ptr_eq(&host, &other));
-    let observations = Mutex::new(vec![]);
-    send(
-        &request(),
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &|_| {
-            let blocked = matches!(host.try_lock(), Err(std::sync::TryLockError::WouldBlock));
-            let independent = other.try_lock().is_ok();
-            if let Ok(mut seen) = observations.lock() {
-                seen.push((blocked, independent));
-            }
-            Ok(())
-        },
-        &keyring,
-    )?;
+    let observations = Arc::new(Mutex::new(vec![]));
+    let mut run = run(options(&root, &stub.url), &logger)?;
+    let recorded = observations.clone();
+    run.wait = Box::new(move |_| {
+        let blocked = matches!(host.try_lock(), Err(std::sync::TryLockError::WouldBlock));
+        let independent = other.try_lock().is_ok();
+        if let Ok(mut seen) = recorded.lock() {
+            seen.push((blocked, independent));
+        }
+        Ok(())
+    });
+    run.send(&request())?;
     assert_eq!(
         observations
-            .into_inner()
+            .lock()
+            .map(|v| v.clone())
             .map_err(|_| "holdoff recorder poisoned")?,
         vec![(true, true)]
     );
