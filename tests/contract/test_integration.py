@@ -73,19 +73,33 @@ class IntegrationExportTests(unittest.TestCase):
             if os.name == "posix":
                 self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
 
-    def test_export_requires_one_of_typesafe_anthropic_nous(self):
-        for keys, accepted in [({"NOUS_API_KEY": "n"}, True), ({"ANTHROPIC_API_KEY": "a"}, True),
-                               ({"OPENAI_API_KEY": "o", "OPENROUTER_API_KEY": "r"}, False)]:
-            with tempfile.TemporaryDirectory() as directory:
-                output = Path(directory) / "keys.env"
-                with patch.object(sys, "argv", [str(SCRIPT), "--export-env", str(output)]), \
-                     patch.object(runner, "key_for", side_effect=lambda provider, variable: keys.get(variable)):
-                    if accepted:
-                        self.assertEqual(runner.main(), 0)
-                        self.assertEqual(output.read_text(), "".join(f"{k}={v}\n" for k, v in keys.items()))
-                    else:
-                        with self.assertRaisesRegex(RuntimeError, "NOUS_API_KEY is required"):
-                            runner.main()
+    def test_export_with_only_an_anthropic_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "keys.env"
+            with patch.object(sys, "argv", [str(SCRIPT), "--export-env", str(output)]), \
+                 patch.object(runner, "key_for", side_effect=lambda provider, variable:
+                              "fixture-key" if provider == "anthropic" else None):
+                self.assertEqual(runner.main(), 0)
+            self.assertEqual(output.read_text(), "ANTHROPIC_API_KEY=fixture-key\n")
+
+    def test_export_refuses_before_writing_without_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "keys.env"
+            with patch.object(sys, "argv", [str(SCRIPT), "--export-env", str(output)]), \
+                 patch.object(runner, "key_for", return_value=None), \
+                 contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as stopped:
+                runner.main()
+            self.assertEqual(stopped.exception.code, 2)
+            self.assertFalse(output.exists())
+
+    def test_export_accepts_any_catalog_provider(self):
+        self.providers = [{"name":"reseller", "key":"BILLING_CREDENTIAL"}]
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "keys.env"
+            with patch.object(sys, "argv", [str(SCRIPT), "--export-env", str(output)]), \
+                 patch.object(runner, "key_for", return_value="fixture-key"):
+                self.assertEqual(runner.main(), 0)
+            self.assertEqual(output.read_text(), "BILLING_CREDENTIAL=fixture-key\n")
 
     def test_required_credential_names_come_from_the_catalog(self):
         self.providers[0]["key"] = "CUSTOM_TYPESAFE_CREDENTIAL"

@@ -36,3 +36,28 @@ fn req_sag_0004_0702_cli_accepts_project_role_timeout_and_batch_workers()
     }
     Ok(())
 }
+
+#[test]
+fn send_provider_flag_is_a_usage_error() {
+    assert!(
+        cli::Cli::try_parse_from([
+            "decidr",
+            "send",
+            "--agent-role",
+            "test",
+            "--provider",
+            "openai"
+        ])
+        .is_err()
+    );
+}
+#[test]
+fn local_timeout_default_is_120_seconds() -> Result<(), Box<dyn std::error::Error>> {
+    let parsed =
+        cli::Cli::try_parse_from(["decidr", "send", "--agent-role", "test", "--model", "laya"])?;
+    match parsed.command {
+        cli::Command::Send { timeout_secs, .. } => assert_eq!(timeout_secs, 120.0),
+        _ => return Err("send command not selected".into()),
+    }
+    Ok(())
+}
