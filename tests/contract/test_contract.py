@@ -93,6 +93,7 @@ class Isolated(unittest.TestCase):
         self.addCleanup(os.chdir, previous)
         environment = {"PATH": os.defpath, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
                        "GIT_CEILING_DIRECTORIES": str(Path(self.directory.name).parent.resolve()),
+                       "SC_AGENT_HOME": self.directory.name,
                        "DECIDR_LOG_ROOT": self.directory.name, "SITR_LOG_ROOT": self.directory.name,
                        "SC_LOG_ROOT": self.directory.name, "SC_COMPOSE_LOG_ROOT": self.directory.name}
         self.environment = patch.dict(os.environ, environment, clear=True)
