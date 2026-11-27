@@ -197,7 +197,8 @@ class RenderedWheelLoopback(unittest.TestCase):
                     def __enter__(self):
                         if entered.is_set():
                             contended.set()
-                        mutex.acquire()
+                        if not mutex.acquire(timeout=10):
+                            raise AssertionError("logger test lock acquisition timed out")
                     def __exit__(self, *_):
                         mutex.release()
                 def create(name, *, tool):
