@@ -913,7 +913,17 @@ class Cli(Isolated):
                                 f"received={received!r}; stdout={stdout!r}; stderr={stderr!r}"
                             )
                     finally:
-                        release.set()
+                        try:
+                            if process.poll() is None:
+                                process.kill()
+                                process.wait(timeout=5)
+                        finally:
+                            try:
+                                for pipe in (process.stdin, process.stdout, process.stderr):
+                                    if pipe is not None:
+                                        pipe.close()
+                            finally:
+                                release.set()
                 self.assertNotEqual(process.returncode, 0, stdout + stderr)
                 results = json.loads(stdout)
                 self.assertTrue(results["ok"], results)
