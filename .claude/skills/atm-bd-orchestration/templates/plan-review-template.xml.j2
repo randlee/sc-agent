@@ -1,6 +1,6 @@
 ---
 name: plan-review-task
-version: 3.11.0
+version: 3.12.0
 description: lead plan-review assignment for quality-mgr. task_id is the plan-review bead (<root>-plan-qa), which blocks every sprint container, so nothing is dispatched until the plan passes. The plan is the beads under the root; there is no plan PR. worktree_path is the absolute path of a checkout of integration_branch.
 format: xml
 required_variables:
@@ -36,7 +36,7 @@ metadata:
 {{ carry_forward | string | cdata_escape }}
   ]]></carry-forward>
 
-  <fix-verification-precedence><![CDATA[A plan review verifying carried findings is not a full plan review. Dispatch only each carried finding's filing reviewer (named on its line). No automatic req-qa/arch-qa, no full plan-scope-reviewer run; `ceremony-finding-screen` still screens the carried findings still open (step d). Lock scope to the carried findings and their original requirement; no sweep, no new findings. Report fixed/open/regressed for those findings. validate-plan (step b) still runs, like required CI. This rule overrides the broader round-1 instructions in steps c and e.]]></fix-verification-precedence>
+  <fix-verification-precedence><![CDATA[A plan review verifying carried findings is not a full plan review. Dispatch only each carried finding's filing reviewer (named on its line). A carried finding filed by an adversarial reviewer (`critical-plan-reviewer`, `ruthless-boundary-qa`, `rust-best-practices-agent`) is never re-checked by that reviewer: those run only on the first pass; `arch-qa` confirms that finding against its original text instead. No automatic req-qa/arch-qa, no full plan-scope-reviewer run; `ceremony-finding-screen` still screens the carried findings still open (step d). Lock scope to the carried findings and their original requirement; no sweep, no new findings. Report fixed/open/regressed for those findings. validate-plan (step b) still runs, like required CI. This rule overrides the broader round-1 instructions in steps c and e.]]></fix-verification-precedence>
 {% endif %}
   <workflow>
     <step id="a"><![CDATA[Check readiness, claim the bead, then start the review. If blocked, do not claim or start; refuse as in step f (`bead_state` `open`), its `reason_md` naming the exact blocker, the bead or agent that must move, and, for a blocker not yet a dependency, the edge `bd dep add {{ task_id | string | cdata_escape }} --blocked-by <blocker>`; never wait.]]></step>
