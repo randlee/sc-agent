@@ -35,6 +35,7 @@ pub fn logger(root: &Temp) -> Result<Arc<Logger>, Box<dyn std::error::Error + Se
 }
 pub fn options(root: &Temp, url: &str) -> Options {
     Options {
+        tool_version: "test".into(),
         environment: vec![
             ("TYPESAFE_API_KEY".into(), "test-secret".into()),
             ("ANTHROPIC_API_KEY".into(), "test-secret".into()),
@@ -44,6 +45,7 @@ pub fn options(root: &Temp, url: &str) -> Options {
             tool: "decidr".into(),
             project: Some("phase-b".into()),
             workers: 1,
+            cache: true,
             models: Default::default(),
             local: Default::default(),
             max_sends: 5,
@@ -284,14 +286,22 @@ pub fn rows(root: &Temp) -> Result<Vec<Value>, Box<dyn std::error::Error + Send 
         .join("sessions/github.com/randlee/sc-agent/rust-developer/phase-b/sessions.jsonl");
     fs::read_to_string(path)?
         .lines()
-        .map(|line| serde_json::from_str(line).map_err(Into::into))
+        .map(|line| {
+            serde_json::from_str::<Value>(line)
+                .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })
+                .and_then(|event| {
+                    event
+                        .get("fields")
+                        .cloned()
+                        .ok_or_else(|| "missing event fields".into())
+                })
+        })
         .collect()
 }
 
 pub fn run(options: Options, logger: &Arc<Logger>) -> Result<sc_agent::Run, sc_agent::Error> {
     let mut run = sc_agent::Run::from_options(
         options,
-        "decidr".into(),
         Some(logger.clone()),
         Arc::new(sc_agent::Cancel::default()),
     )?;

@@ -1,10 +1,9 @@
 pub mod support;
 use sc_agent::{
-    AnthropicCompat, Cancel, DEFAULT_SYSTEM_PROMPT, Decision, Jev, Llm, LlmRequest, OpenAiCompat,
-    Options, Route, Runner, result,
+    AnthropicCompat, Cancel, DEFAULT_SYSTEM_PROMPT, Decision, Exchange, Jev, Llm, LlmRequest,
+    OpenAiCompat, Options, Route, Runner, result,
 };
 use serde_json::{Value, json};
-use std::cell::Cell;
 use support::*;
 
 fn header<'a>(seen: &'a support::Request, name: &str) -> Option<&'a str> {
@@ -27,7 +26,7 @@ fn with_route<T>(
     run: impl Fn(&Route<'_>) -> T,
 ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
     let (provider, model) = pinned_model(provider, name)?;
-    let sends = Cell::new(0);
+    let exchange = Exchange::default();
     let route = Route {
         options,
         provider,
@@ -36,7 +35,7 @@ fn with_route<T>(
         cancel: &Cancel::default(),
         wait: &no_wait,
         keyring: &keyring,
-        sends: &sends,
+        exchange: &exchange,
     };
     Ok(run(&route))
 }
@@ -139,7 +138,7 @@ fn luna_and_haiku_send_the_default_then_the_configured_system_prompt() -> Test {
             let value = {
                 let run = run(opts.clone(), &logger)?;
 
-                run.send(&request())
+                run.send(&request(), Some(false))
             }?;
             assert_eq!(value["answers"], answer()["answers"]);
             let body = &stub.finish()?[0].body;
@@ -167,7 +166,7 @@ fn decide_over_an_llm_rejects_an_answer_of_the_wrong_type() -> Test {
     let failure = result({
         let run = run(opts.clone(), &logger)?;
 
-        run.send(&request())
+        run.send(&request(), Some(false))
     });
     assert_eq!(failure["error"]["id"], "decision.schema_mismatch");
     let _ = stub.finish()?;
@@ -186,7 +185,7 @@ fn max_sends_setting_limits_the_sends_of_one_request() -> Test {
     let failure = result({
         let run = run(opts.clone(), &logger)?;
 
-        run.send(&request())
+        run.send(&request(), Some(false))
     });
     assert_eq!(failure["error"]["id"], "http.provider_busy");
     assert_eq!(failure["error"]["attempts"], 2);
@@ -236,7 +235,7 @@ fn sent(root: &Temp, opts: &Options) -> Result<Value, sc_agent::Error> {
     let reply = {
         let run = run(opts.clone(), &logger)?;
 
-        run.send(&request())
+        run.send(&request(), Some(false))
     };
     logger
         .shutdown()
@@ -363,7 +362,7 @@ fn keyless_resolution_names_every_missing_key_and_redacts_the_used_one() -> Test
         let mut run = run(opts.clone(), &logger)?;
 
         run.keyring = Box::new(empty);
-        run.send(&request())
+        run.send(&request(), Some(false))
     }
     .err()
     .ok_or("sent without a key")?;
@@ -389,7 +388,7 @@ fn keyless_resolution_names_every_missing_key_and_redacts_the_used_one() -> Test
         let mut run = run(opts.clone(), &logger)?;
 
         run.keyring = Box::new(empty);
-        run.send(&request())
+        run.send(&request(), Some(false))
     }
     .err()
     .ok_or("401 accepted")?;
@@ -521,7 +520,7 @@ fn configurable_send_count_does_not_overflow_the_backoff() -> Test {
             Ok(())
         });
 
-        run.send(&request())
+        run.send(&request(), Some(false))
     });
     assert_eq!(failure["error"]["id"], "http.provider_busy");
     assert_eq!(failure["error"]["attempts"], 66);

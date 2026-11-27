@@ -17,7 +17,7 @@ def render_consumers(destination):
     rendered = []
     for client, sitr in (("plan-anchor", False), ("judge-jev", True)):
         variables = destination / f"{client}.json"
-        variables.write_text(json.dumps({"client_name": client, "sitr": sitr,
+        variables.write_text(json.dumps({"client_name": client, "tool_version": "1.0.0", "sitr": sitr,
                                          "sc_decidr_version": importlib.metadata.version("sc-decidr")}))
         output = destination / (client.replace("-", "_") + "_client.py")
         subprocess.run(["sc-compose", "render", "--root", str(template_root), "--file", "consumer.py.j2",
