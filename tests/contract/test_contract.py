@@ -98,6 +98,18 @@ class Wheel(Isolated):
             self.assertEqual(len(received), 1)
             self.assertEqual(self.error(run.send("not JSON"))["id"], "log.write")
 
+    def test_repeated_run_exit_reports_close_failure_to_unraisable_hook(self):
+        events = []
+        run = self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract",
+                           agent_role="contract", config_dir=self.directory.name)
+        with patch.object(sys, "unraisablehook", events.append):
+            self.assertFalse(run.__exit__(None, None, None))
+            self.assertFalse(run.__exit__(None, None, None))
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].object["ok"], False)
+        self.assertEqual(events[0].object["error"]["id"], "log.flush")
+        self.assertIn("log.flush", str(events[0].exc_value))
+
     def test_run_cancel_from_on_result_cancels_the_rest(self):
         with server([(200, {}, ANSWER)]) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY":"contract-secret"}):
             with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name,
