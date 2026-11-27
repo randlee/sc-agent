@@ -1,10 +1,10 @@
 # j-2 plan: the Run, on Rust, decidr and the wheel
 
-Base: sprint/j-1 @f8bb024a (gate 2404/2500). Line refs are file:line at that commit. Written by reading the code; the Rust parts were prototyped on this branch (see Budget).
+Base: sprint/j-1 @f8bb024a (gate 2404/2580). Line refs are file:line at that commit. Written by reading the code; the Rust parts were prototyped on this branch (see Budget).
 
 ## Goal
 
-Rand (ANC-008, ANC-010, ANC-011): "Related values are strategically grouped in one struct to remove repeated method parameters"; "any copy/paste was a big red flag"; "I expect the python api may allow more flexibility than cli, NOT less." Measurable: one `Run` struct replaces the send/batch parameter lists in Rust, decidr and the wheel; no PyCapsule, no `unsafe`, no string-keyed option table in crates/sc-agent-py; restructuring adds 0 net lines; phase total <= 2,404 (j-1 end) + new capability, and <= 2,500.
+Rand (ANC-008, ANC-010, ANC-011): "Related values are strategically grouped in one struct to remove repeated method parameters"; "any copy/paste was a big red flag"; "I expect the python api may allow more flexibility than cli, NOT less." Measurable: one `Run` struct replaces the send/batch parameter lists in Rust, decidr and the wheel; no PyCapsule, no `unsafe`, no string-keyed option table in crates/sc-agent-py; restructuring adds 0 net lines; phase total <= 2,404 (j-1 end) + new capability, and <= 2,580.
 
 Premise found in the code: j-1 @f8bb024a has no `Run`, no `Model`, no J1-13 compat block and no `configured` (j-1's `load` :1474 is that helper). The old j-2 bead names those; they are dropped, not planned.
 
@@ -187,7 +187,7 @@ Paths: default logger `<DECIDR_LOG_ROOT|~/.sc-agent>/logs/decidr.log.jsonl`; ses
 - Tests/fixtures of the removed API (ANC-003 style, deleted not skipped): `Cancel` use in test_contract/loopback, `provider=` cases, `opts.provider = Some(..)` in sending.rs:31 (selected by a `settings.models` entry instead).
 - Not deleted (j-1's): `model_with` and its `provider` argument (test seam of the table), Route, Decision/Llm.
 
-## Budget (rewrite.py counting; against 2,500 phase cap, base 2,404)
+## Budget (rewrite.py counting; against 2,580 phase cap, base 2,404)
 
 | | lines | basis |
 |---|---|---|
@@ -196,7 +196,7 @@ Paths: default logger `<DECIDR_LOG_ROOT|~/.sc-agent>/logs/decidr.log.jsonl`; ses
 | Restructure: PyO3 lib.rs 562 -> about 450 (module send/send_batch/Cancel/capsule/options/wait/lookup out, PyRun/PyLogger in) | about -110 | estimate, not yet built |
 | **Restructure net** | **0 counted** (rule 2: must be <= 0). Measured Rust half is +100 (+118 -18); it nets <= 0 only if the PyO3 port deletes >= 100 lines (estimate -110, unbuilt). If it does not, the dev stops and reports | |
 | New capability: `TYPESAFE` +1, `provider_keys` +5, `PyRun.sends_to` +3, `__enter__`/`__exit__` +6 | about +15 | estimate |
-| **Sprint total** | **about 2,419 / 2,500** (2,404 + new capability 15; restructure counted 0) | |
+| **Sprint total** | **about 2,419 / 2,580** (2,404 + new capability 15; restructure counted 0) | |
 Python (uncounted by the gate): __init__.py 28 -> about 9, stubs about +30, template net <= +4, integration.py net about 0. Docs uncapped. No per-function counts.
 
 ## Done checks
