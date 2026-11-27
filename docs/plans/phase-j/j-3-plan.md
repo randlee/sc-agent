@@ -40,7 +40,7 @@ impl Run {
     pub fn from_options(options: Options, logger: Option<Arc<Logger>>, cancel: Arc<Cancel>) -> Result<Self, Error>;
 }                                         // new, send, send_batch, close, provider, logger: j-2 signatures unchanged
 
-/// Per-call exchange state the wire code fills (replaces the `sends: &Cell<u32>` field of `Route`, lib.rs Route :1008).
+/// Per-call exchange state the wire code fills (replaces the `sends: &Cell<u32>` field of `Route`, lib.rs Route :978).
 #[derive(Default)]
 pub struct Exchange {
     pub sends: Cell<u32>,
@@ -50,15 +50,15 @@ pub struct Exchange {
 }
 pub struct Route<'a> { /* fields unchanged except */ pub exchange: &'a Exchange }   // `sends` removed
 
-/// The one session-log layout: <log_root>/sessions/<repo>/<agent_role>/<project>. Writer and reader both call it.
-pub fn session_dir(log_root: &Path, repo: &str, agent_role: &str, project: &str) -> PathBuf;
+/// The one session-log layout: <log_root>/sessions/<repo>/<agent_role>/<project>. Private: writer (Run::send) and reader (session_rows) are both in lib.rs.
+fn session_dir(log_root: &Path, repo: &str, agent_role: &str, project: &str) -> PathBuf;
 /// The one reader of the session log. Name of the log root and config files is `agent_role` (a generated client's role is its tool name, REQ-SAG-0003).
 /// Ok(object keyed by session_id -> row); a missing id is Err `session.not_found` naming the ids; `project` None resolves like a send.
 pub fn session_rows(ids: &[String], agent_role: &str, project: Option<&str>) -> Result<Value, Error>;
 
 // private (latitude inside bodies, shapes fixed):
-fn event(service: &ServiceName, action: &str, fields: Value) -> Result<LogEvent, Error>;     // `log` becomes logger.log(event(..)?)
-fn append(path: PathBuf, action: &str, fields: Value) -> Result<(), Error>;                 // JsonlFileSink::open(path, NEVER).write(&event) ; NEVER = RetainedLogPolicy with max bytes/age/files at their maxima
+fn event(service: &ServiceName, action: &str, fields: Value) -> Result<LogEvent, Error>;     // private; `pub fn log(logger, action, fields)` (lib.rs:889) keeps its public signature and only its body becomes logger.log(event(..)?)
+fn append(path: PathBuf, action: &str, fields: Value) -> Result<(), Error>;                 // JsonlFileSink::open(path, NEVER).write(&event) ; NEVER = RetainedLogPolicy{rotation_max_bytes: ByteCount::from_bytes(u64::MAX), rotation_max_files and retention_max_age at their maxima, rest default}; sc-observability 1.5.0 has no disable/no-rotation mode (RetainedLogPolicy fields are all required; RetentionMaxAge must be non-zero), so maxima are the only way and rotation can't trigger
 fn rows(path: &Path, keep: impl FnMut(&Value) -> bool) -> Result<Vec<Value>, Error>;        // unwraps each line's `fields`; skips an unparsable (partial) line; Err `session.unreadable` when the file exists and cannot be read
 fn sha(bytes: &[u8]) -> Result<String, Error>;                                               // shared by `digest` and the body hash
 ```
@@ -78,26 +78,26 @@ Per-call cache override is not planned: no record has one (ADR-SAG-0019 decision
 // crates/sc-agent-py/src/lib.rs (PyRun, as in j-2: never raises, stores the error envelope)
 // PyRun::new signature gains `tool_version=None, cache=None` (kwargs `arg::<String>` / `arg::<bool>` into RunArgs.tool_version/.cache; None tool/tool_version -> "")
 #[pymethods] impl PyRun { #[getter] fn run_id(&self) -> Option<String>; }   // Run.run_id.to_string(); None when creation failed
-#[pyfunction(signature=(session_ids=None, *extra, agent_role=None, project=None, general_log=None, **rest))]
+#[pyfunction(signature=(session_ids=None, *extra, agent_role=None, project=None, **rest))]
 fn session_rows(py: Python<'_>, session_ids: Option<&Bound<'_, PyAny>>, extra: &Bound<'_, PyTuple>, agent_role: Option<&Bound<'_, PyAny>>,
-                project: Option<&Bound<'_, PyAny>>, general_log: Option<&Bound<'_, PyAny>>, rest: Option<&Bound<'_, PyDict>>) -> Py<PyAny>;  // respond_value(.., |_| sc_agent::session_rows(..))
+                project: Option<&Bound<'_, PyAny>>, rest: Option<&Bound<'_, PyDict>>) -> Py<PyAny>;  // respond_value(None, agent_role, |_| sc_agent::session_rows(..)): errors go to the default logger named by the role
 // crates/decidr/src/main.rs: RunArgs { tool_version: env!("CARGO_PKG_VERSION").into(), cache: None, .. }
 ```
 j-2's "tool is required" `sc_agent_py.invalid_option` check in `PyRun::new` is dropped: the empty tool reaches `Run::new` and returns `decision.missing_tool` from one place. With `general_log`, the tool is still that logger's service name (j-2).
 
-Python (names added by j-3; `_native.pyi`/`__init__.py`/`__init__.pyi`): `Run.__init__(..., tool_version: str|None=None, cache: bool|None=None)`, `Run.run_id: str|None`, `session_rows(session_ids: Iterable[str], *, agent_role: str, project: str|None=None, general_log: Logger|None=None) -> Envelope`; `__all__` gains `"session_rows"`.
+Python (names added by j-3; `_native.pyi`/`__init__.py`/`__init__.pyi`): `Run.__init__(..., tool_version: str|None=None, cache: bool|None=None)`, `Run.run_id: str|None`, `session_rows(session_ids: Iterable[str], *, agent_role: str, project: str|None=None) -> Envelope`; `__all__` gains `"session_rows"`.
 
 ## Replaces (item -> existing construct; what is deleted with it)
 
 | item | replaces | deleted with it |
 |---|---|---|
-| `append`, `event`, `NEVER` policy | `static SESSION_APPEND` :1186 and the `OpenOptions` append block with `config.session` :1366-1394; the body of `log` :889-894 becomes `event` + `logger.log` | the static, the lock, the manual create_dir_all/writeln, `config.session` id |
-| `session_dir` | inline `.join("sessions").join(repo).join(role).join(project)` :1370-1374 | the inline join (reader and writer share the layout fn) |
+| `append`, `event`, `NEVER` policy | `static SESSION_APPEND` :1186 and the `OpenOptions` append block with `config.session` :1368-1392; the body of `log` :889-894 becomes `event` + `logger.log` | the static, the lock, the manual create_dir_all/writeln, `config.session` id |
+| `session_dir` (private) | inline `.join("sessions").join(repo).join(role).join(project)` :1370-1374 | the inline join (reader and writer share the layout fn) |
 | `sha` | the sc-sha call in `digest` :871-876 | the duplicate call |
-| `Exchange`, `Route.exchange` | `Route.sends: &Cell<u32>` and `let sends = Cell::new(0)` in `send` :1296 | the field and the local |
-| body bytes in `Route::post` | `post.send_json(&sending)` :1128, `body.clone()` :1127 | both |
+| `Exchange`, `Route.exchange` | `Route.sends: &Cell<u32>` and `let sends = Cell::new(0)` in `send` :1308 | the field and the local |
+| body bytes in `Route::post` | `post.send_json(&sending)` :1128, `body.clone()` :1126 | both |
 | row `json!` with schema/tool/provider/model/usage/sha | the row literal :1368 | the literal |
-| `decision.result {session_id, cached}` | `json!({"response":value})` :1398 | the `response` field |
+| `decision.result {session_id, cached}` | `json!({"response":value})` :1394 | the `response` field |
 | `Options.tool_version`, `Run::from_options` minus `tool` | j-2's separate `tool: String` parameter of `from_options` | the parameter and the matching `args.tool` pass-through |
 | `decision.missing_tool` | j-2's PyO3 "tool is required" `invalid_option` | that check |
 | category arm | `_ => "validation"` for `log.write`/`log.flush`/`log.shutdown` | - |
@@ -129,7 +129,7 @@ CLI: no new flag; `decidr send` writes `tool: "decidr"`, `tool_version` = the CL
 
 ## Deletions
 
-- crates/sc-agent/src/lib.rs: `static SESSION_APPEND` :1186; the append block :1366-1394 and `config.session`; the `sends` local :1296 and `Route.sends`; `send_json` :1128 and `body.clone()` :1127; the duplicate sc-sha call :871-876; the `response` field :1398.
+- crates/sc-agent/src/lib.rs: `static SESSION_APPEND` :1186; the append block :1368-1392 and `config.session`; the `sends` local :1308 and `Route.sends`; `send_json` :1128 and `body.clone()` :1126; the duplicate sc-sha call :871-876; the `response` field :1394.
 - crates/sc-agent-py (j-2 plan): the "tool is required" check.
 - Tests: `req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once` (sending.rs:599; replaced by `j3_session_write_failure`). `req_sag_0005_one_mib_request_is_recorded_whole` (records.rs:59) is replaced by `j3_largest_request_that_fits_is_recorded_whole` (owner, 2026-11-24, approved): the largest request whose enveloped row fits the sink's 1 MiB event cap is sent and its row read back whole; one byte larger is still sent whole to the model, writes no row and no link, and returns `log.session_write` (logged once).
 - Nothing else: `model_with`, Route fields, wire impls, batch code are untouched.
@@ -144,7 +144,7 @@ CLI: no new flag; `decidr send` writes `tool: "decidr"`, `tool_version` = the CL
 | New capability: `session_rows` + `rows` reader incl. `session.not_found` | about +25 | estimate |
 | New capability: PyO3 kwargs, `run_id` getter, `session_rows` pyfunction; decidr 2 | about +27 | estimate |
 | **Sprint** | restructure about -4, new capability about +127; **total about 2,468 / 2,500** (margin about 30) | not built |
-Over the cap the dev stops at the gate and reports the line; the first cut is the PyO3 `general_log` keyword on `session_rows`, then `session.not_found`. No per-function counts.
+Over the cap the dev stops at the gate and reports the line; the first cut is `session.not_found`. No per-function counts.
 
 ## Done checks
 
