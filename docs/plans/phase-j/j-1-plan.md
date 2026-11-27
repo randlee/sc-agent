@@ -606,7 +606,7 @@ Layout: crates/sc-agent/src/lib.rs (all of it, no providers.rs); scripts/integra
 
 ### Public surface
 O4-1..O4-6 and O5-1..O5-5 are the closed items O45-01..O45-11 of agt-j-1.group-dev (one copy), plus O45-12 (rows newest first, REQ-SAG-0102, restructure net 0).
-O45-11 (integration export) reads the keyed provider variables by regex over crates/sc-agent/src/lib.rs, with a literal subset in Python: an interim j-1 shortcut (NFR-SAG-0004). It is deferred explicitly to j-2, whose `sc_agent.provider_keys()` and `decidr models` replace the regex and the literal list; j-1 adds no provider-key accessor.
+O45-11 (integration export) reads provider names and credential-variable names from the existing `decidr models` output. The TypeSafe/Anthropic/Nous requirement uses the variable names in those owner rows; no Rust-source scraping or literal key list remains. j-1 adds no provider-key accessor.
 
 ### External contracts (examples)
 Config (global or local decidr.json / sc-agent.json, or env):
