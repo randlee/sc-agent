@@ -340,6 +340,17 @@ fn req_sag_0019_model_entry_accepts_released_date_and_rejects_malformed_date() -
     .err()
     .ok_or("invalid release date accepted")?;
     assert!(failure.to_string().contains("config.invalid"));
+
+    let failure = configured_models(json!({
+        "luna": {
+            "provider": "nous",
+            "id": "openai/gpt-6.1-luna",
+            "released": null
+        }
+    }))
+    .err()
+    .ok_or("null release date accepted")?;
+    assert!(failure.to_string().contains("config.invalid"));
     Ok(())
 }
 

@@ -164,8 +164,8 @@ fn deserialize_model_release<'de, D>(deserializer: D) -> Result<Option<String>, 
 where
     D: serde::Deserializer<'de>,
 {
-    let released = Option::<String>::deserialize(deserializer)?;
-    if let Some(date) = released.as_deref() {
+    let date = String::deserialize(deserializer)?;
+    {
         let mut parts = date.split('-');
         let year_part = parts.next().unwrap_or_default();
         let month_part = parts.next().unwrap_or_default();
@@ -199,7 +199,7 @@ where
             ));
         }
     }
-    Ok(released)
+    Ok(Some(date))
 }
 #[derive(Clone, Debug, Serialize)]
 pub struct Settings {
