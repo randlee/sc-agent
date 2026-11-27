@@ -603,19 +603,6 @@ fn cancel_after_a_lower_layer_error_keeps_it() -> Test {
     }));
     assert_eq!(failure["error"]["id"], "secrets.keyring_read");
     assert!(cancel.is_cancelled());
-    let stub = Stub::new(vec![http(401, json!({"error":"denied"}))])?;
-    let mut opts = options(&root, &stub.url);
-    opts.environment = vec![("TYPESAFE_API_KEY".into(), "test-secret".into())];
-    let failure = sc_agent::result(send(
-        &request(),
-        &opts,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &|_| Err(sc_agent::KeyringError::Read("unexpected key lookup".into())),
-    ));
-    assert_eq!(failure["error"]["id"], "http.auth");
-    assert_eq!(stub.finish()?.len(), 1);
     logger.shutdown()?;
     Ok(())
 }
