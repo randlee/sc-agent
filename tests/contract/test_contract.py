@@ -832,7 +832,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                     f"completed_during_holdoff={completed_during_holdoff!r}; sessions={sessions!r}")
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}), server(
                 [(429, {}, {}), (429, {}, {}), (200, {}, ANSWER)]) as (first, first_received), server(
-                [(200, {}, ANSWER)], host="::1") as (second, second_received):
+                [(200, {}, ANSWER)], host="localhost") as (second, second_received):
             worker = threading.Thread(target=lambda: results.append(send(first, sleep)), daemon=True)
             worker.start()
             try:
