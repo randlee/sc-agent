@@ -28,27 +28,21 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
         let stub = Stub::new(vec![http(200, raw)])?;
         let mut opts = options(&root, &stub.url);
         opts.model = model.into();
-        opts.settings.models.insert(
-            opts.model.clone(),
-            sc_agent::ModelEntry {
-                released: None,
-                provider: provider.into(),
-                id: pinned_model(provider, &opts.model)?.1,
-            },
-        );
+        opts.settings.values["models"][opts.model.clone()] = json!(sc_agent::ModelEntry {
+            released: None,
+            provider: provider.into(),
+            id: pinned_model(provider, &opts.model)?.1,
+        });
         opts.environment.extend([
             ("OPENROUTER_API_KEY".into(), "test-secret".into()),
             ("TOGETHER_API_KEY".into(), "test-secret".into()),
             ("NOUS_API_KEY".into(), "test-secret".into()),
         ]);
         if provider == "laya" {
-            opts.settings.local.insert(
-                "laya".into(),
-                Runner {
-                    host: "127.0.0.1".into(),
-                    port: 1,
-                },
-            );
+            opts.settings.values["laya"] = json!(Runner {
+                host: "127.0.0.1".into(),
+                port: 1,
+            });
         }
         let value = {
             let run = run(opts.clone(), &logger)?;
@@ -304,7 +298,7 @@ fn req_sag_0002_provider_error_over_ten_mib_is_preserved() -> Test {
     // Failure-only hang guard, not a throughput target; the response content decides success.
     // Keep the first transport failure rather than retrying an exhausted one-reply stub.
     opts.timeout = Duration::from_secs(600);
-    opts.settings.max_sends = 1;
+    opts.settings.values["max_sends"] = json!(1);
     let failure = sc_agent::result(run(opts, &logger)?.send(&request()));
     let stub_outcome = stub.finish();
     let error = &failure["error"];
@@ -420,7 +414,7 @@ fn req_sag_0011_precancel_never_reads_a_key_and_invalid_tags_write_no_row() -> T
         if invalid_role {
             bad.agent_role = "Phase B".into();
         } else {
-            bad.settings.project = Some("Phase B".into());
+            bad.settings.values["project"] = json!("Phase B");
         }
         let error = {
             let run = run(bad.clone(), &logger)?;
@@ -473,7 +467,7 @@ fn req_sag_0702_batch_continues_after_failed_item_and_preserves_positions() -> T
         answer()["answers"]
     );
     let mut invalid = options(&root, "http://127.0.0.1:1/v1");
-    invalid.settings.workers = 0;
+    invalid.settings.values["workers"] = json!(0);
     assert_eq!(
         sc_agent::result({
             let run = run(invalid.clone(), &logger)?;
@@ -493,7 +487,7 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
     let stub = Stub::new(vec![http(200, answer()), http(200, answer())])?;
     let mut opts = options(&root, &stub.url);
     opts.environment.clear();
-    opts.settings.workers = 2;
+    opts.settings.values["workers"] = json!(2);
     let (arrivals, arrived) = mpsc::channel();
     let (release, permits) = mpsc::channel();
     let permits = Mutex::new(permits);

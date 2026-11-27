@@ -1,9 +1,12 @@
 use sc_config::{
-    AppName, ConfigError, EnvSource, FileSource, Resolved, Slot, SourceKind, StandardContext,
-    StandardLayers,
+    AppName, ConfigError, EnvSource, FileSource, Resolved, Slot, Source, SourceKind,
+    StandardContext, StandardLayers, ValueSource,
 };
 use sc_observability::{LoggerConfig, ServiceName, v2::Logger};
-use serde::{Deserialize, Serialize, de::Error as DeError};
+use serde::{
+    Deserialize, Serialize,
+    de::{DeserializeOwned, Error as DeError},
+};
 use serde_json::{Value, json};
 use std::{
     cell::Cell,
@@ -185,15 +188,26 @@ fn deserialize_model_release<'de, D: serde::Deserializer<'de>>(
         .map_err(|e| DeError::custom(format!("released must be a YYYY-MM-DD date: {e}")))?;
     Ok(Some(date))
 }
+type Models = BTreeMap<String, ModelEntry>;
+type Prompts = BTreeMap<String, String>;
+/// A setting's accepted key, default and Rust type, declared together.
+pub struct Setting {
+    key: String,
+    default: Option<Value>,
+    validate: fn(&Value) -> Result<(), serde_json::Error>,
+}
+impl Setting {
+    pub fn new<T: DeserializeOwned>(key: impl Into<String>, default: Option<Value>) -> Self {
+        Self {
+            key: key.into(),
+            default,
+            validate: |v| T::deserialize(v).map(drop),
+        }
+    }
+}
 #[derive(Clone, Debug, Serialize)]
 pub struct Settings {
-    pub project: Option<String>,
-    pub workers: usize,
-    /// Configured model names; an entry wins over the built-in table.
-    pub models: BTreeMap<String, ModelEntry>,
-    pub local: BTreeMap<String, Runner>,
-    pub max_sends: u32,
-    pub decidr: BTreeMap<String, String>,
+    pub values: Value,
     #[serde(skip)]
     pub tool: String,
 }
@@ -216,28 +230,16 @@ fn missing_setting(tool: &str, path: &str) -> Error {
         ),
     )
 }
-fn setting<T: serde::de::DeserializeOwned>(
-    tool: &str,
-    resolved: &Resolved,
-    path: &str,
-    default: Value,
-) -> Result<T, Error> {
-    let selected = resolved
-        .value
-        .pointer(&format!("/{}", path.replace('.', "/")));
-    if selected.is_none()
-        && let Some((head, _)) = path.split_once('.')
-        && PROVIDERS.iter().any(|p| p.url.is_empty() && p.name == head)
-    {
-        return Err(invalid_setting(resolved, head, missing_setting(tool, path)));
-    }
-    serde_json::from_value(selected.cloned().unwrap_or(default))
-        .map_err(|e| invalid_setting(resolved, path, e))
+fn at<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
+    path.split('.').try_fold(value, |value, key| value.get(key))
 }
 impl Settings {
+    pub fn get<'a, T: Deserialize<'a>>(&'a self, path: &str) -> Result<T, Error> {
+        T::deserialize(at(&self.values, path).unwrap_or(&Value::Null))
+            .map_err(|e| error("config.invalid", format!("{path}: {e}")))
+    }
     pub fn project_required(&self) -> Result<&str, Error> {
-        self.project
-            .as_deref()
+        self.get::<Option<&str>>("project")?
             .filter(|s| !s.is_empty())
             .ok_or_else(|| {
                 error(
@@ -250,14 +252,6 @@ impl Settings {
             })
     }
 }
-const KEYS: &[&str] = &[
-    "project",
-    "workers",
-    "models",
-    "max_sends",
-    "decidr.luna-system-prompt",
-    "decidr.haiku-system-prompt",
-];
 pub struct Configuration {
     pub config: Settings,
     pub rows: Vec<Value>,
@@ -292,7 +286,24 @@ pub fn config(
     global: Option<&Path>,
     environment: &[(OsString, OsString)],
     project: Option<&str>,
+    extra: &[Setting],
 ) -> Result<Configuration, Error> {
+    let mut schema = vec![
+        Setting::new::<Option<String>>("project", Some(Value::Null)),
+        Setting::new::<usize>("workers", Some(json!(8))),
+        Setting::new::<Models>("models", Some(json!({}))),
+        Setting::new::<u32>("max_sends", Some(json!(5))),
+        Setting::new::<Prompts>("decidr", Some(json!({}))),
+        Setting::new::<String>("model", Some(json!("jev"))),
+        Setting::new::<f64>("timeout_secs", Some(json!(120))),
+    ];
+    for provider in PROVIDERS.iter().filter(|p| p.url.is_empty()) {
+        schema.extend([
+            Setting::new::<String>(format!("{}.host", provider.name), None),
+            Setting::new::<u16>(format!("{}.port", provider.name), None),
+        ]);
+    }
+    let schema = schema.iter().chain(extra).collect::<Vec<_>>();
     let env_prefix = prefix(tool);
     let variables = environment
         .iter()
@@ -307,13 +318,6 @@ pub fn config(
         })
         .cloned()
         .collect();
-    let mut keys = KEYS.iter().map(|key| key.to_string()).collect::<Vec<_>>();
-    keys.extend(
-        PROVIDERS
-            .iter()
-            .filter(|p| p.url.is_empty())
-            .flat_map(|p| ["host", "port"].map(|key| format!("{}.{key}", p.name))),
-    );
     let global = global
         .map(Path::to_path_buf)
         .or_else(|| {
@@ -323,12 +327,16 @@ pub fn config(
                 .map(|(_, value)| PathBuf::from(value))
         })
         .map_or_else(home_root, Ok)?;
-    let context = StandardContext::new(
-        AppName::new("sc-agent").map_err(config_error)?,
-        vec![],
-        vec![],
-    );
-    let mut layers = StandardLayers::new(context).defaults(json!({"workers":8,"max_sends":5}));
+    let app = AppName::new("sc-agent").map_err(config_error)?;
+    let mut layers = StandardLayers::new(StandardContext::new(app, vec![], vec![]));
+    for Setting { key, default, .. } in &schema {
+        if let Some(value) = default {
+            let keys = key.rsplit('.');
+            let value = keys.fold(value.clone(), |value, key| json!({key:value}));
+            let source = ValueSource::new(Source::default("default"), value);
+            layers = layers.insert(Slot::Defaults, source);
+        }
+    }
     let mut files = Vec::new();
     for (slot, folder) in [(Slot::User, Some(global.as_path())), (Slot::Local, local)] {
         if let Some(folder) = folder {
@@ -343,7 +351,7 @@ pub fn config(
                     slot,
                     FileSource::new(path)
                         .optional()
-                        .accepts(keys.iter().map(|key| key.split('.').collect::<Vec<_>>())),
+                        .accepts(schema.iter().map(|d| d.key.split('.').collect::<Vec<_>>())),
                 );
             }
         }
@@ -359,58 +367,45 @@ pub fn config(
         .flags(flags)
         .resolve()
         .map_err(config_error)?;
-    let mut local = BTreeMap::new();
-    for name in PROVIDERS
-        .iter()
-        .filter(|p| p.url.is_empty())
-        .map(|p| p.name)
-    {
-        if resolved.value.get(name).is_some_and(Value::is_object) {
-            let host = setting(tool, &resolved, &format!("{name}.host"), Value::Null)?;
-            let port = setting(tool, &resolved, &format!("{name}.port"), Value::Null)?;
-            local.insert(name.into(), Runner { host, port });
+    for declaration in &schema {
+        let path = &declaration.key;
+        if let Some(value) = at(&resolved.value, path) {
+            (declaration.validate)(value).map_err(|e| invalid_setting(&resolved, path, e))?;
+        } else if let Some((parent, _)) = path.rsplit_once('.')
+            && at(&resolved.value, parent).is_some()
+        {
+            let failure = missing_setting(tool, path);
+            return Err(invalid_setting(&resolved, parent, failure));
         }
     }
     let config = Settings {
-        project: setting(tool, &resolved, "project", Value::Null)?,
-        workers: setting(tool, &resolved, "workers", json!(8))?,
-        models: setting(tool, &resolved, "models", json!({}))?,
-        local,
-        max_sends: setting(tool, &resolved, "max_sends", json!(5))?,
-        decidr: setting(tool, &resolved, "decidr", json!({}))?,
+        values: resolved.value.clone(),
         tool: tool.into(),
     };
-    workers(config.workers)
+    workers(config.get::<usize>("workers")?)
         .map_err(|_| invalid_setting(&resolved, "workers", "must be positive"))?;
-    if config.max_sends == 0 {
+    if config.get::<u32>("max_sends")? == 0 {
         return Err(invalid_setting(&resolved, "max_sends", "must be positive"));
     }
-    for entry in config.models.values() {
+    Duration::try_from_secs_f64(config.get("timeout_secs")?)
+        .map_err(|e| invalid_setting(&resolved, "timeout_secs", e))?;
+    for entry in config.get::<Models>("models")?.values() {
         provider_named(&entry.provider)?;
     }
-    let provenance = resolved.rows();
-    let rows = keys
-        .iter()
-        .map(|key| {
-            let row = provenance.iter().find(|row| row.path.join(".") == *key);
-            let value = row.map_or_else(
-                || "unset".into(),
-                |row| {
-                    row.value
-                        .as_str()
-                        .map(str::to_owned)
-                        .unwrap_or_else(|| row.value.to_string())
-                },
-            );
-            let source = row.map_or_else(
-                || "default".into(),
-                |row| match row.source.kind {
-                    SourceKind::Default => "default".into(),
-                    SourceKind::Flag => "--project".into(),
-                    _ => row.source.name.clone(),
-                },
-            );
-            json!({"path":key,"value":value,"source":source})
+    let rows = resolved
+        .rows()
+        .into_iter()
+        .map(|row| {
+            let source = match row.source.kind {
+                SourceKind::Flag => "--project".into(),
+                _ => row.source.name,
+            };
+            let value = match row.value {
+                Value::Null => "unset".into(),
+                Value::String(text) => text,
+                other => other.to_string(),
+            };
+            json!({"path":row.path.join("."),"value":value,"source":source})
         })
         .collect();
     files.reverse();
@@ -554,12 +549,7 @@ mod resolve_test {
         let options = Options {
             environment: vec![("ANTHROPIC_API_KEY".into(), "held".into())],
             settings: Settings {
-                project: None,
-                workers: 1,
-                models: BTreeMap::new(),
-                local: BTreeMap::new(),
-                max_sends: 1,
-                decidr: BTreeMap::new(),
+                values: json!({}),
                 tool: String::new(),
             },
             model: String::new(),
@@ -883,7 +873,7 @@ fn provider_named(name: &str) -> Result<&'static Provider, Error> {
 /// Every provider row that serves `name`, newest release first, equal dates in table order.
 pub fn candidates(
     name: &str,
-    configured: &BTreeMap<String, ModelEntry>,
+    configured: &Models,
 ) -> Result<Vec<(&'static Provider, String)>, Error> {
     if let Some(entry) = configured.get(name) {
         let p = provider_named(&entry.provider)?;
@@ -967,7 +957,7 @@ pub enum Answer {
     Score {
         score: f64,
         confidence: f64,
-        legend: BTreeMap<String, String>,
+        legend: Prompts,
         probabilities: BTreeMap<String, f64>,
     },
     Noul {
@@ -1179,7 +1169,7 @@ pub struct Jev<'a>(pub &'a Route<'a>);
 pub struct OpenAiCompat<'a>(pub &'a Route<'a>);
 pub struct AnthropicCompat<'a>(pub &'a Route<'a>);
 fn ask(llm: &impl Llm, route: &Route<'_>, req: &DecisionRequest) -> Result<DecisionResult, Error> {
-    let decidr = &route.options.settings.decidr;
+    let decidr = route.options.settings.get::<Prompts>("decidr")?;
     let short = route
         .provider
         .models
@@ -1312,7 +1302,8 @@ impl Route<'_> {
             .map_err(|e| error("decision.response_parse", format!("{e}: {text}")))
     }
     fn post(&self, path: &str, auth: Auth, body: &Value) -> Result<Value, Error> {
-        let (cancel, provider, max) = (self.cancel, self.provider, self.options.settings.max_sends);
+        let (cancel, provider) = (self.cancel, self.provider);
+        let max = self.options.settings.get::<u32>("max_sends")?;
         let url = format!("{}/{path}", self.base.trim_end_matches('/'));
         let uri = url
             .parse::<ureq::http::Uri>()
@@ -1489,16 +1480,20 @@ impl Run {
             args.project.as_deref(),
         )?;
         let mut settings = loaded.config;
-        if let Some(count) = args.workers {
-            settings.workers = workers(count)?;
+        if let Some(count) = args.workers
+            && let Some(value) = settings.values.get_mut("workers")
+        {
+            *value = json!(workers(count)?);
         }
         let options = Options {
             environment,
-            settings,
-            model: args.model.unwrap_or_else(|| "jev".into()),
+            model: args.model.unwrap_or(settings.get("model")?),
             agent_role: args.agent_role,
-            timeout: Duration::try_from_secs_f64(args.timeout_secs.unwrap_or(120.0))
-                .map_err(|e| error("decidr.invalid_request_timeout", e))?,
+            timeout: Duration::try_from_secs_f64(
+                args.timeout_secs.unwrap_or(settings.get("timeout_secs")?),
+            )
+            .map_err(|e| error("decidr.invalid_request_timeout", e))?,
+            settings,
             base_url: args.base_url,
             root,
             log_root: log_root(&args.tool)?,
@@ -1511,7 +1506,7 @@ impl Run {
         logger: Option<Arc<Logger>>,
         cancel: Arc<Cancel>,
     ) -> Result<Self, Error> {
-        let found = candidates(&options.model, &options.settings.models)?;
+        let found = candidates(&options.model, &options.settings.get("models")?)?;
         let owned = logger.is_none();
         let logger = match logger {
             Some(logger) => logger,
@@ -1576,7 +1571,7 @@ impl Run {
                 model,
                 key,
             } = self.resolve()?;
-            let base = match options.settings.local.get(provider.name) {
+            let base = match options.settings.get::<Option<Runner>>(provider.name)? {
                 _ if !provider.url.is_empty() => provider.url.into(),
                 Some(runner) => format!("http://{}:{}/v1", runner.host, runner.port),
                 None => {
@@ -1677,11 +1672,11 @@ impl Run {
         requests: &[Value],
         on_result: &(dyn Fn(usize, &Value) + Sync),
     ) -> Result<Value, Error> {
-        workers(self.options.settings.workers)?;
+        let workers = workers(self.options.settings.get::<usize>("workers")?)?;
         let next = std::sync::atomic::AtomicUsize::new(0);
         let (sender, receiver) = std::sync::mpsc::channel();
         Ok(std::thread::scope(|scope| {
-            for _ in 0..self.options.settings.workers.min(requests.len()) {
+            for _ in 0..workers.min(requests.len()) {
                 let sender = sender.clone();
                 let next = &next;
                 scope.spawn(move || {
@@ -1776,7 +1771,7 @@ pub fn load(tool: &str, config_dir: Option<&Path>, project: Option<&str>) -> Res
     let local = root.join(".sc/sc-agent");
     let local = root.join(".git").exists().then_some(local.as_path());
     Ok((
-        config(tool, local, config_dir, &environment, project)?,
+        config(tool, local, config_dir, &environment, project, &[])?,
         root,
         repo,
         environment,
@@ -1803,7 +1798,7 @@ pub fn model_catalog(
         let Some(models) = provider.get_mut("models").and_then(Value::as_array_mut) else {
             continue;
         };
-        for (alias, entry) in &configuration.config.models {
+        for (alias, entry) in configuration.config.get::<Models>("models")? {
             if entry.provider == name {
                 models.push(json!([alias, entry.id, entry.released]));
             }
@@ -1969,7 +1964,7 @@ pub mod route_tests {
             ..Default::default()
         };
         let run = Run::new(args, Some(logger.clone()), Arc::new(Cancel::default()))?;
-        assert_eq!(run.options.settings.workers, 2);
+        assert_eq!(run.options.settings.get::<usize>("workers")?, 2);
         let (provider, model) = model_with("jev", &BTreeMap::new())?;
         let sends = Cell::new(0);
         for _ in 0..2 {
@@ -1991,13 +1986,13 @@ pub mod route_tests {
             );
         }
         let defaults = options(&root, "http://127.0.0.1:1/v1");
-        let configured = defaults.settings.workers;
+        let configured = defaults.settings.get::<usize>("workers")?;
         let next = self::super::Run::from_options(
             defaults,
             Some(logger.clone()),
             Arc::new(Cancel::default()),
         )?;
-        assert_eq!(next.options.settings.workers, configured);
+        assert_eq!(next.options.settings.get::<usize>("workers")?, configured);
         assert_eq!(next.options.timeout, Duration::from_secs(5));
         logger.shutdown()?;
         Ok(())

@@ -136,7 +136,7 @@ fn luna_and_haiku_send_the_default_then_the_configured_system_prompt() -> Test {
             let mut opts = options(&root, &stub.url);
             opts.model = model.into();
             if let Some(prompt) = configured {
-                opts.settings.decidr.insert(text.into(), prompt.into());
+                opts.settings.values["decidr"][text] = json!(prompt);
             }
             let value = {
                 let run = run(opts.clone(), &logger)?;
@@ -184,7 +184,7 @@ fn max_sends_setting_limits_the_sends_of_one_request() -> Test {
     let busy = || http(502, json!({"error":"busy"}));
     let stub = Stub::new(vec![busy(), busy()])?;
     let mut opts = options(&root, &stub.url);
-    opts.settings.max_sends = 2;
+    opts.settings.values["max_sends"] = json!(2);
     let failure = result({
         let run = run(opts.clone(), &logger)?;
 
@@ -258,7 +258,7 @@ fn local_endpoints() -> Test {
         let mut opts = options(&root, "");
         opts.base_url = None;
         opts.model = model.into();
-        opts.settings.local.insert(name.into(), runner(&stub)?);
+        opts.settings.values[name] = json!(runner(&stub)?);
         sent(&root, &opts)?;
         let seen = stub.finish()?;
         assert_eq!(seen[0].path, "/v1/systemone");
@@ -270,13 +270,10 @@ fn local_endpoints() -> Test {
     let root = Temp::new()?;
     let mut opts = options(&root, "");
     opts.model = "decider-2b-v11".into();
-    opts.settings.local.insert(
-        "decider_4b".into(),
-        Runner {
-            host: "h".into(),
-            port: 1,
-        },
-    );
+    opts.settings.values["decider_4b"] = json!(Runner {
+        host: "h".into(),
+        port: 1,
+    });
     let failure = sent(&root, &opts).err().ok_or("unset runner sent")?;
     let failure = serde_json::to_value(failure)?;
     assert_eq!(failure["id"], "config.missing_setting");
@@ -466,17 +463,12 @@ fn system_prompt_override_by_full_id() -> Test {
         let stub = Stub::new(vec![http(200, raw)])?;
         let mut opts = options(&root, &stub.url);
         opts.model = model.into();
-        opts.settings.models.insert(
-            opts.model.clone(),
-            sc_agent::ModelEntry {
-                released: None,
-                provider: provider.into(),
-                id: pinned_model(provider, &opts.model)?.1,
-            },
-        );
-        opts.settings
-            .decidr
-            .insert(key.into(), "full-id prompt".into());
+        opts.settings.values["models"][opts.model.clone()] = json!(sc_agent::ModelEntry {
+            released: None,
+            provider: provider.into(),
+            id: pinned_model(provider, &opts.model)?.1,
+        });
+        opts.settings.values["decidr"][key] = json!("full-id prompt");
         assert_eq!(sent(&root, &opts)?["answers"], answer()["answers"]);
         let seen = stub.finish()?;
         assert_eq!(seen[0].body.pointer(at), Some(&json!("full-id prompt")));
@@ -489,7 +481,7 @@ fn body_read_failure_is_resent() -> Test {
     let root = Temp::new()?;
     let stub = Stub::new(vec![Reply::Truncated, Reply::Truncated])?;
     let mut opts = options(&root, &stub.url);
-    opts.settings.max_sends = 2;
+    opts.settings.values["max_sends"] = json!(2);
     let failure = result(sent(&root, &opts));
     assert_eq!(failure["error"]["id"], "http.network");
     assert_eq!(failure["error"]["attempts"], 2);
@@ -510,7 +502,7 @@ fn configurable_send_count_does_not_overflow_the_backoff() -> Test {
             .collect(),
     )?;
     let mut opts = options(&root, &stub.url);
-    opts.settings.max_sends = 66;
+    opts.settings.values["max_sends"] = json!(66);
     let waits = std::sync::Arc::new(Mutex::new(Vec::new()));
     let failure = result({
         let mut run = run(opts.clone(), &logger)?;
@@ -548,7 +540,7 @@ fn redirect_never_forwards_the_api_key_to_another_endpoint() -> Test {
     )])?;
     let source = Stub::new(vec![Reply::Redirect(target.url.clone())])?;
     let mut opts = options(&root, &source.url);
-    opts.settings.max_sends = 1;
+    opts.settings.values["max_sends"] = json!(1);
     let outcome = with_route(&opts, ("anthropic", "haiku"), &source.url, |route| {
         AnthropicCompat(route).call(&llm_request())
     })?;
@@ -620,5 +612,34 @@ fn llm_decision_backends_reject_answers_outside_the_requested_schema() -> Test {
 fn stub_shutdown_wakes_a_worker_with_unserved_replies() -> Test {
     let stub = Stub::new(vec![http(200, answer()), http(200, answer())])?;
     assert!(stub.finish()?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn configured_model_prompt_reaches_the_provider() -> Test {
+    for model in ["custom-alias", "custom.full/id"] {
+        let root = Temp::new()?;
+        let raw = json!({"choices":[{"message":{"content":answer().to_string()}}]});
+        let stub = Stub::new(vec![http(200, raw)])?;
+        let mut opts = single_reply_options(&root, &stub.url);
+        std::fs::write(
+            root.0.join("decidr.json"),
+            json!({
+                "project":"phase-b", "max_sends":1,
+                "models":{model:{"provider":"openai","id":"custom-wire-id"}},
+                "decidr":{format!("{model}-system-prompt"):"configured instruction"}
+            })
+            .to_string(),
+        )?;
+        opts.settings = sc_agent::config("decidr", None, Some(&root.0), &[], None, &[])?.config;
+        opts.model = model.into();
+        assert_eq!(sent(&root, &opts)?["answers"], answer()["answers"]);
+        let seen = stub.finish()?;
+        assert_eq!(seen[0].body["model"], "custom-wire-id");
+        assert_eq!(
+            seen[0].body["messages"][0]["content"],
+            "configured instruction"
+        );
+    }
     Ok(())
 }

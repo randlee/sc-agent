@@ -92,19 +92,26 @@ fn req_sag_0004_config_layers_sources_and_required_project() -> Test {
     }
     let env = vec![(OsString::from("SC_PROJECT"), OsString::from("environment"))];
     assert_eq!(
-        config("decidr", Some(&local), Some(&global), &env, Some("flag"))?
-            .config
-            .project_required()?,
+        config(
+            "decidr",
+            Some(&local),
+            Some(&global),
+            &env,
+            Some("flag"),
+            &[]
+        )?
+        .config
+        .project_required()?,
         "flag"
     );
     assert_eq!(
-        config("decidr", Some(&local), Some(&global), &env, None)?
+        config("decidr", Some(&local), Some(&global), &env, None, &[])?
             .config
             .project_required()?,
         "environment"
     );
     for (path, expected) in &places {
-        let loaded = config("decidr", Some(&local), Some(&global), &[], None)?;
+        let loaded = config("decidr", Some(&local), Some(&global), &[], None, &[])?;
         assert_eq!(loaded.config.project_required()?, *expected);
         let resolved = loaded.rows;
         assert_eq!(
@@ -116,8 +123,8 @@ fn req_sag_0004_config_layers_sources_and_required_project() -> Test {
         );
         fs::remove_file(path)?;
     }
-    let empty = config("decidr", Some(&local), Some(&global), &[], None)?;
-    assert_eq!(empty.config.workers, 8);
+    let empty = config("decidr", Some(&local), Some(&global), &[], None, &[])?;
+    assert_eq!(empty.config.get::<usize>("workers")?, 8);
     let error = empty
         .config
         .project_required()
@@ -151,26 +158,27 @@ fn req_sag_0004_config_injected_env_nested_keys_and_outside_git() -> Test {
         ("DECIDR_LAYA__PORT", "9000"),
     ]
     .map(|(k, v)| (k.into(), v.into()));
-    let loaded = config("decidr", None, Some(&root.0), &environment, None)?;
-    assert_eq!(loaded.config.workers, 3);
-    let runner = loaded
-        .config
-        .local
-        .get("laya")
-        .ok_or("runner not decoded")?;
+    let loaded = config("decidr", None, Some(&root.0), &environment, None, &[])?;
+    assert_eq!(loaded.config.get::<usize>("workers")?, 3);
+    let runner = loaded.config.get::<sc_agent::Runner>("laya")?;
     assert_eq!(
         (runner.host.as_str(), runner.port),
         ("example.invalid", 9000)
     );
-    let without_override = config("decidr", None, Some(&root.0), &[], None)?;
-    assert_eq!(without_override.config.workers, 8);
-    assert!(without_override.config.project.is_none());
+    let without_override = config("decidr", None, Some(&root.0), &[], None, &[])?;
+    assert_eq!(without_override.config.get::<usize>("workers")?, 8);
+    assert!(
+        without_override
+            .config
+            .get::<Option<String>>("project")?
+            .is_none()
+    );
     assert_eq!(
         fs::read_to_string(local.join("decidr.json"))?,
         r#"{"project":"local","workers":2}"#
     );
     fs::write(root.0.join("decidr.json"), "not JSON")?;
-    let bad = config("decidr", None, Some(&root.0), &[], None)
+    let bad = config("decidr", None, Some(&root.0), &[], None, &[])
         .err()
         .ok_or("bad config accepted")?;
     assert!(bad.to_string().contains("decidr.json"));
@@ -325,21 +333,21 @@ fn configured_models(
         root.0.join("sc-agent.json"),
         json!({"models": models}).to_string(),
     )?;
-    Ok(config("decidr", None, Some(&root.0), &[], None)?.config)
+    Ok(config("decidr", None, Some(&root.0), &[], None, &[])?.config)
 }
 
 #[test]
 fn req_sag_0101_configured_models_override_and_extend_the_built_in_table() -> Test {
     let none = configured_models(json!({}))?;
-    let (provider, id) = model_with("jev", &none.models)?;
+    let (provider, id) = model_with("jev", &none.get("models")?)?;
     assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-latest"));
     let pinned = configured_models(json!({
         "jev": {"provider": "typesafe", "id": "jev-1.14.0"},
         "myjev": {"provider": "typesafe", "id": "jev-next"}
     }))?;
-    let (provider, id) = model_with("jev", &pinned.models)?;
+    let (provider, id) = model_with("jev", &pinned.get("models")?)?;
     assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-1.14.0"));
-    let (provider, id) = model_with("myjev", &pinned.models)?;
+    let (provider, id) = model_with("myjev", &pinned.get("models")?)?;
     assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-next"));
     Ok(())
 }
@@ -353,10 +361,9 @@ fn req_sag_0019_model_entry_accepts_released_date_and_rejects_malformed_date() -
             "released": "2026-11-20"
         }
     }))?;
-    let model = configured
-        .models
-        .get("luna")
-        .ok_or("missing configured luna")?;
+    let models =
+        configured.get::<std::collections::BTreeMap<String, sc_agent::ModelEntry>>("models")?;
+    let model = models.get("luna").ok_or("missing configured luna")?;
     assert_eq!(model.provider, "nous");
     assert_eq!(model.id, "openai/gpt-6.1-luna");
     assert_eq!(model.released.as_deref(), Some("2026-11-20"));
@@ -474,14 +481,14 @@ fn adr_sag_0021_log_root_is_not_a_configuration_setting() -> Test {
     let root = Temp::new()?;
     let path = root.0.join("logs-from-env");
     let env = vec![("DECIDR_LOG_ROOT".into(), path.as_os_str().to_owned())];
-    let loaded = config("decidr", None, Some(&root.0), &env, None)?;
+    let loaded = config("decidr", None, Some(&root.0), &env, None, &[])?;
     let rows = loaded.rows;
     assert!(rows.iter().all(|row| row["path"] != "log_root"));
     std::fs::write(
         root.0.join("decidr.json"),
         json!({"log_root": path}).to_string(),
     )?;
-    let failure = config("decidr", None, Some(&root.0), &env, None)
+    let failure = config("decidr", None, Some(&root.0), &env, None, &[])
         .err()
         .ok_or("accepted log_root setting")?;
     assert!(failure.to_string().contains("log_root"));
@@ -497,7 +504,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
             "DECIDR_WORKERS".into(),
             value.to_string().trim_matches('"').into(),
         )];
-        let failure = config("decidr", None, Some(&root.0), &env, None)
+        let failure = config("decidr", None, Some(&root.0), &env, None, &[])
             .err()
             .ok_or("accepted invalid workers")?
             .to_string();
@@ -505,7 +512,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
         assert!(failure.contains("workers"), "{failure}");
         let file = root.0.join("decidr.json");
         fs::write(&file, json!({"workers":value}).to_string())?;
-        let failure = config("decidr", None, Some(&root.0), &[], None)
+        let failure = config("decidr", None, Some(&root.0), &[], None, &[])
             .err()
             .ok_or("accepted invalid workers file")?
             .to_string();
@@ -518,7 +525,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
     }
     let file = root.0.join("decidr.json");
     fs::write(&file, json!({"laya":{"host":"localhost"}}).to_string())?;
-    let failure = config("decidr", None, Some(&root.0), &[], None)
+    let failure = config("decidr", None, Some(&root.0), &[], None, &[])
         .err()
         .ok_or("accepted partial runner")?
         .to_string();
@@ -532,7 +539,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
         json!({"laya":{"host":"localhost","port":9000}}).to_string(),
     )?;
     let env = vec![("DECIDR_LAYA__PORT".into(), "bad".into())];
-    let failure = config("decidr", None, Some(&root.0), &env, None)
+    let failure = config("decidr", None, Some(&root.0), &env, None, &[])
         .err()
         .ok_or("accepted invalid port")?
         .to_string();
@@ -554,7 +561,7 @@ fn partial_runner_across_layers_names_missing_key_and_all_sources() -> Test {
         root.0.join("sc-agent.json"),
         json!({"laya":{"host":"remote"}}).to_string(),
     )?;
-    let failure = config("decidr", Some(&local), Some(&root.0), &[], None)
+    let failure = config("decidr", Some(&local), Some(&root.0), &[], None, &[])
         .err()
         .ok_or("partial runner accepted")?
         .to_string();
@@ -587,9 +594,9 @@ fn config_home_and_file_acceptance_are_explicit_and_read_only() -> Test {
     for name in ["sc-agent.local.json", "sitr.json"] {
         fs::write(user.join(name), "invalid JSON must not be read")?;
     }
-    let loaded = config("decidr", None, None, &environment, None)?;
+    let loaded = config("decidr", None, None, &environment, None, &[])?;
     assert_eq!(loaded.config.project_required()?, "relocated");
-    assert_eq!(loaded.config.workers, 3);
+    assert_eq!(loaded.config.get::<usize>("workers")?, 3);
     assert_eq!(loaded.files.len(), 3);
     assert_eq!(
         loaded
@@ -600,16 +607,16 @@ fn config_home_and_file_acceptance_are_explicit_and_read_only() -> Test {
         file.to_string_lossy().as_ref()
     );
     assert!(
-        config("decidr", None, Some(&root.0), &environment, None)?
+        config("decidr", None, Some(&root.0), &environment, None, &[])?
             .config
-            .project
+            .get::<Option<String>>("project")?
             .is_none()
     );
     for name in ["sc-agent.json", "decidr.json", "decidr.local.json"] {
         let path = user.join(name);
         let text = r#"{"laya":{"unknown":true}}"#;
         fs::write(&path, text)?;
-        let failure = config("decidr", None, None, &environment, None)
+        let failure = config("decidr", None, None, &environment, None, &[])
             .err()
             .ok_or("unknown file key accepted")?;
         let failure = serde_json::to_value(failure)?;
@@ -634,7 +641,7 @@ fn environment_json_and_strings_share_file_validation() -> Test {
     for raw in ["1", "true", "null", "[1]", "{\"nested\":1}"] {
         fs::write(&file, json!({"laya":runner}).to_string())?;
         let env = vec![("DECIDR_LAYA__HOST".into(), raw.into())];
-        let failure = config("decidr", None, Some(&root.0), &env, None)
+        let failure = config("decidr", None, Some(&root.0), &env, None, &[])
             .err()
             .ok_or("non-string env host accepted")?
             .to_string();
@@ -643,7 +650,7 @@ fn environment_json_and_strings_share_file_validation() -> Test {
         let mut invalid = runner.clone();
         invalid["host"] = serde_json::from_str(raw)?;
         fs::write(&file, json!({"laya":invalid}).to_string())?;
-        let failure = config("decidr", None, Some(&root.0), &[], None)
+        let failure = config("decidr", None, Some(&root.0), &[], None, &[])
             .err()
             .ok_or("non-string file host accepted")?
             .to_string();
@@ -656,9 +663,9 @@ fn environment_json_and_strings_share_file_validation() -> Test {
     fs::write(&file, json!({"laya":runner}).to_string())?;
     for raw in ["plain", "\"1\""] {
         let env = vec![("DECIDR_LAYA__HOST".into(), raw.into())];
-        let loaded = config("decidr", None, Some(&root.0), &env, None)?;
+        let loaded = config("decidr", None, Some(&root.0), &env, None, &[])?;
         assert_eq!(
-            loaded.config.local["laya"].host,
+            loaded.config.get::<sc_agent::Runner>("laya")?.host,
             if raw == "plain" { "plain" } else { "1" }
         );
     }
@@ -668,8 +675,8 @@ fn environment_json_and_strings_share_file_validation() -> Test {
 #[test]
 fn max_sends_and_system_prompt_keys_load_default_and_report() -> Test {
     let root = Temp::new()?;
-    let defaults = config("decidr", None, Some(&root.0), &[], None)?;
-    assert_eq!(defaults.config.max_sends, 5);
+    let defaults = config("decidr", None, Some(&root.0), &[], None, &[])?;
+    assert_eq!(defaults.config.get::<usize>("max_sends")?, 5);
     let row = |loaded: &sc_agent::Configuration, path: &str| {
         loaded.rows.iter().find(|row| row["path"] == path).cloned()
     };
@@ -681,9 +688,14 @@ fn max_sends_and_system_prompt_keys_load_default_and_report() -> Test {
         root.0.join("sc-agent.json"),
         json!({"max_sends":3,"decidr":{"luna-system-prompt":"P"}}).to_string(),
     )?;
-    let loaded = config("decidr", None, Some(&root.0), &[], None)?;
-    assert_eq!(loaded.config.max_sends, 3);
-    assert_eq!(loaded.config.decidr["luna-system-prompt"], "P");
+    let loaded = config("decidr", None, Some(&root.0), &[], None, &[])?;
+    assert_eq!(loaded.config.get::<usize>("max_sends")?, 3);
+    assert_eq!(
+        loaded
+            .config
+            .get::<std::collections::BTreeMap<String, String>>("decidr")?["luna-system-prompt"],
+        "P"
+    );
     assert_eq!(
         row(&loaded, "decidr.luna-system-prompt").ok_or("row missing")?["value"],
         "P"
@@ -692,7 +704,7 @@ fn max_sends_and_system_prompt_keys_load_default_and_report() -> Test {
         root.0.join("sc-agent.json"),
         json!({"max_sends":0}).to_string(),
     )?;
-    let failure = config("decidr", None, Some(&root.0), &[], None)
+    let failure = config("decidr", None, Some(&root.0), &[], None, &[])
         .err()
         .ok_or("zero accepted")?
         .to_string();
@@ -704,7 +716,12 @@ fn max_sends_and_system_prompt_keys_load_default_and_report() -> Test {
         root.0.join("sc-agent.json"),
         json!({"decidr":{"sonnet-system-prompt":"P"}}).to_string(),
     )?;
-    assert!(config("decidr", None, Some(&root.0), &[], None).is_err());
+    assert_eq!(
+        config("decidr", None, Some(&root.0), &[], None, &[])?
+            .config
+            .values["decidr"]["sonnet-system-prompt"],
+        "P"
+    );
     Ok(())
 }
 
@@ -717,12 +734,15 @@ fn config_local_endpoints() -> Test {
         json!({"decider_4b":{"host":"h4","port":18001},"decider_2b":{"host":"h2","port":18000}})
             .to_string(),
     )?;
-    let loaded = config("decidr", None, Some(&root.0), &[], None)?;
-    let ports = loaded
-        .config
-        .local
-        .iter()
-        .map(|(n, r)| (n.as_str(), r.host.as_str(), r.port));
+    let loaded = config("decidr", None, Some(&root.0), &[], None, &[])?;
+    let runners = ["decider_2b", "decider_4b"].map(|name| {
+        loaded
+            .config
+            .get::<sc_agent::Runner>(name)
+            .map(|r| (name, r))
+    });
+    let runners = runners.into_iter().collect::<Result<Vec<_>, _>>()?;
+    let ports = runners.iter().map(|(n, r)| (*n, r.host.as_str(), r.port));
     assert_eq!(
         ports.collect::<Vec<_>>(),
         [("decider_2b", "h2", 18000), ("decider_4b", "h4", 18001)]
@@ -745,7 +765,7 @@ fn config_local_endpoints() -> Test {
         &file,
         json!({"laya":{"host":"h","port":1,"model":"x"}}).to_string(),
     )?;
-    let failure = config("decidr", None, Some(&root.0), &[], None)
+    let failure = config("decidr", None, Some(&root.0), &[], None, &[])
         .err()
         .ok_or("laya.model accepted")?
         .to_string();
@@ -886,9 +906,9 @@ fn configuration_files_environment_and_missing_project_follow_the_tool_name() ->
         r#"{"project":"tool-file","workers":2}"#,
     )?;
     assert_eq!(
-        config("judge-jev", None, Some(&root.0), &[], None)?
+        config("judge-jev", None, Some(&root.0), &[], None, &[])?
             .config
-            .project
+            .get::<Option<String>>("project")?
             .as_deref(),
         Some("tool-file")
     );
@@ -897,10 +917,13 @@ fn configuration_files_environment_and_missing_project_follow_the_tool_name() ->
         ("JUDGE_JEV_WORKERS".into(), "3".into()),
         ("DECIDR_WORKERS".into(), "5".into()),
     ];
-    let loaded = config("judge-jev", None, Some(&root.0), &env, None)?.config;
-    assert_eq!(loaded.project.as_deref(), Some("shared-env"));
-    assert_eq!(loaded.workers, 3);
-    let absent = config("another-tool", None, Some(&root.0), &[], None)?.config;
+    let loaded = config("judge-jev", None, Some(&root.0), &env, None, &[])?.config;
+    assert_eq!(
+        loaded.get::<Option<String>>("project")?.as_deref(),
+        Some("shared-env")
+    );
+    assert_eq!(loaded.get::<usize>("workers")?, 3);
+    let absent = config("another-tool", None, Some(&root.0), &[], None, &[])?.config;
     let failure = absent
         .project_required()
         .err()
@@ -908,5 +931,132 @@ fn configuration_files_environment_and_missing_project_follow_the_tool_name() ->
         .to_string();
     assert!(failure.contains("SC_PROJECT"), "{failure}");
     assert!(failure.contains("another-tool.json"), "{failure}");
+    Ok(())
+}
+
+#[test]
+fn arbitrary_configured_model_prompt_is_accepted() -> Test {
+    let root = Temp::new()?;
+    fs::write(
+        root.0.join("decidr.json"),
+        json!({
+            "models":{"custom":{"provider":"openai","id":"custom-wire-id"}},
+            "decidr":{"custom-system-prompt":"custom instruction"}
+        })
+        .to_string(),
+    )?;
+    config("decidr", None, Some(&root.0), &[], None, &[])?;
+    Ok(())
+}
+
+#[test]
+fn run_uses_configured_model_and_timeout_defaults() -> Test {
+    let root = Temp::new()?;
+    fs::write(
+        root.0.join("decidr.json"),
+        json!({"model":"haiku","timeout_secs":37.0}).to_string(),
+    )?;
+    let args = || sc_agent::RunArgs {
+        tool: "decidr".into(),
+        config_dir: Some(root.0.clone()),
+        ..Default::default()
+    };
+    let run = sc_agent::Run::new(args(), Some(logger(&root)?), Default::default())?;
+    assert_eq!(run.options.model, "haiku");
+    assert_eq!(run.options.timeout, std::time::Duration::from_secs(37));
+    let run = sc_agent::Run::new(
+        sc_agent::RunArgs {
+            model: Some("jev".into()),
+            timeout_secs: Some(19.0),
+            ..args()
+        },
+        Some(logger(&root)?),
+        Default::default(),
+    )?;
+    assert_eq!(run.options.model, "jev");
+    assert_eq!(run.options.timeout, std::time::Duration::from_secs(19));
+    Ok(())
+}
+
+#[test]
+fn consumer_declarations_supply_nested_defaults_types_and_provenance() -> Test {
+    let root = Temp::new()?;
+    // This consumer-owned declaration is the only change needed to add its setting.
+    let own = [sc_agent::Setting::new::<u16>(
+        "review.limit",
+        Some(json!(7)),
+    )];
+    let load =
+        |env: &[(OsString, OsString)]| config("my-tool", None, Some(&root.0), env, None, &own);
+    let loaded = load(&[])?;
+    assert_eq!(loaded.config.get::<u16>("review.limit")?, 7);
+    assert!(
+        loaded
+            .rows
+            .iter()
+            .any(|r| r == &json!({"path":"review.limit","value":"7","source":"default"}))
+    );
+    let file = root.0.join("my-tool.json");
+    fs::write(&file, json!({"review":{"limit":11}}).to_string())?;
+    assert_eq!(load(&[])?.config.get::<u16>("review.limit")?, 11);
+    let env = [("MY_TOOL_REVIEW__LIMIT".into(), "13".into())];
+    let loaded = load(&env)?;
+    assert_eq!(loaded.config.get::<u16>("review.limit")?, 13);
+    assert!(
+        loaded
+            .rows
+            .iter()
+            .any(|r| r["path"] == "review.limit" && r["source"] == "MY_TOOL_REVIEW__LIMIT")
+    );
+    for value in ["oops", "65536", "-1"] {
+        let failure = load(&[("MY_TOOL_REVIEW__LIMIT".into(), value.into())])
+            .err()
+            .ok_or("wrong type accepted")?
+            .to_string();
+        assert!(
+            failure.contains("review.limit") && failure.contains("MY_TOOL_REVIEW__LIMIT"),
+            "{failure}"
+        );
+    }
+    fs::write(&file, json!({"review":{"limit":"oops"}}).to_string())?;
+    let failure = load(&[])
+        .err()
+        .ok_or("wrong file type accepted")?
+        .to_string();
+    assert!(
+        failure.contains("review.limit") && failure.contains(file.to_str().ok_or("path")?),
+        "{failure}"
+    );
+    Ok(())
+}
+
+#[test]
+fn model_and_timeout_settings_validate_and_follow_environment_precedence() -> Test {
+    let root = Temp::new()?;
+    let load = |env: &[(OsString, OsString)]| config("decidr", None, Some(&root.0), env, None, &[]);
+    let defaults = load(&[])?.config;
+    assert_eq!(defaults.get::<String>("model")?, "jev");
+    assert_eq!(defaults.get::<f64>("timeout_secs")?, 120.0);
+    fs::write(
+        root.0.join("decidr.json"),
+        json!({"model":"haiku", "timeout_secs":37}).to_string(),
+    )?;
+    let env = [
+        ("DECIDR_MODEL".into(), "luna".into()),
+        ("DECIDR_TIMEOUT_SECS".into(), "17.5".into()),
+    ];
+    let loaded = load(&env)?.config;
+    assert_eq!(loaded.get::<String>("model")?, "luna");
+    assert_eq!(loaded.get::<f64>("timeout_secs")?, 17.5);
+    for value in ["-1", "oops", "1e100"] {
+        let failure = load(&[("DECIDR_TIMEOUT_SECS".into(), value.into())])
+            .err()
+            .ok_or("bad timeout accepted")?
+            .to_string();
+        assert!(
+            failure.contains("timeout_secs") && failure.contains("DECIDR_TIMEOUT_SECS"),
+            "{failure}"
+        );
+    }
     Ok(())
 }

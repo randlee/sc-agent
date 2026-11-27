@@ -42,12 +42,7 @@ pub fn options(root: &Temp, url: &str) -> Options {
         ],
         settings: Settings {
             tool: "decidr".into(),
-            project: Some("phase-b".into()),
-            workers: 1,
-            models: Default::default(),
-            local: Default::default(),
-            max_sends: 5,
-            decidr: Default::default(),
+            values: json!({"project":"phase-b","workers":1,"models":{},"max_sends":5,"decidr":{}}),
         },
         model: "jev".into(),
         agent_role: "rust-developer".into(),
@@ -62,7 +57,9 @@ pub fn single_reply_options(root: &Temp, url: &str) -> Options {
     let mut options = options(root, url);
     // Failure-only hang guard, not a response-speed assertion; never resend to an exhausted stub.
     options.timeout = Duration::from_secs(600);
-    options.settings.max_sends = 1;
+    if let Some(value) = options.settings.values.get_mut("max_sends") {
+        *value = json!(1);
+    }
     options
 }
 pub fn request() -> Value {

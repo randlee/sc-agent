@@ -1,3 +1,4 @@
+use serde_json::json;
 pub mod support;
 use std::sync::{Arc, Mutex};
 use support::*;
@@ -15,7 +16,7 @@ fn final_busy_reply_holds_off_the_next_send() -> Test {
         http(200, answer()),
     ])?;
     let mut opts = options(&root, &stub.url);
-    opts.settings.max_sends = 1;
+    opts.settings.values["max_sends"] = json!(1);
     let mut client = run(opts, &logger)?;
     let waits = Arc::new(Mutex::new(Vec::new()));
     let recorded = waits.clone();
@@ -94,7 +95,7 @@ fn deadline_is_per_host_within_one_run_and_isolated_between_runs() -> Test {
     ])?;
     let other = Stub::at(vec![http(200, answer())], "[::1]:0".parse()?)?;
     let mut opts = options(&root, &stub.url);
-    opts.settings.max_sends = 1;
+    opts.settings.values["max_sends"] = json!(1);
     let mut client = run(opts.clone(), &logger)?;
     let waits = Arc::new(Mutex::new(Vec::new()));
     let recorded = waits.clone();
@@ -138,7 +139,7 @@ fn simultaneous_followers_wait_for_one_deadline_without_serializing() -> Test {
         http(200, answer()),
     ])?;
     let mut opts = options(&root, &stub.url);
-    opts.settings.max_sends = 1;
+    opts.settings.values["max_sends"] = json!(1);
     let mut client = run(opts, &logger)?;
     assert!(client.send(&request()).is_err());
     let released = Arc::new((Mutex::new(false), Condvar::new()));
