@@ -496,36 +496,6 @@ fn body_read_failure_is_resent() -> Test {
 }
 
 #[test]
-fn cancel_ends_a_wait_on_the_host_holdoff() -> Test {
-    use std::sync::{Arc, mpsc};
-    use std::time::Duration;
-    let cancel = Arc::new(Cancel::default());
-    let host = sc_agent::host_holdoff("cancel-wait.invalid")?;
-    let same_host = sc_agent::host_holdoff("cancel-wait.invalid")?;
-    let held = host.lock().map_err(|_| "holdoff poisoned")?;
-    let (started, arrived) = mpsc::channel();
-    let (finished, outcome) = mpsc::channel();
-    std::thread::scope(|scope| -> Test {
-        let waiting_cancel = cancel.clone();
-        scope.spawn(move || {
-            let _ = started.send(());
-            let result = waiting_cancel.lock(&same_host).map(|_| json!(null));
-            let _ = finished.send(result);
-        });
-        arrived.recv_timeout(Duration::from_secs(10))?;
-        cancel.cancel();
-        let result = outcome.recv_timeout(Duration::from_secs(10));
-        // Release before asserting so a broken blocking lock cannot hang cleanup.
-        drop(held);
-        assert_eq!(
-            sc_agent::result(result?)["error"]["id"],
-            "decision.cancelled"
-        );
-        Ok(())
-    })
-}
-
-#[test]
 fn configurable_send_count_does_not_overflow_the_backoff() -> Test {
     use std::{sync::Mutex, time::Duration};
     let root = Temp::new()?;

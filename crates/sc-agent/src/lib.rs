@@ -54,6 +54,12 @@ impl Cancel {
             match mutex.try_lock() {
                 Ok(guard) => return Ok(guard),
                 Err(TryLockError::WouldBlock) => {
+                    #[cfg(test)]
+                    route_tests::LOCK_WAIT.with(|hook| {
+                        if let Some(waiting) = hook.borrow_mut().take() {
+                            waiting();
+                        }
+                    });
                     std::thread::park_timeout(Duration::from_millis(20))
                 }
                 Err(TryLockError::Poisoned(e)) => return Err(error("http.network", e)),
@@ -1535,6 +1541,35 @@ pub mod test_support;
 mod route_tests {
     use super::*;
     use test_support::*;
+
+    thread_local! {
+        pub(super) static LOCK_WAIT: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+    }
+
+    #[test]
+    fn cancel_ends_a_wait_on_the_host_holdoff() -> Test {
+        let cancel = Arc::new(Cancel::default());
+        let host = host_holdoff("cancel-wait.invalid")?;
+        let same_host = host_holdoff("cancel-wait.invalid")?;
+        let held = host.lock().map_err(|_| "holdoff poisoned")?;
+        let (finished, outcome) = std::sync::mpsc::channel();
+        std::thread::scope(|scope| -> Test {
+            let waiting_cancel = cancel.clone();
+            let work = scope.spawn(move || {
+                let flag = waiting_cancel.clone();
+                LOCK_WAIT.with(|hook| *hook.borrow_mut() = Some(Box::new(move || flag.cancel())));
+                let result = waiting_cancel.lock(&same_host).map(|_| json!(null));
+                let _ = finished.send(result);
+            });
+            let result = outcome.recv_timeout(Duration::from_secs(10));
+            // A broken lock must fail the test instead of hanging its cleanup.
+            drop(held);
+            work.join().map_err(|_| "lock waiter panicked")?;
+            assert!(cancel.is_cancelled(), "contention hook was not reached");
+            assert_eq!(super::result(result?)["error"]["id"], "decision.cancelled");
+            Ok(())
+        })
+    }
 
     #[test]
     fn timeout_is_per_call_and_sets_the_transport_configuration() -> Test {
