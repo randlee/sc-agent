@@ -1,0 +1,142 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-ADR-SAG-0005">
+  <div class="section-head">
+    <h2>ADR-SAG-0005 sitr&#x27;s Python API is built into the sc-decidr wheel; sitr is its own crate</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;ADR-SAG-0005&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;ADR&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: null,
+    &quot;note&quot;: &quot;No obligation statements.&quot;,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: null
+  },
+  &quot;raptor&quot;: {
+    &quot;alternatives&quot;: {
+      &quot;groups&quot;: [
+        {
+          &quot;cons&quot;: [
+            &quot;Every caller compiles PyO3, clap and sc-observability.&quot;
+          ],
+          &quot;description&quot;: &quot;Build the extension module and `sitr` from `sc-treesitter` with all dependencies always on.&quot;,
+          &quot;name&quot;: &quot;PyO3 bindings and CLI inside sc-treesitter with no feature gates&quot;,
+          &quot;pros&quot;: [
+            &quot;One crate.&quot;
+          ],
+          &quot;why_rejected&quot;: &quot;The library must carry no PyO3 or clap.&quot;
+        },
+        {
+          &quot;cons&quot;: [
+            &quot;Feature gates and `required-features` in the library manifest.&quot;
+          ],
+          &quot;description&quot;: &quot;Build the `sitr` binary from `sc-treesitter` behind a non-default `cli` feature.&quot;,
+          &quot;name&quot;: &quot;sitr inside sc-treesitter behind a cli feature&quot;,
+          &quot;pros&quot;: [
+            &quot;One crate fewer.&quot;
+          ],
+          &quot;why_rejected&quot;: &quot;The reduction plan&#x27;s layout lists `sc-treesitter` and `sitr` as two parts of one row, and the rewrite builds them as two crates; a feature gate would add manifest rules for no gain.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;consequences&quot;: {
+      &quot;negative&quot;: [
+        &quot;Installing the wheel always installs both the decidr and sitr APIs.&quot;
+      ],
+      &quot;neutral&quot;: [],
+      &quot;positive&quot;: [
+        &quot;A Rust caller of `sc-treesitter` compiles no Python or CLI dependencies.&quot;
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;context&quot;: {
+      &quot;background&quot;: &quot;&quot;,
+      &quot;problem_statement&quot;: &quot;The Python bindings and the CLI need PyO3 and clap, but a Rust caller of the library needs neither.&quot;,
+      &quot;text&quot;: &quot;sc-treesitter is the tree-sitter library with two query surfaces: the Python API and the `sitr` CLI.&quot;
+    },
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;decision&quot;: {
+      &quot;chosen_approach&quot;: &quot;&quot;,
+      &quot;key_principles&quot;: [
+        &quot;`sc-treesitter` pulls in no PyO3 or clap.&quot;,
+        &quot;The one Python extension module is built from `sc-agent-py`, not from `sc-treesitter`.&quot;
+      ],
+      &quot;text&quot;: &quot;`sc-agent-py`, the crate that builds the sc-decidr wheel, depends on `sc-treesitter` and exposes the sitr Python API as `sc_agent.sitr`; there is no `sc-treesitter-py` crate (ADR-SAG-0021). There is no separate sitr wheel in phase h; a standalone sitr wheel may return after the MVP, and a process uses either it or the sc-decidr wheel, never both. The `sitr` binary is its own crate, `sitr`, over `sc-treesitter`. `sc-treesitter` has no PyO3 and no clap.&quot;
+    },
+    &quot;decision_date&quot;: &quot;2026-11-09&quot;,
+    &quot;id&quot;: &quot;ADR-SAG-0005&quot;,
+    &quot;impact_analysis&quot;: {
+      &quot;affected_components&quot;: &quot;&quot;,
+      &quot;maintainability_impact&quot;: &quot;&quot;,
+      &quot;performance_impact&quot;: &quot;&quot;,
+      &quot;security_impact&quot;: &quot;&quot;,
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;implementation&quot;: {
+      &quot;code_examples&quot;: &quot;&quot;,
+      &quot;integration_points&quot;: [],
+      &quot;key_components&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-22&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;rationale&quot;: {
+      &quot;benefits&quot;: [],
+      &quot;text&quot;: &quot;Keeping PyO3 in `sc-agent-py` and clap in `sitr` keeps the library&#x27;s dependency set small; building the sitr API into the sc-decidr wheel gives a Python process one copy of sc-observability and one Logger for decidr and sitr calls (ADR-SAG-0021).\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+      &quot;trade_offs&quot;: []
+    },
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0004&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0301&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0303&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;title&quot;: &quot;sitr&#x27;s Python API is built into the sc-decidr wheel; sitr is its own crate&quot;,
+    &quot;version&quot;: &quot;0.4.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">ADR · sc-agent · Approved · version 0.4.0</p>
+  <h3>Context</h3>
+  <p>sc-treesitter is the tree-sitter library with two query surfaces: the Python API and the `sitr` CLI.</p>
+  <h3>Problem</h3>
+  <p>The Python bindings and the CLI need PyO3 and clap, but a Rust caller of the library needs neither.</p>
+  <h3>Decision</h3>
+  <p>`sc-agent-py`, the crate that builds the sc-decidr wheel, depends on `sc-treesitter` and exposes the sitr Python API as `sc_agent.sitr`; there is no `sc-treesitter-py` crate (ADR-SAG-0021). There is no separate sitr wheel in phase h; a standalone sitr wheel may return after the MVP, and a process uses either it or the sc-decidr wheel, never both. The `sitr` binary is its own crate, `sitr`, over `sc-treesitter`. `sc-treesitter` has no PyO3 and no clap.</p>
+  <h3>Key principles</h3>
+  <ul>
+    <li>`sc-treesitter` pulls in no PyO3 or clap.</li>
+    <li>The one Python extension module is built from `sc-agent-py`, not from `sc-treesitter`.</li>
+  </ul>
+  <h3>Rationale</h3>
+  <p>Keeping PyO3 in `sc-agent-py` and clap in `sitr` keeps the library&#x27;s dependency set small; building the sitr API into the sc-decidr wheel gives a Python process one copy of sc-observability and one Logger for decidr and sitr calls (ADR-SAG-0021).
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Positive consequences</h3>
+  <p>A Rust caller of `sc-treesitter` compiles no Python or CLI dependencies.</p>
+  <h3>Negative consequences</h3>
+  <p>Installing the wheel always installs both the decidr and sitr APIs.</p>
+</section>

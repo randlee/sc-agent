@@ -1,0 +1,95 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0006">
+  <div class="section-head">
+    <h2>REQ-SAG-0006 No consumer-application types in shared crates</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0006&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;`sc-agent` MUST NOT contain types specific to plan-anchor, judge-jev or any other consumer application.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0006&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-26&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [
+        &quot;sc-agent&quot;
+      ],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Many applications will build on sc-agent, some decision-based and some not. Shared crates hold only what every consumer can use.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;`sc-agent` MUST NOT contain types specific to plan-anchor, judge-jev or any other consumer application.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: A consumer application is a program built on sc-agent, such as plan-anchor or judge-jev.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A review of `sc-agent` finds no type, field or constant named for or used only by a consumer application.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;No consumer-application types in shared crates&quot;,
+    &quot;version&quot;: &quot;0.3.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.3.0</p>
+  <h3>Statements</h3>
+  <p>`sc-agent` MUST NOT contain types specific to plan-anchor, judge-jev or any other consumer application.</p>
+  <h3>Requirement</h3>
+  <p>Definitions: A consumer application is a program built on sc-agent, such as plan-anchor or judge-jev.</p>
+  <h3>Rationale</h3>
+  <p>Many applications will build on sc-agent, some decision-based and some not. Shared crates hold only what every consumer can use.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <p>A review of `sc-agent` finds no type, field or constant named for or used only by a consumer application.</p>
+</section>

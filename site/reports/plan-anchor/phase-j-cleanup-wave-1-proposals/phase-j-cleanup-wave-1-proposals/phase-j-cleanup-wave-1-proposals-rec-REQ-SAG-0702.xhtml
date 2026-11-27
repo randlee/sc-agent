@@ -1,0 +1,391 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0702">
+  <div class="section-head">
+    <h2>REQ-SAG-0702 A Run may override the send timeout and the worker count for its own calls only</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0702&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A Run MUST accept an optional send timeout.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A Run MUST accept an optional worker count.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A Run&#x27;s `timeout_secs` MUST replace the 120 s default send timeout for that Run.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When a Run has an override, every call through that Run MUST use the override in place of the configured value.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When a Run has no override, every call through that Run MUST use the configured value.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When a Run is given an invalid send timeout, it MUST return an error.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When a Run is given an invalid worker count, it MUST return an error.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When a provider rejects a request as too large for the model&#x27;s context, the call MUST return the provider&#x27;s error.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;A Run MUST NOT clamp an override.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;An override MUST NOT change the configuration.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;A single call through a Run MUST NOT accept an override.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;A Run MUST accept an optional send timeout.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;A Run MUST accept an optional worker count.&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;644bbb1f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: restore last develop obligations from ai-qa re-check&quot;
+      },
+      &quot;statement&quot;: &quot;A Run&#x27;s `timeout_secs` MUST replace the 120 s default send timeout for that Run.&quot;,
+      &quot;statement_index&quot;: 2
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;When a Run has an override, every call through that Run MUST use the override in place of the configured value.&quot;,
+      &quot;statement_index&quot;: 3
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;When a Run has no override, every call through that Run MUST use the configured value.&quot;,
+      &quot;statement_index&quot;: 4
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;22f4a5bd&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: fix ai-qa clean-up findings&quot;
+      },
+      &quot;statement&quot;: &quot;When a Run is given an invalid send timeout, it MUST return an error.&quot;,
+      &quot;statement_index&quot;: 5
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;22f4a5bd&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: fix ai-qa clean-up findings&quot;
+      },
+      &quot;statement&quot;: &quot;When a Run is given an invalid worker count, it MUST return an error.&quot;,
+      &quot;statement_index&quot;: 6
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;3ea97a7c&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;REQ-SAG-0702 s8, 0008 s3, 0104 s3: apply owner rulings 2026-11-25&quot;
+      },
+      &quot;statement&quot;: &quot;When a provider rejects a request as too large for the model&#x27;s context, the call MUST return the provider&#x27;s error.&quot;,
+      &quot;statement_index&quot;: 7
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;A Run MUST NOT clamp an override.&quot;,
+      &quot;statement_index&quot;: 8
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;An override MUST NOT change the configuration.&quot;,
+      &quot;statement_index&quot;: 9
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;A single call through a Run MUST NOT accept an override.&quot;,
+      &quot;statement_index&quot;: 10
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-14&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0701&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0013&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0702&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-25&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Different callers in one process need different parallelism and different patience. Without overrides both are fixed by configuration, so consumers refuse or ignore their own flags. The selected model&#x27;s context is the only size rule for a request. Values that do not vary between the calls of one command are set once on the Run, so an override cannot leak into another Run. Error values rather than exceptions keep every Python result typed.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A Run MUST accept an optional send timeout.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A Run MUST accept an optional worker count.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A Run&#x27;s `timeout_secs` MUST replace the 120 s default send timeout for that Run.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When a Run has an override, every call through that Run MUST use the override in place of the configured value.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When a Run has no override, every call through that Run MUST use the configured value.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When a Run is given an invalid send timeout, it MUST return an error.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When a Run is given an invalid worker count, it MUST return an error.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When a provider rejects a request as too large for the model&#x27;s context, the call MUST return the provider&#x27;s error.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;A Run MUST NOT clamp an override.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;An override MUST NOT change the configuration.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;A single call through a Run MUST NOT accept an override.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions:\n\n- The send timeout is the deadline for one HTTP send of a decision request: connect, headers and body.\n- The worker count is the number of requests of one batch that are sent at the same time.\n- A Run is the run context a tool creates, uses for its calls and then disposes. `decidr send` creates one Run per command from its `--timeout-secs` and `--workers` options.\n- An override is a send timeout or a worker count given to a Run.\n- To clamp a value is to replace it with the nearest bound of a range when it falls outside that range.\n- An invalid send timeout is a send timeout that is negative or not a number.\n- An invalid worker count is a worker count below 1.\n- The configured send timeout is 120 s unless configuration sets another value.\n- A model&#x27;s context is the largest request, in tokens, that the model accepts.\n- The provider&#x27;s error is the error value `decision.api_status` whose message is the provider&#x27;s reply text.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test builds a Run with a 10 s send timeout and checks the transport timeout is 10 s.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test builds a Run with `timeout_secs` of 30 s and checks its sends use 30 s, not 120 s.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test builds a Run with a worker count of 2 and checks the batch runs 2 workers.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test runs `decidr send --timeout-secs 10 --batch --workers 2` and checks the Run&#x27;s send timeout is 10 s and its worker count is 2.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test builds a Run with no override after one with overrides and checks it uses the configured send timeout and worker count.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test gives a Run a negative send timeout and checks the result is an error value.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test gives a Run a NaN send timeout and checks the result is an error value.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test gives a Run a worker count of 0 and checks the result is an error value.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test gives a Run a worker count of -1 and checks the result is an error value.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Python unit test builds `sc_agent.Run` with `timeout_secs` and `workers` and checks a batch through it uses both values.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Python unit test checks that `run.send` and `run.send_batch` have no `timeout_secs` or `workers` parameter.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test has a provider reject a request as too large for the model&#x27;s context and checks the call returns the provider&#x27;s error.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test gives a Run a worker count above the configured one and checks that many workers run.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test checks the configuration is unchanged after a Run with overrides.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test checks that the per-call send and batch signatures have no override parameter.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;A Run may override the send timeout and the worker count for its own calls only&quot;,
+    &quot;version&quot;: &quot;0.7.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.7.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>A Run MUST accept an optional send timeout.</li>
+    <li>A Run MUST accept an optional worker count.</li>
+    <li>A Run&#x27;s `timeout_secs` MUST replace the 120 s default send timeout for that Run.</li>
+    <li>When a Run has an override, every call through that Run MUST use the override in place of the configured value.</li>
+    <li>When a Run has no override, every call through that Run MUST use the configured value.</li>
+    <li>When a Run is given an invalid send timeout, it MUST return an error.</li>
+    <li>When a Run is given an invalid worker count, it MUST return an error.</li>
+    <li>When a provider rejects a request as too large for the model&#x27;s context, the call MUST return the provider&#x27;s error.</li>
+    <li>A Run MUST NOT clamp an override.</li>
+    <li>An override MUST NOT change the configuration.</li>
+    <li>A single call through a Run MUST NOT accept an override.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions:
+
+- The send timeout is the deadline for one HTTP send of a decision request: connect, headers and body.
+- The worker count is the number of requests of one batch that are sent at the same time.
+- A Run is the run context a tool creates, uses for its calls and then disposes. `decidr send` creates one Run per command from its `--timeout-secs` and `--workers` options.
+- An override is a send timeout or a worker count given to a Run.
+- To clamp a value is to replace it with the nearest bound of a range when it falls outside that range.
+- An invalid send timeout is a send timeout that is negative or not a number.
+- An invalid worker count is a worker count below 1.
+- The configured send timeout is 120 s unless configuration sets another value.
+- A model&#x27;s context is the largest request, in tokens, that the model accepts.
+- The provider&#x27;s error is the error value `decision.api_status` whose message is the provider&#x27;s reply text.</p>
+  <h3>Rationale</h3>
+  <p>Different callers in one process need different parallelism and different patience. Without overrides both are fixed by configuration, so consumers refuse or ignore their own flags. The selected model&#x27;s context is the only size rule for a request. Values that do not vary between the calls of one command are set once on the Run, so an override cannot leak into another Run. Error values rather than exceptions keep every Python result typed.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A Rust unit test builds a Run with a 10 s send timeout and checks the transport timeout is 10 s.</li>
+    <li>A Rust unit test builds a Run with `timeout_secs` of 30 s and checks its sends use 30 s, not 120 s.</li>
+    <li>A Rust unit test builds a Run with a worker count of 2 and checks the batch runs 2 workers.</li>
+    <li>A Rust unit test runs `decidr send --timeout-secs 10 --batch --workers 2` and checks the Run&#x27;s send timeout is 10 s and its worker count is 2.</li>
+    <li>A Rust unit test builds a Run with no override after one with overrides and checks it uses the configured send timeout and worker count.</li>
+    <li>A Rust unit test gives a Run a negative send timeout and checks the result is an error value.</li>
+    <li>A Rust unit test gives a Run a NaN send timeout and checks the result is an error value.</li>
+    <li>A Rust unit test gives a Run a worker count of 0 and checks the result is an error value.</li>
+    <li>A Rust unit test gives a Run a worker count of -1 and checks the result is an error value.</li>
+    <li>A Python unit test builds `sc_agent.Run` with `timeout_secs` and `workers` and checks a batch through it uses both values.</li>
+    <li>A Python unit test checks that `run.send` and `run.send_batch` have no `timeout_secs` or `workers` parameter.</li>
+    <li>A Rust unit test has a provider reject a request as too large for the model&#x27;s context and checks the call returns the provider&#x27;s error.</li>
+    <li>A Rust unit test gives a Run a worker count above the configured one and checks that many workers run.</li>
+    <li>A Rust unit test checks the configuration is unchanged after a Run with overrides.</li>
+    <li>A Rust unit test checks that the per-call send and batch signatures have no override parameter.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>ADR-SAG-0019</li>
+    <li>REQ-SAG-0701</li>
+    <li>REQ-SAG-0601</li>
+    <li>REQ-SAG-0013</li>
+  </ul>
+</section>

@@ -1,0 +1,113 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-REQ-SAG-0502-ANC-009">
+  <div class="section-head">
+    <h2>REQ-SAG-0502 × ANC-009 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-009&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [],
+    &quot;jev_disputed&quot;: false,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;c7a40068&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0502&quot;,
+        &quot;statement&quot;: &quot;sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.&quot;,
+        &quot;summary&quot;: &quot;Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;Proposed in wave 2 after re-trace on wave 1&#x27;s result.&quot;,
+    &quot;stale&quot;: null,
+    &quot;what&quot;: &quot;exceeds cell deferred to wave 2; not yet reviewed by a proposer. Provenance below is every dated statement of REQ-SAG-0502, copied from the trace.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.91,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.94,
+        &quot;unclear&quot;: 0.04,
+        &quot;yes&quot;: 0.02
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.67,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.21,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.78
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.73,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.15,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.82
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.26,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.33,
+        &quot;unclear&quot;: 0.16,
+        &quot;yes&quot;: 0.51
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.02,
+    &quot;exceeds&quot;: 0.78,
+    &quot;relates&quot;: 0.82,
+    &quot;serves&quot;: 0.51
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0502&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0502/ANC-009/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8FMAY1B2Y27SB2ECXHV4VXY&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0502 × ANC-009 — exceeds
+What exceeds
+exceeds cell deferred to wave 2; not yet reviewed by a proposer. Provenance below is every dated statement of REQ-SAG-0502, copied from the trace.
+Proposed remedy
+Proposed in wave 2 after re-trace on wave 1&#x27;s result.
+Anchor
+The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.
+Owner said: “hard-coded rows will get stale quickly and often”
+Scope: adds or changes the model table or model configuration in sc-agent
+Record statements
+sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.
+History (git)
+REQ-SAG-0502 statement 1: c7a40068 2026-11-09: Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema
+Jev P(yes): relates 0.82 · serves 0.51 · exceeds 0.78 · conflicts 0.02">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <ul>
+  </ul>
+  <p>exceeds cell deferred to wave 2; not yet reviewed by a proposer. Provenance below is every dated statement of REQ-SAG-0502, copied from the trace.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>Proposed in wave 2 after re-trace on wave 1&#x27;s result.</p>
+  <h3>Anchor</h3>
+  <p>The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.</p>
+  <p>Owner said: “hard-coded rows will get stale quickly and often”</p>
+  <p>Scope: adds or changes the model table or model configuration in sc-agent</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0502 statement 1: c7a40068 2026-11-09: Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.82 · serves 0.51 · exceeds 0.78 · conflicts 0.02</p>
+</section>

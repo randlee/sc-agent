@@ -1,0 +1,92 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-related" id="cell-REQ-SAG-0002-ANC-013">
+  <div class="section-head">
+    <h2>REQ-SAG-0002 × ANC-013 — related</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-013&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.97,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.98,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.01
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.73,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.82,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.17
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.64,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.23,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.76
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 1.0,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 1.0,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.0
+      }
+    }
+  },
+  &quot;class&quot;: &quot;related&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.01,
+    &quot;exceeds&quot;: 0.17,
+    &quot;relates&quot;: 0.76,
+    &quot;serves&quot;: 0.0
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0002&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0002/ANC-013/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8FMA9EY8F6AQFDWDFY75XY1&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0002 × ANC-013 — related
+Anchor
+sc-agent must provide an LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider speaking that format, so callers reach any LLM through one interface.
+Owner said: “we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”
+Scope: adds or changes LLM (non-Jev) calls in sc-agent
+Record statements
+Every public API MUST return a discriminated union of success and error.
+Rust APIs MUST return `Result&lt;T, E&gt;` from the lowest layer to the top-level CLI and PyO3 entry points.
+An error MUST carry the error id and message of every lower-layer error that caused it.
+A layer that changes an error MUST change it only by adding detail.
+Error text received from a provider MUST be kept whole.
+Exception (owner-approved): the API key MUST never appear in an error or log.
+Every error MUST have a stable id.
+Rust code MUST NOT panic on any input or runtime failure.
+A layer MUST NOT drop or replace a lower-layer error id or message.
+Jev P(yes): relates 0.76 · serves 0.00 · exceeds 0.17 · conflicts 0.01">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>Anchor</h3>
+  <p>sc-agent must provide an LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider speaking that format, so callers reach any LLM through one interface.</p>
+  <p>Owner said: “we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”</p>
+  <p>Scope: adds or changes LLM (non-Jev) calls in sc-agent</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>Every public API MUST return a discriminated union of success and error.</li>
+    <li>Rust APIs MUST return `Result&lt;T, E&gt;` from the lowest layer to the top-level CLI and PyO3 entry points.</li>
+    <li>An error MUST carry the error id and message of every lower-layer error that caused it.</li>
+    <li>A layer that changes an error MUST change it only by adding detail.</li>
+    <li>Error text received from a provider MUST be kept whole.</li>
+    <li>Exception (owner-approved): the API key MUST never appear in an error or log.</li>
+    <li>Every error MUST have a stable id.</li>
+    <li>Rust code MUST NOT panic on any input or runtime failure.</li>
+    <li>A layer MUST NOT drop or replace a lower-layer error id or message.</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.76 · serves 0.00 · exceeds 0.17 · conflicts 0.01</p>
+</section>

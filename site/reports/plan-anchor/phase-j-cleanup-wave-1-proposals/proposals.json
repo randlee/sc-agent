@@ -1,0 +1,718 @@
+{
+ "schema": "plan-anchoring/record-cleanup-proposals/1",
+ "level": "aggressive",
+ "not_proposed": [
+  {
+   "slice": "w1-duplicates-1",
+   "reason": "Jev duplicate class disputed (0.68): ADR-SAG-0020 decides per-CLI scope; REQ-SAG-0019 statement 2 states the testable acceptance behaviour. Either cut loses content.",
+   "items": [
+    "ADR-SAG-0020/REQ-SAG-0019/2"
+   ]
+  },
+  {
+   "slice": "w1-duplicates-1",
+   "reason": "Jev duplicate class disputed (0.86): the ADR parenthetical names provider/id keys and released YYYY-MM-DD format, which REQ-SAG-0103 statement 0 does not; a cut loses unique content.",
+   "items": [
+    "ADR-SAG-0020/REQ-SAG-0103/0"
+   ]
+  },
+  {
+   "slice": "w1-duplicates-2",
+   "reason": "Jev duplicate class disputed (0.82): ADR-SAG-0021 has no text about the generated client's <CLIENT>_LOG_ROOT; the only nearby text (<CLI>_LOG_ROOT) is already cut by the REQ-SAG-0003/1 change.",
+   "items": [
+    "ADR-SAG-0021/REQ-SAG-0003/2"
+   ]
+  },
+  {
+   "slice": "w1-duplicates-2",
+   "reason": "Jev duplicate class disputed (0.89): 'The Rust API MUST accept an injected general Logger' is a capability; the ADR's one-Logger-per-process ownership is the decision itself (home rule 3); any cut removes the decision.",
+   "items": [
+    "ADR-SAG-0021/REQ-SAG-0008/0"
+   ]
+  },
+  {
+   "slice": "wave-2",
+   "reason": "Planned wave 2: these 30 exceeds cells and 1 conflict cell (REQ-SAG-0801/ANC-001) are re-traced on wave 1's result and proposed then, in slices of about 10; wave 1 deletes or cuts statements in several of these records, so proposing now would work on stale text.",
+   "items": [
+    "NFR-SAG-0004/ANC-009",
+    "NFR-SAG-0004/ANC-010",
+    "NFR-SAG-0004/ANC-012",
+    "NFR-SAG-0004/ANC-015",
+    "REQ-SAG-0003/ANC-005",
+    "REQ-SAG-0003/ANC-015",
+    "REQ-SAG-0003/ANC-016",
+    "REQ-SAG-0008/ANC-006",
+    "REQ-SAG-0008/ANC-016",
+    "REQ-SAG-0008/ANC-020",
+    "REQ-SAG-0018/ANC-010",
+    "REQ-SAG-0702/ANC-008",
+    "REQ-SAG-0019/ANC-001",
+    "REQ-SAG-0019/ANC-009",
+    "REQ-SAG-0101/ANC-001",
+    "REQ-SAG-0101/ANC-009",
+    "REQ-SAG-0102/ANC-001",
+    "REQ-SAG-0102/ANC-009",
+    "REQ-SAG-0103/ANC-009",
+    "REQ-SAG-0901/ANC-013",
+    "REQ-SAG-0801/ANC-001",
+    "REQ-SAG-0801/ANC-009",
+    "REQ-SAG-0502/ANC-009",
+    "REQ-SAG-0502/ANC-013",
+    "ADR-SAG-0001/ANC-012",
+    "ADR-SAG-0002/ANC-005",
+    "ADR-SAG-0020/ANC-009",
+    "ADR-SAG-0021/ANC-005",
+    "ADR-SAG-0021/ANC-006",
+    "ADR-SAG-0021/ANC-016",
+    "ADR-SAG-0021/ANC-020"
+   ]
+  }
+ ],
+ "dropped": [
+  {
+   "title": "Cut the paid-API key restriction from ADR-SAG-0020's decision text",
+   "correlation_id": "w1-duplicates-2",
+   "reason": "merged into the ADR-SAG-0020 consolidate (w1-duplicates-1), whose model-entry clause cut already removes ', but cannot change where a paid API's key is sent'"
+  }
+ ],
+ "proposals": [
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0501 (decidr subcommands), documented by code",
+   "records": [
+    "REQ-SAG-0501"
+   ],
+   "changes": [],
+   "code": "crates/decidr/src/cli.rs:Command",
+   "justification": "No anchor covers REQ-SAG-0501. The Command enum exposes Models and Send; Send forwards any JSON request from --input or stdin, singly or with --batch (crates/decidr/src/main.rs:main).",
+   "improvement": "REQ-SAG-0501 stays, backed by a named code symbol.",
+   "source": {
+    "ref": "REQ-SAG-0501"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "delete",
+   "title": "Delete REQ-SAG-0503 (doctor model-catalog comparison and key listing)",
+   "records": [
+    "REQ-SAG-0503"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0503"
+    }
+   ],
+   "justification": "No anchor covers it and code does not document it: sc_agent::doctor returns only settings, files and log_root; no catalog comparison, missing-model warning, key listing or key source.",
+   "improvement": "Removes an unanchored record describing behaviour the code does not have.",
+   "source": {
+    "ref": "REQ-SAG-0503"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "delete",
+   "title": "Delete REQ-SAG-0504 (invalid batch input fails fast)",
+   "records": [
+    "REQ-SAG-0504"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0504"
+    }
+   ],
+   "justification": "No anchor covers it. Code only parses each batch line as JSON (crates/decidr/src/main.rs:main, decision.request_parse, 'line N: ...'); no Jev schema validation, no field named.",
+   "improvement": "Removes an unanchored record whose schema-validation obligations the code does not implement.",
+   "source": {
+    "ref": "REQ-SAG-0504"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep NFR-SAG-0001 (one session log file per repo, agent role and project)",
+   "records": [
+    "NFR-SAG-0001"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:Run::send",
+   "justification": "Run::send appends each row to <log_root>/sessions/<repo>/<agent_role>/<project>/sessions.jsonl in append mode; never a file per session.",
+   "improvement": "NFR-SAG-0001 stays, backed by a named code symbol.",
+   "source": {
+    "ref": "NFR-SAG-0001"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep NFR-SAG-0003 (Python 3.11 floor)",
+   "records": [
+    "NFR-SAG-0003"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent-py/pyproject.toml:requires-python",
+   "justification": "ANC-019 owner words; pyproject.toml requires-python >=3.11; pyo3 abi3-py311.",
+   "source": {
+    "ref": "ANC-019",
+    "quote": "sc-agent, judge-jev, prompt-anchor all must be 3.11+"
+   },
+   "improvement": "NFR-SAG-0003 stays, backed by the owner's quote and a code symbol."
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0001 (created ids are ULIDs)",
+   "records": [
+    "REQ-SAG-0001"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:Run::send",
+   "justification": "Run::send mints the session id with ulid::Ulid::new(); no UUID generation in the crates.",
+   "improvement": "REQ-SAG-0001 stays, backed by a named code symbol.",
+   "source": {
+    "ref": "REQ-SAG-0001"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "cut_excess",
+   "title": "Cut the run-log link record obligation from REQ-SAG-0005",
+   "records": [
+    "REQ-SAG-0005"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0005",
+     "before": "For every session row that answers a Run's query, sc-agent MUST append one link record to the query's run log."
+    }
+   ],
+   "justification": "No anchor covers it and no code documents it: no runs.jsonl or link record anywhere; Run::send writes only sessions.jsonl.",
+   "improvement": "Removes a statement the code does not implement.",
+   "source": {
+    "ref": "REQ-SAG-0005"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep the remaining REQ-SAG-0005 session-row statements",
+   "records": [
+    "REQ-SAG-0005"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:Run::send",
+   "justification": "Run::send appends one JSON line to sessions.jsonl only on Ok; failures go to the general logger with no row; one ulid-keyed row per call; busy resends stay in one send.",
+   "improvement": "REQ-SAG-0005 keeps four statements backed by code.",
+   "source": {
+    "ref": "REQ-SAG-0005"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0006 (no consumer-application types in sc-agent)",
+   "records": [
+    "REQ-SAG-0006"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:RunArgs",
+   "justification": "RunArgs takes only generic tool, agent_role and project; no plan-anchor or judge-jev types in crates/**/src (absence evidence).",
+   "improvement": "REQ-SAG-0006 stays, backed by a named code symbol.",
+   "source": {
+    "ref": "REQ-SAG-0006"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0007 (return values are not rounded)",
+   "records": [
+    "REQ-SAG-0007"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:Jev",
+   "justification": "Jev::decide and Run::send pass the response through as serde_json Value; no rounding or narrowing casts (absence evidence).",
+   "improvement": "REQ-SAG-0007 stays, backed by a named code symbol.",
+   "source": {
+    "ref": "REQ-SAG-0007"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0009 (low-level crates work without tokio)",
+   "records": [
+    "REQ-SAG-0009"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/Cargo.toml:[dependencies]",
+   "justification": "No crate lists tokio; sc-agent uses synchronous ureq and std::thread::scope (Run::send_batch).",
+   "improvement": "REQ-SAG-0009 stays, backed by a named code location.",
+   "source": {
+    "ref": "REQ-SAG-0009"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0011 (interrupt cancels cleanly)",
+   "records": [
+    "REQ-SAG-0011"
+   ],
+   "changes": [],
+   "code": "crates/decidr/src/main.rs:main",
+   "justification": "main installs ctrlc::set_handler (termination feature adds SIGTERM) calling Cancel::cancel; Cancel::check returns decision.cancelled; Run::send writes a row for each finished request; sc-agent-py interruptible and call_back catch KeyboardInterrupt; send_batch returns one result per request; main exits 1 after cancel.",
+   "improvement": "Kept with a code citation.",
+   "source": {
+    "ref": "REQ-SAG-0011"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0016 (typed error fields)",
+   "records": [
+    "REQ-SAG-0016"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:Error",
+   "justification": "Error::Failure has typed category (always set) and attempts (skipped when None); Run::send sets attempts; wheel returns error envelopes via respond_value and report; call_back converts callback exceptions to sc_agent_py.callback errors.",
+   "improvement": "Kept with a code citation.",
+   "source": {
+    "ref": "REQ-SAG-0016"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0017 (error category and retryable)",
+   "records": [
+    "REQ-SAG-0017"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:error",
+   "justification": "error() stores the category at construction; http.provider_busy gets busy, http.network gets network, both with action 'Retry later.'.",
+   "improvement": "Kept with a code citation.",
+   "source": {
+    "ref": "REQ-SAG-0017"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "delete",
+   "title": "Delete REQ-SAG-0703 (result cache)",
+   "records": [
+    "REQ-SAG-0703"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0703"
+    }
+   ],
+   "justification": "No anchor covers it; no cache, request hash or SHA-256 cache code under crates/; Run::send always resolves and posts; the session log is never read back. No anchor quote mentions caching.",
+   "improvement": "Removes a requirement with no code or owner words behind it.",
+   "source": {
+    "ref": "REQ-SAG-0703"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "cut_excess",
+   "title": "Cut the cache-hit statement from REQ-SAG-0701",
+   "records": [
+    "REQ-SAG-0701"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0701",
+     "before": "On a cache hit (REQ-SAG-0703), a result MUST carry the `session_id` of the existing session row that holds its result."
+    }
+   ],
+   "justification": "Depends on REQ-SAG-0703's cache, which has no code and is proposed for deletion; Run::send always creates a new session_id.",
+   "improvement": "REQ-SAG-0701 no longer points at a deleted requirement.",
+   "source": {
+    "ref": "REQ-SAG-0701"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep the remaining REQ-SAG-0701 statements (parallel batches)",
+   "records": [
+    "REQ-SAG-0701"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:Run::send_batch",
+   "justification": "send_batch spawns min(workers, requests) threads, workers default 8; each result carries index and session_id; one failure does not stop others; Cancel stops unfinished requests.",
+   "improvement": "Remaining statements kept with a code citation.",
+   "source": {
+    "ref": "REQ-SAG-0701"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0601 (busy resend and holdoff)",
+   "records": [
+    "REQ-SAG-0601"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:Route::post",
+   "justification": "Route::post resends 429/502/529 non-quota and network failures up to max_sends (default 5), honours Retry-After else 2^(attempt-1) s; Route::defer/holdoff share a per-host deadline; Cancel::wait ends holdoff on cancel; 401 and quota not resent. The text's HttpClient name is a naming mismatch (Holdoffs owned by Run).",
+   "improvement": "Kept with a code citation.",
+   "source": {
+    "ref": "REQ-SAG-0601"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0602 (quota is not busy)",
+   "records": [
+    "REQ-SAG-0602"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:Route::post",
+   "justification": "quota test (402 or quota body marker) yields http.quota_exhausted, never resent; busy is 429/502/529 and not quota.",
+   "improvement": "Kept with a code citation.",
+   "source": {
+    "ref": "REQ-SAG-0602"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0401 (credential resolution order)",
+   "records": [
+    "REQ-SAG-0401"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:key",
+   "justification": "key reads environment, then repository-root .env, then keyring; empty counts as missing; os_keyring uses the variable name as service and USER/USERNAME account.",
+   "improvement": "Kept with a code citation.",
+   "source": {
+    "ref": "REQ-SAG-0401"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0013 (config bounds)",
+   "records": [
+    "REQ-SAG-0013"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:config",
+   "justification": "workers is NonZeroUsize; settings validated; invalid_setting names setting and source; timeout_secs via Duration::try_from_secs_f64; Route::post refuses a key on plain http to non-loopback (http.key_on_plain_http).",
+   "improvement": "Kept with a code citation.",
+   "source": {
+    "ref": "REQ-SAG-0013"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0020 (environment variable names)",
+   "records": [
+    "REQ-SAG-0020"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:config",
+   "justification": "config builds EnvSource from prefix(tool); env values validated like file values; invalid_setting names the source; tests/config_and_values.rs checks DECIDR_WORKERS in the error. JSON-vs-string parsing is in external sc_config, not read.",
+   "improvement": "Kept with a code citation.",
+   "source": {
+    "ref": "REQ-SAG-0020"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "cut_excess",
+   "title": "Delete the C# and Go grammar statements and the no-API-change statement from REQ-SAG-0302",
+   "records": [
+    "REQ-SAG-0302"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0302",
+     "before": "The second release MUST add the C# grammar."
+    },
+    {
+     "record": "REQ-SAG-0302",
+     "before": "The C# grammar MUST have language id `csharp`."
+    },
+    {
+     "record": "REQ-SAG-0302",
+     "before": "The second release MUST add the Go grammar."
+    },
+    {
+     "record": "REQ-SAG-0302",
+     "before": "The query API MUST NOT require changes when a grammar is added."
+    }
+   ],
+   "justification": "No anchor covers REQ-SAG-0302. sc-treesitter `language` matches only python and rust; Cargo.toml depends only on tree-sitter-python and tree-sitter-rust; nothing implements C#, csharp or Go. The no-API-change statement is a future constraint with no check.",
+   "improvement": "REQ-SAG-0302 states only the grammars the code supports.",
+   "source": {
+    "ref": "REQ-SAG-0302"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep the remaining REQ-SAG-0302 statements (load grammars, run queries, Python and Rust)",
+   "records": [
+    "REQ-SAG-0302"
+   ],
+   "changes": [],
+   "code": "crates/sc-treesitter/src/lib.rs:language",
+   "justification": "language loads the Python and Rust grammars; query(&Language, source, query) runs a query; crates/sc-treesitter/tests/query.rs covers them.",
+   "improvement": "The record stays tied to existing code.",
+   "source": {
+    "ref": "REQ-SAG-0302"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0202 (question digest computed and recorded)",
+   "records": [
+    "REQ-SAG-0202"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:digest",
+   "justification": "digest(request, question) hashes the request with only that question; stored as question_digests on the response and session row; tests/records.rs checks it.",
+   "improvement": "The record stays tied to existing code.",
+   "source": {
+    "ref": "REQ-SAG-0202"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0301 (sc-treesitter holds no agent code)",
+   "records": [
+    "REQ-SAG-0301"
+   ],
+   "changes": [],
+   "code": "crates/sc-treesitter/Cargo.toml:dependencies",
+   "justification": "Only sc-agent crate dependency is sc-agent; no agent or decision-model code; uses sc_agent::error and Error only.",
+   "improvement": "The record stays tied to existing code.",
+   "source": {
+    "ref": "REQ-SAG-0301"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep REQ-SAG-0303 (PyO3 query access and sitr subcommands)",
+   "records": [
+    "REQ-SAG-0303"
+   ],
+   "changes": [],
+   "code": "crates/sitr/src/cli.rs:Command",
+   "justification": "Command has Languages and Queries, #[command(version)] gives --version; sc-agent-py pyfunction query passes caller language, source and query to sc_treesitter::query.",
+   "improvement": "The record stays tied to existing code.",
+   "source": {
+    "ref": "REQ-SAG-0303"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep ADR-SAG-0004 (crate layering and error values)",
+   "records": [
+    "ADR-SAG-0004"
+   ],
+   "changes": [],
+   "code": "crates/sc-agent/src/lib.rs:Error",
+   "justification": "Exactly the five named crates exist with downward dependencies; Error and error(id, message) returned as Result<T, Error>.",
+   "improvement": "The record stays tied to existing code.",
+   "source": {
+    "ref": "ADR-SAG-0004"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep ADR-SAG-0005 (sitr Python API in the sc-decidr wheel, sitr its own crate)",
+   "records": [
+    "ADR-SAG-0005"
+   ],
+   "changes": [],
+   "code": "crates/sc-treesitter/Cargo.toml:dependencies",
+   "justification": "sc-treesitter has no pyo3 or clap; sitr is a separate crate with clap; sc-agent-py exposes languages, queries, query, run from the one wheel.",
+   "improvement": "The record stays tied to existing code.",
+   "source": {
+    "ref": "ADR-SAG-0005"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep ADR-SAG-0017 (first release surfaces)",
+   "records": [
+    "ADR-SAG-0017"
+   ],
+   "changes": [],
+   "code": "release/sc-publish-consumer-input.json:channels",
+   "justification": "channels defines pypi, homebrew, scoop, winget; python_packages names sc-decidr; release_binaries decidr and sitr; crates lists published crates.",
+   "improvement": "The record stays tied to existing code.",
+   "source": {
+    "ref": "ADR-SAG-0017"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "keep_with_reason",
+   "title": "Keep ADR-SAG-0018 (sc-publish kit owns the release surface)",
+   "records": [
+    "ADR-SAG-0018"
+   ],
+   "changes": [],
+   "code": "release/sc-publish-pin.toml:sc-publish",
+   "justification": "Pins one full kit revision; header says edit sc-publish-consumer-input.json and re-run install.py; rendered release/*.toml beside .j2 templates.",
+   "improvement": "The record stays tied to existing code.",
+   "source": {
+    "ref": "ADR-SAG-0018"
+   }
+  },
+  {
+   "wave": 1,
+   "kind": "consolidate",
+   "title": "Delete the Jev API format statement from REQ-SAG-0801; ADR-SAG-0001 keeps it",
+   "records": [
+    "REQ-SAG-0801",
+    "ADR-SAG-0001"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0801",
+     "before": "`sc-agent` MUST send requests to a local decision runner in the Jev API format.",
+     "keeps": "For decision requests, every decision provider receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, and LLM providers one LLM trait (JSON in, JSON out). Jev implements the decision trait over SystemOne. One type per wire format, OpenAI-compatible chat/completions and Anthropic-compatible Messages, implements both traits and is shared by every provider of that format. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them."
+    }
+   ],
+   "justification": "ADR-SAG-0001 decides every decision provider, local runners included, receives the one Jev API request body; REQ-SAG-0801 restates that choice (Correcting duplicates rule 3). Cutting the ADR sentence would remove its whole decision. REQ-SAG-0801's stub-local-runner acceptance criterion loses its statement; checked when applying.",
+   "source": {
+    "ref": "ADR-SAG-0001",
+    "commit": "057b8146"
+   },
+   "improvement": "The Jev API request form is stated once, in ADR-SAG-0001.",
+   "duplicates": [
+    "ADR-SAG-0001/REQ-SAG-0801/4"
+   ]
+  },
+  {
+   "wave": 1,
+   "kind": "consolidate",
+   "title": "Delete REQ-SAG-0801's paid-API key rule; REQ-SAG-0019 keeps it",
+   "records": [
+    "REQ-SAG-0801",
+    "REQ-SAG-0019"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0801",
+     "before": "Configuration MUST NOT change where a paid API's key is sent.",
+     "keeps": "Configuration MUST NOT change a paid API's base address."
+    }
+   ],
+   "justification": "Both forbid configuration from redirecting a paid API. REQ-SAG-0019 owns what configuration may contain and has the matching acceptance test; REQ-SAG-0801 is about local runners (home rule 4). REQ-SAG-0801's last acceptance criterion tests this; checked when applying.",
+   "source": {
+    "ref": "REQ-SAG-0019",
+    "commit": "b98b4112"
+   },
+   "improvement": "The paid-API restriction is stated once, in REQ-SAG-0019.",
+   "duplicates": [
+    "REQ-SAG-0019/REQ-SAG-0801/7"
+   ]
+  },
+  {
+   "wave": 1,
+   "kind": "consolidate",
+   "title": "Cut 'shipped as package data' from ADR-SAG-0019; REQ-SAG-0018 keeps the obligation",
+   "records": [
+    "ADR-SAG-0019",
+    "REQ-SAG-0018"
+   ],
+   "changes": [
+    {
+     "record": "ADR-SAG-0019",
+     "before": "The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.\n\n1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection, API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query whose model call succeeded (a failed call writes no row; its error goes to the general log), at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.\n\n   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`, shipped as package data; the wheel moves to maturin's mixed layout and `import sc_agent` is unchanged.\n\n   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping.\n   - model selectors are Run arguments.\n   - A result line holds only the generic result fields; session data stays in the session row. The module reads session rows only through `sc_agent.session_rows`, finding a run's queries through its link records or the session_ids in its result lines, and never computes a session-log path.\n   - Python results are typed values, not dicts.\n   - sc-compose is an external render tool, not a wheel dependency; the template's front matter declares its sc-compose minimum (`requires.cli`), declared, not enforced.\n\n   **The lower-level API stays the contract.** `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public, and the generated code uses only them and the standard library.\n\n2. **Typed fields: `attempts` and `category`.** An error value carries at least `id`, `message` and `action`, plus `attempts` (sends made, the first included) and `category` (decision 6) when they apply; unset fields are not written (REQ-SAG-0016). Retry-After is read as a Duration and used for the wait before a resend (REQ-SAG-0601).\n\n5. **Python errors.** Every wheel call returns ok with a value or an error with its id and message; nothing raises (REQ-SAG-0016).\n\n6. **The category is stored when the error is built.** The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`. Every error has a stable id and stores its category, which Python reads from the `category` field (REQ-SAG-0017). Retryable means worth resubmitting as a new call later, after the wheel's own resends have run out; it is true for `busy` and `network` only, and a consumer that resubmits waits first rather than wrapping the wheel in an immediate retry loop.\n\n7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run's calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout. The timeout defaults to 120 s; REQ-SAG-0702 holds the rules.\n\n8. **`send_batch` returns one result per request, each with its input position**, while `on_result` still receives each line as it finishes (REQ-SAG-0702).\n\n11. **sitr is an optional, separate section of the consumer template.** It uses `sc_agent.sitr` only (ADR-SAG-0005, ADR-SAG-0021) and is kept separate from the decision call: extraction runs outside the decision path, and its output feeds the consumer's prompt authoring. In this phase one offline test shows extraction output reaching a dry-run request.\n\n14. **A run is a context object.** `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`); creating it mints the run's ULID `run_id` in Rust (as are `session_id` ULIDs), readable as `run.run_id`.",
+     "after": "The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.\n\n1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection, API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query whose model call succeeded (a failed call writes no row; its error goes to the general log), at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.\n\n   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`; the wheel moves to maturin's mixed layout and `import sc_agent` is unchanged.\n\n   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping.\n   - model selectors are Run arguments.\n   - A result line holds only the generic result fields; session data stays in the session row. The module reads session rows only through `sc_agent.session_rows`, finding a run's queries through its link records or the session_ids in its result lines, and never computes a session-log path.\n   - Python results are typed values, not dicts.\n   - sc-compose is an external render tool, not a wheel dependency; the template's front matter declares its sc-compose minimum (`requires.cli`), declared, not enforced.\n\n   **The lower-level API stays the contract.** `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public, and the generated code uses only them and the standard library.\n\n2. **Typed fields: `attempts` and `category`.** An error value carries at least `id`, `message` and `action`, plus `attempts` (sends made, the first included) and `category` (decision 6) when they apply; unset fields are not written (REQ-SAG-0016). Retry-After is read as a Duration and used for the wait before a resend (REQ-SAG-0601).\n\n5. **Python errors.** Every wheel call returns ok with a value or an error with its id and message; nothing raises (REQ-SAG-0016).\n\n6. **The category is stored when the error is built.** The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`. Every error has a stable id and stores its category, which Python reads from the `category` field (REQ-SAG-0017). Retryable means worth resubmitting as a new call later, after the wheel's own resends have run out; it is true for `busy` and `network` only, and a consumer that resubmits waits first rather than wrapping the wheel in an immediate retry loop.\n\n7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run's calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout. The timeout defaults to 120 s; REQ-SAG-0702 holds the rules.\n\n8. **`send_batch` returns one result per request, each with its input position**, while `on_result` still receives each line as it finishes (REQ-SAG-0702).\n\n11. **sitr is an optional, separate section of the consumer template.** It uses `sc_agent.sitr` only (ADR-SAG-0005, ADR-SAG-0021) and is kept separate from the decision call: extraction runs outside the decision path, and its output feeds the consumer's prompt authoring. In this phase one offline test shows extraction output reaching a dry-run request.\n\n14. **A run is a context object.** `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`); creating it mints the run's ULID `run_id` in Rust (as are `session_id` ULIDs), readable as `run.run_id`.",
+     "keeps": "The sc-decidr wheel's package data MUST include the consumer template."
+    }
+   ],
+   "justification": "Where the consumer template ships is a testable consumer-visible obligation held by REQ-SAG-0018. ADR-SAG-0019 keeps its decision and already cites REQ-SAG-0018 in the same sentence (rule 2). Deletion of words only.",
+   "source": {
+    "ref": "REQ-SAG-0018",
+    "commit": "a614f9c1"
+   },
+   "improvement": "The package-data obligation is stated once, in REQ-SAG-0018.",
+   "duplicates": [
+    "ADR-SAG-0019/REQ-SAG-0018/2"
+   ]
+  },
+  {
+   "wave": 1,
+   "kind": "consolidate",
+   "title": "Cut ADR-SAG-0020 clauses that restate REQ-SAG-0019 and REQ-SAG-0801",
+   "records": [
+    "ADR-SAG-0020",
+    "REQ-SAG-0019",
+    "REQ-SAG-0801"
+   ],
+   "changes": [
+    {
+     "record": "ADR-SAG-0020",
+     "before": "Configuration has two kinds of scope and two locations.\n\n- The shared scope is the file `sc-agent.json`. It holds shared defaults for configuration-reading CLIs: the project/phase (ADR-SAG-0021), worker count, and optional local-runner settings. A CLI file may override those defaults.\n- Each CLI that reads configuration has its own scope, the file `<cli>.json` named after the CLI: `decidr.json`, and the same pattern for every CLI added later. `sitr` reads no configuration.\n- The global location is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform, or the folder named by nonempty `SC_AGENT_HOME`. An explicit configuration directory takes precedence.\n- The local location is `<worktree>/.sc/sc-agent/`, where `<worktree>` is the root of the git work tree the CLI runs in. It holds the same file names with the same keys.\n\nThe CLIs and the files each one reads are these:\n\n| CLI | Global files | Local files | Environment prefix |\n|---|---|---|---|\n| `decidr` | `~/.sc-agent/decidr.local.json`, `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `<worktree>/.sc/sc-agent/decidr.local.json`, `<worktree>/.sc/sc-agent/decidr.json`, `<worktree>/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |\n| `sitr` | none | none | none |\n\nEvery CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. The table is updated when a CLI is added.\n\nA setting is looked up in nine layers, and the first layer that sets it wins:\n\n1. the CLI flag;\n2. the environment variable;\n3. the local `<cli>.local.json`;\n4. the local `<cli>.json`;\n5. the local `sc-agent.json`;\n6. the global `<cli>.local.json`;\n7. the global `<cli>.json`;\n8. the global `sc-agent.json`;\n9. the built-in default, or a typed error when the setting is required and has no default.\n\nModel entries, `models.<alias>`, are set only in configuration files, layers 3 to 8: each is a structured row (`provider` and `id` strings, `released` a `YYYY-MM-DD` date) that a flag or flat environment variable cannot express. `<alias>` becomes the row's short name. A row's provider is one sc-agent already has, so configuration can add a model, including a local model on another computer, but cannot change where a paid API's key is sent. A local endpoint (laya and the two decider endpoints) is configured by `<endpoint>.host` and `<endpoint>.port`, such as `laya.host` and `laya.port`.\n\nEnvironment variables are named after the CLI: `DECIDR_<SETTING>`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).\n\nConfiguration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152).",
+     "after": "Configuration has two kinds of scope and two locations.\n\n- The shared scope is the file `sc-agent.json`. It holds shared defaults for configuration-reading CLIs: the project/phase (ADR-SAG-0021), worker count, and optional local-runner settings. A CLI file may override those defaults.\n- Each CLI that reads configuration has its own scope, the file `<cli>.json` named after the CLI: `decidr.json`, and the same pattern for every CLI added later. `sitr` reads no configuration.\n- The global location is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform, or the folder named by nonempty `SC_AGENT_HOME`. An explicit configuration directory takes precedence.\n- The local location is `<worktree>/.sc/sc-agent/`, where `<worktree>` is the root of the git work tree the CLI runs in. It holds the same file names with the same keys.\n\nThe CLIs and the files each one reads are these:\n\n| CLI | Global files | Local files | Environment prefix |\n|---|---|---|---|\n| `decidr` | `~/.sc-agent/decidr.local.json`, `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `<worktree>/.sc/sc-agent/decidr.local.json`, `<worktree>/.sc/sc-agent/decidr.json`, `<worktree>/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |\n| `sitr` | none | none | none |\n\nEvery CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. The table is updated when a CLI is added.\n\nA setting is looked up in nine layers, and the first layer that sets it wins:\n\n1. the CLI flag;\n2. the environment variable;\n3. the local `<cli>.local.json`;\n4. the local `<cli>.json`;\n5. the local `sc-agent.json`;\n6. the global `<cli>.local.json`;\n7. the global `<cli>.json`;\n8. the global `sc-agent.json`;\n9. the built-in default.\n\nModel entries, `models.<alias>`, are set only in configuration files, layers 3 to 8: each is a structured row (`provider` and `id` strings, `released` a `YYYY-MM-DD` date) that a flag or flat environment variable cannot express. `<alias>` becomes the row's short name. A row's provider is one sc-agent already has.\n\nEnvironment variables are named after the CLI: `DECIDR_<SETTING>`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).\n\nConfiguration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152).",
+     "keeps": "When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error. A model entry MUST add one row to the model table. A local endpoint's address MUST be settable in configuration. Configuration MUST NOT change a paid API's base address. Configuration MUST be able to add a local model that runs on another computer."
+    }
+   ],
+   "justification": "Consumer-visible, testable configuration obligations live in REQs (rule 2); ADR-SAG-0020 keeps its scope and layering decision. Three deletions in the one decision statement: the layer-9 typed-error clause, the model-entry consequence clause (local model on another computer; paid API key destination), and the <endpoint>.host/.port sentence. REQ-SAG-0801's acceptance criteria still name laya.host and laya.port.",
+   "source": {
+    "ref": "REQ-SAG-0019",
+    "commit": "998015d2"
+   },
+   "improvement": "ADR-SAG-0020 states the scope and layering decision; the obligations are stated once, in REQ-SAG-0019 and REQ-SAG-0801.",
+   "duplicates": [
+    "ADR-SAG-0020/REQ-SAG-0019/0",
+    "ADR-SAG-0020/REQ-SAG-0019/5",
+    "ADR-SAG-0020/REQ-SAG-0019/7",
+    "ADR-SAG-0020/REQ-SAG-0019/18",
+    "ADR-SAG-0020/REQ-SAG-0801/5",
+    "ADR-SAG-0020/REQ-SAG-0801/7"
+   ]
+  },
+  {
+   "wave": 1,
+   "kind": "consolidate",
+   "title": "Cut the log-root, session-path and wheel-Logger restatements from ADR-SAG-0021",
+   "records": [
+    "ADR-SAG-0021",
+    "REQ-SAG-0003",
+    "REQ-SAG-0008"
+   ],
+   "changes": [
+    {
+     "record": "ADR-SAG-0021",
+     "before": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** The sc-decidr wheel returns the sc-observability crate's `Logger` to Python, named by the caller. Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue. The wheel has no dependency on the `sc-observability` Python package.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged, so with nothing configured every log lands under `~/.sc-agent/` for a full audit. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root: its `<CLI>_LOG_ROOT` environment override when set and non-empty (used by tests), else `~/.sc-agent`. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n- Session logs are `~/.sc-agent/sessions/<repo>/<agent_role>/<project>/sessions.jsonl`, and each one's run log is `runs.jsonl` in the same directory.\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+     "after": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+     "keeps": "With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/<cli>.log.jsonl`. When `<CLI>_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`. Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005). When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate. The wheel MUST NOT depend on the `sc-observability` Python package."
+    }
+   ],
+   "justification": "ADR-SAG-0021 keeps its decision (one Logger per process owned by the entry point; wheel hands out the crate's Logger; session sink; product and entry-point tables) and drops five restatements of REQ-SAG-0003 and REQ-SAG-0008 obligations, both already in related_documents. Deletions only.",
+   "source": {
+    "ref": "REQ-SAG-0003",
+    "commit": "f023c0d1"
+   },
+   "improvement": "ADR-SAG-0021 cites the REQs instead of restating five of their obligations.",
+   "duplicates": [
+    "ADR-SAG-0021/REQ-SAG-0003/0",
+    "ADR-SAG-0021/REQ-SAG-0003/1",
+    "ADR-SAG-0021/REQ-SAG-0003/3",
+    "ADR-SAG-0021/REQ-SAG-0008/1",
+    "ADR-SAG-0021/REQ-SAG-0008/2"
+   ]
+  }
+ ]
+}

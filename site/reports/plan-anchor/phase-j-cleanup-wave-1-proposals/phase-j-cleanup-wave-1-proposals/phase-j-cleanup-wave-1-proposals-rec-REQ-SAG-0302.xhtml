@@ -1,0 +1,168 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0302">
+  <div class="section-head">
+    <h2>REQ-SAG-0302 Any tree-sitter grammar</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0302&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;`sc-treesitter` MUST load tree-sitter grammars.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;`sc-treesitter` MUST run queries against any loaded grammar.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The first release MUST support the Python grammar.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The first release MUST support the Rust grammar.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The second release MUST add the C# grammar.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The C# grammar MUST have language id `csharp`.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The second release MUST add the Go grammar.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;The query API MUST NOT require changes when a grammar is added.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0302&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;The design must support any language; Python and Rust are needed first, C# and Go next.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;`sc-treesitter` MUST load tree-sitter grammars.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;`sc-treesitter` MUST run queries against any loaded grammar.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The first release MUST support the Python grammar.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The first release MUST support the Rust grammar.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The second release MUST add the C# grammar.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The C# grammar MUST have language id `csharp`.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The second release MUST add the Go grammar.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;The query API MUST NOT require changes when a grammar is added.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: A language id is the name a caller uses to select a grammar. A tree-sitter grammar describes a language for parsing. The query API is the `sc-treesitter` interface for running tree-sitter queries against a loaded grammar. API means application programming interface.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test verifies that a query runs against Python source and against Rust source through the same API call.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test verifies that after the second release the same call runs a query against C# source selected as `csharp` and against Go source.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test verifies that a grammar added after release is queried through the existing API with no API change.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Any tree-sitter grammar&quot;,
+    &quot;version&quot;: &quot;0.1.1&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.1.1</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>`sc-treesitter` MUST load tree-sitter grammars.</li>
+    <li>`sc-treesitter` MUST run queries against any loaded grammar.</li>
+    <li>The first release MUST support the Python grammar.</li>
+    <li>The first release MUST support the Rust grammar.</li>
+    <li>The second release MUST add the C# grammar.</li>
+    <li>The C# grammar MUST have language id `csharp`.</li>
+    <li>The second release MUST add the Go grammar.</li>
+    <li>The query API MUST NOT require changes when a grammar is added.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: A language id is the name a caller uses to select a grammar. A tree-sitter grammar describes a language for parsing. The query API is the `sc-treesitter` interface for running tree-sitter queries against a loaded grammar. API means application programming interface.</p>
+  <h3>Rationale</h3>
+  <p>The design must support any language; Python and Rust are needed first, C# and Go next.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A unit test verifies that a query runs against Python source and against Rust source through the same API call.</li>
+    <li>A unit test verifies that after the second release the same call runs a query against C# source selected as `csharp` and against Go source.</li>
+    <li>A unit test verifies that a grammar added after release is queried through the existing API with no API change.</li>
+  </ul>
+</section>
