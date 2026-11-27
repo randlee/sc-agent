@@ -1,5 +1,5 @@
 use pyo3::{
-    exceptions::PyKeyboardInterrupt,
+    exceptions::{PyKeyboardInterrupt, PyRuntimeError},
     prelude::*,
     types::{PyCFunction, PyDict, PyTuple},
 };
@@ -499,12 +499,19 @@ impl PyRun {
     }
     fn __exit__(
         &self,
+        py: Python<'_>,
         _kind: &Bound<'_, PyAny>,
         _value: &Bound<'_, PyAny>,
         _traceback: &Bound<'_, PyAny>,
     ) -> bool {
         if let Ok(run) = &self.0 {
-            let _ = sc_agent::report(run.logger(), run.close().map(|()| Value::Null));
+            let result = sc_agent::result(run.close().map(|()| Value::Null));
+            if result.get("ok").and_then(Value::as_bool) == Some(false) {
+                let message = result.to_string();
+                let envelope = raw(py, result);
+                PyErr::new::<PyRuntimeError, _>(format!("sc-agent Run.close failed: {message}"))
+                    .write_unraisable(py, Some(envelope.bind(py)));
+            }
         }
         false
     }
