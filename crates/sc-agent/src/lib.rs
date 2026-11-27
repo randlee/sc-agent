@@ -759,6 +759,7 @@ pub struct Provider {
     pub key: &'static str,
     pub wire: Wire,
     pub models: &'static [(&'static str, &'static str, &'static str)],
+    pub open: bool,
 }
 const CLAUDE: &[(&str, &str, &str)] = &[
     ("fable", "claude-fable-5-2", "2026-11-09"),
@@ -780,6 +781,7 @@ pub static PROVIDERS: &[Provider] = &[
         key: "TYPESAFE_API_KEY",
         wire: Wire::Jev,
         models: &[("jev", "jev-latest", "2026-10-14")],
+        open: false,
     },
     Provider {
         name: "anthropic",
@@ -787,6 +789,7 @@ pub static PROVIDERS: &[Provider] = &[
         key: "ANTHROPIC_API_KEY",
         wire: Wire::Messages,
         models: CLAUDE,
+        open: false,
     },
     Provider {
         name: "openai",
@@ -794,6 +797,7 @@ pub static PROVIDERS: &[Provider] = &[
         key: "OPENAI_API_KEY",
         wire: Wire::Chat,
         models: GPT,
+        open: false,
     },
     Provider {
         name: "openrouter",
@@ -810,6 +814,7 @@ pub static PROVIDERS: &[Provider] = &[
             ("luna", "openai/gpt-6-luna", "2026-09-22"),
             ("astra", "openai/gpt-6-astra", "2026-09-03"),
         ],
+        open: true,
     },
     Provider {
         name: "together",
@@ -826,6 +831,7 @@ pub static PROVIDERS: &[Provider] = &[
             ("luna", "openai/gpt-6-luna", "2026-09-22"),
             ("astra", "openai/gpt-6-astra", "2026-09-03"),
         ],
+        open: true,
     },
     Provider {
         name: "nous",
@@ -836,6 +842,7 @@ pub static PROVIDERS: &[Provider] = &[
             ("haiku", "anthropic/claude-haiku-5.5", "2026-10-07"),
             ("luna", "openai/gpt-6-luna", "2026-09-22"),
         ],
+        open: true,
     },
     Provider {
         name: "laya",
@@ -843,6 +850,7 @@ pub static PROVIDERS: &[Provider] = &[
         key: "",
         wire: Wire::Jev,
         models: &[("laya", "laya:en", "2026-09-23")],
+        open: false,
     },
     Provider {
         name: "decider_4b",
@@ -850,6 +858,7 @@ pub static PROVIDERS: &[Provider] = &[
         key: "",
         wire: Wire::Jev,
         models: &[("decider", "decider-4b-v2.1", "2026-09-24")],
+        open: false,
     },
     Provider {
         name: "decider_2b",
@@ -857,6 +866,7 @@ pub static PROVIDERS: &[Provider] = &[
         key: "",
         wire: Wire::Jev,
         models: &[("decider", "decider-2b-v11", "2026-09-24")],
+        open: false,
     },
 ];
 fn provider_named(name: &str) -> Result<&'static Provider, Error> {
