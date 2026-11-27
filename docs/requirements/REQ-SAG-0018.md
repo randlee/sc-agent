@@ -28,7 +28,6 @@ Definitions (how the template is built: ADR-SAG-0019 decision 1):
 - The error mapping maps an error's `category` (REQ-SAG-0017) to a consumer code through the consumer's map.
 - The public API is the names the sc-decidr wheel exports to consumers. The wheel README is `crates/sc-agent-py/README.md`.
 - The session tags are the `project` and `agent_role` values a decision call records in the session log.
-- The logging wiring passes one Logger, the consumer's or `logger(client name)`, to every decision call.
 - The permitted API is the names ADR-SAG-0019 decision 1 makes public: `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr`, plus the Python standard library and the consumer's own modules named through an extension point.
 - A dry run composes a consumer's requests without sending them. A record is a session-log row, a result line, a tool record, a link record or a general-log entry.
 - The consent gate is the consumer module's `allow_remote_judge` check before a decision call.
@@ -52,7 +51,6 @@ Definitions (how the template is built: ADR-SAG-0019 decision 1):
 - The public API MUST stay documented in the wheel README.
 - The wheel README MUST give the consumer template's render command.
 - Every decision call in the consumer module MUST pass the session tags.
-- The consumer module MUST contain the logging wiring.
 - The consumer module MUST cancel its running Run on `KeyboardInterrupt`.
 - The sitr section's extraction output MUST reach the consumer's prompt.
 - The wheel README MUST name the consumer template.
@@ -92,7 +90,6 @@ The owner requires every Python consumer to integrate identically, for errors, A
 - [ ] Inspection of `crates/sc-agent-py/README.md` finds every public-API name.
 - [ ] Inspection of `crates/sc-agent-py/README.md` finds the consumer template's render command.
 - [ ] A loopback test finds each query's session-log record carrying the session tags its call was given.
-- [ ] A loopback unit test finds the call's events in the injected Logger.
 - [ ] A loopback test raises `KeyboardInterrupt` during a batch and finds the Run cancelled.
 - [ ] An offline unit test renders with `sitr` true and finds extraction output from a checked-in source file in a dry-run request's prompt.
 - [ ] Inspection of `crates/sc-agent-py/README.md` finds the consumer template's path.

@@ -56,6 +56,5 @@ The entry point owns the process's one Logger (ADR-SAG-0021). The wheel already 
 **Related:**
 
 - REQ-SAG-0003
-- REQ-SAG-0022
 - ADR-SAG-0019
 - ADR-SAG-0021

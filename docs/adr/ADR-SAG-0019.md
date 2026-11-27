@@ -15,7 +15,7 @@
 
 ### Related Documents
 
-New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (categories), REQ-SAG-0702 (limits and batch order), REQ-SAG-0018 (the generated consumer module) and NFR-SAG-0003 (one Python floor). Decisions 13 to 15 were added, and decisions 1 and 14 amended, on 2026-11-24: model resolution is REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0103 and REQ-SAG-0801, configuration is REQ-SAG-0019, session rows, run log and cache are REQ-SAG-0005 and REQ-SAG-0703, the session-row reader is REQ-SAG-0022, and one owner is NFR-SAG-0004. ADR-SAG-0004 sets the crate layering and that errors are `Result<T, E>`; ADR-SAG-0021 sets the log paths and the session sink.
+New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (categories), REQ-SAG-0702 (limits and batch order), REQ-SAG-0018 (the generated consumer module) and NFR-SAG-0003 (one Python floor). Decisions 13 to 15 were added, and decisions 1 and 14 amended, on 2026-11-24: model resolution is REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0103 and REQ-SAG-0801, configuration is REQ-SAG-0019, session rows, run log and cache are REQ-SAG-0005 and REQ-SAG-0703, and one owner is NFR-SAG-0004. ADR-SAG-0004 sets the crate layering and that errors are `Result<T, E>`; ADR-SAG-0021 sets the log paths and the session sink.
 
 **Requirements:**
 
@@ -38,7 +38,6 @@ New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (categories),
 - REQ-SAG-0103
 - REQ-SAG-0801
 - REQ-SAG-0019
-- REQ-SAG-0022
 - NFR-SAG-0004
 
 **Architecture Decisions:**
@@ -56,7 +55,7 @@ The two existing consumers each rebuilt the wheel boundary, and the copies diver
 
 The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.
 
-1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection (decision 13), API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Neither session logging nor the injected general logger is optional (REQ-SAG-0008, REQ-SAG-0022). Session logging is always on: one row per query sent to a model, at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.
+1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection (decision 13), API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query sent to a model, at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.
 
    **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`, shipped as package data; the wheel moves to maturin's mixed layout and `import sc_agent` is unchanged.
 
