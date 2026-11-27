@@ -121,19 +121,6 @@
           "max_values": null
         },
         {
-          "name": "provider",
-          "long": "--provider",
-          "short": null,
-          "help": "",
-          "long_help": "",
-          "value_name": "PROVIDER",
-          "required": false,
-          "default_value": null,
-          "choices": [],
-          "min_values": null,
-          "max_values": null
-        },
-        {
           "name": "timeout_secs",
           "long": "--timeout-secs",
           "short": null,
