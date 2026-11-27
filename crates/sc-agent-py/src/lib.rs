@@ -332,15 +332,17 @@ impl PyRun {
                 .filter(|v| !v.is_none())
                 .map(logger_of)
                 .transpose()?;
+            let sleep = callback(sleep)?;
+            let lookup = callback(keyring_lookup)?;
             let flag = Arc::new(sc_agent::Cancel::default());
             let mut run = sc_agent::Run::new(args, logger, flag.clone())?;
-            if let Some(callback) = callback(sleep)? {
+            if let Some(callback) = sleep {
                 let flag = flag.clone();
                 run.wait = Box::new(move |delay| {
                     let _ = call_back::<_, Py<PyAny>>(&callback, delay.as_secs_f64(), &flag);
                 });
             }
-            if let Some(callback) = callback(keyring_lookup)? {
+            if let Some(callback) = lookup {
                 run.keyring = Box::new(move |name| {
                     call_back(&callback, name.to_owned(), &flag)
                         .map_err(|e| sc_agent::KeyringError::Read(e.to_string()))

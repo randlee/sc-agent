@@ -1083,6 +1083,7 @@ pub fn digest(request: &Value, question: &str) -> Result<String, Error> {
     .map_err(|e| error("decision.encode", e))
 }
 
+#[derive(Clone)]
 pub struct Options {
     pub environment: Vec<(OsString, OsString)>,
     pub settings: Settings,
@@ -1434,11 +1435,16 @@ pub struct Run {
     pub options: Options,
     pub cancel: Arc<Cancel>,
     pub wait: Box<dyn Fn(Duration) + Send + Sync>,
+    #[expect(
+        clippy::type_complexity,
+        reason = "the Run signature owns the injected keyring callback"
+    )]
     pub keyring: Box<dyn Fn(&str) -> Result<String, KeyringError> + Send + Sync>,
     found: Vec<(&'static Provider, String)>,
     logger: Arc<Logger>,
     owned: bool,
 }
+#[derive(Default)]
 pub struct RunArgs {
     pub tool: String,
     pub agent_role: String,
@@ -1464,10 +1470,7 @@ impl Run {
         if let Some(count) = args.workers {
             settings.workers = workers(count)?;
         }
-        let name = logger
-            .as_ref()
-            .map_or(args.tool.as_str(), |l| l.service_name().as_str())
-            .to_owned();
+        let name = logger.as_ref().map(|l| l.service_name().as_str());
         let options = Options {
             environment: std::env::vars_os().collect(),
             settings,
@@ -1477,7 +1480,7 @@ impl Run {
                 .map_err(|e| error("decidr.invalid_request_timeout", e))?,
             base_url: args.base_url,
             root,
-            log_root: log_root(&name)?,
+            log_root: log_root(name.unwrap_or(&args.tool))?,
             repo,
         };
         Self::from_options(options, args.tool, logger, cancel)
@@ -1821,6 +1824,168 @@ pub mod route_tests {
                 assert!(returned.contains(&cause), "lost cause {cause}: {returned}");
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn run_new_rejects_unknown_model_and_send_resolves_per_call() -> Test {
+        let root = Temp::new()?;
+        let logger = logger(&root)?;
+        let args = RunArgs {
+            tool: "decidr".into(),
+            agent_role: "test".into(),
+            project: Some("test".into()),
+            config_dir: Some(root.0.clone()),
+            model: Some("missing-contract-model".into()),
+            ..Default::default()
+        };
+        let failure = Run::new(args, Some(logger.clone()), Arc::new(Cancel::default()))
+            .err()
+            .ok_or("unknown model accepted")?;
+        assert_eq!(
+            result(Err(failure))["error"]["id"],
+            "types.unknown_short_name"
+        );
+        let reply = answer().to_string();
+        let stub = Stub::new(vec![
+            http(200, json!({"content":[{"text":reply}]})),
+            http(200, json!({"choices":[{"message":{"content":reply}}]})),
+        ])?;
+        let mut options = options(&root, &stub.url);
+        options.model = "haiku".into();
+        options.environment.clear();
+        let mut run = run(options, &logger)?;
+        let second = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let selected = second.clone();
+        run.keyring = Box::new(move |name| {
+            Ok(
+                if name
+                    == (if selected.load(Ordering::SeqCst) {
+                        "OPENROUTER_API_KEY"
+                    } else {
+                        "ANTHROPIC_API_KEY"
+                    })
+                {
+                    "test-secret".into()
+                } else {
+                    String::new()
+                },
+            )
+        });
+        assert!(run.sends_to("anthropic")?);
+        assert_eq!(run.send(&request())?["answers"], answer()["answers"]);
+        second.store(true, Ordering::SeqCst);
+        assert!(run.sends_to("openrouter")?);
+        assert_eq!(run.send(&request())?["answers"], answer()["answers"]);
+        assert_eq!(stub.finish()?.len(), 2);
+        logger.shutdown()?;
+        Ok(())
+    }
+    #[test]
+    fn run_close_shuts_down_only_an_owned_logger() -> Test {
+        for owned in [false, true] {
+            let root = Temp::new()?;
+            let logger = logger(&root)?;
+            let mut run = run(options(&root, "http://127.0.0.1:1/v1"), &logger)?;
+            assert!(!run.owned);
+            // Exercise both ownership branches with a test-owned logger and no default-path writes.
+            run.owned = owned;
+            run.close()?;
+            assert_eq!(logger.flush().is_err(), owned);
+            if !owned {
+                logger.shutdown()?;
+            }
+        }
+        Ok(())
+    }
+    #[test]
+    fn run_timeout_and_workers_apply_to_every_call() -> Test {
+        let root = Temp::new()?;
+        let logger = logger(&root)?;
+        let args = RunArgs {
+            tool: "decidr".into(),
+            agent_role: "test".into(),
+            project: Some("test".into()),
+            config_dir: Some(root.0.clone()),
+            timeout_secs: Some(30.0),
+            workers: Some(2),
+            ..Default::default()
+        };
+        let run = Run::new(args, Some(logger.clone()), Arc::new(Cancel::default()))?;
+        assert_eq!(run.options.settings.workers, 2);
+        let (provider, model) = model("jev", None)?;
+        let sends = Cell::new(0);
+        for _ in 0..2 {
+            let route = Route {
+                options: &run.options,
+                provider,
+                model: model.clone(),
+                base: String::new(),
+                cancel: &run.cancel,
+                wait: &*run.wait,
+                keyring: &keyring,
+                sends: &sends,
+            };
+            assert_eq!(
+                route.agent().config().timeouts().global,
+                Some(Duration::from_secs(30))
+            );
+        }
+        let defaults = options(&root, "http://127.0.0.1:1/v1");
+        let configured = defaults.settings.workers;
+        let next = self::super::Run::from_options(
+            defaults,
+            "decidr".into(),
+            Some(logger.clone()),
+            Arc::new(Cancel::default()),
+        )?;
+        assert_eq!(next.options.settings.workers, configured);
+        assert_eq!(next.options.timeout, Duration::from_secs(5));
+        logger.shutdown()?;
+        Ok(())
+    }
+    #[test]
+    fn run_with_invalid_timeout_or_workers_is_an_error() -> Test {
+        let root = Temp::new()?;
+        let logger = logger(&root)?;
+        for (timeout, workers, id) in [
+            (Some(-1.0), None, "decidr.invalid_request_timeout"),
+            (Some(f64::NAN), None, "decidr.invalid_request_timeout"),
+            (None, Some(0), "decidr.invalid_workers"),
+            (None, Some(-1), "decidr.invalid_workers"),
+        ] {
+            let args = RunArgs {
+                tool: "decidr".into(),
+                agent_role: "test".into(),
+                project: Some("test".into()),
+                config_dir: Some(root.0.clone()),
+                timeout_secs: timeout,
+                workers,
+                ..Default::default()
+            };
+            let failure = Run::new(args, Some(logger.clone()), Arc::new(Cancel::default()))
+                .err()
+                .ok_or("invalid override accepted")?;
+            assert_eq!(result(Err(failure))["error"]["id"], id);
+        }
+        logger.shutdown()?;
+        Ok(())
+    }
+    #[test]
+    fn run_sends_to_returns_the_resolution_error() -> Test {
+        let root = Temp::new()?;
+        let logger = logger(&root)?;
+        let mut options = options(&root, "http://127.0.0.1:1/v1");
+        options.environment.clear();
+        options.model = "haiku".into();
+        let mut run = run(options, &logger)?;
+        run.keyring = Box::new(|_| Ok(String::new()));
+        let failure = run
+            .sends_to(TYPESAFE)
+            .err()
+            .ok_or("missing key returned a boolean")?;
+        assert_eq!(result(Err(failure))["error"]["id"], "secrets.key_missing");
+        logger.shutdown()?;
         Ok(())
     }
 

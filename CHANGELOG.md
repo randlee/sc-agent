@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Breaking
+
+- Decision calls use one Rust/Python `Run` per command. Python exports native
+  `Run` and `Logger` classes, `TYPESAFE`, `provider_keys()` and `models()`.
+- Removed Python module-level `send`, `send_batch`, `Cancel`, the `provider=`
+  argument, and CLI `--provider`. Set timeout/workers on the Run and select
+  providers in model configuration. Invalid Python calls return
+  `sc_agent_py.invalid_option`.
+
 ## 0.4.1
 
 - Add the `models` configuration setting mapping a model name to a built-in `provider` and wire `id`; a configured name wins over the built-in table, and the built-in `jev` now resolves to `jev-latest`.
