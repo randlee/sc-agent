@@ -215,13 +215,22 @@ fn callback(value: Option<&Bound<'_, PyAny>>) -> Result<Option<Py<PyAny>>, Error
         })
         .transpose()
 }
-fn wait(delay: Duration, callback: &Option<Py<PyAny>>, cancel: &sc_agent::Cancel) {
+fn wait(
+    delay: Duration,
+    callback: &Option<Py<PyAny>>,
+    cancel: &sc_agent::Cancel,
+    callback_error: &Mutex<Option<Error>>,
+) {
     if let Some(callback) = callback {
         Python::attach(|py| {
-            if let Err(error) = callback.call1(py, (delay.as_secs_f64(),))
-                && error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
-            {
+            if let Err(error) = callback.call1(py, (delay.as_secs_f64(),)) {
                 cancel.cancel();
+                if !error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
+                    && let Ok(mut first) = callback_error.lock()
+                    && first.is_none()
+                {
+                    *first = Some(invalid(error));
+                }
             }
         });
     } else {
@@ -368,15 +377,23 @@ fn send(
         let flag = cancel_flag(cancel)?;
         let sleep = callback(sleep)?;
         let keyring = callback(keyring_lookup)?;
+        let callback_error = Mutex::new(None);
         interruptible(py, &flag, || {
-            sc_agent::send(
+            let result = sc_agent::send(
                 &value,
                 &options,
                 logger,
                 &flag,
-                &|delay| wait(delay, &sleep, &flag),
+                &|delay| wait(delay, &sleep, &flag, &callback_error),
                 &|name| lookup(name, &keyring, &flag),
-            )
+            );
+            match callback_error.lock() {
+                Ok(mut error) => error.take().map_or(result, Err),
+                Err(_) => Err(sc_agent::error(
+                    "sc_agent_py.callback",
+                    "sleep callback error recorder poisoned",
+                )),
+            }
         })
     })
 }
@@ -447,7 +464,7 @@ fn send_batch(
                 &options,
                 logger,
                 &flag,
-                &|delay| wait(delay, &sleep, &flag),
+                &|delay| wait(delay, &sleep, &flag, &callback_error),
                 &|name| lookup(name, &keyring, &flag),
                 &on_result,
             )

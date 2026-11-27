@@ -499,9 +499,9 @@ pub fn key(
         None => match dotenv()? {
             Some(value) => value,
             None => keyring(variable).map_err(|e| match e {
-                KeyringError::Read(_) => error(
+                KeyringError::Read(detail) => error(
                     "secrets.keyring_read",
-                    format!("The platform keyring is unavailable for {variable}. Set {variable} in the environment or repository .env."),
+                    format!("The platform keyring is unavailable for {variable}: {detail}. Set {variable} in the environment or repository .env."),
                 ),
                 KeyringError::Timeout => error("secrets.keyring_timeout", format!("OS keychain did not answer for {variable}; it may be waiting for approval. Approve access or set {variable} in the environment or .env.")),
             })?,
@@ -1599,13 +1599,23 @@ pub fn repository() -> Result<(PathBuf, String), Error> {
         .map(PathBuf::from)
         .unwrap_or(cwd);
     let origin = git(&["remote", "get-url", "origin"]);
-    let host = std::process::Command::new("hostname")
+    let output = std::process::Command::new("hostname")
         .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| error("config.repo", "host name unavailable"))?;
+        .map_err(|e| error("config.repo", format!("host name command failed: {e}")))?;
+    if !output.status.success() {
+        let detail = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+        return Err(error(
+            "config.repo",
+            format!("host name command failed with {}: {detail}", output.status),
+        ));
+    }
+    let host = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    if host.is_empty() {
+        return Err(error(
+            "config.repo",
+            "host name command returned an empty name",
+        ));
+    }
     let name = repository_identity(origin.as_deref(), &host, &root)?;
     Ok((root, name))
 }
