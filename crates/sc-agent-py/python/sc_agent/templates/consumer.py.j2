@@ -667,8 +667,9 @@ def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings
         line = result_line(jobs[index], settings, getattr(run, "run_id", None), project, result, verdict=verdict)
         try:
             on_line(line, result.value.answers if isinstance(result, Ok) else None)
-        except Exception as exc:
-            errors.append(exc)
+        except (Exception, KeyboardInterrupt) as exc:
+            errors.append(exc if isinstance(exc, Exception) else ClientError(
+                "CANCELED", "interrupted before the command finished", True, "Rerun the command; nothing partial was reported as complete."))
             if cancel is not None:
                 cancel()
             return

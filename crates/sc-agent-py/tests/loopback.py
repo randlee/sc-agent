@@ -182,6 +182,24 @@ class RenderedWheelLoopback(unittest.TestCase):
                 self.assertEqual((result.error.code, result.error.message), ("LOG.WRITE", "disk full"))
                 self.assertEqual(len(runner.received), 1)
 
+    def test_on_line_keyboard_interrupt_returns_canceled_error(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            client = self.load_clients(root)[0]
+            env = {"PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "PLAN_ANCHOR_LOG_ROOT": str(root)}
+            jobs = [client.BatchJob("item", None, str(i), 1, str(i), REQUEST, {}, {}, "directive") for i in range(3)]
+            def interrupt(_line, _answers):
+                raise KeyboardInterrupt
+            with Runner(3) as runner, patch.dict(os.environ, env, clear=True), chdir(root):
+                host, port = runner.address
+                (root / "sc-agent.json").write_text(json.dumps({"project": "loopback", "laya": {"host": host, "port": port}}))
+                opened = client.open_run(model="laya", project="loopback", config_dir=str(root), workers=1, cache=False)
+                with opened.value as run:
+                    result = client.run_batch(run, jobs, client.BatchSettings("plan", 1, "p", .6, False), on_line=interrupt)
+                self.assertFalse(result.ok)
+                self.assertEqual(result.error.code, "CANCELED")
+                self.assertEqual(len(runner.received), 1)
+
     def test_sitr_extract_logs_under_the_tool(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
