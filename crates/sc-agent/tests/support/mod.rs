@@ -272,7 +272,9 @@ pub fn keyring(_: &str) -> Result<String, sc_agent::KeyringError> {
         "test must not access keyring".into(),
     ))
 }
-pub fn no_wait(_: Duration) {}
+pub fn no_wait(_: Duration) -> Result<(), sc_agent::Error> {
+    Ok(())
+}
 pub fn rows(root: &Temp) -> Result<Vec<Value>, Box<dyn std::error::Error + Send + Sync>> {
     let path = root
         .0

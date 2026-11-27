@@ -113,15 +113,12 @@ fn respond(
     }
 }
 fn finish(logger: &Logger, owned: bool, value: Value) -> Value {
-    let flushed = logger.flush().map_err(|e| error("log.flush", e));
-    let stopped = if owned {
-        logger.shutdown().map_err(|e| error("log.shutdown", e))
-    } else {
-        Ok(())
-    };
-    match flushed.and(stopped) {
-        Ok(()) => value,
-        Err(e) => sc_agent::result(Err(e)),
+    match (
+        logger.flush(),
+        if owned { logger.shutdown() } else { Ok(()) },
+    ) {
+        (Err(e), _) => sc_agent::result(Err(error("log.flush", e))),
+        (Ok(()), shutdown) => sc_agent::after_shutdown(value, shutdown),
     }
 }
 fn option<T: for<'a, 'py> FromPyObject<'a, 'py>>(
@@ -219,22 +216,21 @@ fn wait(
     delay: Duration,
     callback: &Option<Py<PyAny>>,
     cancel: &sc_agent::Cancel,
-    callback_error: &Mutex<Option<Error>>,
-) {
+) -> Result<(), Error> {
     if let Some(callback) = callback {
-        Python::attach(|py| {
-            if let Err(error) = callback.call1(py, (delay.as_secs_f64(),)) {
+        Python::attach(|py| match callback.call1(py, (delay.as_secs_f64(),)) {
+            Ok(_) => Ok(()),
+            Err(error) if error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) => {
                 cancel.cancel();
-                if !error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
-                    && let Ok(mut first) = callback_error.lock()
-                    && first.is_none()
-                {
-                    *first = Some(sc_agent::error("sc_agent_py.callback", error));
-                }
+                Ok(())
             }
-        });
+            Err(error) => {
+                let _ = py.detach(|| cancel.wait(delay));
+                Err(sc_agent::error("sc_agent_py.callback", error))
+            }
+        })
     } else {
-        cancel.wait(delay);
+        cancel.wait(delay)
     }
 }
 fn callback_result(
@@ -391,18 +387,16 @@ fn send(
         let flag = cancel_flag(cancel)?;
         let sleep = callback(sleep)?;
         let keyring = callback(keyring_lookup)?;
-        let callback_error = Mutex::new(None);
-        let result = interruptible(py, &flag, || {
+        interruptible(py, &flag, || {
             sc_agent::send(
                 &value,
                 &options,
                 logger,
                 &flag,
-                &|delay| wait(delay, &sleep, &flag, &callback_error),
+                &|delay| wait(delay, &sleep, &flag),
                 &|name| lookup(name, &keyring, &flag),
             )
-        });
-        callback_result(callback_error, result)
+        })
     })
 }
 #[expect(
@@ -472,7 +466,7 @@ fn send_batch(
                 &options,
                 logger,
                 &flag,
-                &|delay| wait(delay, &sleep, &flag, &callback_error),
+                &|delay| wait(delay, &sleep, &flag),
                 &|name| lookup(name, &keyring, &flag),
                 &on_result,
             )

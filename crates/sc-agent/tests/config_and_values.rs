@@ -340,7 +340,13 @@ fn req_sag_0019_model_entry_accepts_released_date_and_rejects_malformed_date() -
     }))
     .err()
     .ok_or("invalid release date accepted")?;
-    assert!(failure.to_string().contains("config.invalid"));
+    let message = failure.to_string();
+    assert!(message.contains("config.invalid"), "{message}");
+    let parser_detail = message
+        .split_once("released must be a YYYY-MM-DD date: ")
+        .map(|(_, detail)| detail)
+        .ok_or("released date error lost its key-specific message")?;
+    assert!(!parser_detail.is_empty(), "{message}");
 
     let failure = configured_models(json!({
         "luna": {

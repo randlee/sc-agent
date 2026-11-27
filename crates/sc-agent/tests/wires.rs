@@ -531,6 +531,7 @@ fn configurable_send_count_does_not_overflow_the_backoff() -> Test {
             if let Ok(mut waits) = waits.lock() {
                 waits.push(delay);
             }
+            Ok(())
         },
         &keyring,
     ));

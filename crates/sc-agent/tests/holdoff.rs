@@ -25,6 +25,7 @@ fn req_sag_0601_holdoff_lock_is_shared_only_by_host_and_held_during_wait() -> Te
             if let Ok(mut seen) = observations.lock() {
                 seen.push((blocked, independent));
             }
+            Ok(())
         },
         &keyring,
     )?;

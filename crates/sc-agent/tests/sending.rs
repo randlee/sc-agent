@@ -112,6 +112,7 @@ fn req_sag_0601_busy_resends_unchanged_retry_after_and_exponential_backoff() -> 
             if let Ok(mut seen) = waits.lock() {
                 seen.push(delay);
             }
+            Ok(())
         };
         let got = send(
             &request(),
@@ -163,6 +164,7 @@ fn req_sag_0601_0017_busy_and_network_exhaustion_report_five_sends() -> Test {
                 if let Ok(mut w) = waits.lock() {
                     w.push(delay);
                 }
+                Ok(())
             },
             &keyring,
         ));
@@ -353,7 +355,8 @@ fn req_sag_0010_0011_cancel_during_retry_keeps_every_batch_position_and_row() ->
                 seen.push(delay);
             }
             cancel.cancel();
-            cancel.wait(Duration::from_secs(600)); // Already signalled: no real wait, regardless of scheduling.
+            let _ = cancel.wait(Duration::from_secs(600)); // Already signalled: no real wait, regardless of scheduling.
+            Ok(())
         },
         &keyring,
         &|index, value| {

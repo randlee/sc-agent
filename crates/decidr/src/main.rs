@@ -126,13 +126,7 @@ fn main() {
             } else {
                 sc_agent::report(&logger, outcome)
             };
-            match logger.shutdown() {
-                Ok(()) => value,
-                Err(error) => sc_agent::result(Err(sc_agent::error(
-                    "log.shutdown",
-                    format!("logger shutdown failed: {error}; command result: {value}"),
-                ))),
-            }
+            sc_agent::after_shutdown(value, logger.shutdown())
         }
     };
     let status = if value.get("ok") == Some(&Value::Bool(true)) && !cancelled.is_cancelled() {

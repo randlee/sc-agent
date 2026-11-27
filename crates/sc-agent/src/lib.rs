@@ -3,7 +3,7 @@ use sc_config::{
     StandardContext, StandardLayers,
 };
 use sc_observability::{LoggerConfig, ServiceName, v2::Logger};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::Error as DeError};
 use serde_json::{Value, json};
 use std::{
     cell::Cell,
@@ -62,7 +62,7 @@ impl Cancel {
             }
         }
     }
-    pub fn wait(&self, delay: Duration) {
+    pub fn wait(&self, delay: Duration) -> Result<(), Error> {
         if let Ok(state) = self.state.lock() {
             #[cfg(test)]
             route_tests::notify(&route_tests::WAIT_ENTERED);
@@ -70,6 +70,7 @@ impl Cancel {
                 .changed
                 .wait_timeout_while(state, delay, |state| !*state);
         }
+        Ok(())
     }
 }
 
@@ -87,6 +88,25 @@ pub enum Error {
         #[serde(skip_serializing_if = "Option::is_none")]
         session_id: Option<String>,
     },
+}
+pub fn after_shutdown(value: Value, shutdown: Result<(), impl std::fmt::Display>) -> Value {
+    let Err(shutdown) = shutdown else {
+        return value;
+    };
+    let original = value.get("error");
+    let message = format!("logger shutdown failed: {shutdown}; command result: {value}");
+    let mut failure = result(Err(error("log.shutdown", message)));
+    if let Some(target) = failure.get_mut("error").and_then(Value::as_object_mut) {
+        for key in ["attempts", "session_id"] {
+            if let Some(field) = original
+                .and_then(|error| error.get(key))
+                .filter(|value| !value.is_null())
+            {
+                target.entry(key).or_insert_with(|| field.clone());
+            }
+        }
+    }
+    failure
 }
 pub fn error(id: &'static str, message: impl ToString) -> Error {
     let category = match id {
@@ -163,13 +183,12 @@ pub struct ModelEntry {
     pub released: Option<String>,
 }
 
-fn deserialize_model_release<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
+fn deserialize_model_release<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
     let date = String::deserialize(deserializer)?;
     serde_json::from_value::<sc_observability::Timestamp>(json!(format!("{date}T00:00:00Z")))
-        .map_err(serde::de::Error::custom)?;
+        .map_err(|e| DeError::custom(format!("released must be a YYYY-MM-DD date: {e}")))?;
     Ok(Some(date))
 }
 #[derive(Clone, Debug, Serialize)]
@@ -1133,7 +1152,7 @@ pub struct Route<'a> {
     pub model: String,
     pub base: String,
     pub cancel: &'a Cancel,
-    pub wait: &'a (dyn Fn(Duration) + Sync),
+    pub wait: &'a (dyn Fn(Duration) -> Result<(), Error> + Sync),
     pub keyring: &'a (dyn Fn(&str) -> Result<String, KeyringError> + Sync),
     pub sends: &'a Cell<u32>,
 }
@@ -1341,9 +1360,9 @@ impl Route<'_> {
             let busy = [429, 502, 529].contains(&status) && !quota;
             if (busy || status == 0) && attempt < max {
                 let _hold = (status != 0).then(|| cancel.lock(&pause)).transpose()?;
-                (self.wait)(
-                    delay.unwrap_or_else(|| Duration::from_secs(2u64.saturating_pow(attempt - 1))),
-                );
+                let delay =
+                    delay.unwrap_or_else(|| Duration::from_secs(2u64.saturating_pow(attempt - 1)));
+                (self.wait)(delay)?;
                 continue;
             }
             let id = match status {
@@ -1385,7 +1404,7 @@ pub fn send(
     options: &Options,
     logger: &Logger,
     cancel: &Cancel,
-    wait: &(dyn Fn(Duration) + Sync),
+    wait: &(dyn Fn(Duration) -> Result<(), Error> + Sync),
     keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
 ) -> Result<Value, Error> {
     let session_id = ulid::Ulid::new().to_string();
@@ -1506,7 +1525,7 @@ pub fn batch(
     options: &Options,
     logger: &Logger,
     cancel: &Cancel,
-    wait: &(dyn Fn(Duration) + Sync),
+    wait: &(dyn Fn(Duration) -> Result<(), Error> + Sync),
     keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
     on_result: &(dyn Fn(usize, &Value) + Sync),
 ) -> Result<Value, Error> {
@@ -1559,9 +1578,13 @@ pub fn repository() -> Result<(PathBuf, String), Error> {
         .map(PathBuf::from)
         .unwrap_or(cwd);
     let origin = git(&["remote", "get-url", "origin"]);
-    let output = std::process::Command::new("hostname")
-        .output()
-        .map_err(|e| error("config.repo", format!("host name command failed: {e}")))?;
+    let host = hostname(std::process::Command::new("hostname").output())?;
+    let name = repository_identity(origin.as_deref(), &host, &root)?;
+    Ok((root, name))
+}
+fn hostname(output: std::io::Result<std::process::Output>) -> Result<String, Error> {
+    let output =
+        output.map_err(|e| error("config.repo", format!("host name command failed: {e}")))?;
     if !output.status.success() {
         let detail = String::from_utf8_lossy(&output.stderr).trim().to_owned();
         return Err(error(
@@ -1570,14 +1593,9 @@ pub fn repository() -> Result<(PathBuf, String), Error> {
         ));
     }
     let host = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-    if host.is_empty() {
-        return Err(error(
-            "config.repo",
-            "host name command returned an empty name",
-        ));
-    }
-    let name = repository_identity(origin.as_deref(), &host, &root)?;
-    Ok((root, name))
+    (!host.is_empty())
+        .then_some(host)
+        .ok_or_else(|| error("config.repo", "host name command returned an empty name"))
 }
 pub fn repository_identity(origin: Option<&str>, host: &str, root: &Path) -> Result<String, Error> {
     let remote = origin
@@ -1722,7 +1740,7 @@ pub mod route_tests {
                     let _ = entered.send(());
                 }))
             });
-            worker_cancel.wait(Duration::from_secs(600));
+            let _ = worker_cancel.wait(Duration::from_secs(600));
             let _ = finished.send(());
         });
         waiting
@@ -1829,6 +1847,43 @@ pub mod route_tests {
             result(after_cancel(Ok(json!(null)), &cancel))["error"]["id"],
             "decision.cancelled"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn hostname_command_failure_is_a_typed_config_error() -> Test {
+        let failure = super::hostname(Err(std::io::Error::other("controlled hostname failure")))
+            .err()
+            .ok_or("hostname failure accepted")?;
+        let value = result(Err(failure));
+        assert_eq!(value["error"]["id"], "config.repo");
+        assert!(
+            value["error"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("controlled hostname failure"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn shutdown_failure_keeps_attempts_and_session_id() -> Test {
+        let mut original = error("http.auth", "provider refused the request");
+        let Error::Failure {
+            attempts,
+            session_id,
+            ..
+        } = &mut original;
+        *attempts = Some(1);
+        *session_id = Some("session-1".into());
+        let value = after_shutdown(result(Err(original)), Err("controlled shutdown failure"));
+        assert_eq!(value["error"]["id"], "log.shutdown");
+        assert_eq!(value["error"]["attempts"], 1);
+        assert_eq!(value["error"]["session_id"], "session-1");
+        assert!(value["error"]["message"].as_str().is_some_and(|message| {
+            message.contains("http.auth")
+                && message.contains("provider refused the request")
+                && message.contains("controlled shutdown failure")
+        }));
         Ok(())
     }
 }

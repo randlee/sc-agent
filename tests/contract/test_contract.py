@@ -447,19 +447,28 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             self.assertEqual(waits, [0.125])
             self.assertEqual(received[0][2], received[1][2])
 
-    def test_sleep_callback_failure_keeps_the_lower_message(self):
-        def rejected(_):
+    def test_sleep_callback_failure_only_fails_its_batch_request(self):
+        waits = []
+        def rejected(delay):
+            waits.append(delay)
             raise ValueError("controlled sleep callback refusal")
-        for batch in (False, True):
-            with self.subTest(batch=batch), server([(429, {}, {})]) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-                send = self.api.send_batch if batch else self.api.send
-                result = send([REQUEST] if batch else REQUEST, project="contract", agent_role="contract",
-                              config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"],
-                              base_url=url, sleep=rejected)
-                error = self.error(result)
-                self.assertEqual(error["id"], "sc_agent_py.callback")
-                self.assertIn("controlled sleep callback refusal", error["message"])
-                self.assertEqual(len(received), 1)
+        replies = [(429, {"Retry-After": "0"}, {}), (200, {}, ANSWER)]
+        with server(replies) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
+            result = self.api.send_batch(
+                [REQUEST, REQUEST], workers=1, project="contract", agent_role="contract",
+                config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"],
+                base_url=url, sleep=rejected,
+            )
+        self.assertTrue(result["ok"], result)
+        first, second = [item["result"] for item in result["value"]]
+        error = self.error(first)
+        self.assertEqual(error["id"], "sc_agent_py.callback")
+        self.assertEqual(error["attempts"], 1)
+        self.assertTrue(error["session_id"])
+        self.assertIn("controlled sleep callback refusal", error["message"])
+        self.assertTrue(second["ok"], second)
+        self.assertEqual(waits, [0.0])
+        self.assertEqual(len(received), 2)
 
     def test_busy_holdoff_is_per_host_and_exponential(self):
         entered, finished = threading.Event(), threading.Event()
