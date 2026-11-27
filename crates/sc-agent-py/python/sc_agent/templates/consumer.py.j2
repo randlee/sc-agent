@@ -292,9 +292,16 @@ def call_result(run: Any, request: str | Mapping[str, Any], *, cache: bool | Non
 
 
 def call_batch_results(run: Any, requests: Sequence[str | Mapping[str, Any]], *, cache: bool | None = None,
-                       on_each: Callable[[int, Result[Reply, ClientError]], object] | None = None,
                        abort_on: frozenset[str] = frozenset(), category_codes: Mapping[str, str] | None = None,
                        repository_root: str = ".", consent_what: str = "The request text") -> Result[list[Result[Reply, ClientError]], ClientError]:
+    return _call_batch_results(run, requests, cache=cache, abort_on=abort_on, category_codes=category_codes,
+                               repository_root=repository_root, consent_what=consent_what)
+
+
+def _call_batch_results(run: Any, requests: Sequence[str | Mapping[str, Any]], *, cache: bool | None = None,
+                        on_each: Callable[[int, Result[Reply, ClientError]], object] | None = None,
+                        abort_on: frozenset[str] = frozenset(), category_codes: Mapping[str, str] | None = None,
+                        repository_root: str = ".", consent_what: str = "The request text") -> Result[list[Result[Reply, ClientError]], ClientError]:
     start = _start(run, abort_on, category_codes, repository_root, consent_what)
     if isinstance(start, Err):
         return start
@@ -659,6 +666,7 @@ def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings
     failed: list[ResultLine] = []
     delivered: set[int] = set()
     errors: list[Exception] = []
+    cancel: Callable[[], object] | None = run.cancel if run is not None and results is None else None
     def deliver(index: int, result: Result[Reply, ClientError]) -> None:
         if errors or index in delivered:
             return
@@ -666,17 +674,18 @@ def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings
         line = result_line(jobs[index], settings, getattr(run, "run_id", None), project, result, verdict=verdict)
         try:
             on_line(line, result.value.answers if isinstance(result, Ok) else None)
-        except Exception as exc:
-            errors.append(exc)
-            if results is None:
-                run.cancel()
+        except (Exception, KeyboardInterrupt) as exc:
+            errors.append(exc if isinstance(exc, Exception) else ClientError(
+                "CANCELED", "interrupted before the command finished", True, "Rerun the command; nothing partial was reported as complete."))
+            if cancel is not None:
+                cancel()
             return
         if not line.ok:
             failed.append(line)
     if results is None:
-        sent = call_batch_results(run, [job.body for job in jobs], cache=False if settings.repeat > 1 else cache,
-                                  on_each=deliver, abort_on=abort_on, category_codes=category_codes,
-                                  repository_root=repository_root, consent_what=consent_what)
+        sent = _call_batch_results(run, [job.body for job in jobs], cache=False if settings.repeat > 1 else cache,
+                                   on_each=deliver, abort_on=abort_on, category_codes=category_codes,
+                                   repository_root=repository_root, consent_what=consent_what)
         if errors:
             return Err(errors[0] if isinstance(errors[0], ClientError) else ClientError("DECIDR.ERROR", str(errors[0])))
         if isinstance(sent, Err):
