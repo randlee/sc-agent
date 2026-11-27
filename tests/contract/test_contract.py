@@ -12,8 +12,9 @@ import subprocess
 import tempfile
 import threading
 import tomllib
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from contextlib import contextmanager, redirect_stderr
+from contextlib import contextmanager
 from unittest.mock import patch
 import unittest
 
@@ -28,7 +29,7 @@ class IPv6ThreadingHTTPServer(ThreadingHTTPServer):
 
 
 @contextmanager
-def server(replies, respond=None, host="127.0.0.1"):
+def server(replies, respond=None, host="127.0.0.1", handled=None, errors=None):
     received = []
     lock = threading.Lock()
 
@@ -59,6 +60,16 @@ def server(replies, respond=None, host="127.0.0.1"):
             self.wfile.write(data)
 
     server_class = IPv6ThreadingHTTPServer if ":" in host else ThreadingHTTPServer
+    if handled is not None:
+        class ObservedServer(server_class):
+            def handle_error(self, request, client_address):
+                errors.append(traceback.format_exc())
+
+            def shutdown_request(self, request):
+                super().shutdown_request(request)
+                handled.set()  # The handler thread has recorded any error by now.
+
+        server_class = ObservedServer
     http = server_class((host, 0), Handler)
     thread = threading.Thread(target=http.serve_forever)
     thread.start()
@@ -1125,8 +1136,8 @@ class Cli(Isolated):
                     process.send_signal(interrupt)
                     release.wait()
                     return None
-                server_errors = io.StringIO()
-                with redirect_stderr(server_errors), server([None], respond) as (url, received):
+                handled, server_errors = threading.Event(), []
+                with server([None], respond, handled=handled, errors=server_errors) as (url, received):
                     port = int(url.split(":")[2].split("/")[0])
                     Path(folder, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": port}}))
                     env = {"PATH": os.defpath, "DECIDR_LOG_ROOT": folder,
@@ -1160,7 +1171,10 @@ class Cli(Isolated):
                                         pipe.close()
                             finally:
                                 release.set()
-                self.assertEqual(server_errors.getvalue(), "")
+                self.assertTrue(handled.wait(20),
+                                f"{interrupt.name} handler did not finish; "
+                                f"received={received!r}; stdout={stdout!r}; stderr={stderr!r}")
+                self.assertEqual(server_errors, [])
                 self.assertNotEqual(process.returncode, 0, stdout + stderr)
                 results = json.loads(stdout)
                 self.assertTrue(results["ok"], results)
