@@ -871,7 +871,12 @@ class Cli(Isolated):
                             process.kill()
                             process.communicate()
                 self.assertNotEqual(process.returncode, 0, stdout + stderr)
-                self.assertEqual(json.loads(stdout)["error"]["id"], "decision.cancelled")
+                results = json.loads(stdout)
+                self.assertTrue(results["ok"], results)
+                self.assertEqual(len(results["value"]), 3)
+                self.assertEqual([row["index"] for row in results["value"]], [0, 1, 2])
+                self.assertTrue(all(row["result"]["error"]["id"] == "decision.cancelled"
+                                    for row in results["value"]))
                 self.assertEqual(len(received), 1)
                 rows = [json.loads(line) for path in Path(folder).rglob("sessions.jsonl") for line in path.read_text().splitlines()]
                 self.assertEqual(len(rows), 3)

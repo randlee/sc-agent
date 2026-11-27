@@ -11,7 +11,7 @@ use std::{
     ffi::OsString,
     path::{Path, PathBuf},
     sync::{
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, MutexGuard, TryLockError,
         atomic::Ordering,
         mpsc::{Receiver, RecvTimeoutError},
     },
@@ -45,6 +45,18 @@ impl Cancel {
             match receiver.recv_timeout(Duration::from_millis(20)) {
                 Err(RecvTimeoutError::Timeout) => {}
                 other => return other.map_err(|e| error(id, e)),
+            }
+        }
+    }
+    pub fn lock<'a, T>(&self, mutex: &'a Mutex<T>) -> Result<MutexGuard<'a, T>, Error> {
+        loop {
+            self.check()?;
+            match mutex.try_lock() {
+                Ok(guard) => return Ok(guard),
+                Err(TryLockError::WouldBlock) => {
+                    std::thread::park_timeout(Duration::from_millis(20))
+                }
+                Err(TryLockError::Poisoned(e)) => return Err(error("http.network", e)),
             }
         }
     }
@@ -662,25 +674,34 @@ mod keyring_timeout_test {
     }
 }
 
+#[derive(Clone, Copy, Debug, Serialize)]
+pub enum Wire {
+    #[serde(rename = "systemone")]
+    Jev,
+    #[serde(rename = "chat/completions")]
+    Chat,
+    #[serde(rename = "messages")]
+    Messages,
+}
 #[derive(Debug, Serialize)]
 pub struct Provider {
     pub name: &'static str,
     pub url: &'static str,
     pub key: &'static str,
-    pub wire: &'static str,
+    pub wire: Wire,
     pub models: &'static [(&'static str, &'static str, &'static str)],
     pub open: bool,
 }
 const CLAUDE: &[(&str, &str, &str)] = &[
+    ("fable", "claude-fable-5-2", "2026-11-09"),
     ("haiku", "claude-haiku-5-5", "2026-10-07"),
     ("sonnet", "claude-sonnet-5-5", "2026-09-28"),
     ("opus", "claude-opus-5-5", "2026-09-22"),
-    ("fable", "claude-fable-5-2", "2026-11-09"),
 ];
 const GPT: &[(&str, &str, &str)] = &[
-    ("luna", "gpt-6-luna", "2026-09-22"),
     ("terra", "gpt-6.1-terra", "2026-10-26"),
     ("sol", "gpt-6.1-sol", "2026-09-29"),
+    ("luna", "gpt-6-luna", "2026-09-22"),
     ("astra", "gpt-6-astra", "2026-09-03"),
 ];
 pub static PROVIDERS: &[Provider] = &[
@@ -688,7 +709,7 @@ pub static PROVIDERS: &[Provider] = &[
         name: "typesafe",
         url: "https://api.typesafe.ai/v1",
         key: "TYPESAFE_API_KEY",
-        wire: "systemone",
+        wire: Wire::Jev,
         models: &[("jev", "jev-latest", "2026-10-14")],
         open: false,
     },
@@ -696,7 +717,7 @@ pub static PROVIDERS: &[Provider] = &[
         name: "anthropic",
         url: "https://api.anthropic.com/v1",
         key: "ANTHROPIC_API_KEY",
-        wire: "messages",
+        wire: Wire::Messages,
         models: CLAUDE,
         open: false,
     },
@@ -704,7 +725,7 @@ pub static PROVIDERS: &[Provider] = &[
         name: "openai",
         url: "https://api.openai.com/v1",
         key: "OPENAI_API_KEY",
-        wire: "chat/completions",
+        wire: Wire::Chat,
         models: GPT,
         open: false,
     },
@@ -712,15 +733,15 @@ pub static PROVIDERS: &[Provider] = &[
         name: "openrouter",
         url: "https://openrouter.ai/api/v1",
         key: "OPENROUTER_API_KEY",
-        wire: "chat/completions",
+        wire: Wire::Chat,
         models: &[
+            ("fable", "anthropic/claude-fable-5.2", "2026-11-09"),
+            ("terra", "openai/gpt-6.1-terra", "2026-10-26"),
             ("haiku", "anthropic/claude-haiku-5.5", "2026-10-07"),
+            ("sol", "openai/gpt-6.1-sol", "2026-09-29"),
             ("sonnet", "anthropic/claude-sonnet-5.5", "2026-09-28"),
             ("opus", "anthropic/claude-opus-5.5", "2026-09-22"),
-            ("fable", "anthropic/claude-fable-5.2", "2026-11-09"),
             ("luna", "openai/gpt-6-luna", "2026-09-22"),
-            ("terra", "openai/gpt-6.1-terra", "2026-10-26"),
-            ("sol", "openai/gpt-6.1-sol", "2026-09-29"),
             ("astra", "openai/gpt-6-astra", "2026-09-03"),
         ],
         open: true,
@@ -729,15 +750,15 @@ pub static PROVIDERS: &[Provider] = &[
         name: "together",
         url: "https://api.together.ai/v1",
         key: "TOGETHER_API_KEY",
-        wire: "chat/completions",
+        wire: Wire::Chat,
         models: &[
+            ("fable", "anthropic/claude-fable-5-2", "2026-11-09"),
+            ("terra", "openai/gpt-6.1-terra", "2026-10-26"),
             ("haiku", "anthropic/claude-haiku-5-5", "2026-10-07"),
+            ("sol", "openai/gpt-6.1-sol", "2026-09-29"),
             ("sonnet", "anthropic/claude-sonnet-5-5", "2026-09-28"),
             ("opus", "anthropic/claude-opus-5-5", "2026-09-22"),
-            ("fable", "anthropic/claude-fable-5-2", "2026-11-09"),
             ("luna", "openai/gpt-6-luna", "2026-09-22"),
-            ("terra", "openai/gpt-6.1-terra", "2026-10-26"),
-            ("sol", "openai/gpt-6.1-sol", "2026-09-29"),
             ("astra", "openai/gpt-6-astra", "2026-09-03"),
         ],
         open: true,
@@ -746,7 +767,7 @@ pub static PROVIDERS: &[Provider] = &[
         name: "nous",
         url: "https://inference-api.nousresearch.com/v1",
         key: "NOUS_API_KEY",
-        wire: "chat/completions",
+        wire: Wire::Chat,
         models: &[
             ("haiku", "anthropic/claude-haiku-5.5", "2026-10-07"),
             ("luna", "openai/gpt-6-luna", "2026-09-22"),
@@ -757,7 +778,7 @@ pub static PROVIDERS: &[Provider] = &[
         name: "laya",
         url: "",
         key: "",
-        wire: "systemone",
+        wire: Wire::Jev,
         models: &[("laya", "laya:en", "2026-09-23")],
         open: false,
     },
@@ -765,7 +786,7 @@ pub static PROVIDERS: &[Provider] = &[
         name: "decider_4b",
         url: "",
         key: "",
-        wire: "systemone",
+        wire: Wire::Jev,
         models: &[("decider", "decider-4b-v2.1", "2026-09-24")],
         open: false,
     },
@@ -773,7 +794,7 @@ pub static PROVIDERS: &[Provider] = &[
         name: "decider_2b",
         url: "",
         key: "",
-        wire: "systemone",
+        wire: Wire::Jev,
         models: &[("decider", "decider-2b-v11", "2026-09-24")],
         open: false,
     },
@@ -1035,6 +1056,8 @@ pub const DEFAULT_SYSTEM_PROMPT: &str = "Answer every question in the decision r
 type Auth = &'static [(&'static str, &'static str)];
 const BEARER: Auth = &[("Authorization", "Bearer {}")];
 const ANTHROPIC: Auth = &[("x-api-key", "{}"), ("anthropic-version", "2023-06-01")];
+// Messages model output limit: https://platform.claude.com/docs/en/models/overview
+const ANTHROPIC_MAX_TOKENS: u32 = 128000;
 pub struct Route<'a> {
     pub options: &'a Options,
     pub provider: &'static Provider,
@@ -1049,11 +1072,16 @@ pub struct Jev<'a>(pub &'a Route<'a>);
 pub struct OpenAiCompat<'a>(pub &'a Route<'a>);
 pub struct AnthropicCompat<'a>(pub &'a Route<'a>);
 fn ask(llm: &impl Llm, route: &Route<'_>, req: &DecisionRequest) -> Result<DecisionResult, Error> {
-    let prompt = route
-        .options
-        .settings
-        .decidr
-        .get(&format!("{}-system-prompt", route.options.model));
+    let decidr = &route.options.settings.decidr;
+    let short = route
+        .provider
+        .models
+        .iter()
+        .find(|row| row.1 == route.model)
+        .map_or(route.options.model.as_str(), |row| row.0);
+    let prompt = decidr
+        .get(&format!("{}-system-prompt", route.options.model))
+        .or_else(|| decidr.get(&format!("{short}-system-prompt")));
     let questions = req
         .get("questions")
         .and_then(Value::as_object)
@@ -1062,14 +1090,15 @@ fn ask(llm: &impl Llm, route: &Route<'_>, req: &DecisionRequest) -> Result<Decis
     let answers = questions
         .map(|(id, question)| (id, answer_schema(question)))
         .collect::<BTreeMap<_, _>>();
-    llm.call(&LlmRequest {
+    let reply = llm.call(&LlmRequest {
         system: Some(prompt.map_or(DEFAULT_SYSTEM_PROMPT, String::as_str).into()),
         messages: json!([{"role":"user","content":req.to_string()}]),
         schema: Some(json!({
             "type":"object", "required":["answers"], "additionalProperties":false,
             "properties":{"answers":{"type":"object","properties":answers,"required":answers.keys().collect::<Vec<_>>(),"additionalProperties":false}}
         })),
-    })
+    })?;
+    schema(req, &reply).map(|()| reply)
 }
 impl Decision for Jev<'_> {
     fn decide(&self, req: &DecisionRequest) -> Result<DecisionResult, Error> {
@@ -1077,7 +1106,8 @@ impl Decision for Jev<'_> {
         if let Some(body) = body.as_object_mut() {
             body.insert("model".into(), json!(self.0.model));
         }
-        self.0.post("systemone", BEARER, &body)
+        let reply = self.0.post("systemone", BEARER, &body)?;
+        schema(req, &reply).map(|()| reply)
     }
 }
 impl Decision for OpenAiCompat<'_> {
@@ -1115,11 +1145,18 @@ impl Llm for AnthropicCompat<'_> {
             .schema
             .as_ref()
             .map(|schema| json!({"format":{"type":"json_schema","schema":schema}}));
-        let body = json!({"model":self.0.model,"max_tokens":8192,"messages":req.messages,"system":req.system,"output_config":format});
+        let body = json!({"model":self.0.model,"max_tokens":ANTHROPIC_MAX_TOKENS,"messages":req.messages,"system":req.system,"output_config":format});
         self.0.text("messages", ANTHROPIC, body, "/content/0/text")
     }
 }
 impl Route<'_> {
+    fn agent(&self) -> ureq::Agent {
+        ureq::Agent::config_builder()
+            .http_status_as_error(false)
+            .timeout_global(Some(self.options.timeout))
+            .build()
+            .new_agent()
+    }
     fn text(&self, path: &str, auth: Auth, mut body: Value, at: &str) -> Result<Value, Error> {
         if let Some(fields) = body.as_object_mut() {
             fields.retain(|_, field| !field.is_null());
@@ -1174,16 +1211,11 @@ impl Route<'_> {
                 text.replace(&key, "[redacted]")
             }
         };
-        let agent = ureq::Agent::config_builder()
-            .http_status_as_error(false)
-            .timeout_global(Some(self.options.timeout))
-            .build()
-            .new_agent();
+        let agent = self.agent();
         for attempt in 1..=max {
             cancel.check()?;
             // A busy reply holds off senders to this host through its injected wait.
-            drop(pause.lock().map_err(|e| error("http.network", e))?);
-            cancel.check()?;
+            drop(cancel.lock(&pause)?);
             let mut post = agent.post(&url).header("Content-Type", "application/json");
             for (name, value) in auth.iter().filter(|_| !key.is_empty()) {
                 post = post.header(*name, value.replace("{}", &key));
@@ -1208,12 +1240,8 @@ impl Route<'_> {
                 }));
             });
             let (status, delay, text) = match cancel.recv(&receiver, "http.network")? {
-                Ok((status, delay, text)) => (
-                    status,
-                    delay,
-                    redact(text.map_err(|e| error("decision.response_parse", e))?),
-                ),
-                Err(e) => (0, None, redact(e.to_string())),
+                Ok((status, delay, Ok(text))) => (status, delay, redact(text)),
+                Ok((_, _, Err(e))) | Err(e) => (0, None, redact(e.to_string())),
             };
             if (200..300).contains(&status) {
                 return serde_json::from_str(&text)
@@ -1231,10 +1259,7 @@ impl Route<'_> {
                 .any(|needle| low.contains(needle));
             let busy = [429, 502, 529].contains(&status) && !quota;
             if (busy || status == 0) && attempt < max {
-                let _hold = (status != 0)
-                    .then(|| pause.lock())
-                    .transpose()
-                    .map_err(|e| error("http.network", e))?;
+                let _hold = (status != 0).then(|| cancel.lock(&pause)).transpose()?;
                 (self.wait)(delay.unwrap_or_else(|| Duration::from_secs(2u64.pow(attempt - 1))));
                 continue;
             }
@@ -1269,6 +1294,9 @@ pub fn workers(value: i64) -> Result<usize, Error> {
         .ok_or_else(|| error("decidr.invalid_workers", "workers must be positive"))
 }
 
+fn after_cancel(outcome: Result<Value, Error>, cancel: &Cancel) -> Result<Value, Error> {
+    outcome.and_then(|value| cancel.check().map(|()| value))
+}
 pub fn send(
     request: &Value,
     options: &Options,
@@ -1288,7 +1316,7 @@ pub fn send(
                 .collect::<BTreeMap<_, _>>()
         });
     let sends = Cell::new(0);
-    let mut outcome = (|| {
+    let outcome = (|| {
         cancel.check()?;
         let project = options.settings.project_required()?;
         slug(project)?;
@@ -1314,16 +1342,13 @@ pub fn send(
             keyring,
             sends: &sends,
         };
-        let reply = match provider.wire {
-            "messages" => AnthropicCompat(&route).decide(request),
-            "chat/completions" => OpenAiCompat(&route).decide(request),
-            _ => Jev(&route).decide(request),
-        }?;
-        schema(request, &reply).map(|()| reply)
+        match provider.wire {
+            Wire::Messages => AnthropicCompat(&route).decide(request),
+            Wire::Chat => OpenAiCompat(&route).decide(request),
+            Wire::Jev => Jev(&route).decide(request),
+        }
     })();
-    if let Err(e) = cancel.check() {
-        outcome = Err(e);
-    }
+    let mut outcome = after_cancel(outcome, cancel);
     if let Err(Error::Failure {
         session_id: id,
         attempts,
@@ -1497,4 +1522,60 @@ pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {
         return result(Err(failure));
     }
     result(outcome)
+}
+
+#[cfg(test)]
+extern crate self as sc_agent;
+#[cfg(test)]
+#[path = "../tests/support/mod.rs"]
+pub mod test_support;
+#[cfg(test)]
+mod route_tests {
+    use super::*;
+    use test_support::*;
+
+    #[test]
+    fn timeout_is_per_call_and_sets_the_transport_configuration() -> Test {
+        let root = Temp::new()?;
+        let cancel = Cancel::default();
+        let sends = Cell::new(0);
+        for timeout in [
+            Duration::from_secs(120),
+            Duration::from_millis(50),
+            Duration::from_secs(120),
+        ] {
+            let mut options = options(&root, "http://127.0.0.1:1/v1");
+            options.timeout = timeout;
+            let (provider, model) = model("jev", None)?;
+            let route = Route {
+                options: &options,
+                provider,
+                model,
+                base: String::new(),
+                cancel: &cancel,
+                wait: &no_wait,
+                keyring: &keyring,
+                sends: &sends,
+            };
+            assert_eq!(route.agent().config().timeouts().global, Some(timeout));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn cancellation_keeps_auth_errors_and_overrides_only_success() -> Test {
+        let cancel = Cancel::default();
+        cancel.cancel();
+        let failure = result(after_cancel(
+            Err(error("http.auth", "remote refusal")),
+            &cancel,
+        ));
+        assert_eq!(failure["error"]["id"], "http.auth");
+        assert_eq!(failure["error"]["message"], "remote refusal");
+        assert_eq!(
+            result(after_cancel(Ok(json!(null)), &cancel))["error"]["id"],
+            "decision.cancelled"
+        );
+        Ok(())
+    }
 }

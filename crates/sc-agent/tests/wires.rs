@@ -98,6 +98,7 @@ fn anthropic_compat_call_returns_the_json_the_model_wrote() -> Test {
     let seen = stub.finish()?;
     assert_eq!(seen[0].path, "/v1/messages");
     assert_eq!(seen[0].body["system"], "S");
+    assert_eq!(seen[0].body["max_tokens"], 128000);
     assert_eq!(
         seen[0].body["messages"],
         json!([{"role":"user","content":"hi"}])
@@ -413,4 +414,113 @@ fn keyless_resolution_names_every_missing_key_and_redacts_the_used_one() -> Test
     stub.finish()?;
     logger.shutdown()?;
     Ok(())
+}
+
+#[test]
+fn compat_reply_missing_the_schema_is_schema_mismatch() -> Test {
+    for (provider, model, raw) in [
+        (
+            "openai",
+            "luna",
+            json!({"choices":[{"message":{"content":"{}"}}]}),
+        ),
+        (
+            "anthropic",
+            "haiku",
+            json!({"content":[{"type":"text","text":"{}"}]}),
+        ),
+        ("typesafe", "jev", json!({})),
+    ] {
+        let root = Temp::new()?;
+        let stub = Stub::new(vec![http(200, raw)])?;
+        let opts = options(&root, &stub.url);
+        let failure = with_route(&opts, (provider, model), &stub.url, |route| {
+            match route.provider.wire {
+                sc_agent::Wire::Jev => Jev(route).decide(&request()),
+                sc_agent::Wire::Chat => OpenAiCompat(route).decide(&request()),
+                sc_agent::Wire::Messages => AnthropicCompat(route).decide(&request()),
+            }
+        })?;
+        assert_eq!(result(failure)["error"]["id"], "decision.schema_mismatch");
+        assert_eq!(stub.finish()?.len(), 1);
+    }
+    Ok(())
+}
+
+#[test]
+fn system_prompt_override_by_full_id() -> Test {
+    for (provider, model, key, raw, at) in [
+        (
+            "openai",
+            "gpt-6-luna",
+            "luna-system-prompt",
+            json!({"choices":[{"message":{"content":answer().to_string()}}]}),
+            "/messages/0/content",
+        ),
+        (
+            "anthropic",
+            "claude-haiku-5-5",
+            "haiku-system-prompt",
+            json!({"content":[{"type":"text","text":answer().to_string()}]}),
+            "/system",
+        ),
+    ] {
+        let root = Temp::new()?;
+        let stub = Stub::new(vec![http(200, raw)])?;
+        let mut opts = options(&root, &stub.url);
+        opts.model = model.into();
+        opts.provider = Some(provider.into());
+        opts.settings
+            .decidr
+            .insert(key.into(), "full-id prompt".into());
+        assert_eq!(sent(&root, &opts)?["answers"], answer()["answers"]);
+        let seen = stub.finish()?;
+        assert_eq!(seen[0].body.pointer(at), Some(&json!("full-id prompt")));
+    }
+    Ok(())
+}
+
+#[test]
+fn body_read_failure_is_resent() -> Test {
+    let root = Temp::new()?;
+    let stub = Stub::new(vec![Reply::Truncated, Reply::Truncated])?;
+    let mut opts = options(&root, &stub.url);
+    opts.settings.max_sends = 2;
+    let failure = result(sent(&root, &opts));
+    assert_eq!(failure["error"]["id"], "http.network");
+    assert_eq!(failure["error"]["attempts"], 2);
+    let seen = stub.finish()?;
+    assert_eq!(seen.len(), 2);
+    assert_eq!(seen[0].body, seen[1].body);
+    Ok(())
+}
+
+#[test]
+fn cancel_ends_a_wait_on_the_host_holdoff() -> Test {
+    use std::sync::{Arc, mpsc};
+    use std::time::Duration;
+    let cancel = Arc::new(Cancel::default());
+    let host = sc_agent::host_holdoff("cancel-wait.invalid")?;
+    let same_host = sc_agent::host_holdoff("cancel-wait.invalid")?;
+    let held = host.lock().map_err(|_| "holdoff poisoned")?;
+    let (started, arrived) = mpsc::channel();
+    let (finished, outcome) = mpsc::channel();
+    std::thread::scope(|scope| -> Test {
+        let waiting_cancel = cancel.clone();
+        scope.spawn(move || {
+            let _ = started.send(());
+            let result = waiting_cancel.lock(&same_host).map(|_| json!(null));
+            let _ = finished.send(result);
+        });
+        arrived.recv_timeout(Duration::from_secs(10))?;
+        cancel.cancel();
+        let result = outcome.recv_timeout(Duration::from_secs(10));
+        // Release before asserting so a broken blocking lock cannot hang cleanup.
+        drop(held);
+        assert_eq!(
+            sc_agent::result(result?)["error"]["id"],
+            "decision.cancelled"
+        );
+        Ok(())
+    })
 }

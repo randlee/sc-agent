@@ -641,3 +641,17 @@ fn config_local_endpoints() -> Test {
     );
     Ok(())
 }
+
+#[test]
+fn built_in_rows_are_newest_first() {
+    for provider in sc_agent::PROVIDERS {
+        assert!(
+            provider
+                .models
+                .windows(2)
+                .all(|rows| rows[0].2 >= rows[1].2),
+            "{}",
+            provider.name
+        );
+    }
+}

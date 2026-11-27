@@ -66,9 +66,8 @@ pub fn answer() -> Value {
 }
 pub enum Reply {
     Http(u16, Vec<(&'static str, &'static str)>, String),
-    HttpIfComplete(u16, Vec<(&'static str, &'static str)>, String),
     Disconnect,
-    Never,
+    Truncated,
 }
 pub fn http(status: u16, body: Value) -> Reply {
     Reply::Http(status, vec![], body.to_string())
@@ -135,7 +134,6 @@ impl Stub {
         let server_notify = notify.clone();
         let worker = std::thread::spawn(move || {
             let mut seen = vec![];
-            let mut unanswered = vec![];
             for reply in replies {
                 let (mut stream, _) = listener.accept()?;
                 if stopped.load(Ordering::SeqCst) {
@@ -144,27 +142,18 @@ impl Stub {
                 // Deadlines are hang guards only; no test waits for or asserts on elapsed time.
                 stream.set_read_timeout(Some(Duration::from_secs(5)))?;
                 stream.set_write_timeout(Some(Duration::from_secs(5)))?;
-                let request = match read_request(&mut stream) {
-                    Ok(request) => request,
-                    Err(_) if matches!(&reply, Reply::Never | Reply::HttpIfComplete(..)) => {
-                        // A timeout during connect/write is still an attempted send.
-                        seen.push(Request {
-                            path: String::new(),
-                            headers: vec![],
-                            body: Value::Null,
-                        });
-                        let _ = server_notify.send(());
-                        continue;
-                    }
-                    Err(error) => return Err(error),
-                };
+                let request = read_request(&mut stream)?;
                 seen.push(request);
                 let _ = server_notify.send(());
                 match reply {
                     Reply::Disconnect => stream.shutdown(std::net::Shutdown::Both)?,
-                    Reply::Never => unanswered.push(stream),
-                    Reply::Http(status, headers, body)
-                    | Reply::HttpIfComplete(status, headers, body) => {
+                    Reply::Truncated => {
+                        write!(
+                            stream,
+                            "HTTP/1.1 200 Test\r\nContent-Length: 100\r\nConnection: close\r\n\r\n{{"
+                        )?;
+                    }
+                    Reply::Http(status, headers, body) => {
                         write!(
                             stream,
                             "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n",
@@ -177,7 +166,6 @@ impl Stub {
                     }
                 }
             }
-            drop(unanswered);
             Ok(seen)
         });
         Ok(Self {
