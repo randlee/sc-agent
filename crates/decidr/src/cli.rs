@@ -18,8 +18,6 @@ pub enum Command {
         #[arg(long, default_value = "jev")]
         model: String,
         #[arg(long)]
-        provider: Option<String>,
-        #[arg(long)]
         agent_role: String,
         #[arg(long)]
         input: Option<PathBuf>,

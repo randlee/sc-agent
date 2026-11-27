@@ -1055,7 +1055,6 @@ pub struct Options {
     pub environment: Vec<(OsString, OsString)>,
     pub settings: Settings,
     pub model: String,
-    pub provider: Option<String>,
     pub agent_role: String,
     pub timeout: Duration,
     pub base_url: Option<String>,
@@ -1399,170 +1398,186 @@ pub fn workers(value: i64) -> Result<usize, Error> {
 fn after_cancel(outcome: Result<Value, Error>, cancel: &Cancel) -> Result<Value, Error> {
     outcome.and_then(|value| cancel.check().map(|()| value))
 }
-pub fn send(
-    request: &Value,
-    options: &Options,
-    logger: &Logger,
-    cancel: &Cancel,
-    wait: &(dyn Fn(Duration) -> Result<(), Error> + Sync),
-    keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
-) -> Result<Value, Error> {
-    let session_id = ulid::Ulid::new().to_string();
-    let digests = request
-        .get("questions")
-        .and_then(Value::as_object)
-        .map(|questions| {
-            questions
-                .keys()
-                .filter_map(|id| digest(request, id).ok().map(|hash| (id.clone(), hash)))
-                .collect::<BTreeMap<_, _>>()
-        });
-    let sends = Cell::new(0);
-    let outcome = (|| {
-        cancel.check()?;
-        let project = options.settings.project_required()?;
-        slug(project)?;
-        slug(&options.agent_role)?;
-        let found = candidates(
-            &options.model,
-            options.provider.as_deref(),
-            &options.settings.models,
-        )?;
-        let (provider, model) = resolve(found, options, keyring)?;
-        let base = match options.settings.local.get(provider.name) {
-            _ if !provider.url.is_empty() => provider.url.into(),
-            Some(runner) => format!("http://{}:{}/v1", runner.host, runner.port),
-            None => return Err(missing_setting(&format!("{}.host", provider.name))),
-        };
-        let route = Route {
-            options,
-            provider,
-            model,
-            base: options.base_url.clone().unwrap_or(base),
-            cancel,
-            wait,
-            keyring,
-            sends: &sends,
-        };
-        match provider.wire {
-            Wire::Messages => AnthropicCompat(&route).decide(request),
-            Wire::Chat => OpenAiCompat(&route).decide(request),
-            Wire::Jev => Jev(&route).decide(request),
-        }
-    })();
-    let mut outcome = after_cancel(outcome, cancel);
-    if let Err(Error::Failure {
-        session_id: id,
-        attempts,
-        ..
-    }) = &mut outcome
-    {
-        *id = Some(session_id.clone());
-        *attempts = (sends.get() > 0 || cancel.is_cancelled()).then(|| sends.get());
-    }
-    if let Ok(value) = &mut outcome
-        && let Some(fields) = value.as_object_mut()
-    {
-        fields.insert("attempts".into(), json!(sends.get()));
-        fields.insert("session_id".into(), json!(session_id));
-        fields.insert("question_digests".into(), json!(digests));
-    }
-    let mut session_failure = None;
-    let attach = |failure, context| contextual(failure, context, Some(&session_id));
-    let prior = || format!("original outcome: {outcome:?}");
-    if let Ok(project) = options.settings.project_required()
-        && slug(project).is_ok()
-        && slug(&options.agent_role).is_ok()
-    {
-        let row = json!({"session_id":session_id,"repo":options.repo,"agent_role":options.agent_role,"project":project,"request":request,"question_digests":digests,"result":match &outcome {Ok(v)=>json!({"ok":true,"value":v}),Err(e)=>json!({"ok":false,"error":e})}});
-        let path = options
-            .log_root
-            .join("sessions")
-            .join(&options.repo)
-            .join(&options.agent_role)
-            .join(project);
-        let _append = SESSION_APPEND
-            .lock()
-            .map_err(|e| attach(error("config.session", e), prior()))?;
-        let written = (|| -> std::io::Result<()> {
-            use std::io::Write;
-            std::fs::create_dir_all(&path)?;
-            writeln!(
-                std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(path.join("sessions.jsonl"))?,
-                "{row}"
-            )
-        })();
-        session_failure = written
-            .err()
-            .map(|e| attach(error("log.session_write", e), prior()));
-        if let Some(failure) = &session_failure
-            && let Err(log_failure) = log(logger, "error", json!(failure))
-        {
-            outcome = Err(attach(
-                log_failure,
-                format!("original session error: {failure}"),
-            ));
-        }
-    }
-    let logged = match &outcome {
-        Ok(value) => log(logger, "decision.result", json!({"response":value})),
-        Err(_) => Ok(()),
-    };
-    for failure in [logged, logger.flush().map_err(|e| error("log.flush", e))]
-        .into_iter()
-        .filter_map(Result::err)
-    {
-        let context = format!("original outcome: {outcome:?}; session error: {session_failure:?}");
-        outcome = Err(attach(failure, context));
-    }
-    outcome
+pub struct Run {
+    pub options: Options,
+    pub cancel: Arc<Cancel>,
+    pub wait: Box<dyn Fn(Duration) + Send + Sync>,
+    pub keyring: Box<dyn Fn(&str) -> Result<String, KeyringError> + Send + Sync>,
+    pub provider: &'static Provider,
+    found: Vec<(&'static Provider, String)>,
+    logger: Arc<Logger>,
+    owned: bool,
 }
-pub fn batch(
-    requests: &[Value],
-    options: &Options,
-    logger: &Logger,
-    cancel: &Cancel,
-    wait: &(dyn Fn(Duration) -> Result<(), Error> + Sync),
-    keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
-    on_result: &(dyn Fn(usize, &Value) + Sync),
-) -> Result<Value, Error> {
-    if options.settings.workers == 0 {
-        return Err(error("decidr.invalid_workers", "workers must be positive"));
+impl Run {
+    pub fn new(
+        options: Options,
+        logger: Option<Arc<Logger>>,
+        cancel: Arc<Cancel>,
+    ) -> Result<Self, Error> {
+        let found = candidates(&options.model, None, &options.settings.models)?;
+        let provider = found[0].0;
+        let owned = logger.is_none();
+        let logger = match logger {
+            Some(logger) => logger,
+            None => Arc::new(default_logger("decidr")?),
+        };
+        let waiting = cancel.clone();
+        Ok(Self {
+            options,
+            cancel,
+            wait: Box::new(move |delay| waiting.wait(delay)),
+            keyring: Box::new(os_keyring),
+            provider,
+            found,
+            logger,
+            owned,
+        })
     }
-    let next = std::sync::atomic::AtomicUsize::new(0);
-    let (sender, receiver) = std::sync::mpsc::channel();
-    Ok(std::thread::scope(|scope| {
-        for _ in 0..options.settings.workers.min(requests.len()) {
-            let sender = sender.clone();
-            let next = &next;
-            scope.spawn(move || {
-                loop {
-                    let index = next.fetch_add(1, Ordering::SeqCst);
-                    let Some(request) = requests.get(index) else {
-                        break;
-                    };
-                    let value = report(
-                        logger,
-                        send(request, options, logger, cancel, wait, keyring),
-                    );
-                    on_result(index, &value);
-                    let _ = sender.send((index, value));
-                }
-            });
+    pub fn logger(&self) -> &Logger {
+        &self.logger
+    }
+    pub fn close(&self) -> Result<(), Error> {
+        self.logger.flush().map_err(|e| error("log.flush", e))?;
+        if self.owned {
+            self.logger
+                .shutdown()
+                .map_err(|e| error("log.shutdown", e))?;
         }
-        drop(sender);
-        let mut results = receiver.into_iter().collect::<Vec<_>>();
-        results.sort_by_key(|(index, _)| *index);
-        json!(
-            results
-                .into_iter()
-                .map(|(index, value)| json!({"index":index,"result":value}))
-                .collect::<Vec<_>>()
-        )
-    }))
+        Ok(())
+    }
+    pub fn send(&self, request: &Value) -> Result<Value, Error> {
+        let (options, logger, cancel) = (&self.options, self.logger(), &*self.cancel);
+        let session_id = ulid::Ulid::new().to_string();
+        let digests = request
+            .get("questions")
+            .and_then(Value::as_object)
+            .map(|questions| {
+                questions
+                    .keys()
+                    .filter_map(|id| digest(request, id).ok().map(|hash| (id.clone(), hash)))
+                    .collect::<BTreeMap<_, _>>()
+            });
+        let sends = Cell::new(0);
+        let mut outcome = (|| {
+            cancel.check()?;
+            let project = options.settings.project_required()?;
+            slug(project)?;
+            slug(&options.agent_role)?;
+            let (provider, model) = resolve(self.found.clone(), options, &*self.keyring)?;
+            let base = match options.settings.local.get(provider.name) {
+                _ if !provider.url.is_empty() => provider.url.into(),
+                Some(runner) => format!("http://{}:{}/v1", runner.host, runner.port),
+                None => return Err(missing_setting(&format!("{}.host", provider.name))),
+            };
+            let route = Route {
+                options,
+                provider,
+                model,
+                base: options.base_url.clone().unwrap_or(base),
+                cancel,
+                wait: &*self.wait,
+                keyring: &*self.keyring,
+                sends: &sends,
+            };
+            let reply = match provider.wire {
+                "messages" => AnthropicCompat(&route).decide(request),
+                "chat/completions" => OpenAiCompat(&route).decide(request),
+                _ => Jev(&route).decide(request),
+            }?;
+            schema(request, &reply).map(|()| reply)
+        })();
+        if let Err(e) = cancel.check() {
+            outcome = Err(e);
+        }
+        if let Err(Error::Failure {
+            session_id: id,
+            attempts,
+            ..
+        }) = &mut outcome
+        {
+            *id = Some(session_id.clone());
+            *attempts = (sends.get() > 0 || cancel.is_cancelled()).then(|| sends.get());
+        }
+        if let Ok(value) = &mut outcome
+            && let Some(fields) = value.as_object_mut()
+        {
+            fields.insert("attempts".into(), json!(sends.get()));
+            fields.insert("session_id".into(), json!(session_id));
+            fields.insert("question_digests".into(), json!(digests));
+        }
+        if let Ok(project) = options.settings.project_required()
+            && slug(project).is_ok()
+            && slug(&options.agent_role).is_ok()
+        {
+            let row = json!({"session_id":session_id,"repo":options.repo,"agent_role":options.agent_role,"project":project,"request":request,"question_digests":digests,"result":match &outcome {Ok(v)=>json!({"ok":true,"value":v}),Err(e)=>json!({"ok":false,"error":e})}});
+            let path = options
+                .log_root
+                .join("sessions")
+                .join(&options.repo)
+                .join(&options.agent_role)
+                .join(project);
+            let _append = SESSION_APPEND
+                .lock()
+                .map_err(|e| error("config.session", e))?;
+            let written = (|| -> std::io::Result<()> {
+                use std::io::Write;
+                std::fs::create_dir_all(&path)?;
+                writeln!(
+                    std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(path.join("sessions.jsonl"))?,
+                    "{row}"
+                )
+            })();
+            if let Err(e) = written {
+                log(logger, "error", json!(error("log.session_write", e)))?;
+            }
+        }
+        if let Ok(value) = &outcome {
+            log(logger, "decision.result", json!({"response":value}))?;
+        }
+        logger.flush().map_err(|e| error("log.flush", e))?;
+        outcome
+    }
+    pub fn send_batch(
+        &self,
+        requests: &[Value],
+        on_result: &(dyn Fn(usize, &Value) + Sync),
+    ) -> Result<Value, Error> {
+        let options = &self.options;
+        if options.settings.workers == 0 {
+            return Err(error("decidr.invalid_workers", "workers must be positive"));
+        }
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        let (sender, receiver) = std::sync::mpsc::channel();
+        Ok(std::thread::scope(|scope| {
+            for _ in 0..options.settings.workers.min(requests.len()) {
+                let sender = sender.clone();
+                let next = &next;
+                scope.spawn(move || {
+                    loop {
+                        let index = next.fetch_add(1, Ordering::SeqCst);
+                        let Some(request) = requests.get(index) else {
+                            break;
+                        };
+                        let value = report(self.logger(), self.send(request));
+                        on_result(index, &value);
+                        let _ = sender.send((index, value));
+                    }
+                });
+            }
+            drop(sender);
+            let mut results = receiver.into_iter().collect::<Vec<_>>();
+            results.sort_by_key(|(index, _)| *index);
+            json!(
+                results
+                    .into_iter()
+                    .map(|(index, value)| json!({"index":index,"result":value}))
+                    .collect::<Vec<_>>()
+            )
+        }))
+    }
 }
 pub fn repository() -> Result<(PathBuf, String), Error> {
     let cwd = std::env::current_dir().map_err(|e| error("config.repo", e))?;
