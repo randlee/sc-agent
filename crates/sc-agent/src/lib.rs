@@ -200,17 +200,30 @@ pub struct Settings {
     pub local: BTreeMap<String, Runner>,
     pub max_sends: u32,
     pub decidr: BTreeMap<String, String>,
+    #[serde(skip)]
+    pub tool: String,
 }
-fn missing_setting(path: &str) -> Error {
+fn prefix(tool: &str) -> String {
+    format!("{}_", tool.to_uppercase().replace('-', "_"))
+}
+fn layers(tool: &str) -> String {
+    format!(
+        "local {tool}.local.json, local {tool}.json, local sc-agent.json, global {tool}.local.json, global {tool}.json, or global sc-agent.json"
+    )
+}
+fn missing_setting(tool: &str, path: &str) -> Error {
     error(
         "config.missing_setting",
         format!(
-            "Set {path} through DECIDR_{}, local decidr.local.json, local decidr.json, local sc-agent.json, global decidr.local.json, global decidr.json, or global sc-agent.json",
-            path.to_uppercase().replace('.', "__")
+            "Set {path} through {}{}, {}",
+            prefix(tool),
+            path.to_uppercase().replace('.', "__"),
+            layers(tool)
         ),
     )
 }
 fn setting<T: serde::de::DeserializeOwned>(
+    tool: &str,
     resolved: &Resolved,
     path: &str,
     default: Value,
@@ -222,14 +235,25 @@ fn setting<T: serde::de::DeserializeOwned>(
         && let Some((head, _)) = path.split_once('.')
         && PROVIDERS.iter().any(|p| p.url.is_empty() && p.name == head)
     {
-        return Err(invalid_setting(resolved, head, missing_setting(path)));
+        return Err(invalid_setting(resolved, head, missing_setting(tool, path)));
     }
     serde_json::from_value(selected.cloned().unwrap_or(default))
         .map_err(|e| invalid_setting(resolved, path, e))
 }
 impl Settings {
     pub fn project_required(&self) -> Result<&str, Error> {
-        self.project.as_deref().filter(|s| !s.is_empty()).ok_or_else(||error("config.missing_project", "Set project/phase through --project, SC_PROJECT, local decidr.local.json, local decidr.json, local sc-agent.json, global decidr.local.json, global decidr.json, or global sc-agent.json"))
+        self.project
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                error(
+                    "config.missing_project",
+                    format!(
+                        "Set project/phase through --project, SC_PROJECT, {}",
+                        layers(&self.tool)
+                    ),
+                )
+            })
     }
 }
 const KEYS: &[&str] = &[
@@ -248,7 +272,7 @@ pub struct Configuration {
 struct ConfigEnv(String, Vec<(OsString, OsString)>);
 impl LayerSource for ConfigEnv {
     fn load(&self, base: &Value) -> Result<Option<Layer>, ConfigError> {
-        let prefix = format!("{}_", self.0.to_uppercase().replace('-', "_"));
+        let prefix = prefix(&self.0);
         let variables = self
             .1
             .iter()
@@ -355,18 +379,19 @@ pub fn config(
         .map(|p| p.name)
     {
         if resolved.value.get(name).is_some_and(Value::is_object) {
-            let host = setting(&resolved, &format!("{name}.host"), Value::Null)?;
-            let port = setting(&resolved, &format!("{name}.port"), Value::Null)?;
+            let host = setting(tool, &resolved, &format!("{name}.host"), Value::Null)?;
+            let port = setting(tool, &resolved, &format!("{name}.port"), Value::Null)?;
             local.insert(name.into(), Runner { host, port });
         }
     }
     let config = Settings {
-        project: setting(&resolved, "project", Value::Null)?,
-        workers: setting(&resolved, "workers", json!(8))?,
-        models: setting(&resolved, "models", json!({}))?,
+        project: setting(tool, &resolved, "project", Value::Null)?,
+        workers: setting(tool, &resolved, "workers", json!(8))?,
+        models: setting(tool, &resolved, "models", json!({}))?,
         local,
-        max_sends: setting(&resolved, "max_sends", json!(5))?,
-        decidr: setting(&resolved, "decidr", json!({}))?,
+        max_sends: setting(tool, &resolved, "max_sends", json!(5))?,
+        decidr: setting(tool, &resolved, "decidr", json!({}))?,
+        tool: tool.into(),
     };
     if config.workers == 0 {
         return Err(invalid_setting(&resolved, "workers", "must be positive"));
@@ -1519,7 +1544,12 @@ impl Run {
             let base = match options.settings.local.get(provider.name) {
                 _ if !provider.url.is_empty() => provider.url.into(),
                 Some(runner) => format!("http://{}:{}/v1", runner.host, runner.port),
-                None => return Err(missing_setting(&format!("{}.host", provider.name))),
+                None => {
+                    return Err(missing_setting(
+                        &options.settings.tool,
+                        &format!("{}.host", provider.name),
+                    ));
+                }
             };
             let route = Route {
                 options,
