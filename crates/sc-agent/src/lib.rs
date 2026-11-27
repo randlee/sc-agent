@@ -1891,7 +1891,7 @@ pub mod route_tests {
             http(200, json!({"content":[{"text":reply}]})),
             http(200, json!({"choices":[{"message":{"content":reply}}]})),
         ])?;
-        let mut options = options(&root, &stub.url);
+        let mut options = single_reply_options(&root, &stub.url);
         options.model = "haiku".into();
         options.environment.clear();
         let mut run = run(options, &logger)?;
@@ -2176,7 +2176,7 @@ pub mod route_tests {
         let logger = logger(&root)?;
         let body = json!({"error":"controlled remote refusal"});
         let stub = Stub::new(vec![http(401, body.clone())])?;
-        let run = run(options(&root, &stub.url), &logger)?;
+        let run = run(single_reply_options(&root, &stub.url), &logger)?;
         let cancel = run.cancel.clone();
         let lower = run.send(&request()).err().ok_or("401 accepted")?;
         assert!(!cancel.is_cancelled());
