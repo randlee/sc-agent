@@ -113,15 +113,12 @@ fn respond(
     }
 }
 fn finish(logger: &Logger, owned: bool, value: Value) -> Value {
-    let flushed = logger.flush().map_err(|e| error("log.flush", e));
-    let stopped = if owned {
-        logger.shutdown().map_err(|e| error("log.shutdown", e))
-    } else {
-        Ok(())
-    };
-    match flushed.and(stopped) {
-        Ok(()) => value,
-        Err(e) => sc_agent::result(Err(e)),
+    match (
+        logger.flush(),
+        if owned { logger.shutdown() } else { Ok(()) },
+    ) {
+        (Err(e), _) => sc_agent::result(Err(error("log.flush", e))),
+        (Ok(()), shutdown) => sc_agent::after_shutdown(value, shutdown),
     }
 }
 fn option<T: for<'a, 'py> FromPyObject<'a, 'py>>(
@@ -155,19 +152,10 @@ fn options(
         option::<String>(named, "agent_role")?.ok_or_else(|| invalid("agent_role is required"))?;
     let model = option::<String>(named, "model")?.unwrap_or_else(|| "jev".into());
     let provider = option::<String>(named, "provider")?;
-    let (root, repo) = sc_agent::repository()?;
     let global = option::<String>(named, "config_dir")?.map(PathBuf::from);
     let project = option::<String>(named, "project")?;
-    let mut settings = sc_agent::config(
-        root.join(".git")
-            .exists()
-            .then_some(root.join(".sc/sc-agent"))
-            .as_deref(),
-        global.as_deref(),
-        &std::env::vars_os().collect::<Vec<_>>(),
-        project.as_deref(),
-    )?
-    .config;
+    let (loaded, root, repo) = sc_agent::load(global.as_deref(), project.as_deref())?;
+    let mut settings = loaded.config;
     sc_agent::model_with(&model, provider.as_deref(), &settings.models)?;
     if let Some(workers) = workers {
         settings.workers = workers;
@@ -224,18 +212,40 @@ fn callback(value: Option<&Bound<'_, PyAny>>) -> Result<Option<Py<PyAny>>, Error
         })
         .transpose()
 }
-fn wait(delay: Duration, callback: &Option<Py<PyAny>>, cancel: &sc_agent::Cancel) {
+fn wait(
+    delay: Duration,
+    callback: &Option<Py<PyAny>>,
+    cancel: &sc_agent::Cancel,
+) -> Result<(), Error> {
     if let Some(callback) = callback {
-        Python::attach(|py| {
-            if let Err(error) = callback.call1(py, (delay.as_secs_f64(),))
-                && error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
-            {
+        Python::attach(|py| match callback.call1(py, (delay.as_secs_f64(),)) {
+            Ok(_) => Ok(()),
+            Err(error) if error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) => {
                 cancel.cancel();
+                Ok(())
             }
-        });
+            Err(error) => {
+                let _ = py.detach(|| cancel.wait(delay));
+                Err(sc_agent::error("sc_agent_py.callback", error))
+            }
+        })
     } else {
-        cancel.wait(delay);
+        cancel.wait(delay)
     }
+}
+fn callback_result(
+    callback_error: Mutex<Option<Error>>,
+    outcome: Result<Value, Error>,
+) -> Result<Value, Error> {
+    if let Some(mut failure) = callback_error.into_inner().map_err(invalid)? {
+        let Error::Failure { message, .. } = &mut failure;
+        message.push_str(&format!(
+            "; original outcome: {}",
+            sc_agent::result(outcome)
+        ));
+        return Err(failure);
+    }
+    outcome
 }
 fn interruptible(
     py: Python<'_>,
@@ -461,10 +471,7 @@ fn send_batch(
                 &on_result,
             )
         });
-        match callback_error.into_inner().map_err(invalid)? {
-            Some(error) => Err(error),
-            None => result,
-        }
+        callback_result(callback_error, result)
     })
 }
 #[pyfunction]
@@ -572,6 +579,36 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn callback_failure_keeps_a_later_logging_failure() -> Result<(), Box<dyn std::error::Error>> {
+        for outcome in [
+            Err(sc_agent::error("log.flush", "controlled sink refusal")),
+            Ok(
+                json!([{"index":0,"result":sc_agent::result(Err(sc_agent::error("log.flush", "controlled sink refusal")))}]),
+            ),
+        ] {
+            let failure = callback_result(
+                Mutex::new(Some(sc_agent::error(
+                    "sc_agent_py.callback",
+                    "controlled callback refusal",
+                ))),
+                outcome,
+            )
+            .err()
+            .ok_or("combined failure lost")?;
+            let value = serde_json::to_value(failure)?;
+            assert_eq!(value["id"], "sc_agent_py.callback");
+            let message = value["message"].as_str().ok_or("message absent")?;
+            for detail in [
+                "controlled callback refusal",
+                "log.flush",
+                "controlled sink refusal",
+            ] {
+                assert!(message.contains(detail), "{message}");
+            }
+        }
+        Ok(())
+    }
     #[test]
     fn respond_mapping_returns_closed_logger_failure() -> Result<(), Box<dyn std::error::Error>> {
         let root = std::env::temp_dir().join(format!("wheel-finish-{}", std::process::id()));

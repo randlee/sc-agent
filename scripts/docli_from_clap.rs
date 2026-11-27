@@ -9,28 +9,6 @@ use std::path::{Path, PathBuf};
 use clap::{Arg, Command};
 use serde::Serialize;
 
-/// Failure while reading arguments or writing a model file.
-#[derive(Debug)]
-pub struct CliModelError {
-    message: String,
-}
-
-impl std::fmt::Display for CliModelError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(&self.message)
-    }
-}
-
-impl std::error::Error for CliModelError {}
-
-impl CliModelError {
-    fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-        }
-    }
-}
-
 /// A command (or subcommand) in the neutral model.
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct CliModel {
@@ -71,66 +49,34 @@ pub struct ArgumentSpec {
     choices: Vec<String>,
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
-impl CliModel {
-    /// Command name.
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Nested subcommands, sorted by name.
-    pub fn subcommands(&self) -> &[CliModel] {
-        &self.subcommands
-    }
-
-    /// Flags and options, sorted by name. Auto-injected help and version are omitted.
-    pub fn options(&self) -> &[OptionSpec] {
-        &self.options
-    }
-}
-
-#[cfg_attr(not(test), allow(dead_code))]
-impl OptionSpec {
-    /// Long form, including dashes.
-    pub fn long(&self) -> Option<&str> {
-        self.long.as_deref()
-    }
-
-    /// Canonical identifier.
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-}
-
 /// Build a model from `command` (typically `Cli::command()`).
 pub fn from_clap(command: &Command) -> CliModel {
     from_clap_path(command, command.get_name())
 }
 
 /// `--output <path>` from the process arguments.
-pub fn output_path_from_args() -> Result<PathBuf, CliModelError> {
+pub fn output_path_from_args() -> Result<PathBuf, String> {
     let mut args = std::env::args().skip(1);
     match (args.next().as_deref(), args.next()) {
         (Some("--output"), Some(path)) if args.next().is_none() && !path.is_empty() => {
             Ok(PathBuf::from(path))
         }
-        _ => Err(CliModelError::new("usage: gen-cli-model --output <path>")),
+        _ => Err("usage: gen-cli-model --output <path>".into()),
     }
 }
 
 /// Write `model` as pretty JSON, creating parent directories when needed.
-pub fn write_model(path: &Path, model: &CliModel) -> Result<(), CliModelError> {
+pub fn write_model(path: &Path, model: &CliModel) -> Result<(), String> {
     if let Some(parent) = path.parent()
         && !parent.as_os_str().is_empty()
     {
         std::fs::create_dir_all(parent)
-            .map_err(|error| CliModelError::new(format!("create {}: {error}", parent.display())))?;
+            .map_err(|error| format!("create {}: {error}", parent.display()))?;
     }
-    let mut bytes = serde_json::to_vec_pretty(model)
-        .map_err(|error| CliModelError::new(format!("encode model: {error}")))?;
+    let mut bytes =
+        serde_json::to_vec_pretty(model).map_err(|error| format!("encode model: {error}"))?;
     bytes.push(b'\n');
-    std::fs::write(path, bytes)
-        .map_err(|error| CliModelError::new(format!("write {}: {error}", path.display())))
+    std::fs::write(path, bytes).map_err(|error| format!("write {}: {error}", path.display()))
 }
 
 fn from_clap_path(command: &Command, full_name: &str) -> CliModel {
@@ -251,7 +197,7 @@ mod tests {
             .subcommand(Command::new("run").about("Run it"));
 
         let model = from_clap(&command);
-        assert_eq!(model.name(), "demo");
+        assert_eq!(model.name, "demo");
         assert_eq!(model.version.as_deref(), Some("1.2.3"));
         assert_eq!(model.description, "Demo tool");
         assert!(model.usage.contains("demo"));
@@ -265,20 +211,15 @@ mod tests {
         assert_eq!(file.help, "Input file");
 
         let verbose = model
-            .options()
+            .options
             .iter()
-            .find(|option| option.name() == "verbose")
+            .find(|option| option.name == "verbose")
             .expect("flag");
-        assert_eq!(verbose.long(), Some("--verbose"));
-        assert!(model.options().iter().all(|option| option.name() != "help"));
-        assert!(
-            model
-                .options()
-                .iter()
-                .all(|option| option.name() != "version")
-        );
+        assert_eq!(verbose.long.as_deref(), Some("--verbose"));
+        assert!(model.options.iter().all(|option| option.name != "help"));
+        assert!(model.options.iter().all(|option| option.name != "version"));
 
-        let names: Vec<&str> = model.subcommands().iter().map(CliModel::name).collect();
+        let names: Vec<&str> = model.subcommands.iter().map(|c| c.name.as_str()).collect();
         assert_eq!(names, ["run"]);
     }
 }

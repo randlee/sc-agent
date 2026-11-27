@@ -42,8 +42,7 @@ fn main() {
                 Ok(value)
             })();
             let value = flushed(sc_agent::report(&logger, result), logger.flush());
-            let _ = logger.shutdown();
-            value
+            sc_agent::after_shutdown(value, logger.shutdown())
         }
     };
     let status = if value.get("ok") == Some(&Value::Bool(true)) {

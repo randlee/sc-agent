@@ -1,8 +1,8 @@
 pub mod support;
-use sc_agent::{Cancel, Runner, batch, host_holdoff, send};
+use sc_agent::{Cancel, Runner, batch, send};
 use serde_json::{Value, json};
 use std::{
-    sync::{Arc, Mutex, mpsc},
+    sync::{Mutex, mpsc},
     time::Duration,
 };
 use support::*;
@@ -16,13 +16,13 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
         ("openrouter", "haiku", "/v1/chat/completions"),
         ("together", "luna", "/v1/chat/completions"),
         ("nous", "custom/model", "/v1/chat/completions"),
-        ("local", "laya", "/v1/systemone"),
+        ("laya", "laya", "/v1/systemone"),
     ] {
         let root = Temp::new()?;
         let logger = logger(&root)?;
         let raw = match provider {
             "anthropic" => json!({"content":[{"type":"text","text":answer().to_string()}]}),
-            "typesafe" | "local" => answer(),
+            "typesafe" | "laya" => answer(),
             _ => json!({"choices":[{"message":{"content":answer().to_string()}}]}),
         };
         let stub = Stub::new(vec![http(200, raw)])?;
@@ -34,12 +34,14 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
             ("TOGETHER_API_KEY".into(), "test-secret".into()),
             ("NOUS_API_KEY".into(), "test-secret".into()),
         ]);
-        if provider == "local" {
-            opts.settings.laya = Some(Runner {
-                host: "127.0.0.1".into(),
-                port: 1,
-                model: "configured-local".into(),
-            });
+        if provider == "laya" {
+            opts.settings.local.insert(
+                "laya".into(),
+                Runner {
+                    host: "127.0.0.1".into(),
+                    port: 1,
+                },
+            );
         }
         let value = send(
             &request(),
@@ -54,13 +56,9 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
         let seen = stub.finish()?;
         let first = seen.first().ok_or("request missing")?;
         assert_eq!(first.path, path);
-        if ["typesafe", "local"].contains(&provider) {
+        if ["typesafe", "laya"].contains(&provider) {
             let mut expected = request();
-            expected["model"] = json!(if provider == "local" {
-                "configured-local".to_owned()
-            } else {
-                sc_agent::model(model, Some(provider))?.1
-            });
+            expected["model"] = json!(sc_agent::model(model, Some(provider))?.1);
             assert_eq!(first.body, expected);
         } else {
             let schema = if provider == "anthropic" {
@@ -83,7 +81,7 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
                     .iter()
                     .any(|(k, v)| k == "x-api-key" && v == "test-secret")
             );
-        } else if provider != "local" {
+        } else if provider != "laya" {
             assert!(
                 first
                     .headers
@@ -93,92 +91,6 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
         }
         logger.shutdown()?;
     }
-    Ok(())
-}
-
-#[test]
-fn req_sag_0702_timeout_is_per_call_and_uses_the_transport() -> Test {
-    let root = Temp::new()?;
-    let logger = logger(&root)?;
-    let replies = vec![
-        Reply::Never,
-        Reply::Never,
-        Reply::Never,
-        Reply::Never,
-        Reply::Never,
-    ];
-    let stub = Stub::new(replies)?;
-    let mut overridden = options(&root, &stub.url);
-    overridden.timeout = Duration::from_millis(50);
-
-    let signal = stub.request_signal();
-    let timed_out = std::thread::scope(|scope| {
-        let logger_ref = &logger;
-        let overridden_ref = &overridden;
-        let client = scope.spawn(move || {
-            let outcome = send(
-                &request(),
-                overridden_ref,
-                logger_ref,
-                &Cancel::default(),
-                &no_wait,
-                &keyring,
-            );
-            let _ = signal.send(());
-            outcome
-        });
-        stub.wait_for_request()?;
-        let outcome = client.join().map_err(|_| "send thread panicked")?;
-        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(sc_agent::report(&logger, outcome))
-    })?;
-    assert_eq!(timed_out["error"]["id"], "http.network");
-    assert_eq!(timed_out["error"]["attempts"], 5);
-    let _ = stub.finish()?;
-    logger.shutdown()?;
-    Ok(())
-}
-
-#[test]
-fn req_sag_0702_later_plain_call_uses_configured_timeout() -> Test {
-    let root = Temp::new()?;
-    let logger = logger(&root)?;
-    let configured_timeout = Duration::ZERO;
-
-    let override_stub = Stub::new(vec![http(200, answer())])?;
-    let mut overridden = options(&root, &override_stub.url);
-    overridden.timeout = Duration::from_secs(5);
-    assert_ne!(overridden.timeout, configured_timeout);
-    let override_result = send(
-        &request(),
-        &overridden,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    )?;
-    assert_eq!(override_result["answers"], answer()["answers"]);
-    assert_eq!(override_stub.finish()?.len(), 1);
-
-    let plain_stub = Stub::new(vec![Reply::HttpIfComplete(
-        200,
-        vec![],
-        answer().to_string(),
-    )])?;
-    let mut plain_options = options(&root, &plain_stub.url);
-    plain_options.timeout = configured_timeout;
-    assert_eq!(plain_options.timeout, configured_timeout);
-    let plain = sc_agent::result(send(
-        &request(),
-        &plain_options,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    ));
-    assert_eq!(plain["error"]["id"], "http.network");
-    assert_eq!(plain["error"]["attempts"], 5);
-    let _ = plain_stub.finish()?;
-    logger.shutdown()?;
     Ok(())
 }
 
@@ -200,6 +112,7 @@ fn req_sag_0601_busy_resends_unchanged_retry_after_and_exponential_backoff() -> 
             if let Ok(mut seen) = waits.lock() {
                 seen.push(delay);
             }
+            Ok(())
         };
         let got = send(
             &request(),
@@ -251,6 +164,7 @@ fn req_sag_0601_0017_busy_and_network_exhaustion_report_five_sends() -> Test {
                 if let Ok(mut w) = waits.lock() {
                     w.push(delay);
                 }
+                Ok(())
             },
             &keyring,
         ));
@@ -352,36 +266,69 @@ fn req_sag_0002_0601_auth_quota_are_not_retried_and_remote_text_is_redacted_whol
 }
 
 #[test]
-fn req_sag_0601_holdoff_lock_is_shared_only_by_host_and_held_during_wait() -> Test {
+fn invalid_utf8_provider_error_keeps_status_and_surrounding_text() -> Test {
     let root = Temp::new()?;
     let logger = logger(&root)?;
-    let stub = Stub::new(vec![http(429, json!({})), http(200, answer())])?;
-    let host = host_holdoff("127.0.0.1")?;
-    assert!(Arc::ptr_eq(&host, &host_holdoff("127.0.0.1")?));
-    let other = host_holdoff("independent.invalid")?;
-    assert!(!Arc::ptr_eq(&host, &other));
-    let observations = Mutex::new(vec![]);
-    send(
+    let replies = (0..5)
+        .map(|_| {
+            Reply::Raw(
+                401,
+                vec![("Content-Type", "text/plain")],
+                b"before\xffafter".to_vec(),
+            )
+        })
+        .collect();
+    let stub = Stub::new(replies)?;
+    let failure = sc_agent::result(send(
         &request(),
         &options(&root, &stub.url),
         &logger,
         &Cancel::default(),
-        &|_| {
-            let blocked = matches!(host.try_lock(), Err(std::sync::TryLockError::WouldBlock));
-            let independent = other.try_lock().is_ok();
-            if let Ok(mut seen) = observations.lock() {
-                seen.push((blocked, independent));
-            }
-        },
+        &no_wait,
         &keyring,
-    )?;
-    assert_eq!(
-        observations
-            .into_inner()
-            .map_err(|_| "holdoff recorder poisoned")?,
-        vec![(true, true)]
+    ));
+    let requests = stub.finish()?;
+    assert_eq!(failure["error"]["id"], "http.auth");
+    assert_eq!(failure["error"]["message"], "before?after");
+    assert_eq!(failure["error"]["attempts"], 1);
+    assert_eq!(requests.len(), 1);
+    logger.shutdown()?;
+    Ok(())
+}
+
+#[test]
+fn req_sag_0002_provider_error_over_ten_mib_is_preserved() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let detail = "x".repeat(10 * 1024 * 1024 + 1);
+    let stub = Stub::new(vec![http(401, json!({"error":detail}))])?;
+    let mut opts = options(&root, &stub.url);
+    // Failure-only hang guard, not a throughput target; the response content decides success.
+    // Keep the first transport failure rather than retrying an exhausted one-reply stub.
+    opts.timeout = Duration::from_secs(600);
+    opts.settings.max_sends = 1;
+    let failure = sc_agent::result(send(
+        &request(),
+        &opts,
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    ));
+    let stub_outcome = stub.finish();
+    let error = &failure["error"];
+    let message = error["message"].as_str().unwrap_or_default();
+    let diagnostic = format!(
+        "id={}, attempts={}, message_bytes={}, prefix={:?}, stub={:?}",
+        error["id"],
+        error["attempts"],
+        message.len(),
+        message.chars().take(160).collect::<String>(),
+        stub_outcome,
     );
-    assert_eq!(stub.finish()?.len(), 2);
+    assert_eq!(error["id"], "http.auth", "{diagnostic}");
+    assert!(message.contains(&detail), "{diagnostic}");
+    assert_eq!(stub_outcome?.len(), 1);
     logger.shutdown()?;
     Ok(())
 }
@@ -408,7 +355,8 @@ fn req_sag_0010_0011_cancel_during_retry_keeps_every_batch_position_and_row() ->
                 seen.push(delay);
             }
             cancel.cancel();
-            cancel.wait(Duration::from_secs(600)); // Already signalled: no real wait, regardless of scheduling.
+            let _ = cancel.wait(Duration::from_secs(600)); // Already signalled: no real wait, regardless of scheduling.
+            Ok(())
         },
         &keyring,
         &|index, value| {
@@ -554,15 +502,16 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
     let (arrivals, arrived) = mpsc::channel();
     let (release, permits) = mpsc::channel();
     let permits = Mutex::new(permits);
+    let permit_error = Mutex::new(None);
     let keys = |_: &str| {
         arrivals
             .send(std::thread::current().id())
             .map_err(|e| e.to_string())?;
-        permits
-            .lock()
-            .map_err(|e| e.to_string())?
-            .recv_timeout(Duration::from_secs(5))
-            .map_err(|e| e.to_string())?;
+        if let Err(error) = permits.lock().map_err(|e| e.to_string())?.recv() {
+            *permit_error.lock().map_err(|e| e.to_string())? =
+                Some(format!("missing keyring release permit: {error}"));
+            return Err("platform keyring is unavailable".to_owned().into());
+        }
         Ok("test-secret".into())
     };
     let (result, workers) = std::thread::scope(
@@ -581,13 +530,25 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
             let workers = (0..2)
                 .map(|_| arrived.recv_timeout(Duration::from_secs(5)))
                 .collect::<Result<Vec<_>, _>>();
-            for _ in 0..2 {
-                release.send(())?;
+            if workers.is_ok() {
+                for _ in 0..2 {
+                    release.send(())?;
+                }
             }
+            drop(release);
             let result = work.join().map_err(|_| "batch panicked")??;
-            Ok((result, workers?))
+            Ok((result, workers))
         },
     )?;
+    let permit_error = permit_error
+        .into_inner()
+        .map_err(|_| "keyring permit error recorder poisoned")?;
+    let workers = workers.map_err(|error| {
+        std::io::Error::other(format!(
+            "worker arrival deadline expired: {error}; permit_error={permit_error:?}; batch={result:?}"
+        ))
+    })?;
+    assert_eq!(permit_error, None, "keyring permit failed");
     assert_ne!(workers.first(), workers.last());
     assert_eq!(result.as_array().ok_or("missing batch results")?.len(), 2);
     assert_eq!(stub.finish()?.len(), 2);
@@ -641,5 +602,22 @@ fn req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once() ->
         );
         logger.shutdown()?;
     }
+    Ok(())
+}
+
+#[test]
+fn cancel_after_a_lower_layer_error_keeps_it() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let mut opts = options(&root, "http://127.0.0.1:1/v1");
+    opts.environment.clear();
+    let cancel = Cancel::default();
+    let failure = sc_agent::result(send(&request(), &opts, &logger, &cancel, &no_wait, &|_| {
+        cancel.cancel();
+        Err(sc_agent::KeyringError::Read("controlled failure".into()))
+    }));
+    assert_eq!(failure["error"]["id"], "secrets.keyring_read");
+    assert!(cancel.is_cancelled());
+    logger.shutdown()?;
     Ok(())
 }

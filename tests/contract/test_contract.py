@@ -19,6 +19,7 @@ import unittest
 
 REQUEST = {"state": "evidence", "questions": {"q": {"type": "choice", "instructions": "True?", "criteria": {"yes": "true", "no": "false"}}}}
 ANSWER = {"model": "jev-1.14.0", "answers": {"q": {"type": "choice", "choice": "yes", "confidence": 0.73123456789, "probabilities": {"yes": 0.73123456789, "no": 0.26876543211}}}}
+INTERRUPT_CHILD = os.environ.get("SC_INTERRUPT_CHILD") == "1"
 
 
 @contextmanager
@@ -214,21 +215,30 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         release, arrived = threading.Event(), threading.Event()
         def respond(body):
             arrived.set()
-            release.wait(10)
+            release.wait()
             return 200, {}, ANSWER
         cancel, results = self.api.Cancel(), []
+        call = None
         with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            call = threading.Thread(target=lambda: results.append(self.api.send(
-                json.dumps(REQUEST), project="contract", agent_role="contract", config_dir=self.directory.name,
-                general_log=self.api.logger("decidr")["value"], base_url=url, timeout_secs=60.0, cancel=cancel)))
-            call.start()
-            self.assertTrue(arrived.wait(10))
-            cancel.cancel()
-            call.join(5)
-            ended = not call.is_alive()
-            release.set()
-            call.join(10)
-        self.assertTrue(ended, "send waited for the reply after cancel")
+            def send():
+                results.append(self.api.send(
+                    json.dumps(REQUEST), project="contract", agent_role="contract", config_dir=self.directory.name,
+                    general_log=self.api.logger("decidr")["value"], base_url=url, timeout_secs=60.0, cancel=cancel))
+
+            call = threading.Thread(target=send, daemon=True)
+            try:
+                call.start()
+                self.assertTrue(arrived.wait(10), f"request did not arrive; received={received!r}, results={results!r}")
+                cancel.cancel()
+                call.join(5)
+                self.assertFalse(call.is_alive(), f"send waited after cancel; received={received!r}, results={results!r}")
+            finally:
+                cancel.cancel()
+                release.set()
+                if call.is_alive():
+                    call.join(10)
+        self.assertEqual(len(received), 1)
+        self.assertEqual(len(results), 1)
         self.assertEqual(self.error(results[0])["id"], "decision.cancelled")
 
     def test_log_returns_an_event_the_logger_refuses(self):
@@ -287,7 +297,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         self.assertEqual(list(Path(self.directory.name).rglob("sessions.jsonl")), [])
 
     def test_project_precedence_through_session_paths(self):
-        initialized = subprocess.run(["git", "init", "--quiet"], capture_output=True, text=True)
+        initialized = subprocess.run(["git", "init", "--quiet"], capture_output=True, text=True, timeout=20)
         self.assertEqual(initialized.returncode, 0, initialized.stderr)
         root = Path.cwd()
         local = root / ".sc/sc-agent"
@@ -437,6 +447,29 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             self.assertEqual(waits, [0.125])
             self.assertEqual(received[0][2], received[1][2])
 
+    def test_sleep_callback_failure_only_fails_its_batch_request(self):
+        waits = []
+        def rejected(delay):
+            waits.append(delay)
+            raise ValueError("controlled sleep callback refusal")
+        replies = [(429, {"Retry-After": "0"}, {}), (200, {}, ANSWER)]
+        with server(replies) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
+            result = self.api.send_batch(
+                [REQUEST, REQUEST], workers=1, project="contract", agent_role="contract",
+                config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"],
+                base_url=url, sleep=rejected,
+            )
+        self.assertTrue(result["ok"], result)
+        first, second = [item["result"] for item in result["value"]]
+        error = self.error(first)
+        self.assertEqual(error["id"], "sc_agent_py.callback")
+        self.assertEqual(error["attempts"], 1)
+        self.assertTrue(error["session_id"])
+        self.assertIn("controlled sleep callback refusal", error["message"])
+        self.assertTrue(second["ok"], second)
+        self.assertEqual(waits, [0.0])
+        self.assertEqual(len(received), 2)
+
     def test_busy_holdoff_is_per_host_and_exponential(self):
         entered, finished = threading.Event(), threading.Event()
         waits, completed_during_holdoff, results = [], [], []
@@ -567,14 +600,36 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         self.assertTrue(got["value"][0]["result"]["ok"])
         self.assertEqual([self.error(item["result"])["id"] for item in got["value"][1:]], ["decision.cancelled"] * 2)
 
-    def test_pending_python_interrupt_ends_native_busy_wait(self):
+    def test_pending_python_interrupt_cancels_inflight_send(self):
+        if not INTERRUPT_CHILD:
+            env = dict(os.environ, SC_INTERRUPT_CHILD="1")
+            command = [sys.executable, "-m", "unittest", "discover", "-s", str(Path(__file__).parent),
+                       "-p", "test_contract.py", "-k", "test_pending_python_interrupt_cancels_inflight_send"]
+            try:
+                run = subprocess.run(command, env=env, text=True, capture_output=True, timeout=30)
+            except subprocess.TimeoutExpired as error:
+                self.fail(f"interrupt child timed out; stdout={error.stdout!r}; stderr={error.stderr!r}")
+            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+            return
+        previous_handler = signal.signal(signal.SIGINT, signal.default_int_handler)
+        self.addCleanup(signal.signal, signal.SIGINT, previous_handler)
+        release = threading.Event()
+        expired = threading.Event()
         def respond(body):
             _thread.interrupt_main()
-            return 429, {"Retry-After": "600"}, {}
+            if not release.wait(20):
+                expired.set()
+                release.set()
+                return 500, {}, {"error": "send_batch did not return while reply was withheld"}
+            return 200, {}, ANSWER
         with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            got = self.api.send_batch([REQUEST] * 3, workers=1,
-                                      project="contract", agent_role="contract", config_dir=self.directory.name,
-                                      general_log=self.api.logger("decidr")["value"], base_url=url)
+            try:
+                got = self.api.send_batch([REQUEST] * 3, workers=1,
+                                          project="contract", agent_role="contract", config_dir=self.directory.name,
+                                          general_log=self.api.logger("decidr")["value"], base_url=url)
+            finally:
+                release.set()
+        self.assertFalse(expired.is_set(), f"response backstop expired; received={received!r}, got={got!r}")
         self.assertTrue(got["ok"], got)
         self.assertEqual(len(received), 1)
         self.assertEqual([self.error(item["result"])["id"] for item in got["value"]], ["decision.cancelled"] * 3)
@@ -590,14 +645,14 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             self.assertTrue(got["ok"], got)
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret", "HOSTNAME": "not-the-host"}), server([(200, {}, ANSWER)] * 5) as (url, _):
             send(url)
-            subprocess.run(["git", "init", "--quiet"], check=True)
-            subprocess.run(["git", "remote", "add", "origin", "https://github.com/example/project.git"], check=True)
+            subprocess.run(["git", "init", "--quiet"], check=True, timeout=20)
+            subprocess.run(["git", "remote", "add", "origin", "https://github.com/example/project.git"], check=True, timeout=20)
             send(url)
             for origin in ("git@github.com:example/project.git", "https://example.com:8443/o/r.git", "ssh://git@example.com:2222/o/r.git"):
-                subprocess.run(["git", "remote", "set-url", "origin", origin], check=True)
+                subprocess.run(["git", "remote", "set-url", "origin", origin], check=True, timeout=20)
                 send(url)
         rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
-        host = subprocess.run(["hostname"], check=True, text=True, capture_output=True).stdout.strip()
+        host = subprocess.run(["hostname"], check=True, text=True, capture_output=True, timeout=20).stdout.strip()
         self.assertEqual(sorted(row["repo"] for row in rows), sorted([f"local/{host}/{Path.cwd().name}", "github.com/example/project", "github.com/example/project", "example.com/o/r", "example.com/o/r"]))
 
     def test_network_errors_are_returned_and_attempts_bounded(self):
@@ -633,7 +688,7 @@ class Cli(Isolated):
 
     def test_cli_size_and_worker_refusals_keep_typed_ids(self):
         binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
-        Path(self.directory.name, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": 1, "model": "local"}}))
+        Path(self.directory.name, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": 1}}))
         cases = [(["--batch", "--workers", str(workers)], "{}", "decidr.invalid_workers") for workers in (-1, 0)]
         for flags, text, expected in cases:
             got = subprocess.run([str(binary), "--config-dir", self.directory.name, "send", "--model", "laya",
@@ -734,7 +789,7 @@ class Cli(Isolated):
     def test_doctor_environment_sources(self):
         root = Path(self.directory.name).resolve()
         (root / "global").mkdir()
-        (root / "global/decidr.json").write_text('{"laya":{"host":"localhost","port":1,"model":"test"}}')
+        (root / "global/decidr.json").write_text('{"laya":{"host":"localhost","port":1}}')
         got = self.doctor(root, {"SC_PROJECT": "phase-d", "DECIDR_WORKERS": "3", "DECIDR_LAYA__PORT": "9000"})
         self.assertEqual(got.returncode, 0, got.stdout)
         rows = {row["path"]: row for row in json.loads(got.stdout)["value"]["settings"]}
@@ -813,7 +868,7 @@ class Cli(Isolated):
         with tempfile.TemporaryDirectory() as folder, server([(200, {}, ANSWER)]) as (url, received):
             port = int(url.split(":")[2].split("/")[0])
             config = Path(folder) / "decidr.json"
-            config.write_text(json.dumps({"project": "contract", "workers": 2, "laya": {"host": "127.0.0.1", "port": port, "model": "laya"}}))
+            config.write_text(json.dumps({"project": "contract", "workers": 2, "laya": {"host": "127.0.0.1", "port": port}}))
             env = {"PATH": os.defpath, "DECIDR_LOG_ROOT": folder,
                    "GIT_CEILING_DIRECTORIES": str(Path(folder).parent.resolve())}
             doctor = subprocess.run([str(binary), "--config-dir", folder, "doctor"], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
@@ -853,25 +908,52 @@ class Cli(Isolated):
         binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
         for interrupt in (signal.SIGINT, signal.SIGTERM):
             with self.subTest(signal=interrupt), tempfile.TemporaryDirectory() as folder:
+                release = threading.Event()
                 def respond(body):
                     process.send_signal(interrupt)
-                    return 429, {"Retry-After": "600"}, {}
+                    release.wait()
+                    return 200, {}, ANSWER
                 with server([None], respond) as (url, received):
                     port = int(url.split(":")[2].split("/")[0])
-                    Path(folder, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": port, "model": "laya"}}))
+                    Path(folder, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": port}}))
                     env = {"PATH": os.defpath, "DECIDR_LOG_ROOT": folder,
                    "GIT_CEILING_DIRECTORIES": str(Path(folder).parent.resolve())}
                     process = subprocess.Popen([str(binary), "--config-dir", folder, "send", "--model", "laya",
                                                  "--agent-role", "contract", "--batch", "--workers", "1"],
                                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=folder, env=env)
                     try:
-                        stdout, stderr = process.communicate("\n".join([json.dumps(REQUEST)] * 3), timeout=20)
-                    finally:
-                        if process.poll() is None:
+                        try:
+                            stdout, stderr = process.communicate("\n".join([json.dumps(REQUEST)] * 3), timeout=20)
+                        except subprocess.TimeoutExpired as deadline:
                             process.kill()
-                            process.communicate()
+                            try:
+                                stdout, stderr = process.communicate(timeout=5)
+                            except subprocess.TimeoutExpired as drain_deadline:
+                                stdout = drain_deadline.output or deadline.output or ""
+                                stderr = drain_deadline.stderr or deadline.stderr or ""
+                            self.fail(
+                                f"{interrupt.name} cancellation deadline expired; "
+                                f"received={received!r}; stdout={stdout!r}; stderr={stderr!r}"
+                            )
+                    finally:
+                        try:
+                            if process.poll() is None:
+                                process.kill()
+                                process.wait(timeout=5)
+                        finally:
+                            try:
+                                for pipe in (process.stdin, process.stdout, process.stderr):
+                                    if pipe is not None:
+                                        pipe.close()
+                            finally:
+                                release.set()
                 self.assertNotEqual(process.returncode, 0, stdout + stderr)
-                self.assertEqual(json.loads(stdout)["error"]["id"], "decision.cancelled")
+                results = json.loads(stdout)
+                self.assertTrue(results["ok"], results)
+                self.assertEqual(len(results["value"]), 3)
+                self.assertEqual([row["index"] for row in results["value"]], [0, 1, 2])
+                self.assertTrue(all(row["result"]["error"]["id"] == "decision.cancelled"
+                                    for row in results["value"]))
                 self.assertEqual(len(received), 1)
                 rows = [json.loads(line) for path in Path(folder).rglob("sessions.jsonl") for line in path.read_text().splitlines()]
                 self.assertEqual(len(rows), 3)

@@ -1,9 +1,9 @@
-"""Export provider credentials for the consumers' owner-attended integration runs."""
+"""Export provider credentials for consumer integration runs; requires decidr on PATH."""
 import argparse
 import getpass
+import json
 import os
 from pathlib import Path
-import re
 import subprocess
 import sys
 
@@ -11,8 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def credential_variables():
-    source = ROOT / "crates/sc-agent/src/lib.rs"
-    return {name: name for name in re.findall(r'\bkey:\s*"([A-Z][A-Z0-9_]+)"', source.read_text())}
+    found = subprocess.run(["decidr", "models"], capture_output=True, text=True, timeout=20)
+    if found.returncode:
+        raise RuntimeError(found.stdout + found.stderr)
+    return {row["name"]: row["key"] for row in json.loads(found.stdout)["value"] if row["key"]}
 
 
 def key_for(provider, variable):
@@ -32,10 +34,10 @@ def main():
                         help="Write a new mode-0600 credential .env outside the checkout")
     args = parser.parse_args()
     variables = credential_variables()
-    providers = ("typesafe", "anthropic", "openai")
-    keys = {provider: key_for(provider, variables[f"{provider.upper()}_API_KEY"]) for provider in providers}
-    if not keys["typesafe"]:
-        raise RuntimeError("TypeSafe key is required (environment or platform keychain)")
+    keys = {variable: key_for(provider, variable) for provider, variable in variables.items()}
+    required = [variables[name] for name in ("typesafe", "anthropic", "nous")]
+    if not any(keys.get(variable) for variable in required):
+        raise RuntimeError(f"one of {', '.join(required)} is required (environment or platform keychain)")
     destination = args.export_env.resolve()
     if ROOT in destination.parents:
         raise RuntimeError("temporary credential export must be outside the checkout")
@@ -43,9 +45,9 @@ def main():
         raise RuntimeError("credential contains a newline")
     descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w") as output:
-        for provider, key in keys.items():
+        for variable, key in keys.items():
             if key:
-                output.write(f"{variables[f'{provider.upper()}_API_KEY']}={key}\n")
+                output.write(f"{variable}={key}\n")
     return 0
 
 

@@ -3,13 +3,18 @@ use sc_config::{
     StandardContext, StandardLayers,
 };
 use sc_observability::{LoggerConfig, ServiceName, v2::Logger};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::Error as DeError};
 use serde_json::{Value, json};
 use std::{
+    cell::Cell,
     collections::BTreeMap,
     ffi::OsString,
     path::{Path, PathBuf},
-    sync::{Arc, Condvar, Mutex, atomic::Ordering},
+    sync::{
+        Arc, Condvar, Mutex, MutexGuard, TryLockError,
+        atomic::Ordering,
+        mpsc::{Receiver, RecvTimeoutError},
+    },
     time::Duration,
 };
 
@@ -28,12 +33,44 @@ impl Cancel {
     pub fn is_cancelled(&self) -> bool {
         self.state.lock().map_or(true, |state| *state)
     }
-    pub fn wait(&self, delay: Duration) {
+    pub fn check(&self) -> Result<(), Error> {
+        match self.is_cancelled() {
+            true => Err(error("decision.cancelled", "request cancelled")),
+            false => Ok(()),
+        }
+    }
+    pub fn recv<T>(&self, receiver: &Receiver<T>, id: &'static str) -> Result<T, Error> {
+        loop {
+            self.check()?;
+            match receiver.recv_timeout(Duration::from_millis(20)) {
+                Err(RecvTimeoutError::Timeout) => {}
+                other => return other.map_err(|e| error(id, e)),
+            }
+        }
+    }
+    pub fn lock<'a, T>(&self, mutex: &'a Mutex<T>) -> Result<MutexGuard<'a, T>, Error> {
+        loop {
+            self.check()?;
+            match mutex.try_lock() {
+                Ok(guard) => return Ok(guard),
+                Err(TryLockError::WouldBlock) => {
+                    #[cfg(test)]
+                    route_tests::notify(&route_tests::LOCK_WAIT);
+                    std::thread::park_timeout(Duration::from_millis(20))
+                }
+                Err(TryLockError::Poisoned(e)) => return Err(error("http.network", e)),
+            }
+        }
+    }
+    pub fn wait(&self, delay: Duration) -> Result<(), Error> {
         if let Ok(state) = self.state.lock() {
+            #[cfg(test)]
+            route_tests::notify(&route_tests::WAIT_ENTERED);
             let _ = self
                 .changed
                 .wait_timeout_while(state, delay, |state| !*state);
         }
+        Ok(())
     }
 }
 
@@ -52,6 +89,25 @@ pub enum Error {
         session_id: Option<String>,
     },
 }
+pub fn after_shutdown(value: Value, shutdown: Result<(), impl std::fmt::Display>) -> Value {
+    let Err(shutdown) = shutdown else {
+        return value;
+    };
+    let original = value.get("error");
+    let message = format!("logger shutdown failed: {shutdown}; command result: {value}");
+    let mut failure = result(Err(error("log.shutdown", message)));
+    if let Some(target) = failure.get_mut("error").and_then(Value::as_object_mut) {
+        for key in ["attempts", "session_id"] {
+            if let Some(field) = original
+                .and_then(|error| error.get(key))
+                .filter(|value| !value.is_null())
+            {
+                target.entry(key).or_insert_with(|| field.clone());
+            }
+        }
+    }
+    failure
+}
 pub fn error(id: &'static str, message: impl ToString) -> Error {
     let category = match id {
         "secrets.key_missing"
@@ -60,10 +116,12 @@ pub fn error(id: &'static str, message: impl ToString) -> Error {
         | "secrets.keyring_timeout"
         | "http.auth" => "auth",
         "http.network" => "network",
+        "decision.api_status" => "other",
         "http.provider_busy" => "busy",
         "http.quota_exhausted" => "quota",
         "decision.cancelled" => "cancelled",
         "decision.response_parse" | "decision.schema_mismatch" => "response_invalid",
+        s if s.starts_with("log.") => "log",
         s if s.starts_with("config.") => "config",
         _ => "validation",
     };
@@ -89,6 +147,16 @@ pub fn error(id: &'static str, message: impl ToString) -> Error {
         session_id: None,
     }
 }
+fn contextual(mut failure: Error, context: impl std::fmt::Display, session: Option<&str>) -> Error {
+    let Error::Failure {
+        message,
+        session_id,
+        ..
+    } = &mut failure;
+    message.push_str(&format!("; {context}"));
+    *session_id = session.map(str::to_owned).or_else(|| session_id.take());
+    failure
+}
 pub fn result(value: Result<Value, Error>) -> Value {
     match value {
         Ok(value) => json!({"ok":true,"value":value}),
@@ -100,7 +168,6 @@ pub fn result(value: Result<Value, Error>) -> Value {
 pub struct Runner {
     pub host: String,
     pub port: u16,
-    pub model: String,
 }
 /// A configured model: the built-in provider it belongs to and the id sent on the wire.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -108,6 +175,21 @@ pub struct Runner {
 pub struct ModelEntry {
     pub provider: String,
     pub id: String,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_model_release",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub released: Option<String>,
+}
+
+fn deserialize_model_release<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
+    let date = String::deserialize(deserializer)?;
+    serde_json::from_value::<sc_observability::Timestamp>(json!(format!("{date}T00:00:00Z")))
+        .map_err(|e| DeError::custom(format!("released must be a YYYY-MM-DD date: {e}")))?;
+    Ok(Some(date))
 }
 #[derive(Clone, Debug, Serialize)]
 pub struct Settings {
@@ -115,7 +197,9 @@ pub struct Settings {
     pub workers: usize,
     /// Configured model names; an entry wins over the built-in table.
     pub models: BTreeMap<String, ModelEntry>,
-    pub laya: Option<Runner>,
+    pub local: BTreeMap<String, Runner>,
+    pub max_sends: u32,
+    pub decidr: BTreeMap<String, String>,
 }
 fn missing_setting(path: &str) -> Error {
     error(
@@ -128,14 +212,17 @@ fn missing_setting(path: &str) -> Error {
 }
 fn setting<T: serde::de::DeserializeOwned>(
     resolved: &Resolved,
-    path: &'static str,
+    path: &str,
     default: Value,
 ) -> Result<T, Error> {
     let selected = resolved
         .value
         .pointer(&format!("/{}", path.replace('.', "/")));
-    if selected.is_none() && path.starts_with("laya.") {
-        return Err(invalid_setting(resolved, "laya", missing_setting(path)));
+    if selected.is_none()
+        && let Some((head, _)) = path.split_once('.')
+        && PROVIDERS.iter().any(|p| p.url.is_empty() && p.name == head)
+    {
+        return Err(invalid_setting(resolved, head, missing_setting(path)));
     }
     serde_json::from_value(selected.cloned().unwrap_or(default))
         .map_err(|e| invalid_setting(resolved, path, e))
@@ -149,9 +236,9 @@ const KEYS: &[&str] = &[
     "project",
     "workers",
     "models",
-    "laya.host",
-    "laya.port",
-    "laya.model",
+    "max_sends",
+    "decidr.luna-system-prompt",
+    "decidr.haiku-system-prompt",
 ];
 pub struct Configuration {
     pub config: Settings,
@@ -209,6 +296,13 @@ pub fn config(
     environment: &[(OsString, OsString)],
     project: Option<&str>,
 ) -> Result<Configuration, Error> {
+    let mut keys = KEYS.iter().map(|key| key.to_string()).collect::<Vec<_>>();
+    keys.extend(
+        PROVIDERS
+            .iter()
+            .filter(|p| p.url.is_empty())
+            .flat_map(|p| ["host", "port"].map(|key| format!("{}.{key}", p.name))),
+    );
     let global = global
         .map(Path::to_path_buf)
         .or_else(|| {
@@ -224,7 +318,7 @@ pub fn config(
         vec![],
         vec![],
     );
-    let mut layers = StandardLayers::new(context).defaults(json!({"workers":8}));
+    let mut layers = StandardLayers::new(context).defaults(json!({"workers":8,"max_sends":5}));
     let mut files = Vec::new();
     for (slot, folder) in [(Slot::User, Some(global.as_path())), (Slot::Local, local)] {
         if let Some(folder) = folder {
@@ -235,7 +329,7 @@ pub fn config(
                     slot,
                     FileSource::new(path)
                         .optional()
-                        .accepts(KEYS.iter().map(|key| key.split('.').collect::<Vec<_>>())),
+                        .accepts(keys.iter().map(|key| key.split('.').collect::<Vec<_>>())),
                 );
             }
         }
@@ -248,28 +342,37 @@ pub fn config(
         .flags(flags)
         .resolve()
         .map_err(config_error)?;
+    let mut local = BTreeMap::new();
+    for name in PROVIDERS
+        .iter()
+        .filter(|p| p.url.is_empty())
+        .map(|p| p.name)
+    {
+        if resolved.value.get(name).is_some_and(Value::is_object) {
+            let host = setting(&resolved, &format!("{name}.host"), Value::Null)?;
+            let port = setting(&resolved, &format!("{name}.port"), Value::Null)?;
+            local.insert(name.into(), Runner { host, port });
+        }
+    }
     let config = Settings {
         project: setting(&resolved, "project", Value::Null)?,
         workers: setting(&resolved, "workers", json!(8))?,
         models: setting(&resolved, "models", json!({}))?,
-        laya: if resolved.value.get("laya").is_some_and(Value::is_object) {
-            Some(Runner {
-                host: setting(&resolved, "laya.host", Value::Null)?,
-                port: setting(&resolved, "laya.port", Value::Null)?,
-                model: setting(&resolved, "laya.model", Value::Null)?,
-            })
-        } else {
-            setting(&resolved, "laya", Value::Null)?
-        },
+        local,
+        max_sends: setting(&resolved, "max_sends", json!(5))?,
+        decidr: setting(&resolved, "decidr", json!({}))?,
     };
     if config.workers == 0 {
         return Err(invalid_setting(&resolved, "workers", "must be positive"));
+    }
+    if config.max_sends == 0 {
+        return Err(invalid_setting(&resolved, "max_sends", "must be positive"));
     }
     for entry in config.models.values() {
         provider_named(&entry.provider)?;
     }
     let provenance = resolved.rows();
-    let rows = KEYS
+    let rows = keys
         .iter()
         .map(|key| {
             let row = provenance.iter().find(|row| row.path.join(".") == *key);
@@ -376,9 +479,9 @@ pub fn key(
         None => match dotenv()? {
             Some(value) => value,
             None => keyring(variable).map_err(|e| match e {
-                KeyringError::Read(_) => error(
+                KeyringError::Read(detail) => error(
                     "secrets.keyring_read",
-                    format!("The platform keyring is unavailable for {variable}. Set {variable} in the environment or repository .env."),
+                    format!("The platform keyring is unavailable for {variable} : {detail}. Set {variable} in the environment or repository .env."),
                 ),
                 KeyringError::Timeout => error("secrets.keyring_timeout", format!("OS keychain did not answer for {variable}; it may be waiting for approval. Approve access or set {variable} in the environment or .env.")),
             })?,
@@ -436,6 +539,39 @@ pub fn os_keyring(variable: &str) -> Result<String, KeyringError> {
     )
 }
 
+#[cfg(test)]
+mod resolve_test {
+    use super::*;
+    #[test]
+    fn a_keyless_candidate_beats_a_keyed_one_and_is_never_looked_up() {
+        let seam = |_: &str| -> Result<String, KeyringError> { Err(KeyringError::Timeout) };
+        let options = Options {
+            environment: vec![("ANTHROPIC_API_KEY".into(), "held".into())],
+            settings: Settings {
+                project: None,
+                workers: 1,
+                models: BTreeMap::new(),
+                local: BTreeMap::new(),
+                max_sends: 1,
+                decidr: BTreeMap::new(),
+            },
+            model: String::new(),
+            provider: None,
+            agent_role: String::new(),
+            timeout: Duration::ZERO,
+            base_url: None,
+            root: PathBuf::new(),
+            log_root: PathBuf::new(),
+            repo: String::new(),
+        };
+        let keyed = || (&PROVIDERS[1], "keyed".to_owned());
+        let keyless = || (&PROVIDERS[6], "keyless".to_owned());
+        let picked = resolve(vec![keyed(), keyless()], &options, &seam);
+        assert!(matches!(picked, Ok((p, id)) if p.key.is_empty() && id == "keyless"));
+        let picked = resolve(vec![(&PROVIDERS[3], "x".into()), keyed()], &options, &seam);
+        assert!(matches!(picked, Ok((p, _)) if p.name == "anthropic"));
+    }
+}
 #[cfg(test)]
 mod keyring_timeout_test {
     use super::*;
@@ -515,7 +651,7 @@ mod keyring_timeout_test {
         assert!(message.contains("platform keyring is unavailable"));
         assert!(message.contains("TYPESAFE_API_KEY"));
         assert!(message.contains(".env"));
-        assert!(!message.contains("controlled refusal"));
+        assert!(message.contains("controlled refusal"));
         Ok(())
     }
 
@@ -567,8 +703,7 @@ mod keyring_timeout_test {
             assert!(message.contains("platform keyring is unavailable"));
             assert!(message.contains("TYPESAFE_API_KEY"));
             assert!(message.contains(".env"));
-            assert!(!message.contains("denied"));
-            assert!(!message.contains("missing service"));
+            assert!(message.contains(&detail), "{message}");
             assert!(
                 error["action"]
                     .as_str()
@@ -589,24 +724,34 @@ mod keyring_timeout_test {
     }
 }
 
+#[derive(Clone, Copy, Debug, Serialize)]
+pub enum Wire {
+    #[serde(rename = "systemone")]
+    Jev,
+    #[serde(rename = "chat/completions")]
+    Chat,
+    #[serde(rename = "messages")]
+    Messages,
+}
 #[derive(Debug, Serialize)]
 pub struct Provider {
     pub name: &'static str,
     pub url: &'static str,
     pub key: &'static str,
-    pub wire: &'static str,
+    pub wire: Wire,
     pub models: &'static [(&'static str, &'static str, &'static str)],
+    pub open: bool,
 }
 const CLAUDE: &[(&str, &str, &str)] = &[
+    ("fable", "claude-fable-5-2", "2026-11-09"),
     ("haiku", "claude-haiku-5-5", "2026-10-07"),
     ("sonnet", "claude-sonnet-5-5", "2026-09-28"),
     ("opus", "claude-opus-5-5", "2026-09-22"),
-    ("fable", "claude-fable-5-2", "2026-11-09"),
 ];
 const GPT: &[(&str, &str, &str)] = &[
-    ("luna", "gpt-6-luna", "2026-09-22"),
     ("terra", "gpt-6.1-terra", "2026-10-26"),
     ("sol", "gpt-6.1-sol", "2026-09-29"),
+    ("luna", "gpt-6-luna", "2026-09-22"),
     ("astra", "gpt-6-astra", "2026-09-03"),
 ];
 pub static PROVIDERS: &[Provider] = &[
@@ -614,68 +759,94 @@ pub static PROVIDERS: &[Provider] = &[
         name: "typesafe",
         url: "https://api.typesafe.ai/v1",
         key: "TYPESAFE_API_KEY",
-        wire: "systemone",
+        wire: Wire::Jev,
         models: &[("jev", "jev-latest", "2026-10-14")],
+        open: false,
     },
     Provider {
         name: "anthropic",
         url: "https://api.anthropic.com/v1",
         key: "ANTHROPIC_API_KEY",
-        wire: "messages",
+        wire: Wire::Messages,
         models: CLAUDE,
+        open: false,
     },
     Provider {
         name: "openai",
         url: "https://api.openai.com/v1",
         key: "OPENAI_API_KEY",
-        wire: "chat/completions",
+        wire: Wire::Chat,
         models: GPT,
+        open: false,
     },
     Provider {
         name: "openrouter",
         url: "https://openrouter.ai/api/v1",
         key: "OPENROUTER_API_KEY",
-        wire: "chat/completions",
+        wire: Wire::Chat,
         models: &[
+            ("fable", "anthropic/claude-fable-5.2", "2026-11-09"),
+            ("terra", "openai/gpt-6.1-terra", "2026-10-26"),
             ("haiku", "anthropic/claude-haiku-5.5", "2026-10-07"),
+            ("sol", "openai/gpt-6.1-sol", "2026-09-29"),
             ("sonnet", "anthropic/claude-sonnet-5.5", "2026-09-28"),
             ("opus", "anthropic/claude-opus-5.5", "2026-09-22"),
-            ("fable", "anthropic/claude-fable-5.2", "2026-11-09"),
             ("luna", "openai/gpt-6-luna", "2026-09-22"),
-            ("terra", "openai/gpt-6.1-terra", "2026-10-26"),
-            ("sol", "openai/gpt-6.1-sol", "2026-09-29"),
             ("astra", "openai/gpt-6-astra", "2026-09-03"),
         ],
+        open: true,
     },
     Provider {
         name: "together",
         url: "https://api.together.ai/v1",
         key: "TOGETHER_API_KEY",
-        wire: "chat/completions",
+        wire: Wire::Chat,
         models: &[
+            ("fable", "anthropic/claude-fable-5-2", "2026-11-09"),
+            ("terra", "openai/gpt-6.1-terra", "2026-10-26"),
             ("haiku", "anthropic/claude-haiku-5-5", "2026-10-07"),
+            ("sol", "openai/gpt-6.1-sol", "2026-09-29"),
             ("sonnet", "anthropic/claude-sonnet-5-5", "2026-09-28"),
             ("opus", "anthropic/claude-opus-5-5", "2026-09-22"),
-            ("fable", "anthropic/claude-fable-5-2", "2026-11-09"),
             ("luna", "openai/gpt-6-luna", "2026-09-22"),
-            ("terra", "openai/gpt-6.1-terra", "2026-10-26"),
-            ("sol", "openai/gpt-6.1-sol", "2026-09-29"),
             ("astra", "openai/gpt-6-astra", "2026-09-03"),
         ],
+        open: true,
     },
     Provider {
         name: "nous",
         url: "https://inference-api.nousresearch.com/v1",
         key: "NOUS_API_KEY",
-        wire: "chat/completions",
-        models: &[],
+        wire: Wire::Chat,
+        models: &[
+            ("haiku", "anthropic/claude-haiku-5.5", "2026-10-07"),
+            ("luna", "openai/gpt-6-luna", "2026-09-22"),
+        ],
+        open: true,
     },
     Provider {
-        name: "local",
+        name: "laya",
         url: "",
         key: "",
-        wire: "systemone",
-        models: &[("laya", "laya", "")],
+        wire: Wire::Jev,
+        models: &[("laya", "laya:en", "2026-09-23")],
+        open: false,
+    },
+    Provider {
+        name: "decider_4b",
+        url: "",
+        key: "",
+        wire: Wire::Jev,
+        models: &[("decider", "decider-4b-v2.1", "2026-09-24")],
+        open: false,
+    },
+    Provider {
+        name: "decider_2b",
+        url: "",
+        key: "",
+        wire: Wire::Jev,
+        models: &[("decider", "decider-2b-v11", "2026-09-24")],
+        open: false,
     },
 ];
 fn provider_named(name: &str) -> Result<&'static Provider, Error> {
@@ -688,41 +859,79 @@ fn provider_named(name: &str) -> Result<&'static Provider, Error> {
 pub fn model(name: &str, provider: Option<&str>) -> Result<(&'static Provider, String), Error> {
     model_with(name, provider, &BTreeMap::new())
 }
-/// Resolve a model name; a configured entry for `name` wins over the built-in
-/// tables unless an explicit `provider` names a different provider.
+/// Resolve a model name to its first candidate; a configured entry for `name`
+/// wins over the built-in tables unless an explicit `provider` names a different one.
 pub fn model_with(
     name: &str,
     provider: Option<&str>,
     configured: &BTreeMap<String, ModelEntry>,
 ) -> Result<(&'static Provider, String), Error> {
+    Ok(candidates(name, provider, configured)?.remove(0))
+}
+/// Every provider row that serves `name`, newest release first, equal dates in table order.
+fn candidates(
+    name: &str,
+    provider: Option<&str>,
+    configured: &BTreeMap<String, ModelEntry>,
+) -> Result<Vec<(&'static Provider, String)>, Error> {
     if let Some(entry) = configured.get(name) {
         let p = provider_named(&entry.provider)?;
         if provider.is_none_or(|requested| requested == entry.provider) {
-            return Ok((p, entry.id.clone()));
+            return Ok(vec![(p, entry.id.clone())]);
         }
     }
-    let rows = |p: &Provider| {
-        p.models
-            .iter()
-            .filter(|(short, id, _)| *short == name || *id == name)
-            .max_by_key(|(_, _, date)| *date)
-            .map(|(_, id, _)| (*id).to_owned())
-    };
-    if let Some(provider) = provider {
-        let p = PROVIDERS
-            .iter()
-            .find(|p| p.name == provider)
-            .ok_or_else(|| error("types.unknown_provider", provider))?;
-        if let Some(id) = rows(p) {
-            return Ok((p, id));
+    let chosen = provider.map(provider_named).transpose()?;
+    let mut rows = Vec::new();
+    for p in PROVIDERS
+        .iter()
+        .filter(|p| chosen.is_none_or(|c| c.name == p.name))
+    {
+        for (_, id, date) in p.models.iter().filter(|(s, i, _)| *s == name || *i == name) {
+            rows.push((*date, p, (*id).to_owned()));
         }
-        if ["openrouter", "together", "nous"].contains(&provider) {
-            return Ok((p, name.into()));
-        }
-    } else if let Some(found) = PROVIDERS.iter().find_map(|p| rows(p).map(|id| (p, id))) {
-        return Ok(found);
     }
-    Err(error("types.unknown_short_name", name))
+    rows.sort_by_key(|row| std::cmp::Reverse(row.0));
+    let mut found = rows
+        .into_iter()
+        .map(|(_, p, id)| (p, id))
+        .collect::<Vec<_>>();
+    if let Some(p) = chosen.filter(|p| p.open && found.is_empty()) {
+        found.push((p, name.into()));
+    }
+    if found.is_empty() {
+        return Err(error("types.unknown_short_name", name));
+    }
+    Ok(found)
+}
+/// Pick the candidate to send to: a keyless provider first, else the first whose key is held.
+fn resolve(
+    found: Vec<(&'static Provider, String)>,
+    options: &Options,
+    keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
+) -> Result<(&'static Provider, String), Error> {
+    let single = found.first().filter(|_| found.len() == 1);
+    if let Some(row) = found.iter().find(|(p, _)| p.key.is_empty()).or(single) {
+        return Ok(row.clone());
+    }
+    let mut last = None;
+    for (p, id) in &found {
+        match key(p.key, &options.environment, &options.root, keyring) {
+            Ok(_) => return Ok((p, id.clone())),
+            Err(mut failure) => {
+                if let Some(mut previous) = last.take() {
+                    // Missing keys add context without replacing an earlier failure.
+                    let Error::Failure { id, .. } = &failure;
+                    if *id == "secrets.key_missing" {
+                        std::mem::swap(&mut previous, &mut failure);
+                    }
+                    let Error::Failure { message, .. } = &mut failure;
+                    message.push_str(&format!("\n{previous}"));
+                }
+                last = Some(failure);
+            }
+        }
+    }
+    Err(last.unwrap_or_else(|| error("types.unknown_short_name", &options.model)))
 }
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Bounds {
@@ -754,6 +963,52 @@ pub enum Answer {
     },
 }
 pub fn schema(request: &Value, response: &Value) -> Result<(), Error> {
+    fn check_shape(value: &Value, shape: &Value, path: &str) -> Result<(), Error> {
+        if let Some(values) = shape.get("enum").and_then(Value::as_array)
+            && !values.contains(value)
+        {
+            return Err(error(
+                "decision.schema_mismatch",
+                format!("{path}: value is outside requested choices"),
+            ));
+        }
+        if let Some(properties) = shape.get("properties").and_then(Value::as_object)
+            && !value.is_null()
+        {
+            let fields = value.as_object().ok_or_else(|| {
+                error(
+                    "decision.schema_mismatch",
+                    format!("{path}: expected an object"),
+                )
+            })?;
+            for key in shape
+                .get("required")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+            {
+                if !fields.contains_key(key) {
+                    return Err(error(
+                        "decision.schema_mismatch",
+                        format!("{path}.{key}: required field is missing"),
+                    ));
+                }
+            }
+            for (key, child) in fields {
+                if let Some(rule) = properties.get(key) {
+                    check_shape(child, rule, &format!("{path}.{key}"))?;
+                } else if shape.get("additionalProperties").and_then(Value::as_bool) == Some(false)
+                {
+                    return Err(error(
+                        "decision.schema_mismatch",
+                        format!("{path}.{key}: unexpected field"),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
     let questions = request
         .get("questions")
         .and_then(Value::as_object)
@@ -774,12 +1029,7 @@ pub fn schema(request: &Value, response: &Value) -> Result<(), Error> {
             .ok_or_else(|| error("decision.schema_mismatch", format!("missing answer {id}")))?;
         let _: Answer = serde_json::from_value(answer.clone())
             .map_err(|e| error("decision.schema_mismatch", format!("{id}: {e}")))?;
-        if answer.get("type") != question.get("type") {
-            return Err(error(
-                "decision.schema_mismatch",
-                format!("{id}: wrong question type"),
-            ));
-        }
+        check_shape(answer, &answer_schema(question), id)?;
     }
     Ok(())
 }
@@ -876,137 +1126,151 @@ fn answer_schema(question: &Value) -> Value {
         .unwrap_or_default();
     json!({"type":"object","properties":fields,"required":required,"additionalProperties":false})
 }
-fn wire(request: &Value, model: &str, wire: &str) -> Value {
-    if wire == "systemone" {
-        let mut body = request.clone();
-        if let Some(body) = body.as_object_mut() {
-            body.insert("model".into(), json!(model));
-        }
-        return body;
-    }
-    let properties = request
+pub type DecisionRequest = Value;
+pub type DecisionResult = Value;
+#[derive(Debug)]
+pub struct LlmRequest {
+    pub system: Option<String>,
+    pub messages: Value,
+    pub schema: Option<Value>,
+}
+pub trait Decision {
+    fn decide(&self, req: &DecisionRequest) -> Result<DecisionResult, Error>;
+}
+pub trait Llm {
+    fn call(&self, req: &LlmRequest) -> Result<Value, Error>;
+}
+pub const DEFAULT_SYSTEM_PROMPT: &str = "Answer every question in the decision request. Reply with one JSON object that matches the supplied schema, including probabilities and confidence.";
+type Auth = &'static [(&'static str, &'static str)];
+const BEARER: Auth = &[("Authorization", "Bearer {}")];
+const ANTHROPIC: Auth = &[("x-api-key", "{}"), ("anthropic-version", "2023-06-01")];
+// Messages model output limit: https://platform.claude.com/docs/en/models/overview
+const ANTHROPIC_MAX_TOKENS: u32 = 128000;
+pub struct Route<'a> {
+    pub options: &'a Options,
+    pub provider: &'static Provider,
+    pub model: String,
+    pub base: String,
+    pub cancel: &'a Cancel,
+    pub wait: &'a (dyn Fn(Duration) -> Result<(), Error> + Sync),
+    pub keyring: &'a (dyn Fn(&str) -> Result<String, KeyringError> + Sync),
+    pub sends: &'a Cell<u32>,
+}
+pub struct Jev<'a>(pub &'a Route<'a>);
+pub struct OpenAiCompat<'a>(pub &'a Route<'a>);
+pub struct AnthropicCompat<'a>(pub &'a Route<'a>);
+fn ask(llm: &impl Llm, route: &Route<'_>, req: &DecisionRequest) -> Result<DecisionResult, Error> {
+    let decidr = &route.options.settings.decidr;
+    let short = route
+        .provider
+        .models
+        .iter()
+        .find(|row| row.1 == route.model)
+        .map_or(route.options.model.as_str(), |row| row.0);
+    let prompt = decidr
+        .get(&format!("{}-system-prompt", route.options.model))
+        .or_else(|| decidr.get(&format!("{short}-system-prompt")));
+    let questions = req
         .get("questions")
         .and_then(Value::as_object)
-        .map(|questions| {
-            questions
-                .iter()
-                .map(|(id, question)| (id.clone(), answer_schema(question)))
-                .collect::<BTreeMap<_, _>>()
-        })
-        .unwrap_or_default();
-    let required = properties.keys().cloned().collect::<Vec<_>>();
-    let schema = json!({
-        "type":"object", "required":["answers"], "additionalProperties":false,
-        "properties":{"answers":{"type":"object","properties":properties,"required":required,"additionalProperties":false}}
-    });
-    let messages = json!([{"role":"user","content":format!("Answer every question in this decision request using its required schema, including probabilities and confidence: {request}")}]);
-    if wire == "messages" {
-        json!({"model":model,"max_tokens":8192,"messages":messages,"output_config":{"format":{"type":"json_schema","schema":schema}}})
-    } else {
-        json!({"model":model,"messages":messages,"response_format":{"type":"json_schema","json_schema":{"name":"decision","strict":true,"schema":schema}}})
-    }
-}
-fn response(request: &Value, raw: Value, wire: &str) -> Result<Value, Error> {
-    let answer = match wire {
-        "messages" => raw
-            .get("content")
-            .and_then(Value::as_array)
-            .and_then(|items| {
-                items
-                    .iter()
-                    .find_map(|v| v.get("text").and_then(Value::as_str))
-            }),
-        "chat/completions" => raw
-            .pointer("/choices/0/message/content")
-            .and_then(Value::as_str),
-        _ => {
-            schema(request, &raw)?;
-            return Ok(raw);
-        }
-    }
-    .ok_or_else(|| {
-        error(
-            "decision.response_parse",
-            format!("provider reply has no text: {raw}"),
-        )
+        .into_iter()
+        .flatten();
+    let answers = questions
+        .map(|(id, question)| (id, answer_schema(question)))
+        .collect::<BTreeMap<_, _>>();
+    let reply = llm.call(&LlmRequest {
+        system: Some(prompt.map_or(DEFAULT_SYSTEM_PROMPT, String::as_str).into()),
+        messages: json!([{"role":"user","content":req.to_string()}]),
+        schema: Some(json!({
+            "type":"object", "required":["answers"], "additionalProperties":false,
+            "properties":{"answers":{"type":"object","properties":answers,"required":answers.keys().collect::<Vec<_>>(),"additionalProperties":false}}
+        })),
     })?;
-    let parsed: Value = serde_json::from_str(answer)
-        .map_err(|e| error("decision.response_parse", format!("{e}: {answer}")))?;
-    schema(request, &parsed)?;
-    Ok(parsed)
+    schema(req, &reply).map(|()| reply)
 }
-static HOLDOFFS: Mutex<BTreeMap<String, Arc<Mutex<()>>>> = Mutex::new(BTreeMap::new());
-static SESSION_APPEND: Mutex<()> = Mutex::new(());
-
-pub fn host_holdoff(host: &str) -> Result<Arc<Mutex<()>>, Error> {
-    Ok(HOLDOFFS
-        .lock()
-        .map_err(|e| error("http.network", e))?
-        .entry(host.to_owned())
-        .or_default()
-        .clone())
-}
-
-pub fn workers(value: i64) -> Result<usize, Error> {
-    usize::try_from(value)
-        .ok()
-        .filter(|v| *v > 0)
-        .ok_or_else(|| error("decidr.invalid_workers", "workers must be positive"))
-}
-
-pub fn send(
-    request: &Value,
-    options: &Options,
-    logger: &Logger,
-    cancel: &Cancel,
-    wait: &(dyn Fn(Duration) + Sync),
-    keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
-) -> Result<Value, Error> {
-    let session_id = ulid::Ulid::new().to_string();
-    let digests = request
-        .get("questions")
-        .and_then(Value::as_object)
-        .map(|questions| {
-            questions
-                .keys()
-                .filter_map(|id| digest(request, id).ok().map(|hash| (id.clone(), hash)))
-                .collect::<BTreeMap<_, _>>()
-        });
-    let mut sends = 0;
-    let mut outcome = (|| {
-        if cancel.is_cancelled() {
-            return Err(error("decision.cancelled", "request cancelled"));
+impl Decision for Jev<'_> {
+    fn decide(&self, req: &DecisionRequest) -> Result<DecisionResult, Error> {
+        let mut body = req.clone();
+        if let Some(body) = body.as_object_mut() {
+            body.insert("model".into(), json!(self.0.model));
         }
-        let project = options.settings.project_required()?;
-        slug(project)?;
-        slug(&options.agent_role)?;
-        let (provider, model) = model_with(
-            &options.model,
-            options.provider.as_deref(),
-            &options.settings.models,
-        )?;
-        let (base, model) = if provider.name == "local" {
-            let runner = options
-                .settings
-                .laya
-                .as_ref()
-                .ok_or_else(|| missing_setting("laya.host"))?;
-            (
-                format!("http://{}:{}/v1", runner.host, runner.port),
-                runner.model.clone(),
+        let reply = self.0.post("systemone", BEARER, &body)?;
+        schema(req, &reply).map(|()| reply)
+    }
+}
+impl Decision for OpenAiCompat<'_> {
+    fn decide(&self, req: &DecisionRequest) -> Result<DecisionResult, Error> {
+        ask(self, self.0, req)
+    }
+}
+impl Decision for AnthropicCompat<'_> {
+    fn decide(&self, req: &DecisionRequest) -> Result<DecisionResult, Error> {
+        ask(self, self.0, req)
+    }
+}
+impl Llm for OpenAiCompat<'_> {
+    fn call(&self, req: &LlmRequest) -> Result<Value, Error> {
+        let system = req
+            .system
+            .iter()
+            .map(|text| json!({"role":"system","content":text}));
+        let messages = system
+            .chain(req.messages.as_array().cloned().unwrap_or_default())
+            .collect::<Vec<_>>();
+        let format = req.schema.as_ref().map(|schema| json!({"type":"json_schema","json_schema":{"name":"decision","strict":true,"schema":schema}}));
+        let body = json!({"model":self.0.model,"messages":messages,"response_format":format});
+        self.0.text(
+            "chat/completions",
+            BEARER,
+            body,
+            "/choices/0/message/content",
+        )
+    }
+}
+impl Llm for AnthropicCompat<'_> {
+    fn call(&self, req: &LlmRequest) -> Result<Value, Error> {
+        let format = req
+            .schema
+            .as_ref()
+            .map(|schema| json!({"format":{"type":"json_schema","schema":schema}}));
+        let body = json!({"model":self.0.model,"max_tokens":ANTHROPIC_MAX_TOKENS,"messages":req.messages,"system":req.system,"output_config":format});
+        self.0.text("messages", ANTHROPIC, body, "/content")
+    }
+}
+impl Route<'_> {
+    fn agent(&self) -> ureq::Agent {
+        ureq::Agent::config_builder()
+            .max_redirects(0)
+            .http_status_as_error(false)
+            .timeout_global(Some(self.options.timeout))
+            .build()
+            .new_agent()
+    }
+    fn text(&self, path: &str, auth: Auth, mut body: Value, at: &str) -> Result<Value, Error> {
+        if let Some(fields) = body.as_object_mut() {
+            fields.retain(|_, field| !field.is_null());
+        }
+        let reply = self.post(path, auth, &body)?;
+        let text = reply.pointer(at).and_then(|value| {
+            value.as_str().or_else(|| {
+                value
+                    .as_array()?
+                    .iter()
+                    .find_map(|block| block.get("text")?.as_str())
+            })
+        });
+        let text = text.ok_or_else(|| {
+            error(
+                "decision.response_parse",
+                format!("provider reply has no text: {reply}"),
             )
-        } else {
-            (provider.url.into(), model)
-        };
-        let url = format!(
-            "{}/{}",
-            options
-                .base_url
-                .as_deref()
-                .unwrap_or(&base)
-                .trim_end_matches('/'),
-            provider.wire
-        );
+        })?;
+        serde_json::from_str(text)
+            .map_err(|e| error("decision.response_parse", format!("{e}: {text}")))
+    }
+    fn post(&self, path: &str, auth: Auth, body: &Value) -> Result<Value, Error> {
+        let (cancel, provider, max) = (self.cancel, self.provider, self.options.settings.max_sends);
+        let url = format!("{}/{path}", self.base.trim_end_matches('/'));
         let uri = url
             .parse::<ureq::http::Uri>()
             .map_err(|e| error("http.network", e))?;
@@ -1027,35 +1291,32 @@ pub fn send(
             ));
         }
         let pause = host_holdoff(&host)?;
-        let key = if provider.key.is_empty() {
-            String::new()
-        } else {
-            key(provider.key, &options.environment, &options.root, keyring)?
+        let key = match provider.key {
+            "" => String::new(),
+            name => key(
+                name,
+                &self.options.environment,
+                &self.options.root,
+                self.keyring,
+            )?,
         };
-        let body = wire(request, &model, provider.wire);
-        let agent = ureq::Agent::config_builder()
-            .http_status_as_error(false)
-            .timeout_global(Some(options.timeout))
-            .build()
-            .new_agent();
-        for attempt in 1..=5 {
-            if cancel.is_cancelled() {
-                return Err(error("decision.cancelled", "request cancelled"));
+        let redact = |text: String| {
+            if key.is_empty() {
+                text
+            } else {
+                text.replace(&key, "[redacted]")
             }
+        };
+        let agent = self.agent();
+        for attempt in 1..=max {
+            cancel.check()?;
             // A busy reply holds off senders to this host through its injected wait.
-            drop(pause.lock().map_err(|e| error("http.network", e))?);
-            if cancel.is_cancelled() {
-                return Err(error("decision.cancelled", "request cancelled"));
-            }
+            drop(cancel.lock(&pause)?);
             let mut post = agent.post(&url).header("Content-Type", "application/json");
-            if provider.name == "anthropic" {
-                post = post
-                    .header("x-api-key", &key)
-                    .header("anthropic-version", "2023-06-01");
-            } else if !key.is_empty() {
-                post = post.header("Authorization", format!("Bearer {key}"));
+            for (name, value) in auth.iter().filter(|_| !key.is_empty()) {
+                post = post.header(*name, value.replace("{}", &key));
             }
-            sends = attempt;
+            self.sends.set(attempt);
             // A send in flight cannot be aborted, so on cancel it is abandoned and the request ends now.
             let (sender, receiver) = std::sync::mpsc::sync_channel(1);
             let sending = body.clone();
@@ -1070,57 +1331,21 @@ pub fn send(
                     (
                         reply.status().as_u16(),
                         delay,
-                        reply.body_mut().read_to_string(),
+                        reply
+                            .body_mut()
+                            .with_config()
+                            .lossy_utf8(true)
+                            .read_to_string(),
                     )
                 }));
             });
-            let sent = loop {
-                if cancel.is_cancelled() {
-                    return Err(error("decision.cancelled", "request cancelled"));
-                }
-                match receiver.recv_timeout(Duration::from_millis(20)) {
-                    Ok(sent) => break sent,
-                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-                    Err(e) => return Err(error("http.network", e)),
-                }
-            };
-            let (status, delay, text) = match sent {
-                Ok((status, delay, text)) => {
-                    let text = text.map_err(|e| error("decision.response_parse", e))?;
-                    (
-                        status,
-                        delay,
-                        if key.is_empty() {
-                            text
-                        } else {
-                            text.replace(&key, "[redacted]")
-                        },
-                    )
-                }
-                Err(e) => {
-                    if attempt < 5 {
-                        wait(Duration::from_secs(2u64.pow(attempt - 1)));
-                        continue;
-                    }
-                    return Err(Error::Failure {
-                        id: "http.network",
-                        action: "Retry later.",
-                        message: if key.is_empty() {
-                            e.to_string()
-                        } else {
-                            e.to_string().replace(&key, "[redacted]")
-                        },
-                        category: "network",
-                        attempts: Some(attempt),
-                        session_id: None,
-                    });
-                }
+            let (status, delay, text) = match cancel.recv(&receiver, "http.network")? {
+                Ok((status, delay, Ok(text))) => (status, delay, redact(text)),
+                Ok((_, _, Err(e))) | Err(e) => (0, None, redact(e.to_string())),
             };
             if (200..300).contains(&status) {
-                let decoded = serde_json::from_str(&text)
-                    .map_err(|e| error("decision.response_parse", format!("{e}: {text}")))
-                    .and_then(|raw| response(request, raw, provider.wire));
-                return decoded;
+                return serde_json::from_str(&text)
+                    .map_err(|e| error("decision.response_parse", format!("{e}: {text}")));
             }
             let low = text.to_lowercase();
             let quota = status == 402
@@ -1133,47 +1358,99 @@ pub fn send(
                 .iter()
                 .any(|needle| low.contains(needle));
             let busy = [429, 502, 529].contains(&status) && !quota;
-            if busy && attempt < 5 {
-                let _hold = pause.lock().map_err(|e| error("http.network", e))?;
-                wait(delay.unwrap_or_else(|| Duration::from_secs(2u64.pow(attempt - 1))));
+            if (busy || status == 0) && attempt < max {
+                let _hold = (status != 0).then(|| cancel.lock(&pause)).transpose()?;
+                let delay =
+                    delay.unwrap_or_else(|| Duration::from_secs(2u64.saturating_pow(attempt - 1)));
+                (self.wait)(delay)?;
                 continue;
             }
-            return Err(Error::Failure {
-                id: if quota {
-                    "http.quota_exhausted"
-                } else if busy {
-                    "http.provider_busy"
-                } else if status == 401 {
-                    "http.auth"
-                } else {
-                    "decision.api_status"
-                },
-                message: text,
-                action: if busy {
-                    "Retry later."
-                } else if status == 401 {
-                    "Check the provider API key."
-                } else {
-                    "Check the provider response."
-                },
-                category: if quota {
-                    "quota"
-                } else if busy {
-                    "busy"
-                } else if status == 401 {
-                    "auth"
-                } else {
-                    "other"
-                },
-                attempts: Some(attempt),
-                session_id: None,
-            });
+            let id = match status {
+                _ if quota => "http.quota_exhausted",
+                _ if busy => "http.provider_busy",
+                0 => "http.network",
+                401 => "http.auth",
+                _ => "decision.api_status",
+            };
+            return Err(error(id, text));
         }
         Err(error("http.network", "send count exhausted"))
-    })();
-    if cancel.is_cancelled() {
-        outcome = Err(error("decision.cancelled", "request cancelled"));
     }
+}
+static HOLDOFFS: Mutex<BTreeMap<String, Arc<Mutex<()>>>> = Mutex::new(BTreeMap::new());
+static SESSION_APPEND: Mutex<()> = Mutex::new(());
+
+pub fn host_holdoff(host: &str) -> Result<Arc<Mutex<()>>, Error> {
+    Ok(HOLDOFFS
+        .lock()
+        .map_err(|e| error("http.network", e))?
+        .entry(host.to_owned())
+        .or_default()
+        .clone())
+}
+
+pub fn workers(value: i64) -> Result<usize, Error> {
+    usize::try_from(value)
+        .ok()
+        .filter(|v| *v > 0)
+        .ok_or_else(|| error("decidr.invalid_workers", "workers must be positive"))
+}
+
+fn after_cancel(outcome: Result<Value, Error>, cancel: &Cancel) -> Result<Value, Error> {
+    outcome.and_then(|value| cancel.check().map(|()| value))
+}
+pub fn send(
+    request: &Value,
+    options: &Options,
+    logger: &Logger,
+    cancel: &Cancel,
+    wait: &(dyn Fn(Duration) -> Result<(), Error> + Sync),
+    keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
+) -> Result<Value, Error> {
+    let session_id = ulid::Ulid::new().to_string();
+    let digests = request
+        .get("questions")
+        .and_then(Value::as_object)
+        .map(|questions| {
+            questions
+                .keys()
+                .filter_map(|id| digest(request, id).ok().map(|hash| (id.clone(), hash)))
+                .collect::<BTreeMap<_, _>>()
+        });
+    let sends = Cell::new(0);
+    let outcome = (|| {
+        cancel.check()?;
+        let project = options.settings.project_required()?;
+        slug(project)?;
+        slug(&options.agent_role)?;
+        let found = candidates(
+            &options.model,
+            options.provider.as_deref(),
+            &options.settings.models,
+        )?;
+        let (provider, model) = resolve(found, options, keyring)?;
+        let base = match options.settings.local.get(provider.name) {
+            _ if !provider.url.is_empty() => provider.url.into(),
+            Some(runner) => format!("http://{}:{}/v1", runner.host, runner.port),
+            None => return Err(missing_setting(&format!("{}.host", provider.name))),
+        };
+        let route = Route {
+            options,
+            provider,
+            model,
+            base: options.base_url.clone().unwrap_or(base),
+            cancel,
+            wait,
+            keyring,
+            sends: &sends,
+        };
+        match provider.wire {
+            Wire::Messages => AnthropicCompat(&route).decide(request),
+            Wire::Chat => OpenAiCompat(&route).decide(request),
+            Wire::Jev => Jev(&route).decide(request),
+        }
+    })();
+    let mut outcome = after_cancel(outcome, cancel);
     if let Err(Error::Failure {
         session_id: id,
         attempts,
@@ -1181,17 +1458,18 @@ pub fn send(
     }) = &mut outcome
     {
         *id = Some(session_id.clone());
-        if cancel.is_cancelled() {
-            *attempts = Some(sends);
-        }
+        *attempts = (sends.get() > 0 || cancel.is_cancelled()).then(|| sends.get());
     }
     if let Ok(value) = &mut outcome
         && let Some(fields) = value.as_object_mut()
     {
-        fields.insert("attempts".into(), json!(sends));
+        fields.insert("attempts".into(), json!(sends.get()));
         fields.insert("session_id".into(), json!(session_id));
         fields.insert("question_digests".into(), json!(digests));
     }
+    let mut session_failure = None;
+    let attach = |failure, context| contextual(failure, context, Some(&session_id));
+    let prior = || format!("original outcome: {outcome:?}");
     if let Ok(project) = options.settings.project_required()
         && slug(project).is_ok()
         && slug(&options.agent_role).is_ok()
@@ -1205,7 +1483,7 @@ pub fn send(
             .join(project);
         let _append = SESSION_APPEND
             .lock()
-            .map_err(|e| error("config.session", e))?;
+            .map_err(|e| attach(error("config.session", e), prior()))?;
         let written = (|| -> std::io::Result<()> {
             use std::io::Write;
             std::fs::create_dir_all(&path)?;
@@ -1217,14 +1495,29 @@ pub fn send(
                 "{row}"
             )
         })();
-        if let Err(e) = written {
-            log(logger, "error", json!(error("log.session_write", e)))?;
+        session_failure = written
+            .err()
+            .map(|e| attach(error("log.session_write", e), prior()));
+        if let Some(failure) = &session_failure
+            && let Err(log_failure) = log(logger, "error", json!(failure))
+        {
+            outcome = Err(attach(
+                log_failure,
+                format!("original session error: {failure}"),
+            ));
         }
     }
-    if let Ok(value) = &outcome {
-        log(logger, "decision.result", json!({"response":value}))?;
+    let logged = match &outcome {
+        Ok(value) => log(logger, "decision.result", json!({"response":value})),
+        Err(_) => Ok(()),
+    };
+    for failure in [logged, logger.flush().map_err(|e| error("log.flush", e))]
+        .into_iter()
+        .filter_map(Result::err)
+    {
+        let context = format!("original outcome: {outcome:?}; session error: {session_failure:?}");
+        outcome = Err(attach(failure, context));
     }
-    logger.flush().map_err(|e| error("log.flush", e))?;
     outcome
 }
 pub fn batch(
@@ -1232,7 +1525,7 @@ pub fn batch(
     options: &Options,
     logger: &Logger,
     cancel: &Cancel,
-    wait: &(dyn Fn(Duration) + Sync),
+    wait: &(dyn Fn(Duration) -> Result<(), Error> + Sync),
     keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
     on_result: &(dyn Fn(usize, &Value) + Sync),
 ) -> Result<Value, Error> {
@@ -1285,15 +1578,24 @@ pub fn repository() -> Result<(PathBuf, String), Error> {
         .map(PathBuf::from)
         .unwrap_or(cwd);
     let origin = git(&["remote", "get-url", "origin"]);
-    let host = std::process::Command::new("hostname")
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| error("config.repo", "host name unavailable"))?;
+    let host = hostname(std::process::Command::new("hostname").output())?;
     let name = repository_identity(origin.as_deref(), &host, &root)?;
     Ok((root, name))
+}
+fn hostname(output: std::io::Result<std::process::Output>) -> Result<String, Error> {
+    let output =
+        output.map_err(|e| error("config.repo", format!("host name command failed: {e}")))?;
+    if !output.status.success() {
+        let detail = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+        return Err(error(
+            "config.repo",
+            format!("host name command failed with {}: {detail}", output.status),
+        ));
+    }
+    let host = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    (!host.is_empty())
+        .then_some(host)
+        .ok_or_else(|| error("config.repo", "host name command returned an empty name"))
 }
 pub fn repository_identity(origin: Option<&str>, host: &str, root: &Path) -> Result<String, Error> {
     let remote = origin
@@ -1323,16 +1625,22 @@ pub fn repository_identity(origin: Option<&str>, host: &str, root: &Path) -> Res
     Ok(name)
 }
 
-pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error> {
-    let (root, _) = repository()?;
+pub fn load(
+    config_dir: Option<&Path>,
+    project: Option<&str>,
+) -> Result<(Configuration, PathBuf, String), Error> {
+    let (root, repo) = repository()?;
     let local = root.join(".sc/sc-agent");
-
-    let loaded = config(
-        root.join(".git").exists().then_some(local.as_path()),
-        config_dir,
-        &std::env::vars_os().collect::<Vec<_>>(),
-        project,
-    )?;
+    let environment = std::env::vars_os().collect::<Vec<_>>();
+    let local = root.join(".git").exists().then_some(local.as_path());
+    Ok((
+        config(local, config_dir, &environment, project)?,
+        root,
+        repo,
+    ))
+}
+pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error> {
+    let (loaded, ..) = load(config_dir, project)?;
     Ok(json!({"settings":loaded.rows, "files":loaded.files, "log_root":log_root("decidr")?}))
 }
 
@@ -1340,7 +1648,242 @@ pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {
     if let Err(error) = &outcome
         && let Err(failure) = log(logger, "error", json!(error))
     {
-        return result(Err(failure));
+        let Error::Failure { session_id, .. } = error;
+        return result(Err(contextual(
+            failure,
+            format!("original error: {error}"),
+            session_id.as_deref(),
+        )));
     }
     result(outcome)
+}
+
+#[cfg(test)]
+extern crate self as sc_agent;
+#[cfg(test)]
+pub mod route_tests {
+    use super::*;
+    pub mod test_support {
+        include!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/support/mod.rs"));
+    }
+    use test_support::*;
+    type Hook = std::cell::RefCell<Option<Box<dyn FnOnce()>>>;
+    pub(super) fn notify(hook: &'static std::thread::LocalKey<Hook>) {
+        hook.with(|hook| {
+            if let Some(waiting) = hook.borrow_mut().take() {
+                waiting();
+            }
+        });
+    }
+
+    #[test]
+    fn resolution_failure_keeps_every_candidate_error() -> Test {
+        for (case, expected_id) in [
+            (0, "secrets.key_malformed"),
+            (1, "secrets.keyring_read"),
+            (2, "secrets.key_missing"),
+        ] {
+            let root = Temp::new()?;
+            let mut options = options(&root, "http://127.0.0.1:1/v1");
+            options.environment.clear();
+            let lookup = |variable: &str| {
+                if case == 2 {
+                    return Ok(String::new());
+                }
+                match variable {
+                    "ANTHROPIC_API_KEY" => Err(KeyringError::Timeout),
+                    "OPENROUTER_API_KEY" => Err(KeyringError::Read("controlled refusal".into())),
+                    "NOUS_API_KEY" if case == 0 => Ok("malformed key".into()),
+                    _ => Ok(String::new()),
+                }
+            };
+            let found = candidates("haiku", None, &BTreeMap::new())?;
+            let causes = found
+                .iter()
+                .map(|(provider, _)| {
+                    key(provider.key, &options.environment, &options.root, &lookup)
+                        .err()
+                        .ok_or("candidate unexpectedly has a key")
+                        .map(|failure| failure.to_string())
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let failure = result(resolve(found, &options, &lookup).map(|_| json!(null)));
+            assert_eq!(failure["error"]["id"], expected_id);
+            let message = failure["error"]["message"]
+                .as_str()
+                .ok_or("missing error message")?;
+            let returned = format!(
+                "{}: {message}",
+                failure["error"]["id"].as_str().ok_or("missing error id")?
+            );
+            for cause in causes {
+                assert!(returned.contains(&cause), "lost cause {cause}: {returned}");
+            }
+        }
+        Ok(())
+    }
+
+    thread_local! {
+        pub(super) static LOCK_WAIT: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+        pub(super) static WAIT_ENTERED: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+    }
+
+    #[test]
+    fn cancel_ends_busy_holdoff_after_wait_is_entered() -> Test {
+        let cancel = Arc::new(Cancel::default());
+        let (entered, waiting) = std::sync::mpsc::channel();
+        let (finished, outcome) = std::sync::mpsc::channel();
+        let worker_cancel = cancel.clone();
+        let worker = std::thread::spawn(move || {
+            WAIT_ENTERED.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || {
+                    let _ = entered.send(());
+                }))
+            });
+            let _ = worker_cancel.wait(Duration::from_secs(600));
+            let _ = finished.send(());
+        });
+        waiting
+            .recv_timeout(Duration::from_secs(10))
+            .map_err(|e| format!("holdoff wait not entered: {e}"))?;
+        std::thread::spawn(move || cancel.cancel());
+        outcome
+            .recv_timeout(Duration::from_secs(10))
+            .map_err(|e| format!("cancel did not release holdoff: {e}"))?;
+        worker.join().map_err(|_| "holdoff waiter panicked")?;
+        Ok(())
+    }
+
+    #[test]
+    fn cancel_ends_a_wait_on_the_host_holdoff() -> Test {
+        let cancel = Arc::new(Cancel::default());
+        let host = host_holdoff("cancel-wait.invalid")?;
+        let same_host = host_holdoff("cancel-wait.invalid")?;
+        let held = host.lock().map_err(|_| "holdoff poisoned")?;
+        let (finished, outcome) = std::sync::mpsc::channel();
+        let waiting_cancel = cancel.clone();
+        let reached = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let worker_reached = reached.clone();
+        let work = std::thread::spawn(move || {
+            let flag = waiting_cancel.clone();
+            LOCK_WAIT.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || {
+                    worker_reached.store(true, Ordering::SeqCst);
+                    flag.cancel();
+                }));
+            });
+            let result = waiting_cancel.lock(&same_host).map(|_| json!(null));
+            let _ = finished.send(result);
+        });
+        let result = outcome.recv_timeout(Duration::from_secs(10));
+        drop(held);
+        if matches!(result, Err(RecvTimeoutError::Timeout)) {
+            return Err(format!(
+                "lock waiter timed out; contention hook reached={}",
+                reached.load(Ordering::SeqCst)
+            )
+            .into());
+        }
+        work.join().map_err(|_| "lock waiter panicked")?;
+        assert!(cancel.is_cancelled(), "contention hook was not reached");
+        assert_eq!(super::result(result?)["error"]["id"], "decision.cancelled");
+        Ok(())
+    }
+
+    #[test]
+    fn timeout_is_per_call_and_sets_the_transport_configuration() -> Test {
+        let root = Temp::new()?;
+        let cancel = Cancel::default();
+        let sends = Cell::new(0);
+        for timeout in [
+            Duration::from_secs(120),
+            Duration::from_millis(50),
+            Duration::from_secs(120),
+        ] {
+            let mut options = options(&root, "http://127.0.0.1:1/v1");
+            options.timeout = timeout;
+            let (provider, model) = model("jev", None)?;
+            let route = Route {
+                options: &options,
+                provider,
+                model,
+                base: String::new(),
+                cancel: &cancel,
+                wait: &no_wait,
+                keyring: &keyring,
+                sends: &sends,
+            };
+            assert_eq!(route.agent().config().timeouts().global, Some(timeout));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn cancellation_keeps_auth_errors_and_overrides_only_success() -> Test {
+        let root = Temp::new()?;
+        let logger = logger(&root)?;
+        let body = json!({"error":"controlled remote refusal"});
+        let stub = Stub::new(vec![http(401, body.clone())])?;
+        let cancel = Cancel::default();
+        let lower = send(
+            &request(),
+            &options(&root, &stub.url),
+            &logger,
+            &cancel,
+            &no_wait,
+            &keyring,
+        )
+        .err()
+        .ok_or("401 accepted")?;
+        assert!(!cancel.is_cancelled());
+        assert_eq!(stub.finish()?.len(), 1);
+        cancel.cancel();
+        let failure = result(after_cancel(Err(lower), &cancel));
+        assert_eq!(failure["error"]["id"], "http.auth");
+        assert_eq!(failure["error"]["message"], body.to_string());
+        assert!(cancel.is_cancelled());
+        logger.shutdown()?;
+        assert_eq!(
+            result(after_cancel(Ok(json!(null)), &cancel))["error"]["id"],
+            "decision.cancelled"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn hostname_command_failure_is_a_typed_config_error() -> Test {
+        let failure = super::hostname(Err(std::io::Error::other("controlled hostname failure")))
+            .err()
+            .ok_or("hostname failure accepted")?;
+        let value = result(Err(failure));
+        assert_eq!(value["error"]["id"], "config.repo");
+        assert!(
+            value["error"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("controlled hostname failure"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn shutdown_failure_keeps_attempts_and_session_id() -> Test {
+        let mut original = error("http.auth", "provider refused the request");
+        let Error::Failure {
+            attempts,
+            session_id,
+            ..
+        } = &mut original;
+        *attempts = Some(1);
+        *session_id = Some("session-1".into());
+        let value = after_shutdown(result(Err(original)), Err("controlled shutdown failure"));
+        assert_eq!(value["error"]["id"], "log.shutdown");
+        assert_eq!(value["error"]["attempts"], 1);
+        assert_eq!(value["error"]["session_id"], "session-1");
+        assert!(value["error"]["message"].as_str().is_some_and(|message| {
+            message.contains("http.auth")
+                && message.contains("provider refused the request")
+                && message.contains("controlled shutdown failure")
+        }));
+        Ok(())
+    }
 }
