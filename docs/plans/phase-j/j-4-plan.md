@@ -1,6 +1,6 @@
 # j-4 plan: the consumer template on the Run
 
-Base: sprint/j-3 @cfb57cd3 (j-4 follows j-3: it uses j-3's per-call `cache`, `PyRun.log`, `run_id`, `session_rows`, sitr `tool=` and `tool_version` render wiring). `:N` = `crates/sc-agent-py/python/sc_agent/templates/consumer.py.j2` at that commit (668 lines). Wheel API = j-2 and j-3 planned end states (j-2-plan.md, j-3-plan.md); their code on this branch is partial. Written by reading the code; no j-4 code yet.
+Base: sprint/j-3 @3bab4c0a (j-4 follows j-3: it uses j-3's per-call `cache`, `PyRun.log`, `run_id`, `session_rows`, sitr `tool=` and `tool_version` render wiring). `:N` = `crates/sc-agent-py/python/sc_agent/templates/consumer.py.j2` at that commit (668 lines). Wheel API = j-2 and j-3 planned end states (j-2-plan.md, j-3-plan.md); their code on this branch is partial. Written by reading the code; no j-4 code yet.
 
 ## Goal
 
