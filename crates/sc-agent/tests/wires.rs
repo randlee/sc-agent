@@ -37,6 +37,8 @@ fn with_route<T>(
         wait: &no_wait,
         keyring: &keyring,
         sends: &sends,
+        now: &std::time::Duration::default,
+        holdoffs: &std::sync::Mutex::new(std::collections::BTreeMap::new()),
     };
     Ok(run(&route))
 }
