@@ -10,7 +10,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def credential_variables():
+def credential_variables() -> dict[str, str]:
     found = subprocess.run(["decidr", "models"], capture_output=True, text=True, timeout=20)
     if found.returncode:
         raise RuntimeError(found.stdout + found.stderr)
@@ -35,9 +35,8 @@ def main():
     args = parser.parse_args()
     variables = credential_variables()
     keys = {variable: key_for(provider, variable) for provider, variable in variables.items()}
-    required = [variables[name] for name in ("typesafe", "anthropic", "nous")]
-    if not any(keys.get(variable) for variable in required):
-        raise RuntimeError(f"one of {', '.join(required)} is required (environment or platform keychain)")
+    if not any(keys.values()):
+        parser.error("no provider credentials found (environment or platform keychain)")
     destination = args.export_env.resolve()
     if ROOT in destination.parents:
         raise RuntimeError("temporary credential export must be outside the checkout")

@@ -4,9 +4,9 @@ use serde_json::{Value, json};
 use std::{
     io::{Read, Write},
     sync::{Arc, mpsc},
-    time::Duration,
 };
 mod cli;
+const TOOL: &str = "decidr";
 fn main() {
     let cancelled = Arc::new(sc_agent::Cancel::default());
     let flag = cancelled.clone();
@@ -27,23 +27,24 @@ fn main() {
     let doctor = parsed
         .as_ref()
         .is_ok_and(|cli| matches!(cli.command, Command::Doctor));
-    let value = match signal.and_then(|()| sc_agent::default_logger("decidr")) {
+    let value = match signal.and_then(|()| sc_agent::default_logger(TOOL)) {
         Err(error) => sc_agent::result(Err(error)),
         Ok(logger) => {
+            let logger = Arc::new(logger);
             let outcome = (|| -> Result<Value, sc_agent::Error> {
                 let cli = parsed.map_err(|e| sc_agent::error("decidr.usage", e))?;
                 if matches!(cli.command, Command::Models) {
                     return Ok(json!(sc_agent::PROVIDERS));
                 }
                 if matches!(cli.command, Command::Doctor) {
-                    return sc_agent::doctor(cli.config_dir.as_deref(), cli.project.as_deref());
+                    return sc_agent::doctor(
+                        TOOL,
+                        cli.config_dir.as_deref(),
+                        cli.project.as_deref(),
+                    );
                 }
-                let (loaded, root, repo) =
-                    sc_agent::load(cli.config_dir.as_deref(), cli.project.as_deref())?;
-                let mut settings = loaded.config;
                 let Command::Send {
                     model,
-                    provider,
                     agent_role,
                     input,
                     batch,
@@ -53,9 +54,20 @@ fn main() {
                 else {
                     return Ok(Value::Null);
                 };
-                if let Some(workers) = workers {
-                    settings.workers = sc_agent::workers(workers)?;
-                }
+                let run = sc_agent::Run::new(
+                    sc_agent::RunArgs {
+                        tool: TOOL.into(),
+                        agent_role,
+                        model: Some(model),
+                        project: cli.project,
+                        config_dir: cli.config_dir,
+                        timeout_secs: Some(timeout_secs),
+                        workers,
+                        base_url: None,
+                    },
+                    Some(logger.clone()),
+                    cancelled.clone(),
+                )?;
                 cancelled.check()?;
                 let text = match input {
                     Some(path) => std::fs::read_to_string(path)
@@ -72,20 +84,6 @@ fn main() {
                             .map_err(|e| sc_agent::error("decidr.input_read", e))?
                     }
                 };
-                let log_root = sc_agent::log_root("decidr")?;
-                let options = sc_agent::Options {
-                    environment: std::env::vars_os().collect(),
-                    settings,
-                    model,
-                    provider,
-                    agent_role,
-                    timeout: Duration::try_from_secs_f64(timeout_secs)
-                        .map_err(|e| sc_agent::error("decidr.invalid_request_timeout", e))?,
-                    base_url: None,
-                    root,
-                    log_root,
-                    repo,
-                };
                 if batch {
                     let requests = text
                         .lines()
@@ -99,25 +97,11 @@ fn main() {
                             })
                         })
                         .collect::<Result<Vec<_>, _>>()?;
-                    sc_agent::batch(
-                        &requests,
-                        &options,
-                        &logger,
-                        &cancelled,
-                        &|delay| cancelled.wait(delay),
-                        &sc_agent::os_keyring,
-                        &|_, _| {},
-                    )
+                    run.send_batch(&requests, &|_, _| {})
                 } else {
-                    let request = serde_json::from_str(&text)
-                        .map_err(|e| sc_agent::error("decision.request_parse", e))?;
-                    sc_agent::send(
-                        &request,
-                        &options,
-                        &logger,
-                        &cancelled,
-                        &|delay| cancelled.wait(delay),
-                        &sc_agent::os_keyring,
+                    run.send(
+                        &serde_json::from_str(&text)
+                            .map_err(|e| sc_agent::error("decision.request_parse", e))?,
                     )
                 }
             })();

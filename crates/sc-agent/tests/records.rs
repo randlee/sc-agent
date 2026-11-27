@@ -1,5 +1,5 @@
 pub mod support;
-use sc_agent::{Cancel, send};
+use sc_agent::Cancel;
 use serde_json::{Value, json};
 use support::*;
 
@@ -11,14 +11,11 @@ fn req_sag_0001_0004_0005_session_rows_append_with_distinct_ulids() -> Test {
     let stub = Stub::new((0..3).map(|_| http(200, answer())).collect())?;
     let opts = options(&root, &stub.url);
     for _ in 0..3 {
-        send(
-            &request(),
-            &opts,
-            &logger,
-            &Cancel::default(),
-            &no_wait,
-            &keyring,
-        )?;
+        {
+            let run = run(opts.clone(), &logger)?;
+
+            run.send(&request())
+        }?;
     }
     let seen = stub.finish()?;
     assert_eq!(seen.len(), 3);
@@ -66,14 +63,11 @@ fn req_sag_0005_one_mib_request_is_recorded_whole() -> Test {
     let payload = "x".repeat(1024 * 1024 - serde_json::to_vec(&input)?.len());
     input["state"] = json!(payload);
     assert_eq!(serde_json::to_vec(&input)?.len(), 1024 * 1024);
-    send(
-        &input,
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    )?;
+    {
+        let run = run(options(&root, &stub.url), &logger)?;
+
+        run.send(&input)
+    }?;
     assert_eq!(
         stub.finish()?.first().ok_or("request not sent")?.body["state"],
         input["state"]
@@ -130,14 +124,11 @@ fn req_sag_0008_one_mib_jsonl_limit_preserves_accepted_event_and_decision() -> T
             .clone()
     );
     let stub = Stub::new(vec![http(200, answer())])?;
-    let value = send(
-        &request(),
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    )?;
+    let value = {
+        let run = run(options(&root, &stub.url), &logger)?;
+
+        run.send(&request())
+    }?;
     assert_eq!(value["answers"], answer()["answers"]);
     assert_eq!(stub.finish()?.len(), 1);
     assert_eq!(
@@ -153,16 +144,15 @@ fn adr_sag_0021_send_and_report_return_logger_failures() -> Test {
     let root = Temp::new()?;
     let logger = logger(&root)?;
     logger.shutdown()?;
-    let cancelled = Cancel::default();
+    let cancelled = std::sync::Arc::new(Cancel::default());
     cancelled.cancel();
-    let outcome = send(
-        &request(),
-        &options(&root, "http://127.0.0.1:1"),
-        &logger,
-        &cancelled,
-        &no_wait,
-        &|_| panic!("cancelled send read a key"),
-    );
+    let outcome = {
+        let mut run = run(options(&root, "http://127.0.0.1:1"), &logger)?;
+        run.cancel = cancelled.clone();
+
+        run.keyring = Box::new(move |_| panic!("cancelled send read a key"));
+        run.send(&request())
+    };
     let failure = sc_agent::result(outcome);
     assert_eq!(failure["error"]["id"], "log.flush");
     let original = logger
@@ -223,14 +213,11 @@ fn req_sag_0019_missing_runner_names_its_setting_layers() -> Test {
     let logger = logger(&root)?;
     let mut opts = options(&root, "http://127.0.0.1:1");
     opts.model = "laya".into();
-    let failure = sc_agent::result(send(
-        &request(),
-        &opts,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    ));
+    let failure = sc_agent::result({
+        let run = run(opts.clone(), &logger)?;
+
+        run.send(&request())
+    });
     assert_eq!(failure["error"]["id"], "config.missing_setting");
     let message = failure["error"]["message"]
         .as_str()
@@ -255,14 +242,7 @@ fn failed_general_logger_preserves_the_successful_session() -> Test {
     let logger = logger(&root)?;
     logger.shutdown()?;
     let stub = Stub::new(vec![http(200, answer())])?;
-    let failure = sc_agent::result(send(
-        &request(),
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    ));
+    let failure = sc_agent::result(run(options(&root, &stub.url), &logger)?.send(&request()));
     assert_eq!(failure["error"]["id"], "log.flush");
     assert!(failure["error"]["session_id"].as_str().is_some());
     assert!(
@@ -299,14 +279,11 @@ fn old_session_file_survives_a_new_decision_unchanged() -> Test {
     let modified = std::fs::metadata(&old)?.modified()?;
     let logger = logger(&root)?;
     let stub = Stub::new(vec![http(200, answer())])?;
-    send(
-        &request(),
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    )?;
+    {
+        let run = run(options(&root, &stub.url), &logger)?;
+
+        run.send(&request())
+    }?;
     assert_eq!(stub.finish()?.len(), 1);
     assert_eq!(std::fs::read_to_string(&old)?, "{\"old\":true}\n");
     assert_eq!(std::fs::metadata(&old)?.modified()?, modified);
@@ -385,14 +362,8 @@ fn session_write_failure_survives_later_flush_failure() -> Test {
     builder.register_sink(sc_observability::SinkRegistration::typed(sink.clone()));
     let logger = builder.build()?;
     let stub = Stub::new(vec![http(200, answer())])?;
-    let failure = sc_agent::result(send(
-        &request(),
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    ));
+    let logger = std::sync::Arc::new(logger);
+    let failure = sc_agent::result(run(options(&root, &stub.url), &logger)?.send(&request()));
     assert_eq!(failure["error"]["id"], "log.flush");
     assert!(failure["error"]["session_id"].as_str().is_some());
     let message = failure["error"]["message"]
@@ -426,16 +397,13 @@ fn injected_test_sink_receives_every_general_record_without_default_file() -> Te
     config.enable_console_sink = false;
     let mut builder = sc_observability::v2::Logger::builder(config)?;
     builder.register_sink(sc_observability::SinkRegistration::typed(sink.clone()));
-    let logger = builder.build()?;
+    let logger = std::sync::Arc::new(builder.build()?);
     let stub = Stub::new(vec![http(200, answer())])?;
-    send(
-        &request(),
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    )?;
+    {
+        let run = run(options(&root, &stub.url), &logger)?;
+
+        run.send(&request())
+    }?;
     assert_eq!(stub.finish()?.len(), 1);
     sc_agent::report(
         &logger,

@@ -1,6 +1,6 @@
 use sc_config::{
-    AppName, ConfigError, EnvSource, FileSource, Layer, LayerSource, Resolved, Slot, SourceKind,
-    StandardContext, StandardLayers,
+    AppName, ConfigError, EnvSource, FileSource, Resolved, Slot, SourceKind, StandardContext,
+    StandardLayers,
 };
 use sc_observability::{LoggerConfig, ServiceName, v2::Logger};
 use serde::{Deserialize, Serialize, de::Error as DeError};
@@ -109,40 +109,37 @@ pub fn after_shutdown(value: Value, shutdown: Result<(), impl std::fmt::Display>
     failure
 }
 pub fn error(id: &'static str, message: impl ToString) -> Error {
-    let category = match id {
-        "secrets.key_missing"
-        | "secrets.key_malformed"
-        | "secrets.keyring_read"
-        | "secrets.keyring_timeout"
-        | "http.auth" => "auth",
-        "http.network" => "network",
-        "decision.api_status" => "other",
-        "http.provider_busy" => "busy",
-        "http.quota_exhausted" => "quota",
-        "decision.cancelled" => "cancelled",
-        "decision.response_parse" | "decision.schema_mismatch" => "response_invalid",
-        s if s.starts_with("log.") => "log",
-        s if s.starts_with("config.") => "config",
-        _ => "validation",
+    let fix_input = "Fix the named input or provider response.";
+    let retry = "Retry later.";
+    let (category, action) = match id {
+        "secrets.keyring_timeout" => (
+            "auth",
+            "Approve keychain access, or set the environment variable or .env key.",
+        ),
+        "secrets.keyring_read" => (
+            "auth",
+            "Restore platform keyring access, or set the key in the environment or repository .env.",
+        ),
+        "secrets.key_missing" => (
+            "auth",
+            "Set the key in the environment, repository .env, or platform keyring.",
+        ),
+        "secrets.key_malformed" | "http.auth" => ("auth", "Check the provider API key."),
+        "http.network" => ("network", retry),
+        "http.provider_busy" => ("busy", retry),
+        "decision.api_status" => ("other", fix_input),
+        "http.quota_exhausted" => ("quota", fix_input),
+        "decision.cancelled" => ("cancelled", fix_input),
+        "decision.response_parse" | "decision.schema_mismatch" => ("response_invalid", fix_input),
+        s if s.starts_with("log.") => ("log", fix_input),
+        s if s.starts_with("config.") => ("config", fix_input),
+        _ => ("validation", fix_input),
     };
     Error::Failure {
         id,
         message: message.to_string(),
         category,
-        action: match category {
-            "auth" if id == "secrets.keyring_timeout" => {
-                "Approve keychain access, or set the environment variable or .env key."
-            }
-            "auth" if id == "secrets.keyring_read" => {
-                "Restore platform keyring access, or set the key in the environment or repository .env."
-            }
-            "auth" if id == "secrets.key_missing" => {
-                "Set the key in the environment, repository .env, or platform keyring."
-            }
-            "auth" => "Check the provider API key.",
-            "busy" | "network" => "Retry later.",
-            _ => "Fix the named input or provider response.",
-        },
+        action,
         attempts: None,
         session_id: None,
     }
@@ -200,17 +197,30 @@ pub struct Settings {
     pub local: BTreeMap<String, Runner>,
     pub max_sends: u32,
     pub decidr: BTreeMap<String, String>,
+    #[serde(skip)]
+    pub tool: String,
 }
-fn missing_setting(path: &str) -> Error {
+fn prefix(tool: &str) -> String {
+    format!("{}_", tool.to_uppercase().replace('-', "_"))
+}
+fn layers(tool: &str) -> String {
+    format!(
+        "local {tool}.local.json, local {tool}.json, local sc-agent.json, global {tool}.local.json, global {tool}.json, or global sc-agent.json"
+    )
+}
+fn missing_setting(tool: &str, path: &str) -> Error {
     error(
         "config.missing_setting",
         format!(
-            "Set {path} through DECIDR_{}, local decidr.local.json, local decidr.json, local sc-agent.json, global decidr.local.json, global decidr.json, or global sc-agent.json",
-            path.to_uppercase().replace('.', "__")
+            "Set {path} through {}{}, {}",
+            prefix(tool),
+            path.to_uppercase().replace('.', "__"),
+            layers(tool)
         ),
     )
 }
 fn setting<T: serde::de::DeserializeOwned>(
+    tool: &str,
     resolved: &Resolved,
     path: &str,
     default: Value,
@@ -222,14 +232,25 @@ fn setting<T: serde::de::DeserializeOwned>(
         && let Some((head, _)) = path.split_once('.')
         && PROVIDERS.iter().any(|p| p.url.is_empty() && p.name == head)
     {
-        return Err(invalid_setting(resolved, head, missing_setting(path)));
+        return Err(invalid_setting(resolved, head, missing_setting(tool, path)));
     }
     serde_json::from_value(selected.cloned().unwrap_or(default))
         .map_err(|e| invalid_setting(resolved, path, e))
 }
 impl Settings {
     pub fn project_required(&self) -> Result<&str, Error> {
-        self.project.as_deref().filter(|s| !s.is_empty()).ok_or_else(||error("config.missing_project", "Set project/phase through --project, SC_PROJECT, local decidr.local.json, local decidr.json, local sc-agent.json, global decidr.local.json, global decidr.json, or global sc-agent.json"))
+        self.project
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                error(
+                    "config.missing_project",
+                    format!(
+                        "Set project/phase through --project, SC_PROJECT, {}",
+                        layers(&self.tool)
+                    ),
+                )
+            })
     }
 }
 const KEYS: &[&str] = &[
@@ -244,28 +265,6 @@ pub struct Configuration {
     pub config: Settings,
     pub rows: Vec<Value>,
     pub files: Vec<Value>,
-}
-struct ConfigEnv(Vec<(OsString, OsString)>);
-impl LayerSource for ConfigEnv {
-    fn load(&self, base: &Value) -> Result<Option<Layer>, ConfigError> {
-        let variables = self
-            .0
-            .iter()
-            .filter(|(name, _)| {
-                let key = name
-                    .to_str()
-                    .and_then(|name| name.strip_prefix("DECIDR_"))
-                    .and_then(|key| key.split("__").next())
-                    .unwrap_or("")
-                    .to_ascii_lowercase();
-                !matches!(key.as_str(), "log_root" | "project")
-            })
-            .cloned()
-            .collect();
-        EnvSource::new("DECIDR_", variables)
-            .alias("SC_PROJECT", ["project"])
-            .load(base)
-    }
 }
 fn config_error(failure: ConfigError) -> Error {
     let id = match failure.code() {
@@ -291,11 +290,26 @@ fn invalid_setting(resolved: &Resolved, path: &str, failure: impl ToString) -> E
     )
 }
 pub fn config(
+    tool: &str,
     local: Option<&Path>,
     global: Option<&Path>,
     environment: &[(OsString, OsString)],
     project: Option<&str>,
 ) -> Result<Configuration, Error> {
+    let env_prefix = prefix(tool);
+    let variables = environment
+        .iter()
+        .filter(|(name, _)| {
+            let key = name
+                .to_str()
+                .and_then(|name| name.strip_prefix(env_prefix.as_str()))
+                .and_then(|key| key.split("__").next())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            !matches!(key.as_str(), "log_root" | "project")
+        })
+        .cloned()
+        .collect();
     let mut keys = KEYS.iter().map(|key| key.to_string()).collect::<Vec<_>>();
     keys.extend(
         PROVIDERS
@@ -322,7 +336,11 @@ pub fn config(
     let mut files = Vec::new();
     for (slot, folder) in [(Slot::User, Some(global.as_path())), (Slot::Local, local)] {
         if let Some(folder) = folder {
-            for name in ["sc-agent.json", "decidr.json", "decidr.local.json"] {
+            for name in [
+                "sc-agent.json".into(),
+                format!("{tool}.json"),
+                format!("{tool}.local.json"),
+            ] {
                 let path = folder.join(name);
                 files.push(json!({"path":path,"exists":path.exists()}));
                 layers = layers.insert(
@@ -338,7 +356,10 @@ pub fn config(
         .map(|project| json!({"project":project}))
         .unwrap_or(json!({}));
     let resolved = layers
-        .insert(Slot::Env, ConfigEnv(environment.to_vec()))
+        .insert(
+            Slot::Env,
+            EnvSource::new(env_prefix, variables).alias("SC_PROJECT", ["project"]),
+        )
         .flags(flags)
         .resolve()
         .map_err(config_error)?;
@@ -349,18 +370,19 @@ pub fn config(
         .map(|p| p.name)
     {
         if resolved.value.get(name).is_some_and(Value::is_object) {
-            let host = setting(&resolved, &format!("{name}.host"), Value::Null)?;
-            let port = setting(&resolved, &format!("{name}.port"), Value::Null)?;
+            let host = setting(tool, &resolved, &format!("{name}.host"), Value::Null)?;
+            let port = setting(tool, &resolved, &format!("{name}.port"), Value::Null)?;
             local.insert(name.into(), Runner { host, port });
         }
     }
     let config = Settings {
-        project: setting(&resolved, "project", Value::Null)?,
-        workers: setting(&resolved, "workers", json!(8))?,
-        models: setting(&resolved, "models", json!({}))?,
+        project: setting(tool, &resolved, "project", Value::Null)?,
+        workers: setting(tool, &resolved, "workers", json!(8))?,
+        models: setting(tool, &resolved, "models", json!({}))?,
         local,
-        max_sends: setting(&resolved, "max_sends", json!(5))?,
-        decidr: setting(&resolved, "decidr", json!({}))?,
+        max_sends: setting(tool, &resolved, "max_sends", json!(5))?,
+        decidr: setting(tool, &resolved, "decidr", json!({}))?,
+        tool: tool.into(),
     };
     if config.workers == 0 {
         return Err(invalid_setting(&resolved, "workers", "must be positive"));
@@ -419,18 +441,15 @@ pub fn slug(value: &str) -> Result<(), Error> {
     Ok(())
 }
 pub fn log_root(name: &str) -> Result<PathBuf, Error> {
-    std::env::var_os(format!(
-        "{}_LOG_ROOT",
-        name.to_uppercase().replace('-', "_")
-    ))
-    .filter(|s| !s.is_empty())
-    .map(PathBuf::from)
-    .map(Ok)
-    .unwrap_or_else(|| {
-        std::env::home_dir()
-            .map(|p| p.join(".sc-agent"))
-            .ok_or_else(|| error("config.home", "Home directory unavailable"))
-    })
+    std::env::var_os(format!("{}LOG_ROOT", prefix(name)))
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .map(Ok)
+        .unwrap_or_else(|| {
+            std::env::home_dir()
+                .map(|p| p.join(".sc-agent"))
+                .ok_or_else(|| error("config.home", "Home directory unavailable"))
+        })
 }
 pub fn default_logger(name: &str) -> Result<Logger, Error> {
     slug(name)?;
@@ -554,9 +573,9 @@ mod resolve_test {
                 local: BTreeMap::new(),
                 max_sends: 1,
                 decidr: BTreeMap::new(),
+                tool: String::new(),
             },
             model: String::new(),
-            provider: None,
             agent_role: String::new(),
             timeout: Duration::ZERO,
             base_url: None,
@@ -754,9 +773,10 @@ const GPT: &[(&str, &str, &str)] = &[
     ("luna", "gpt-6-luna", "2026-09-22"),
     ("astra", "gpt-6-astra", "2026-09-03"),
 ];
+pub const TYPESAFE: &str = "typesafe";
 pub static PROVIDERS: &[Provider] = &[
     Provider {
-        name: "typesafe",
+        name: TYPESAFE,
         url: "https://api.typesafe.ai/v1",
         key: "TYPESAFE_API_KEY",
         wire: Wire::Jev,
@@ -855,49 +875,33 @@ fn provider_named(name: &str) -> Result<&'static Provider, Error> {
         .find(|p| p.name == name)
         .ok_or_else(|| error("types.unknown_provider", name))
 }
-/// Resolve a model name using only the built-in tables.
-pub fn model(name: &str, provider: Option<&str>) -> Result<(&'static Provider, String), Error> {
-    model_with(name, provider, &BTreeMap::new())
-}
-/// Resolve a model name to its first candidate; a configured entry for `name`
-/// wins over the built-in tables unless an explicit `provider` names a different one.
+/// Resolve a model name to its first configured or catalog candidate.
 pub fn model_with(
     name: &str,
-    provider: Option<&str>,
     configured: &BTreeMap<String, ModelEntry>,
 ) -> Result<(&'static Provider, String), Error> {
-    Ok(candidates(name, provider, configured)?.remove(0))
+    Ok(candidates(name, configured)?.remove(0))
 }
 /// Every provider row that serves `name`, newest release first, equal dates in table order.
 fn candidates(
     name: &str,
-    provider: Option<&str>,
     configured: &BTreeMap<String, ModelEntry>,
 ) -> Result<Vec<(&'static Provider, String)>, Error> {
     if let Some(entry) = configured.get(name) {
         let p = provider_named(&entry.provider)?;
-        if provider.is_none_or(|requested| requested == entry.provider) {
-            return Ok(vec![(p, entry.id.clone())]);
-        }
+        return Ok(vec![(p, entry.id.clone())]);
     }
-    let chosen = provider.map(provider_named).transpose()?;
     let mut rows = Vec::new();
-    for p in PROVIDERS
-        .iter()
-        .filter(|p| chosen.is_none_or(|c| c.name == p.name))
-    {
+    for p in PROVIDERS {
         for (_, id, date) in p.models.iter().filter(|(s, i, _)| *s == name || *i == name) {
             rows.push((*date, p, (*id).to_owned()));
         }
     }
     rows.sort_by_key(|row| std::cmp::Reverse(row.0));
-    let mut found = rows
+    let found = rows
         .into_iter()
         .map(|(_, p, id)| (p, id))
         .collect::<Vec<_>>();
-    if let Some(p) = chosen.filter(|p| p.open && found.is_empty()) {
-        found.push((p, name.into()));
-    }
     if found.is_empty() {
         return Err(error("types.unknown_short_name", name));
     }
@@ -924,8 +928,7 @@ fn resolve(
                     if *id == "secrets.key_missing" {
                         std::mem::swap(&mut previous, &mut failure);
                     }
-                    let Error::Failure { message, .. } = &mut failure;
-                    message.push_str(&format!("\n{previous}"));
+                    failure = contextual(failure, previous, None);
                 }
                 last = Some(failure);
             }
@@ -1051,11 +1054,11 @@ pub fn digest(request: &Value, question: &str) -> Result<String, Error> {
     .map_err(|e| error("decision.encode", e))
 }
 
+#[derive(Clone)]
 pub struct Options {
     pub environment: Vec<(OsString, OsString)>,
     pub settings: Settings,
     pub model: String,
-    pub provider: Option<String>,
     pub agent_role: String,
     pub timeout: Duration,
     pub base_url: Option<String>,
@@ -1072,18 +1075,12 @@ pub fn log(logger: &Logger, action: &str, fields: Value) -> Result<(), Error> {
 
 fn answer_schema(question: &Value) -> Value {
     let kind = question.get("type").and_then(Value::as_str).unwrap_or("");
-    let names = if kind == "choice" {
-        question
-            .get("criteria")
-            .and_then(Value::as_object)
-            .map(|v| v.keys().cloned().collect::<Vec<_>>())
-            .unwrap_or_default()
-    } else {
-        question
-            .get("criteria")
-            .and_then(Value::as_array)
-            .map(|v| (0..v.len()).map(|i| i.to_string()).collect::<Vec<_>>())
-            .unwrap_or_default()
+    let names = match question.get("criteria") {
+        Some(Value::Object(values)) if kind == "choice" => values.keys().cloned().collect(),
+        Some(Value::Array(values)) if kind != "choice" => (0..values.len())
+            .map(|index| index.to_string())
+            .collect::<Vec<_>>(),
+        _ => Vec::new(),
     };
     let object = |value_type| {
         json!({
@@ -1093,37 +1090,32 @@ fn answer_schema(question: &Value) -> Value {
             "additionalProperties":false
         })
     };
-    let mut fields = json!({"type":{"type":"string","enum":[kind]}});
-    if let Some(fields) = fields.as_object_mut() {
-        match kind {
-            "choice" => {
+    let mut fields = serde_json::Map::new();
+    fields.insert("type".into(), json!({"type":"string","enum":[kind]}));
+    match kind {
+        "choice" | "score" => {
+            fields.insert("confidence".into(), json!({"type":"number"}));
+            fields.insert("probabilities".into(), object("number"));
+            if kind == "choice" {
                 fields.insert("choice".into(), json!({"type":"string","enum":names}));
-                fields.insert("confidence".into(), json!({"type":"number"}));
-                fields.insert("probabilities".into(), object("number"));
-            }
-            "score" => {
+            } else {
                 fields.insert("score".into(), json!({"type":"number"}));
-                fields.insert("confidence".into(), json!({"type":"number"}));
                 fields.insert("legend".into(), object("string"));
-                fields.insert("probabilities".into(), object("number"));
             }
-            "box" => {
-                fields.insert("box".into(),json!({
+        }
+        "box" => {
+            fields.insert("box".into(),json!({
                     "type":["object","null"],
                     "properties":(["top","bottom","left","right"].into_iter().map(|name|(name,json!({"type":"number"}))).collect::<BTreeMap<_,_>>()),
                     "required":["top","bottom","left","right"],"additionalProperties":false
                 }));
-                fields.insert("confidence".into(), json!({"type":["number","null"]}));
-            }
-            _ => {
-                fields.insert("noul".into(), json!({"type":"number"}));
-            }
+            fields.insert("confidence".into(), json!({"type":["number","null"]}));
+        }
+        _ => {
+            fields.insert("noul".into(), json!({"type":"number"}));
         }
     }
-    let required = fields
-        .as_object()
-        .map(|v| v.keys().cloned().collect::<Vec<_>>())
-        .unwrap_or_default();
+    let required = fields.keys().cloned().collect::<Vec<_>>();
     json!({"type":"object","properties":fields,"required":required,"additionalProperties":false})
 }
 pub type DecisionRequest = Value;
@@ -1399,170 +1391,252 @@ pub fn workers(value: i64) -> Result<usize, Error> {
 fn after_cancel(outcome: Result<Value, Error>, cancel: &Cancel) -> Result<Value, Error> {
     outcome.and_then(|value| cancel.check().map(|()| value))
 }
-pub fn send(
-    request: &Value,
-    options: &Options,
-    logger: &Logger,
-    cancel: &Cancel,
-    wait: &(dyn Fn(Duration) -> Result<(), Error> + Sync),
-    keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
-) -> Result<Value, Error> {
-    let session_id = ulid::Ulid::new().to_string();
-    let digests = request
-        .get("questions")
-        .and_then(Value::as_object)
-        .map(|questions| {
-            questions
-                .keys()
-                .filter_map(|id| digest(request, id).ok().map(|hash| (id.clone(), hash)))
-                .collect::<BTreeMap<_, _>>()
-        });
-    let sends = Cell::new(0);
-    let outcome = (|| {
-        cancel.check()?;
-        let project = options.settings.project_required()?;
-        slug(project)?;
-        slug(&options.agent_role)?;
-        let found = candidates(
-            &options.model,
-            options.provider.as_deref(),
-            &options.settings.models,
-        )?;
-        let (provider, model) = resolve(found, options, keyring)?;
-        let base = match options.settings.local.get(provider.name) {
-            _ if !provider.url.is_empty() => provider.url.into(),
-            Some(runner) => format!("http://{}:{}/v1", runner.host, runner.port),
-            None => return Err(missing_setting(&format!("{}.host", provider.name))),
-        };
-        let route = Route {
-            options,
-            provider,
-            model,
-            base: options.base_url.clone().unwrap_or(base),
-            cancel,
-            wait,
-            keyring,
-            sends: &sends,
-        };
-        match provider.wire {
-            Wire::Messages => AnthropicCompat(&route).decide(request),
-            Wire::Chat => OpenAiCompat(&route).decide(request),
-            Wire::Jev => Jev(&route).decide(request),
-        }
-    })();
-    let mut outcome = after_cancel(outcome, cancel);
-    if let Err(Error::Failure {
-        session_id: id,
-        attempts,
-        ..
-    }) = &mut outcome
-    {
-        *id = Some(session_id.clone());
-        *attempts = (sends.get() > 0 || cancel.is_cancelled()).then(|| sends.get());
-    }
-    if let Ok(value) = &mut outcome
-        && let Some(fields) = value.as_object_mut()
-    {
-        fields.insert("attempts".into(), json!(sends.get()));
-        fields.insert("session_id".into(), json!(session_id));
-        fields.insert("question_digests".into(), json!(digests));
-    }
-    let mut session_failure = None;
-    let attach = |failure, context| contextual(failure, context, Some(&session_id));
-    let prior = || format!("original outcome: {outcome:?}");
-    if let Ok(project) = options.settings.project_required()
-        && slug(project).is_ok()
-        && slug(&options.agent_role).is_ok()
-    {
-        let row = json!({"session_id":session_id,"repo":options.repo,"agent_role":options.agent_role,"project":project,"request":request,"question_digests":digests,"result":match &outcome {Ok(v)=>json!({"ok":true,"value":v}),Err(e)=>json!({"ok":false,"error":e})}});
-        let path = options
-            .log_root
-            .join("sessions")
-            .join(&options.repo)
-            .join(&options.agent_role)
-            .join(project);
-        let _append = SESSION_APPEND
-            .lock()
-            .map_err(|e| attach(error("config.session", e), prior()))?;
-        let written = (|| -> std::io::Result<()> {
-            use std::io::Write;
-            std::fs::create_dir_all(&path)?;
-            writeln!(
-                std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(path.join("sessions.jsonl"))?,
-                "{row}"
-            )
-        })();
-        session_failure = written
-            .err()
-            .map(|e| attach(error("log.session_write", e), prior()));
-        if let Some(failure) = &session_failure
-            && let Err(log_failure) = log(logger, "error", json!(failure))
-        {
-            outcome = Err(attach(
-                log_failure,
-                format!("original session error: {failure}"),
-            ));
-        }
-    }
-    let logged = match &outcome {
-        Ok(value) => log(logger, "decision.result", json!({"response":value})),
-        Err(_) => Ok(()),
-    };
-    for failure in [logged, logger.flush().map_err(|e| error("log.flush", e))]
-        .into_iter()
-        .filter_map(Result::err)
-    {
-        let context = format!("original outcome: {outcome:?}; session error: {session_failure:?}");
-        outcome = Err(attach(failure, context));
-    }
-    outcome
+type KeyringFn = dyn Fn(&str) -> Result<String, KeyringError> + Send + Sync;
+pub struct Run {
+    pub options: Options,
+    pub cancel: Arc<Cancel>,
+    pub wait: Box<dyn Fn(Duration) -> Result<(), Error> + Send + Sync>,
+    pub keyring: Box<KeyringFn>,
+    found: Vec<(&'static Provider, String)>,
+    logger: Arc<Logger>,
+    owned: bool,
 }
-pub fn batch(
-    requests: &[Value],
-    options: &Options,
-    logger: &Logger,
-    cancel: &Cancel,
-    wait: &(dyn Fn(Duration) -> Result<(), Error> + Sync),
-    keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
-    on_result: &(dyn Fn(usize, &Value) + Sync),
-) -> Result<Value, Error> {
-    if options.settings.workers == 0 {
-        return Err(error("decidr.invalid_workers", "workers must be positive"));
-    }
-    let next = std::sync::atomic::AtomicUsize::new(0);
-    let (sender, receiver) = std::sync::mpsc::channel();
-    Ok(std::thread::scope(|scope| {
-        for _ in 0..options.settings.workers.min(requests.len()) {
-            let sender = sender.clone();
-            let next = &next;
-            scope.spawn(move || {
-                loop {
-                    let index = next.fetch_add(1, Ordering::SeqCst);
-                    let Some(request) = requests.get(index) else {
-                        break;
-                    };
-                    let value = report(
-                        logger,
-                        send(request, options, logger, cancel, wait, keyring),
-                    );
-                    on_result(index, &value);
-                    let _ = sender.send((index, value));
-                }
-            });
+#[derive(Default)]
+pub struct RunArgs {
+    pub tool: String,
+    pub agent_role: String,
+    pub model: Option<String>,
+    pub project: Option<String>,
+    pub config_dir: Option<PathBuf>,
+    pub timeout_secs: Option<f64>,
+    pub workers: Option<i64>,
+    pub base_url: Option<String>,
+}
+impl Run {
+    pub fn new(
+        args: RunArgs,
+        logger: Option<Arc<Logger>>,
+        cancel: Arc<Cancel>,
+    ) -> Result<Self, Error> {
+        let (loaded, root, repo) = load(
+            &args.tool,
+            args.config_dir.as_deref(),
+            args.project.as_deref(),
+        )?;
+        let mut settings = loaded.config;
+        if let Some(count) = args.workers {
+            settings.workers = workers(count)?;
         }
-        drop(sender);
-        let mut results = receiver.into_iter().collect::<Vec<_>>();
-        results.sort_by_key(|(index, _)| *index);
-        json!(
-            results
-                .into_iter()
-                .map(|(index, value)| json!({"index":index,"result":value}))
-                .collect::<Vec<_>>()
-        )
-    }))
+        let options = Options {
+            environment: std::env::vars_os().collect(),
+            settings,
+            model: args.model.unwrap_or_else(|| "jev".into()),
+            agent_role: args.agent_role,
+            timeout: Duration::try_from_secs_f64(args.timeout_secs.unwrap_or(120.0))
+                .map_err(|e| error("decidr.invalid_request_timeout", e))?,
+            base_url: args.base_url,
+            root,
+            log_root: log_root(&args.tool)?,
+            repo,
+        };
+        Self::from_options(options, args.tool, logger, cancel)
+    }
+    pub fn from_options(
+        options: Options,
+        tool: String,
+        logger: Option<Arc<Logger>>,
+        cancel: Arc<Cancel>,
+    ) -> Result<Self, Error> {
+        let found = candidates(&options.model, &options.settings.models)?;
+        let owned = logger.is_none();
+        let logger = match logger {
+            Some(logger) => logger,
+            None => Arc::new(default_logger(&tool)?),
+        };
+        let waiting = cancel.clone();
+        Ok(Self {
+            options,
+            cancel,
+            wait: Box::new(move |delay| waiting.wait(delay)),
+            keyring: Box::new(os_keyring),
+            found,
+            logger,
+            owned,
+        })
+    }
+    fn resolve(&self) -> Result<(&'static Provider, String), Error> {
+        resolve(self.found.clone(), &self.options, &*self.keyring)
+    }
+    /// Whether the next send resolves to the named provider (keyless first, then the first held key).
+    pub fn sends_to(&self, provider: &str) -> Result<bool, Error> {
+        self.resolve().map(|(p, _)| p.name == provider)
+    }
+    pub fn logger(&self) -> &Logger {
+        &self.logger
+    }
+    pub fn close(&self) -> Result<(), Error> {
+        let flushed = self.logger.flush().map_err(|e| error("log.flush", e));
+        let stopped = if self.owned {
+            self.logger.shutdown().map_err(|e| error("log.shutdown", e))
+        } else {
+            Ok(())
+        };
+        flushed.and(stopped)
+    }
+    pub fn send(&self, request: &Value) -> Result<Value, Error> {
+        let (options, logger, cancel) = (&self.options, self.logger(), &*self.cancel);
+        let session_id = ulid::Ulid::new().to_string();
+        let digests = request
+            .get("questions")
+            .and_then(Value::as_object)
+            .map(|questions| {
+                questions
+                    .keys()
+                    .filter_map(|id| digest(request, id).ok().map(|hash| (id.clone(), hash)))
+                    .collect::<BTreeMap<_, _>>()
+            });
+        let sends = Cell::new(0);
+        let outcome = (|| {
+            cancel.check()?;
+            let project = options.settings.project_required()?;
+            slug(project)?;
+            slug(&options.agent_role)?;
+            let (provider, model) = self.resolve()?;
+            let base = match options.settings.local.get(provider.name) {
+                _ if !provider.url.is_empty() => provider.url.into(),
+                Some(runner) => format!("http://{}:{}/v1", runner.host, runner.port),
+                None => {
+                    return Err(missing_setting(
+                        &options.settings.tool,
+                        &format!("{}.host", provider.name),
+                    ));
+                }
+            };
+            let route = Route {
+                options,
+                provider,
+                model,
+                base: options.base_url.clone().unwrap_or(base),
+                cancel,
+                wait: &*self.wait,
+                keyring: &*self.keyring,
+                sends: &sends,
+            };
+            match provider.wire {
+                Wire::Messages => AnthropicCompat(&route).decide(request),
+                Wire::Chat => OpenAiCompat(&route).decide(request),
+                Wire::Jev => Jev(&route).decide(request),
+            }
+        })();
+        let mut outcome = after_cancel(outcome, cancel);
+        if let Err(Error::Failure {
+            session_id: id,
+            attempts,
+            ..
+        }) = &mut outcome
+        {
+            *id = Some(session_id.clone());
+            *attempts = (sends.get() > 0 || cancel.is_cancelled()).then(|| sends.get());
+        }
+        if let Ok(value) = &mut outcome
+            && let Some(fields) = value.as_object_mut()
+        {
+            fields.insert("attempts".into(), json!(sends.get()));
+            fields.insert("session_id".into(), json!(session_id));
+            fields.insert("question_digests".into(), json!(digests));
+        }
+        let mut session_failure = None;
+        let attach = |failure, context| contextual(failure, context, Some(&session_id));
+        let prior = || format!("original outcome: {outcome:?}");
+        if let Ok(project) = options.settings.project_required()
+            && slug(project).is_ok()
+            && slug(&options.agent_role).is_ok()
+        {
+            let row = json!({"session_id":session_id,"repo":options.repo,"agent_role":options.agent_role,"project":project,"request":request,"question_digests":digests,"result":match &outcome {Ok(v)=>json!({"ok":true,"value":v}),Err(e)=>json!({"ok":false,"error":e})}});
+            let path = options
+                .log_root
+                .join("sessions")
+                .join(&options.repo)
+                .join(&options.agent_role)
+                .join(project);
+            let _append = SESSION_APPEND
+                .lock()
+                .map_err(|e| attach(error("config.session", e), prior()))?;
+            let written = (|| -> std::io::Result<()> {
+                use std::io::Write;
+                std::fs::create_dir_all(&path)?;
+                writeln!(
+                    std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(path.join("sessions.jsonl"))?,
+                    "{row}"
+                )
+            })();
+            session_failure = written
+                .err()
+                .map(|e| attach(error("log.session_write", e), prior()));
+            if let Some(failure) = &session_failure
+                && let Err(log_failure) = log(logger, "error", json!(failure))
+            {
+                outcome = Err(attach(
+                    log_failure,
+                    format!("original session error: {failure}"),
+                ));
+            }
+        }
+        let logged = match &outcome {
+            Ok(value) => log(logger, "decision.result", json!({"response":value})),
+            Err(_) => Ok(()),
+        };
+        for failure in [logged, logger.flush().map_err(|e| error("log.flush", e))]
+            .into_iter()
+            .filter_map(Result::err)
+        {
+            let context =
+                format!("original outcome: {outcome:?}; session error: {session_failure:?}");
+            outcome = Err(attach(failure, context));
+        }
+        outcome
+    }
+
+    pub fn send_batch(
+        &self,
+        requests: &[Value],
+        on_result: &(dyn Fn(usize, &Value) + Sync),
+    ) -> Result<Value, Error> {
+        if self.options.settings.workers == 0 {
+            return Err(error("decidr.invalid_workers", "workers must be positive"));
+        }
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        let (sender, receiver) = std::sync::mpsc::channel();
+        Ok(std::thread::scope(|scope| {
+            for _ in 0..self.options.settings.workers.min(requests.len()) {
+                let sender = sender.clone();
+                let next = &next;
+                scope.spawn(move || {
+                    loop {
+                        let index = next.fetch_add(1, Ordering::SeqCst);
+                        let Some(request) = requests.get(index) else {
+                            break;
+                        };
+                        let value = report(self.logger(), self.send(request));
+                        on_result(index, &value);
+                        let _ = sender.send((index, value));
+                    }
+                });
+            }
+            drop(sender);
+            let mut results = receiver.into_iter().collect::<Vec<_>>();
+            results.sort_by_key(|(index, _)| *index);
+            json!(
+                results
+                    .into_iter()
+                    .map(|(index, value)| json!({"index":index,"result":value}))
+                    .collect::<Vec<_>>()
+            )
+        }))
+    }
 }
 pub fn repository() -> Result<(PathBuf, String), Error> {
     let cwd = std::env::current_dir().map_err(|e| error("config.repo", e))?;
@@ -1626,6 +1700,7 @@ pub fn repository_identity(origin: Option<&str>, host: &str, root: &Path) -> Res
 }
 
 pub fn load(
+    tool: &str,
     config_dir: Option<&Path>,
     project: Option<&str>,
 ) -> Result<(Configuration, PathBuf, String), Error> {
@@ -1634,14 +1709,18 @@ pub fn load(
     let environment = std::env::vars_os().collect::<Vec<_>>();
     let local = root.join(".git").exists().then_some(local.as_path());
     Ok((
-        config(local, config_dir, &environment, project)?,
+        config(tool, local, config_dir, &environment, project)?,
         root,
         repo,
     ))
 }
-pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error> {
-    let (loaded, ..) = load(config_dir, project)?;
-    Ok(json!({"settings":loaded.rows, "files":loaded.files, "log_root":log_root("decidr")?}))
+pub fn doctor(
+    tool: &str,
+    config_dir: Option<&Path>,
+    project: Option<&str>,
+) -> Result<Value, Error> {
+    let (loaded, ..) = load(tool, config_dir, project)?;
+    Ok(json!({"settings":loaded.rows, "files":loaded.files, "log_root":log_root(tool)?}))
 }
 
 pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {
@@ -1697,7 +1776,7 @@ pub mod route_tests {
                     _ => Ok(String::new()),
                 }
             };
-            let found = candidates("haiku", None, &BTreeMap::new())?;
+            let found = candidates("haiku", &BTreeMap::new())?;
             let causes = found
                 .iter()
                 .map(|(provider, _)| {
@@ -1720,6 +1799,168 @@ pub mod route_tests {
                 assert!(returned.contains(&cause), "lost cause {cause}: {returned}");
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn run_new_rejects_unknown_model_and_send_resolves_per_call() -> Test {
+        let root = Temp::new()?;
+        let logger = logger(&root)?;
+        let args = RunArgs {
+            tool: "decidr".into(),
+            agent_role: "test".into(),
+            project: Some("test".into()),
+            config_dir: Some(root.0.clone()),
+            model: Some("missing-contract-model".into()),
+            ..Default::default()
+        };
+        let failure = Run::new(args, Some(logger.clone()), Arc::new(Cancel::default()))
+            .err()
+            .ok_or("unknown model accepted")?;
+        assert_eq!(
+            result(Err(failure))["error"]["id"],
+            "types.unknown_short_name"
+        );
+        let reply = answer().to_string();
+        let stub = Stub::new(vec![
+            http(200, json!({"content":[{"text":reply}]})),
+            http(200, json!({"choices":[{"message":{"content":reply}}]})),
+        ])?;
+        let mut options = options(&root, &stub.url);
+        options.model = "haiku".into();
+        options.environment.clear();
+        let mut run = run(options, &logger)?;
+        let second = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let selected = second.clone();
+        run.keyring = Box::new(move |name| {
+            Ok(
+                if name
+                    == (if selected.load(Ordering::SeqCst) {
+                        "OPENROUTER_API_KEY"
+                    } else {
+                        "ANTHROPIC_API_KEY"
+                    })
+                {
+                    "test-secret".into()
+                } else {
+                    String::new()
+                },
+            )
+        });
+        assert!(run.sends_to("anthropic")?);
+        assert_eq!(run.send(&request())?["answers"], answer()["answers"]);
+        second.store(true, Ordering::SeqCst);
+        assert!(run.sends_to("openrouter")?);
+        assert_eq!(run.send(&request())?["answers"], answer()["answers"]);
+        assert_eq!(stub.finish()?.len(), 2);
+        logger.shutdown()?;
+        Ok(())
+    }
+    #[test]
+    fn run_close_shuts_down_only_an_owned_logger() -> Test {
+        for owned in [false, true] {
+            let root = Temp::new()?;
+            let logger = logger(&root)?;
+            let mut run = run(options(&root, "http://127.0.0.1:1/v1"), &logger)?;
+            assert!(!run.owned);
+            // Exercise both ownership branches with a test-owned logger and no default-path writes.
+            run.owned = owned;
+            run.close()?;
+            assert_eq!(logger.flush().is_err(), owned);
+            if !owned {
+                logger.shutdown()?;
+            }
+        }
+        Ok(())
+    }
+    #[test]
+    fn run_timeout_and_workers_apply_to_every_call() -> Test {
+        let root = Temp::new()?;
+        let logger = logger(&root)?;
+        let args = RunArgs {
+            tool: "decidr".into(),
+            agent_role: "test".into(),
+            project: Some("test".into()),
+            config_dir: Some(root.0.clone()),
+            timeout_secs: Some(30.0),
+            workers: Some(2),
+            ..Default::default()
+        };
+        let run = Run::new(args, Some(logger.clone()), Arc::new(Cancel::default()))?;
+        assert_eq!(run.options.settings.workers, 2);
+        let (provider, model) = model_with("jev", &BTreeMap::new())?;
+        let sends = Cell::new(0);
+        for _ in 0..2 {
+            let route = Route {
+                options: &run.options,
+                provider,
+                model: model.clone(),
+                base: String::new(),
+                cancel: &run.cancel,
+                wait: &*run.wait,
+                keyring: &keyring,
+                sends: &sends,
+            };
+            assert_eq!(
+                route.agent().config().timeouts().global,
+                Some(Duration::from_secs(30))
+            );
+        }
+        let defaults = options(&root, "http://127.0.0.1:1/v1");
+        let configured = defaults.settings.workers;
+        let next = self::super::Run::from_options(
+            defaults,
+            "decidr".into(),
+            Some(logger.clone()),
+            Arc::new(Cancel::default()),
+        )?;
+        assert_eq!(next.options.settings.workers, configured);
+        assert_eq!(next.options.timeout, Duration::from_secs(5));
+        logger.shutdown()?;
+        Ok(())
+    }
+    #[test]
+    fn run_with_invalid_timeout_or_workers_is_an_error() -> Test {
+        let root = Temp::new()?;
+        let logger = logger(&root)?;
+        for (timeout, workers, id) in [
+            (Some(-1.0), None, "decidr.invalid_request_timeout"),
+            (Some(f64::NAN), None, "decidr.invalid_request_timeout"),
+            (None, Some(0), "decidr.invalid_workers"),
+            (None, Some(-1), "decidr.invalid_workers"),
+        ] {
+            let args = RunArgs {
+                tool: "decidr".into(),
+                agent_role: "test".into(),
+                project: Some("test".into()),
+                config_dir: Some(root.0.clone()),
+                timeout_secs: timeout,
+                workers,
+                ..Default::default()
+            };
+            let failure = Run::new(args, Some(logger.clone()), Arc::new(Cancel::default()))
+                .err()
+                .ok_or("invalid override accepted")?;
+            assert_eq!(result(Err(failure))["error"]["id"], id);
+        }
+        logger.shutdown()?;
+        Ok(())
+    }
+    #[test]
+    fn run_sends_to_returns_the_resolution_error() -> Test {
+        let root = Temp::new()?;
+        let logger = logger(&root)?;
+        let mut options = options(&root, "http://127.0.0.1:1/v1");
+        options.environment.clear();
+        options.model = "haiku".into();
+        let mut run = run(options, &logger)?;
+        run.keyring = Box::new(|_| Ok(String::new()));
+        let failure = run
+            .sends_to(TYPESAFE)
+            .err()
+            .ok_or("missing key returned a boolean")?;
+        assert_eq!(result(Err(failure))["error"]["id"], "secrets.key_missing");
+        logger.shutdown()?;
         Ok(())
     }
 
@@ -1802,7 +2043,7 @@ pub mod route_tests {
         ] {
             let mut options = options(&root, "http://127.0.0.1:1/v1");
             options.timeout = timeout;
-            let (provider, model) = model("jev", None)?;
+            let (provider, model) = model_with("jev", &BTreeMap::new())?;
             let route = Route {
                 options: &options,
                 provider,
@@ -1824,17 +2065,9 @@ pub mod route_tests {
         let logger = logger(&root)?;
         let body = json!({"error":"controlled remote refusal"});
         let stub = Stub::new(vec![http(401, body.clone())])?;
-        let cancel = Cancel::default();
-        let lower = send(
-            &request(),
-            &options(&root, &stub.url),
-            &logger,
-            &cancel,
-            &no_wait,
-            &keyring,
-        )
-        .err()
-        .ok_or("401 accepted")?;
+        let run = run(options(&root, &stub.url), &logger)?;
+        let cancel = run.cancel.clone();
+        let lower = run.send(&request()).err().ok_or("401 accepted")?;
         assert!(!cancel.is_cancelled());
         assert_eq!(stub.finish()?.len(), 1);
         cancel.cancel();

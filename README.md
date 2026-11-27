@@ -50,7 +50,7 @@ sitr query rust match-arms input.rs
 ```
 
 - `decidr send` reads JSON from `--input` or stdin; `--batch` reads JSONL and returns one JSON array of indexed results. Single sends return one tagged JSON result.
-- `--model` accepts a short name or model id. `--provider` overrides the provider; otherwise the first provider table supporting the selector is used. A local `laya` runner uses its configured host, port and model.
+- `--model` accepts a short name or model id. Provider selection follows the model table and available credentials; use `models.<name>.provider` in configuration to select a provider. A local `laya` runner uses its configured host and port with its catalog model.
 - `--workers` controls batch concurrency; `--timeout-secs` sets the request timeout. Images and long-context CLI flags are not exposed.
 - `models` reports the built-in provider tables. `doctor` reports configuration values, sources, layer-file paths/existence and the fixed log root without sending or writing files.
 - `--config-dir PATH` selects the global configuration directory; the default is `~/.sc-agent/`.
@@ -62,12 +62,13 @@ Ctrl-C or SIGTERM cancels unfinished work. Cancellation returns a typed error an
 ```python
 import sc_agent
 
-line = sc_agent.send(request_json, model="jev", project="my-project", agent_role="judge")
-lines = sc_agent.send_batch(requests, model="haiku", project="my-project", agent_role="judge")
+with sc_agent.Run(tool="my-tool", model="haiku", project="my-project", agent_role="judge") as run:
+    line = run.send(request_json)
+    lines = run.send_batch(requests)
 sc_agent.sitr.languages()
 ```
 
-The wheel exposes decision calls, digests, cancellation and sitr queries. Calls return tagged success or error values. `general_log=` accepts an opaque Logger handle obtained with `sc_agent.logger(name)`; the generated client creates one named Logger and injects it into its decision and sitr calls. `cancel=` accepts `sc_agent.Cancel()`. A keyboard interrupt cancels unfinished work and returns a cancellation error.
+The wheel exposes decision calls, digests, cancellation and sitr queries. Calls return tagged success or error values. `Run(general_log=...)` accepts a native Logger obtained with `sc_agent.logger(name)`; the generated client creates one named Logger and injects it into its decision and sitr calls. Call `run.cancel()` to cancel its unfinished calls. A keyboard interrupt cancels unfinished work and returns a cancellation error.
 
 ## Configuration, keys and logs
 
