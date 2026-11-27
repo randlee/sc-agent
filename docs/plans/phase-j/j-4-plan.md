@@ -78,15 +78,18 @@ class StreamedResult(NamedTuple): failed: list[ResultLine]
 def batch_settings(args: Any, prefix: str, *, check_threshold: Callable[[Any], Any]) -> Result[BatchSettings, ClientError]
 def fixture_answer(job: BatchJob, fixture: Mapping[str, Any]) -> Result[Reply, ClientError]   # Reply(answers, None, False)
 def result_line(job: BatchJob, settings: BatchSettings, run_id: str | None, project: str | None,
-                result: Result[Reply, ClientError]) -> ResultLine
-    # generic only: min_confidence = min `confidence` over the answers; verdict = "pass" if >= threshold else "fail";
-    # leaning = `choice` of the lowest-confidence answer; all three None on Err or when no answer has a confidence
+                result: Result[Reply, ClientError], *,
+                verdict: Callable[[BatchJob, BatchSettings, Mapping[str, Any] | None], tuple[str | None, float | None, str | None]] | None = None) -> ResultLine
+    # verdict(job, settings, answers | None) -> (verdict, min_confidence, leaning): fills exactly those 3 of the 14 fields;
+    # None -> all three None. decide() stays in each tool.
 def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings, *,
               on_line: Callable[[ResultLine, Mapping[str, Any] | None], object],
               project: str | None = None, fixture: Mapping[str, Any] | None = None,
               on_request: Callable[[Any], object] | None = None, abort_on: frozenset[str] = frozenset(),
               category_codes: Mapping[str, str] | None = None, repository_root: str = ".",
-              consent_what: str = "The request text") -> Result[StreamedResult, ClientError]
+              consent_what: str = "The request text",
+              verdict: Callable[[BatchJob, BatchSettings, Mapping[str, Any] | None], tuple[str | None, float | None, str | None]] | None = None
+              ) -> Result[StreamedResult, ClientError]
 def answers_for(lines: Sequence[Mapping[str, Any]]) -> Result[dict[str, dict[str, Any]], ClientError]
     # {request_id: answers}; one sc_agent.session_rows(ids, agent_role=CLIENT_NAME, project=p) per distinct line project
 BEARER_RE: re.Pattern[str]          # r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{16,}"
@@ -142,6 +145,7 @@ def fake_open_run(module: types.ModuleType, script: Mapping[str, Any]) -> Iterat
 | `run_batch` | `check_fixture_coverage` :567-579 and the send loops each consumer writes (judge-jev jev_judge.py.j2, plan-anchor jev_judge.py.j2; deleted in j-5/j-6) | `check_fixture_coverage` |
 | `answers_for` | consumers reading answers from /1 lines (`answers` key) | — |
 | `BEARER_RE`, `redact_secrets` | judge-jev jev_errors.py.j2:17-30 `redact_sensitive`, plan-anchor jev_judge.py.j2:236 (deleted in j-5/j-6) | — |
+| `verdict=` callback of `result_line`/`run_batch` | judge-jev jev_judge.py:850-857 `batch_verdict_fields` (and plan-anchor's copy) building verdict keys into the line dict; `decide()` (judge-jev :731, plan-anchor :1842) stays in each tool | the dict-merge of tool keys into the line |
 | `encode_result_line(line)` | :635-638 | `redact=` opt-out |
 | `extract` | :659-667 | `general_log=` and `_logger` use |
 | `safe_id`, `validate_request_lines`, `load_answers_fixture`, `batch_settings` -> Result | :398-402, :560-564, :582-595, :489-502 | dict returns |
@@ -177,7 +181,7 @@ tests: test_template.py:33 assertions on `fixture_attempt`/`total_attempts`; loo
 - Build: `maturin develop` (wheel), `python3 scripts/check_consumer_template.py` renders both configurations `--strict`; strict Pyright on both renders and testing.py.
 - Gate: `RUSTUP_TOOLCHAIN=1.98.1 python3 scripts/gate/rewrite.py` all PASS; Rust source <= j-3 end + ~6 and <= 2,500.
 - Greps (empty): `grep -nE 'hashlib|threading|_logger|Cancel|remote_preflight|total_attempts|fixture_attempt|questions_digest' crates/sc-agent-py/python/sc_agent/templates/consumer.py.j2`; `grep -rn 'jev-batch-result/1' crates/sc-agent-py tests/contract`; `grep -n 'sc_agent.testing' <renders>`.
-- tests/contract/test_template.py (FakeRun, deterministic): `test_render_requires_tool_version_and_defines_result_types`, `test_results_are_typed_values`, `test_result_line_fields_in_order_and_error_passthrough` (`ResultLine._fields` = the 14), `test_run_batch_lines_and_answers_for` (3 jobs: run_id, session_ids in index order; answers_for returns scripted answers), `test_open_run_passes_tool_and_no_logger` (open_args has tool, tool_version, agent_role; no general_log unless seams), `test_open_run_repeat_disables_cache`, `test_open_run_without_wheel_is_err`, `test_result_line_generic_verdict_fields`, `test_fixture_coverage_before_any_line`, `test_fixture_with_run_stamps_run_id_and_sends_nothing`, `test_dry_run_sends_and_writes_nothing`, `test_abort_on_auth_cancels_remaining_jobs`, `test_redact_secrets_table` (bearer rows, provider-key row, 10,000-deep list), `test_category_codes_table`, `test_rendered_module_imports_without_wheel` (`sys.modules["sc_agent"] = None`).
+- tests/contract/test_template.py (FakeRun, deterministic): `test_render_requires_tool_version_and_defines_result_types`, `test_results_are_typed_values`, `test_result_line_fields_in_order_and_error_passthrough` (`ResultLine._fields` = the 14), `test_run_batch_lines_and_answers_for` (3 jobs: run_id, session_ids in index order; answers_for returns scripted answers), `test_open_run_passes_tool_and_no_logger` (open_args has tool, tool_version, agent_role; no general_log unless seams), `test_open_run_repeat_disables_cache`, `test_open_run_without_wheel_is_err`, `test_verdict_callback_fills_only_three_fields`, `test_fixture_coverage_before_any_line`, `test_fixture_with_run_stamps_run_id_and_sends_nothing`, `test_dry_run_sends_and_writes_nothing`, `test_abort_on_auth_cancels_remaining_jobs`, `test_redact_secrets_table` (bearer rows, provider-key row, 10,000-deep list), `test_category_codes_table`, `test_rendered_module_imports_without_wheel` (`sys.modules["sc_agent"] = None`).
 - crates/sc-agent-py/tests/loopback.py (real wheel, loopback stub, `<CLIENT>_LOG_ROOT` set): `test_consent_only_for_typesafe` (haiku: settings module never imported; jev without consent: `POLICY.REMOTE_JUDGE_DISABLED`, 0 stub requests), `test_haiku_runs_without_typesafe_key`, `test_keyboard_interrupt_cancels_the_run` (interrupt from the stub's seam callback; propagates), `test_default_log_path_is_the_wheels` (records in `<CLIENT>_LOG_ROOT/logs/<client>.log.jsonl`; no general_log passed), `test_sitr_extract_logs_under_the_tool` (updated), `test_rendered_modules_only_reference_the_permitted_api` (updated: `Run, session_rows, provider_keys, TYPESAFE, sitr`), `test_fakerun_conforms_to_real_run` (envelope key sets and attributes match), `test_rendered_clients_run_against_the_installed_wheel` (updated).
 - No sleeps, threads or timing in any test (CLAUDE.md flaky-test rule).
 
@@ -189,4 +193,4 @@ Gate count (non-test Rust, scripts/gate/rewrite.py): this branch measures 2,440/
 
 1. sitr `tool=`: tools pass their name and the library picks the default logger (rule 0, ANC-015, ANC-016), so the 4 sitr pyfunctions gain `tool=` (+~6 Rust, new capability) and the template passes no Logger. Conflicting record text to delete on develop: ADR-SAG-0019 d1 l.57 "The generated client gets one Logger from the wheel, named after the client and writing `~/.sc-agent/logs/<client>.log.jsonl`, and gives it to its Run and every sitr call."
 2. Repeats: j-3 has no per-call cache override (REQ-SAG-0702), so `open_run(repeat=)` sets `cache=False` on the Run when repeat > 1 (plan-anchor REQ-085).
-3. /2 is generic only (owner ruling, j1-bead.txt:364-368): no `result_fields` callback; verdict, min_confidence and leaning are computed in `result_line` from answers and threshold.
+3. /2 is generic only (owner ruling, j1-bead.txt:364-368): no open `result_fields` dict; a typed `verdict` callback returns `(verdict, min_confidence, leaning)` and fills exactly those 3 of the 14 fields. Jev does not return them; each tool's `decide()` computes them (result interpretation is the consumer's, ADR-SAG-0019 d1).
