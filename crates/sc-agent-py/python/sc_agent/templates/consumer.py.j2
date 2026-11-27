@@ -659,6 +659,7 @@ def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings
     failed: list[ResultLine] = []
     delivered: set[int] = set()
     errors: list[Exception] = []
+    cancel: Callable[[], object] | None = run.cancel if run is not None and results is None else None
     def deliver(index: int, result: Result[Reply, ClientError]) -> None:
         if errors or index in delivered:
             return
@@ -668,8 +669,8 @@ def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings
             on_line(line, result.value.answers if isinstance(result, Ok) else None)
         except Exception as exc:
             errors.append(exc)
-            if results is None:
-                run.cancel()
+            if cancel is not None:
+                cancel()
             return
         if not line.ok:
             failed.append(line)
