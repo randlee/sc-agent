@@ -145,7 +145,7 @@ def fake_open_run(module: types.ModuleType, script: Mapping[str, Any]) -> Iterat
 | `run_batch` | `check_fixture_coverage` :567-579 and the send loops each consumer writes (judge-jev jev_judge.py.j2, plan-anchor jev_judge.py.j2; deleted in j-5/j-6) | `check_fixture_coverage` |
 | `answers_for` | consumers reading answers from /1 lines (`answers` key) | — |
 | `BEARER_RE`, `redact_secrets` | judge-jev jev_errors.py.j2:17-30 `redact_sensitive`, plan-anchor jev_judge.py.j2:236 (deleted in j-5/j-6) | — |
-| `verdict=` callback of `result_line`/`run_batch` | judge-jev jev_judge.py:850-857 `batch_verdict_fields` (and plan-anchor's copy) building verdict keys into the line dict; `decide()` (judge-jev :731, plan-anchor :1842) stays in each tool | the dict-merge of tool keys into the line |
+| `verdict=` callback of `result_line`/`run_batch` | judge-jev jev_judge.py:850-857 `batch_verdict_fields` and plan-anchor jev_judge.py:1913 `leaning_of`, :2222, :2247 (deleted in j-5) building verdict keys into the line dict; `decide()` (judge-jev :731, plan-anchor :1842) stays in each tool | the dict-merge of tool keys into the line |
 | `encode_result_line(line)` | :635-638 | `redact=` opt-out |
 | `extract` | :659-667 | `general_log=` and `_logger` use |
 | `safe_id`, `validate_request_lines`, `load_answers_fixture`, `batch_settings` -> Result | :398-402, :560-564, :582-595, :489-502 | dict returns |
