@@ -20,11 +20,13 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
     ] {
         let root = Temp::new()?;
         let logger = logger(&root)?;
-        let raw = match provider {
+        let mut raw = match provider {
             "anthropic" => json!({"content":[{"type":"text","text":answer().to_string()}]}),
             "typesafe" | "laya" => answer(),
             _ => json!({"choices":[{"message":{"content":answer().to_string()}}]}),
         };
+        raw["model"] = json!("actual-model");
+        raw["usage"] = json!({"input_tokens": 7});
         let stub = Stub::new(vec![http(200, raw)])?;
         let mut opts = options(&root, &stub.url);
         opts.model = model.into();
@@ -53,13 +55,28 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
         let value = {
             let run = run(opts.clone(), &logger)?;
 
-            run.send(&request())
+            run.send(&request(), Some(false))
         }?;
         assert_eq!(value["answers"], answer()["answers"]);
         assert_eq!(value["answers"]["q"]["noul"], 0.123456789);
         let seen = stub.finish()?;
         let first = seen.first().ok_or("request missing")?;
         assert_eq!(first.path, path);
+        let recorded = rows(&root)?;
+        let row = recorded.first().ok_or("session row missing")?;
+        assert_eq!(row["schema"], "sc-agent-session/2");
+        assert_eq!(row["provider"], provider);
+        assert_eq!(row["model_requested"], pinned_model(provider, model)?.1);
+        assert_eq!(row["model_answered"], "actual-model");
+        assert_eq!(row["usage"], json!({"input_tokens":7}));
+        assert_eq!(
+            row["request_sha256"],
+            sc_sha::calculate_hash(sc_sha::HashInput::TextFileBytes {
+                utf8_file_bytes: &serde_json::to_vec(&first.body)?
+            })?
+            .template()
+            .to_string()
+        );
         if ["typesafe", "laya"].contains(&provider) {
             let mut expected = request();
             expected["model"] = json!(pinned_model(provider, model)?.1);
@@ -124,7 +141,7 @@ fn req_sag_0601_busy_resends_unchanged_retry_after_and_exponential_backoff() -> 
 
             run.wait = Box::new(wait);
 
-            run.send(&request())
+            run.send(&request(), Some(false))
         }?;
         assert_eq!(got["attempts"], 4);
         let waits = waits
@@ -174,7 +191,7 @@ fn req_sag_0601_0017_busy_and_network_exhaustion_report_five_sends() -> Test {
                 Ok(())
             });
 
-            run.send(&request())
+            run.send(&request(), Some(false))
         });
         assert_eq!(
             got["error"]["id"],
@@ -240,7 +257,7 @@ fn req_sag_0002_0601_auth_quota_are_not_retried_and_remote_text_is_redacted_whol
         let got = sc_agent::report(&logger, {
             let run = run(options(&root, &stub.url), &logger)?;
 
-            run.send(&request())
+            run.send(&request(), Some(false))
         });
         assert_eq!(got["error"]["id"], id);
         assert_eq!(got["error"]["category"], category);
@@ -253,7 +270,7 @@ fn req_sag_0002_0601_auth_quota_are_not_retried_and_remote_text_is_redacted_whol
         logger.flush()?;
         let general = std::fs::read_to_string(root.0.join("logs/rust-test.log.jsonl"))?;
         assert!(!general.contains("test-secret"));
-        assert!(!serde_json::to_string(&rows(&root)?)?.contains("test-secret"));
+        assert!(!root.0.join("sessions").exists());
         let errors = general
             .lines()
             .map(serde_json::from_str::<Value>)
@@ -284,7 +301,7 @@ fn invalid_utf8_provider_error_keeps_status_and_surrounding_text() -> Test {
         })
         .collect();
     let stub = Stub::new(replies)?;
-    let failure = sc_agent::result(run(options(&root, &stub.url), &logger)?.send(&request()));
+    let failure = sc_agent::result(run(options(&root, &stub.url), &logger)?.send(&request(), None));
     let requests = stub.finish()?;
     assert_eq!(failure["error"]["id"], "http.auth");
     assert_eq!(failure["error"]["message"], "before?after");
@@ -305,7 +322,7 @@ fn req_sag_0002_provider_error_over_ten_mib_is_preserved() -> Test {
     // Keep the first transport failure rather than retrying an exhausted one-reply stub.
     opts.timeout = Duration::from_secs(600);
     opts.settings.max_sends = 1;
-    let failure = sc_agent::result(run(opts, &logger)?.send(&request()));
+    let failure = sc_agent::result(run(opts, &logger)?.send(&request(), None));
     let stub_outcome = stub.finish();
     let error = &failure["error"];
     let message = error["message"].as_str().unwrap_or_default();
@@ -349,7 +366,7 @@ fn req_sag_0010_0011_cancel_during_retry_keeps_every_batch_position_and_row() ->
             cancel.wait(Duration::from_secs(600)) // Already signalled: no real wait, regardless of scheduling.
         });
 
-        run.send_batch(&vec![request(); 3], &|index, value| {
+        run.send_batch(&vec![request(); 3], Some(false), &|index, value| {
             if let Ok(mut seen) = completed.lock() {
                 seen.push((index, value.clone()));
             }
@@ -385,7 +402,7 @@ fn req_sag_0010_0011_cancel_during_retry_keeps_every_batch_position_and_row() ->
             .map_err(|_| "wait recorder poisoned")?,
         vec![Duration::from_secs(600)]
     );
-    assert_eq!(rows(&root)?.len(), 3);
+    assert!(!root.0.join("sessions").exists());
     logger.shutdown()?;
     Ok(())
 }
@@ -408,11 +425,11 @@ fn req_sag_0011_precancel_never_reads_a_key_and_invalid_tags_write_no_row() -> T
             keys.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             Err(sc_agent::KeyringError::Read("unexpected lookup".into()))
         });
-        run.send(&request())
+        run.send(&request(), Some(false))
     });
     assert_eq!(got["error"]["id"], "decision.cancelled");
     assert_eq!(keys.load(std::sync::atomic::Ordering::SeqCst), 0);
-    assert_eq!(rows(&root)?.len(), 1);
+    assert!(!root.0.join("sessions").exists());
     // REQ-SAG-0004: invalid/missing project or invalid role is refused without creating a session.
     for invalid_role in [false, true] {
         let isolated = Temp::new()?;
@@ -425,7 +442,7 @@ fn req_sag_0011_precancel_never_reads_a_key_and_invalid_tags_write_no_row() -> T
         let error = {
             let run = run(bad.clone(), &logger)?;
 
-            run.send(&request())
+            run.send(&request(), Some(false))
         }
         .err()
         .ok_or("invalid tag accepted")?;
@@ -449,7 +466,7 @@ fn req_sag_0702_batch_continues_after_failed_item_and_preserves_positions() -> T
     let got = {
         let run = run(options(&root, &stub.url), &logger)?;
 
-        run.send_batch(&vec![request(); 2], &|index, value| {
+        run.send_batch(&vec![request(); 2], Some(false), &|index, value| {
             if let Ok(mut items) = seen.lock() {
                 items.push((index, value["ok"].clone()));
             }
@@ -465,14 +482,19 @@ fn req_sag_0702_batch_continues_after_failed_item_and_preserves_positions() -> T
         vec![(0, json!(false)), (1, json!(true))]
     );
     assert_eq!(stub.finish()?.len(), 2);
-    assert_eq!(rows(&root)?.len(), 2);
+    let recorded = rows(&root)?;
+    assert_eq!(recorded.len(), 1);
+    assert_eq!(
+        recorded.first().ok_or("success row missing")?["result"]["ok"],
+        true
+    );
     let mut invalid = options(&root, "http://127.0.0.1:1/v1");
     invalid.settings.workers = 0;
     assert_eq!(
         sc_agent::result({
             let run = run(invalid.clone(), &logger)?;
 
-            run.send_batch(&[], &|_, _| {})
+            run.send_batch(&[], Some(false), &|_, _| {})
         })["error"]["id"],
         "decidr.invalid_workers"
     );
@@ -510,7 +532,7 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
                 let mut run = run(opts.clone(), &logger)?;
 
                 run.keyring = Box::new(keys);
-                run.send_batch(&vec![request(); 2], &|_, _| {})
+                run.send_batch(&vec![request(); 2], Some(false), &|_, _| {})
             });
             let workers = (0..2)
                 .map(|_| arrived.recv_timeout(Duration::from_secs(5)))
@@ -543,7 +565,7 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
 }
 
 #[test]
-fn req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once() -> Test {
+fn j3_session_write_failure() -> Test {
     for status in [200, 401] {
         let root = Temp::new()?;
         let logger = logger(&root)?;
@@ -554,21 +576,27 @@ fn req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once() ->
             json!({"error":"provider message stays whole"})
         };
         let stub = Stub::new(vec![http(status, body.clone())])?;
-        let outcome = sc_agent::result({
+        let outcome = sc_agent::report(&logger, {
             let run = run(options(&root, &stub.url), &logger)?;
 
-            run.send(&request())
+            run.send(&request(), Some(false))
         });
         if status == 200 {
-            assert_eq!(outcome["value"]["answers"], body["answers"]);
+            assert_eq!(outcome["error"]["id"], "log.session_write");
         } else {
             assert_eq!(outcome["error"]["id"], "http.auth");
             assert_eq!(outcome["error"]["message"], body.to_string());
-            outcome["error"]["session_id"]
-                .as_str()
-                .ok_or("failed request lacks ULID")?
-                .parse::<ulid::Ulid>()?;
         }
+        outcome["error"]["session_id"]
+            .as_str()
+            .ok_or("failed request lacks ULID")?
+            .parse::<ulid::Ulid>()?;
+        assert!(
+            !root
+                .0
+                .join("sessions/github.com/randlee/sc-agent/rust-developer/phase-b/runs.jsonl")
+                .exists()
+        );
         assert_eq!(stub.finish()?.len(), 1);
         logger.flush()?;
         let text = std::fs::read_to_string(root.0.join("logs/rust-test.log.jsonl"))?;
@@ -581,7 +609,14 @@ fn req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once() ->
                 .iter()
                 .filter(|event| event["fields"]["id"] == "log.session_write")
                 .count(),
-            1
+            usize::from(status == 200)
+        );
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event["fields"]["id"] == "http.auth")
+                .count(),
+            usize::from(status == 401)
         );
         logger.shutdown()?;
     }
@@ -604,7 +639,7 @@ fn cancel_after_a_lower_layer_error_keeps_it() -> Test {
             cancel.cancel();
             Err(sc_agent::KeyringError::Read("controlled failure".into()))
         });
-        run.send(&request())
+        run.send(&request(), Some(false))
     });
     assert_eq!(failure["error"]["id"], "secrets.keyring_read");
     assert!(cancel.is_cancelled());

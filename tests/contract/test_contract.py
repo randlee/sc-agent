@@ -92,15 +92,15 @@ class Wheel(Isolated):
 
     def test_run_sends_through_loopback_and_closes(self):
         with server([(200, {}, ANSWER)]) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY":"contract-secret"}):
-            with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name, base_url=url) as run:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract", config_dir=self.directory.name, base_url=url) as run:
                 value = run.send(REQUEST)
                 self.assertTrue(value["ok"], value)
             self.assertEqual(len(received), 1)
-            self.assertEqual(self.error(run.send("not JSON"))["id"], "log.write")
+            self.assertEqual(self.error(run.send("not JSON"))["id"], "decision.request_parse")
 
     def test_run_cancel_from_on_result_cancels_the_rest(self):
         with server([(200, {}, ANSWER)]) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY":"contract-secret"}):
-            with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name,
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract", config_dir=self.directory.name,
                               base_url=url, workers=1) as run:
                 def completed(index, value):
                     if index == 0:
@@ -116,19 +116,20 @@ class Wheel(Isolated):
         for options in ({}, {"tool":""}, {"tool":False}):
             run = self.api.Run(**options)
             failures = [run.send(REQUEST), run.send_batch([]), run.cancel(), run.sends_to("typesafe"), run.sends_to(1)]
-            self.assertTrue(all(self.error(value)["id"] == "sc_agent_py.invalid_option" for value in failures))
+            expected = "sc_agent_py.invalid_option" if options.get("tool") is False else "decision.missing_tool"
+            self.assertTrue(all(self.error(value)["id"] == expected for value in failures))
             self.assertTrue(all(value == failures[0] for value in failures))
         self.assertFalse((Path(self.directory.name) / "logs").exists())
-        with self.api.Run(tool="decidr", agent_role="contract", config_dir=self.directory.name) as run:
+        with self.api.Run(tool="decidr", tool_version="test", cache=False, agent_role="contract", config_dir=self.directory.name) as run:
             for value in (run.send(REQUEST, "extra"), run.send(REQUEST, workers=2),
                           run.send_batch([], timeout_secs=1), run.cancel(1), run.sends_to(1),
                           run.sends_to(), run.sends_to("typesafe", 1), run.sends_to("typesafe", bogus=1)):
                 self.assertEqual(self.error(value)["id"], "sc_agent_py.invalid_option")
-        with self.api.Run(tool="decidr", agent_role="contract", config_dir=self.directory.name, provider="openai") as run:
+        with self.api.Run(tool="decidr", tool_version="test", cache=False, agent_role="contract", config_dir=self.directory.name, provider="openai") as run:
             self.assertIn("provider", self.error(run.send(REQUEST))["message"])
 
     def test_run_model_errors(self):
-        with self.api.Run(tool="decidr", agent_role="contract", config_dir=self.directory.name, model="not-a-model") as run:
+        with self.api.Run(tool="decidr", tool_version="test", cache=False, agent_role="contract", config_dir=self.directory.name, model="not-a-model") as run:
             failed = run.send(REQUEST)
             self.assertEqual(self.error(failed)["id"], "types.unknown_short_name")
             self.assertEqual(run.send_batch([]), failed)
@@ -142,11 +143,11 @@ class Wheel(Isolated):
         self.assertEqual(self.api.provider_keys(), [row["key"] for row in catalog["value"] if row["key"]])
         self.assertEqual(self.api.TYPESAFE, "typesafe")
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY":"contract-secret"}):
-            with self.api.Run(tool="decidr", model="haiku", agent_role="contract", config_dir=self.directory.name,
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, model="haiku", agent_role="contract", config_dir=self.directory.name,
                               keyring_lookup=lambda name: "") as run:
                 self.assertEqual(run.sends_to("anthropic"), {"ok":True,"value":True})
                 self.assertEqual(run.sends_to(self.api.TYPESAFE), {"ok":True,"value":False})
-        with self.api.Run(tool="decidr", model="haiku", agent_role="contract", config_dir=self.directory.name,
+        with self.api.Run(tool="decidr", tool_version="test", cache=False, model="haiku", agent_role="contract", config_dir=self.directory.name,
                           keyring_lookup=lambda name: "") as run:
             self.assertEqual(self.error(run.sends_to(self.api.TYPESAFE))["id"], "secrets.key_missing")
 
@@ -157,7 +158,7 @@ class Wheel(Isolated):
         self.assertEqual(self.api.models(), json.loads(found.stdout))
 
     def test_module_exports_only_the_run_api(self):
-        self.assertEqual(set(self.api.__all__), {"Logger", "Run", "TYPESAFE", "digest", "flush", "log", "logger", "models", "provider_keys", "sitr"})
+        self.assertEqual(set(self.api.__all__), {"Logger", "Run", "TYPESAFE", "digest", "flush", "log", "logger", "models", "provider_keys", "session_rows", "sitr"})
         for old in ("Cancel", "send", "send_batch", "_new_cancel", "_cancel"):
             self.assertFalse(hasattr(self.api, old), old)
         logger = self.api.logger("decidr")["value"]
@@ -175,7 +176,7 @@ class Wheel(Isolated):
         self.assertLessEqual(exports, declared)
         run = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "Run")
         self.assertEqual({node.name for node in run.body if isinstance(node, ast.FunctionDef)},
-                         {"__init__", "__enter__", "__exit__", "sends_to", "cancel", "send", "send_batch"})
+                         {"__init__", "__enter__", "__exit__", "sends_to", "cancel", "send", "send_batch", "run_id", "log"})
 
     def test_sc_agent_home_supplies_wheel_config_and_project(self):
         root = Path(self.directory.name)
@@ -184,17 +185,17 @@ class Wheel(Isolated):
         (user / "decidr.local.json").write_text('{"project":"from-home","workers":2}')
         with server([(200, {}, ANSWER)]) as (url, received), patch.dict(os.environ, {
                 "SC_AGENT_HOME": str(user), "TYPESAFE_API_KEY": "contract-secret"}):
-            with self.api.Run(tool="decidr", agent_role="contract", base_url=url, general_log=self.api.logger("decidr")["value"]) as run_2:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, agent_role="contract", base_url=url, general_log=self.api.logger("decidr")["value"]) as run_2:
                 got = run_2.send(REQUEST)
         self.assertTrue(got["ok"], got)
         self.assertEqual(len(received), 1)
-        rows = [json.loads(line) for path in (root / "sessions").rglob("sessions.jsonl")
+        rows = [json.loads(line)["fields"] for path in (root / "sessions").rglob("sessions.jsonl")
                 for line in path.read_text().splitlines()]
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["project"], "from-home")
 
     def test_bad_call_signatures_return_errors(self):
-        run = self.api.Run(tool="decidr", agent_role="contract", config_dir=self.directory.name)
+        run = self.api.Run(tool="decidr", tool_version="test", cache=False, agent_role="contract", config_dir=self.directory.name)
         self.addCleanup(run.__exit__, None, None, None)
         functions = [self.api.logger, self.api.log, self.api.flush, self.api.digest,
                      run.send, run.send_batch, self.api.sitr.languages,
@@ -217,7 +218,7 @@ class Wheel(Isolated):
 
     def test_bad_signature_logs_once_to_injected_logger(self):
         logger = self.api.logger("decidr")["value"]
-        with self.api.Run(tool="decidr", bogus=1, general_log=logger, agent_role="contract") as run_1:
+        with self.api.Run(tool="decidr", tool_version="test", cache=False, bogus=1, general_log=logger, agent_role="contract") as run_1:
             result = run_1.send({})
         self.assertEqual(self.error(result)["id"], "sc_agent_py.invalid_option")
         rows = [json.loads(line) for line in (Path(self.directory.name) / "logs/decidr.log.jsonl").read_text().splitlines()]
@@ -231,16 +232,19 @@ import json, sys
 from pathlib import Path
 import sc_agent
 root = Path(sys.argv[1])
-with sc_agent.Run(tool="decidr", model="jev", project="contract", agent_role="contract", config_dir=str(root), keyring_lookup=lambda *args: "") as run_1:
-    result = run_1.send({})
-assert not result["ok"], result
+with sc_agent.Run(tool="decidr", tool_version="test", cache=False, model="jev", project="contract", agent_role="contract", config_dir=str(root), base_url=sys.argv[2]) as run_1:
+    result = run_1.send({"state":"evidence","questions":{"q":{"type":"choice","instructions":"True?","criteria":{"yes":"true","no":"false"}}}})
+assert result["ok"], result
 assert (root / "logs/decidr.log.jsonl").is_file()
-rows = [json.loads(line) for path in (root / "sessions").rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+rows = [json.loads(line)["fields"] for path in (root / "sessions").rglob("sessions.jsonl") for line in path.read_text().splitlines()]
 assert len(rows) == 1, rows
 '''
-        got = subprocess.run([sys.executable, "-c", code, str(root)], env=dict(os.environ),
-                             cwd=root, text=True, capture_output=True, timeout=20)
-        self.assertEqual(got.returncode, 0, got.stderr)
+        with server([(200, {}, ANSWER)]) as (url, received):
+            env = dict(os.environ, TYPESAFE_API_KEY="contract-secret")
+            got = subprocess.run([sys.executable, "-c", code, str(root), url], env=env,
+                                 cwd=root, text=True, capture_output=True, timeout=20)
+            self.assertEqual(got.returncode, 0, got.stderr)
+            self.assertEqual(len(received), 1)
 
     def test_default_logs_and_option_errors_once(self):
         code = r'''
@@ -249,14 +253,14 @@ from pathlib import Path
 import sc_agent
 root = Path(sys.argv[1])
 def send():
-    with sc_agent.Run(tool="decidr", project="test", agent_role="test", config_dir=str(root)) as run:
+    with sc_agent.Run(tool="decidr", tool_version="test", cache=False, project="test", agent_role="test", config_dir=str(root)) as run:
         return run.send("not JSON")
 calls = [send, sc_agent.sitr.languages]
 if sys.argv[2] == "sitr-first": calls.reverse()
 for call in calls: call()
-with sc_agent.Run(tool="decidr", timeout_secs=float("nan"), agent_role="test", config_dir=str(root)) as run_1:
+with sc_agent.Run(tool="decidr", tool_version="test", cache=False, timeout_secs=float("nan"), agent_role="test", config_dir=str(root)) as run_1:
     run_1.send("{}")
-with sc_agent.Run(tool="decidr", workers=0, agent_role="test", config_dir=str(root)) as run_2:
+with sc_agent.Run(tool="decidr", tool_version="test", cache=False, workers=0, agent_role="test", config_dir=str(root)) as run_2:
     run_2.send_batch([])
 for name in ("decidr", "sitr"):
     assert (root / "logs" / (name + ".log.jsonl")).is_file()
@@ -275,14 +279,14 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         def completed(index, value):
             raise ValueError("controlled caller failure")
         with server([(200, {}, ANSWER)]) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            with self.api.Run(tool="decidr", workers=1, project="contract", agent_role="contract", config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"], base_url=url) as run_3:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, workers=1, project="contract", agent_role="contract", config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"], base_url=url) as run_3:
                 got = run_3.send_batch([REQUEST] * 3, on_result=completed)
         error = self.error(got)
         self.assertEqual(error["id"], "sc_agent_py.callback")
         self.assertIn("ValueError: controlled caller failure", error["message"])
         self.assertEqual(len(received), 1)
-        rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
-        self.assertEqual(len(rows), 3)
+        rows = [json.loads(line)["fields"] for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 1)
 
     def test_a_result_python_cannot_load_is_an_error_value(self):
         # REQ-SAG-0002: the loader's error is returned, not dropped as None.
@@ -297,7 +301,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         # REQ-SAG-0013. The refusal comes before any connection or keyring lookup.
         lookups = []
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"], base_url="http://192.0.2.1/v1", keyring_lookup=lookups.append) as run_4:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract", config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"], base_url="http://192.0.2.1/v1", keyring_lookup=lookups.append) as run_4:
                 got = run_4.send(json.dumps(REQUEST))
         error = self.error(got)
         self.assertEqual(error["id"], "http.key_on_plain_http")
@@ -313,7 +317,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             return 200, {}, ANSWER
         results = []
         with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name,
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract", config_dir=self.directory.name,
                               general_log=self.api.logger("decidr")["value"], base_url=url, timeout_secs=60.0) as run:
                 def send():
                     results.append(run.send(json.dumps(REQUEST)))
@@ -349,9 +353,9 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         kwargs = dict(project="contract", agent_role="contract", config_dir=self.directory.name,
                       general_log=self.api.logger("decidr")["value"], base_url="http://127.0.0.1:1/v1", keyring_lookup=keyring)
         for workers in (-1, 0):
-            with self.api.Run(tool="decidr", workers=workers, **kwargs) as run_24:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, workers=workers, **kwargs) as run_24:
                 self.assertEqual(self.error(run_24.send_batch([]))["id"], "decidr.invalid_workers")
-        with self.api.Run(tool="decidr", timeout_secs="bad", **kwargs) as run_5:
+        with self.api.Run(tool="decidr", tool_version="test", cache=False, timeout_secs="bad", **kwargs) as run_5:
             bad = self.error(run_5.send(REQUEST))
         self.assertIn("invalid timeout_secs:", bad["message"])
         self.assertIn("TypeError:", bad["message"])
@@ -373,7 +377,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             if source == "keyring":
                 dotenv.unlink()
             with server([(200, {}, ANSWER)]) as (url, received):
-                with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name, general_log=logger, base_url=url, keyring_lookup=keyring) as run_16:
+                with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract", config_dir=self.directory.name, general_log=logger, base_url=url, keyring_lookup=keyring) as run_16:
                     value = run_16.send(json.dumps(REQUEST))
             self.assertTrue(value["ok"], value)
             self.assertEqual(received[0][1]["authorization"], "Bearer " + expected)
@@ -385,7 +389,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
 
     def test_missing_project_sends_nothing_and_writes_no_session(self):
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}), server([], respond=lambda body: (200, {}, ANSWER)) as (url, received):
-            with self.api.Run(tool="decidr", agent_role="contract", config_dir=self.directory.name, base_url=url) as run_6:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, agent_role="contract", config_dir=self.directory.name, base_url=url) as run_6:
                 result = run_6.send(REQUEST)
         self.assertEqual(self.error(result)["id"], "config.missing_project")
         self.assertEqual(received, [])
@@ -411,20 +415,20 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 if i < 2: os.environ["SC_PROJECT"] = "environment"
                 else: os.environ.pop("SC_PROJECT", None)
                 if i >= 3: places[i - 3][0].unlink()
-                with self.api.Run(tool="decidr", project="flag" if i == 0 else None, agent_role="contract", config_dir=str(global_dir), general_log=logger, base_url=url) as run_17:
+                with self.api.Run(tool="decidr", tool_version="test", cache=False, project="flag" if i == 0 else None, agent_role="contract", config_dir=str(global_dir), general_log=logger, base_url=url) as run_17:
                     result = run_17.send(json.dumps(REQUEST))
                 self.assertTrue(result["ok"], result)
                 observed.append(project)
             places[-1][0].unlink()
-            with self.api.Run(tool="decidr", agent_role="contract", config_dir=str(global_dir), general_log=logger, base_url=url) as run_18:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, agent_role="contract", config_dir=str(global_dir), general_log=logger, base_url=url) as run_18:
                 error = self.error(run_18.send(json.dumps(REQUEST)))
         for place in ("--project", "SC_PROJECT", "decidr.json", "sc-agent.json"):
             self.assertIn(place, error["message"])
-        rows = [json.loads(line) for path in root.rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+        rows = [json.loads(line)["fields"] for path in root.rglob("sessions.jsonl") for line in path.read_text().splitlines()]
         self.assertEqual(sorted(row["project"] for row in rows), sorted(observed))
 
     def test_bad_inputs_return_values(self):
-        with self.api.Run(tool="decidr", agent_role="contract", config_dir=self.directory.name) as run:
+        with self.api.Run(tool="decidr", tool_version="test", cache=False, agent_role="contract", config_dir=self.directory.name) as run:
             for function, args in ((run.send, (None,)), (run.send_batch, (None,)),
                                    (self.api.digest, (None,)), (self.api.logger, (None,)),
                                    (self.api.log, (None, None))):
@@ -453,12 +457,12 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
     def test_bad_provider_and_options(self):
         for options in ({"provider": "unknown"}, {"timeout_secs": -1},
                         {"timeout_secs": float("nan")}, {"model": "unknown"}):
-            with self.api.Run(tool="decidr", project="test", agent_role="contract", config_dir=self.directory.name, **options) as run_19:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, project="test", agent_role="contract", config_dir=self.directory.name, **options) as run_19:
                 self.error(run_19.send(json.dumps(REQUEST)))
         for workers in (-1, 0):
-            with self.api.Run(tool="decidr", workers=workers, agent_role="contract") as run_20:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, workers=workers, agent_role="contract") as run_20:
                 self.error(run_20.send_batch([]))
-        with self.api.Run(tool="decidr", sleep=42, agent_role="contract") as run_7:
+        with self.api.Run(tool="decidr", tool_version="test", cache=False, sleep=42, agent_role="contract") as run_7:
             self.error(run_7.send(json.dumps(REQUEST)))
 
     def test_typed_answers(self):
@@ -467,7 +471,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                  ({"type": "box"}, {"type": "box", "box": {"top": 0.123456789, "bottom": 0.9, "left": 0.2, "right": 0.8}, "confidence": None}))
         for question, answer in cases:
             with self.subTest(question=question), server([(200, {}, {"answers": {"q": answer}})]) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-                with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"], base_url=url) as run_21:
+                with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract", config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"], base_url=url) as run_21:
                     got = run_21.send(json.dumps({"state": "evidence", "questions": {"q": question}}))
                 self.assertTrue(got["ok"], got)
                 self.assertEqual(got["value"]["answers"]["q"], answer)
@@ -487,7 +491,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             try:
                 logger = self.api.logger("t")["value"]
                 self.assertTrue(self.api.log(logger, {"action": "python.own", "target": "consumer", "correlation_id": "contract-id", "fields": {"source": "python"}})["ok"])
-                with self.api.Run(tool="decidr", config_dir=folder, project="contract", agent_role="contract", general_log=logger) as run_23:
+                with self.api.Run(tool="decidr", tool_version="test", cache=False, config_dir=folder, project="contract", agent_role="contract", general_log=logger) as run_23:
                     self.error(run_23.send("not JSON"))
                 self.assertTrue(self.api.sitr.languages(general_log=logger)["ok"])
                 self.assertTrue(self.api.flush(logger)["ok"])
@@ -516,7 +520,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 with patch.dict(os.environ, {"DECIDR_LOG_ROOT": directory, provider.upper() + "_API_KEY": "contract-secret"}):
                     expected_id = {"typesafe": "jev-latest", "anthropic": "claude-haiku-5-5", "openai": "gpt-6-luna", "openrouter": "anthropic/claude-haiku-5.5", "together": "openai/gpt-6-luna", "nous": "custom-id"}[provider]
                     (Path(directory) / "decidr.json").write_text(json.dumps({"models": {model: {"provider": provider, "id": expected_id}}}))
-                    with self.api.Run(tool="decidr", model=model, project="contract", agent_role="contract", config_dir=directory, general_log=self.api.logger("decidr")["value"], base_url=url) as run:
+                    with self.api.Run(tool="decidr", tool_version="test", cache=False, model=model, project="contract", agent_role="contract", config_dir=directory, general_log=self.api.logger("decidr")["value"], base_url=url) as run:
                         result = run.send(json.dumps(REQUEST))
                 self.assertTrue(result["ok"], result)
                 self.assertEqual(result["value"]["answers"], ANSWER["answers"])
@@ -536,7 +540,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         for status, body, expected in ((429, {"error": {"type": "insufficient_quota"}}, "http.quota_exhausted"),
                                        (401, {"error": "bad contract-secret"}, "http.auth")):
             with self.subTest(status=status), tempfile.TemporaryDirectory() as directory, server([(status, {}, body)]) as (url, received), patch.dict(os.environ, {"DECIDR_LOG_ROOT": directory, "TYPESAFE_API_KEY": "contract-secret"}):
-                with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=directory, general_log=self.api.logger("decidr")["value"], base_url=url) as run_22:
+                with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract", config_dir=directory, general_log=self.api.logger("decidr")["value"], base_url=url) as run_22:
                     result = run_22.send(json.dumps(REQUEST))
                 error = self.error(result)
                 self.assertEqual(error["id"], expected)
@@ -545,7 +549,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 self.assertNotIn("contract-secret", json.dumps(result))
         waits = []
         with tempfile.TemporaryDirectory() as directory, server([(429, {"Retry-After": "0.125"}, {"error": "busy"}), (200, {}, ANSWER)]) as (url, received), patch.dict(os.environ, {"DECIDR_LOG_ROOT": directory, "TYPESAFE_API_KEY": "contract-secret"}):
-            with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=directory, general_log=self.api.logger("decidr")["value"], base_url=url, sleep=waits.append) as run_8:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract", config_dir=directory, general_log=self.api.logger("decidr")["value"], base_url=url, sleep=waits.append) as run_8:
                 got = run_8.send(json.dumps(REQUEST))
             self.assertTrue(got["ok"], got)
             self.assertEqual(waits, [0.125])
@@ -558,7 +562,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             raise ValueError("controlled sleep callback refusal")
         replies = [(429, {"Retry-After": "0"}, {}), (200, {}, ANSWER)]
         with server(replies) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            with self.api.Run(tool="decidr", workers=1, project="contract", agent_role="contract",
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, workers=1, project="contract", agent_role="contract",
                               config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"],
                               base_url=url, sleep=rejected) as run:
                 result = run.send_batch([REQUEST, REQUEST])
@@ -582,7 +586,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             entered.set()
             completed_during_holdoff.append(finished.wait(10))
         def send(url, wait):
-            with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name, general_log=logger, base_url=url, sleep=wait) as run_9:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract", config_dir=self.directory.name, general_log=logger, base_url=url, sleep=wait) as run_9:
                 return run_9.send(json.dumps(REQUEST))
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}), server(
                 [(429, {}, {}), (429, {}, {}), (200, {}, ANSWER)]) as (first, _), server(
@@ -625,7 +629,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 if any('"state":"finished"' in path.read_text() for path in rows):
                     persisted.set()
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}), server([None] * 3, respond) as (url, _):
-            with self.api.Run(tool="decidr", workers=2, project="contract", agent_role="contract", config_dir=self.directory.name, base_url=url, sleep=sleep, general_log=self.api.logger("decidr")["value"]) as run_10:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, workers=2, project="contract", agent_role="contract", config_dir=self.directory.name, base_url=url, sleep=sleep, general_log=self.api.logger("decidr")["value"]) as run_10:
                 got = run_10.send_batch([json.dumps({**REQUEST, "state": state}) for state in ("finished", "busy")], on_result=completed)
         self.assertTrue(got["ok"], got)
         self.assertTrue(all(item["result"]["ok"] for item in got["value"]), got)
@@ -651,14 +655,14 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 release_first.set()
 
         with server([None, None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            with self.api.Run(tool="decidr", workers=2, project="contract", agent_role="contract", config_dir=self.directory.name, base_url=url, general_log=self.api.logger("decidr")["value"]) as run_11:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, workers=2, project="contract", agent_role="contract", config_dir=self.directory.name, base_url=url, general_log=self.api.logger("decidr")["value"]) as run_11:
                 got = run_11.send_batch([json.dumps({**REQUEST, "state": str(i)}) for i in range(2)], on_result=completed)
         self.assertTrue(got["ok"], got)
         self.assertEqual([item["index"] for item in got["value"]], [0, 1])
         self.assertEqual([item["result"]["value"]["marker"] for item in got["value"]], ["0", "1"])
         self.assertEqual([index for index, _ in callbacks], [1, 0])
         self.assertEqual([result["value"]["marker"] for _, result in callbacks], ["1", "0"])
-        rows = [json.loads(line) for path in Path(self.directory.name).rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+        rows = [json.loads(line)["fields"] for path in Path(self.directory.name).rglob("sessions.jsonl") for line in path.read_text().splitlines()]
         self.assertEqual(len(rows), 2)
         for row in rows:
             self.assertEqual(row["project"], "contract")
@@ -671,7 +675,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         def completed(index, value):
             run.cancel()
         with server([(200, {}, ANSWER)]) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            with self.api.Run(tool="decidr", workers=1, project="contract", agent_role="contract", config_dir=self.directory.name,
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, workers=1, project="contract", agent_role="contract", config_dir=self.directory.name,
                               general_log=self.api.logger("decidr")["value"], base_url=url) as run:
                 got = run.send_batch([json.dumps(REQUEST)] * 3, on_result=completed)
         self.assertTrue(got["ok"], got)
@@ -680,8 +684,8 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         self.assertTrue(got["value"][0]["result"]["ok"])
         for item in got["value"][1:]:
             self.assertEqual(self.error(item["result"])["id"], "decision.cancelled")
-        rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
-        self.assertEqual(len(rows), 3)
+        rows = [json.loads(line)["fields"] for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 1)
         self.assertEqual(sum(row["result"]["ok"] for row in rows), 1)
 
     def test_keyboard_interrupt_in_callback_cancels_unfinished_results(self):
@@ -689,7 +693,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             if index == 0:
                 raise KeyboardInterrupt
         with server([(200, {}, ANSWER)]) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            with self.api.Run(tool="decidr", workers=1, project="contract", agent_role="contract", config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"], base_url=url) as run_12:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, workers=1, project="contract", agent_role="contract", config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"], base_url=url) as run_12:
                 got = run_12.send_batch([REQUEST] * 3, on_result=completed)
         self.assertTrue(got["ok"], got)
         self.assertEqual(len(received), 1)
@@ -719,7 +723,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 return 500, {}, {"error": "send_batch did not return while reply was withheld"}
             return 200, {}, ANSWER
         with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            with self.api.Run(tool="decidr", workers=1, project="contract", agent_role="contract", config_dir=self.directory.name,
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, workers=1, project="contract", agent_role="contract", config_dir=self.directory.name,
                               general_log=self.api.logger("decidr")["value"], base_url=url) as run_13:
                 try:
                     got = run_13.send_batch([REQUEST] * 3)
@@ -729,14 +733,14 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         self.assertTrue(got["ok"], got)
         self.assertEqual(len(received), 1)
         self.assertEqual([self.error(item["result"])["id"] for item in got["value"]], ["decision.cancelled"] * 3)
-        rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
-        self.assertEqual(len(rows), 3)
-        self.assertTrue(all(row["result"]["error"]["id"] == "decision.cancelled" for row in rows))
+        rows = [json.loads(line)["fields"] for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows), 0)
+
 
     def test_repository_identity_uses_origin_and_real_host(self):
         logger = self.api.logger("decidr")["value"]
         def send(url):
-            with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name, general_log=logger, base_url=url) as run_14:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract", config_dir=self.directory.name, general_log=logger, base_url=url) as run_14:
                 got = run_14.send(REQUEST)
             self.assertTrue(got["ok"], got)
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret", "HOSTNAME": "not-the-host"}), server([(200, {}, ANSWER)] * 5) as (url, _):
@@ -747,14 +751,14 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             for origin in ("git@github.com:example/project.git", "https://example.com:8443/o/r.git", "ssh://git@example.com:2222/o/r.git"):
                 subprocess.run(["git", "remote", "set-url", "origin", origin], check=True, timeout=20)
                 send(url)
-        rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+        rows = [json.loads(line)["fields"] for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
         host = subprocess.run(["hostname"], check=True, text=True, capture_output=True, timeout=20).stdout.strip()
         self.assertEqual(sorted(row["repo"] for row in rows), sorted([f"local/{host}/{Path.cwd().name}", "github.com/example/project", "github.com/example/project", "example.com/o/r", "example.com/o/r"]))
 
     def test_network_errors_are_returned_and_attempts_bounded(self):
         waits = []
         with server([(None, {}, None)] * 5) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"], base_url=url, sleep=waits.append) as run_15:
+            with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract", config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"], base_url=url, sleep=waits.append) as run_15:
                 got = run_15.send(json.dumps(REQUEST))
         error = self.error(got)
         self.assertEqual(error["id"], "http.network")
@@ -1050,9 +1054,9 @@ class Cli(Isolated):
                 self.assertTrue(all(row["result"]["error"]["id"] == "decision.cancelled"
                                     for row in results["value"]))
                 self.assertEqual(len(received), 1)
-                rows = [json.loads(line) for path in Path(folder).rglob("sessions.jsonl") for line in path.read_text().splitlines()]
-                self.assertEqual(len(rows), 3)
-                self.assertTrue(all(row["result"]["error"]["id"] == "decision.cancelled" for row in rows))
+                rows = [json.loads(line)["fields"] for path in Path(folder).rglob("sessions.jsonl") for line in path.read_text().splitlines()]
+                self.assertEqual(len(rows), 0)
+
 
     def test_models_and_sitr_queries(self):
         root = Path(__file__).resolve().parents[2]

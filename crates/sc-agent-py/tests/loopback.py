@@ -157,7 +157,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                         expected = root / "sessions/example.invalid/test/client" / client.CLIENT_NAME / "phase-i-loopback/sessions.jsonl"
                         self.assertEqual(list((root / "sessions").rglob("sessions.jsonl")), [expected])
                         self.assertFalse((root / "wrong-root").exists())
-                        rows = [json.loads(line) for line in expected.read_text().splitlines()]
+                        rows = [json.loads(line)["fields"] for line in expected.read_text().splitlines()]
                         self.assertEqual(len(rows), 1)
                         self.assertEqual(rows[0]["agent_role"], client.CLIENT_NAME)
 
@@ -250,14 +250,13 @@ class RenderedWheelLoopback(unittest.TestCase):
                         self.assertTrue(sc_agent.flush(logger["value"])["ok"])
 
                     rows = [
-                        json.loads(line)
+                        json.loads(line)["fields"]
                         for path in (root / "sessions").rglob("sessions.jsonl")
                         for line in path.read_text().splitlines()
                     ]
-                    self.assertEqual(len(rows), 2)
-                    for row in rows:
-                        self.assertEqual((row["project"], row["agent_role"]), ("phase-i-loopback", client.CLIENT_NAME))
-                    self.assertEqual({row["request"]["state"] for row in rows}, {"ok", "unauthorized"})
+                    self.assertEqual(len(rows), 1)
+                    self.assertEqual((rows[0]["project"], rows[0]["agent_role"]), ("phase-i-loopback", client.CLIENT_NAME))
+                    self.assertEqual(rows[0]["request"]["state"], "ok")
                     log = (root / "logs" / "consumer-test.log.jsonl").read_text()
                     self.assertIn("decision.result", log)
                     self.assertIn("http.auth", log)
@@ -348,7 +347,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                 self.assertTrue(batch["value"][0]["ok"], batch["value"][0])
                 self.assertEqual([item["error"].code for item in batch["value"][1:]], ["CANCELED", "CANCELED"])
 
-                later = client.call_result(REQUEST, **self.call_options(client, root, logger["value"]))
+                later = client.call_result({**REQUEST, "state": "later"}, **self.call_options(client, root, logger["value"]))
                 self.assertTrue(later["ok"], later)
                 self.assertEqual(len(runner.received), 2)
                 self.assertTrue(sc_agent.flush(logger["value"])["ok"])
@@ -375,7 +374,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                 for method, native_call in ((client.call_result, "send"),
                                             (client.call_batch_results, "send_batch")):
                     with self.subTest(native_call=native_call):
-                        with sc_agent.Run(tool=client.CLIENT_NAME, model="laya", project="phase-i-loopback",
+                        with sc_agent.Run(tool=client.CLIENT_NAME, tool_version="test", model="laya", project="phase-i-loopback",
                                           agent_role=client.CLIENT_NAME, config_dir=str(root),
                                           general_log=logger["value"], timeout_secs=5) as real_run:
                             interrupted = MagicMock()

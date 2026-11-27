@@ -24,7 +24,7 @@ fn req_sag_0601_holdoff_lock_is_shared_only_by_host_and_held_during_wait() -> Te
         }
         Ok(())
     });
-    run.send(&request())?;
+    run.send(&request(), Some(false))?;
     assert_eq!(
         observations
             .lock()

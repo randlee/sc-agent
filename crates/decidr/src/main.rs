@@ -57,6 +57,8 @@ fn main() {
                 let run = sc_agent::Run::new(
                     sc_agent::RunArgs {
                         tool: TOOL.into(),
+                        tool_version: env!("CARGO_PKG_VERSION").into(),
+                        cache: None,
                         agent_role,
                         model: Some(model),
                         project: cli.project,
@@ -97,11 +99,12 @@ fn main() {
                             })
                         })
                         .collect::<Result<Vec<_>, _>>()?;
-                    run.send_batch(&requests, &|_, _| {})
+                    run.send_batch(&requests, None, &|_, _| {})
                 } else {
                     run.send(
                         &serde_json::from_str(&text)
                             .map_err(|e| sc_agent::error("decision.request_parse", e))?,
+                        None,
                     )
                 }
             })();
