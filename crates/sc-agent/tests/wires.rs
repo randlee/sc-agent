@@ -552,3 +552,25 @@ fn redirect_never_forwards_the_api_key_to_another_endpoint() -> Test {
     assert_eq!(result(outcome)["error"]["id"], "decision.api_status");
     Ok(())
 }
+
+#[test]
+fn anthropic_compat_skips_thinking_blocks_before_the_first_text_answer() -> Test {
+    for model in ["haiku", "sonnet", "opus", "fable"] {
+        let root = Temp::new()?;
+        let raw = json!({"content":[
+            {"type":"thinking","thinking":"internal reasoning"},
+            {"type":"text","text":42},
+            {"type":"text","text":answer().to_string()},
+            {"type":"text","text":"not the first text"}
+        ]});
+        let stub = Stub::new(vec![http(200, raw.clone()), http(200, raw)])?;
+        let opts = options(&root, &stub.url);
+        with_route(&opts, ("anthropic", model), &stub.url, |route| -> Test {
+            assert_eq!(AnthropicCompat(route).call(&llm_request())?, answer());
+            assert_eq!(AnthropicCompat(route).decide(&request())?, answer());
+            Ok(())
+        })??;
+        assert_eq!(stub.finish()?.len(), 2);
+    }
+    Ok(())
+}

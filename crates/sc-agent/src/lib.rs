@@ -1152,7 +1152,7 @@ impl Llm for AnthropicCompat<'_> {
             .as_ref()
             .map(|schema| json!({"format":{"type":"json_schema","schema":schema}}));
         let body = json!({"model":self.0.model,"max_tokens":ANTHROPIC_MAX_TOKENS,"messages":req.messages,"system":req.system,"output_config":format});
-        self.0.text("messages", ANTHROPIC, body, "/content/0/text")
+        self.0.text("messages", ANTHROPIC, body, "/content")
     }
 }
 impl Route<'_> {
@@ -1169,7 +1169,14 @@ impl Route<'_> {
             fields.retain(|_, field| !field.is_null());
         }
         let reply = self.post(path, auth, &body)?;
-        let text = reply.pointer(at).and_then(Value::as_str);
+        let text = reply.pointer(at).and_then(|value| {
+            value.as_str().or_else(|| {
+                value
+                    .as_array()?
+                    .iter()
+                    .find_map(|block| block.get("text")?.as_str())
+            })
+        });
         let text = text.ok_or_else(|| {
             error(
                 "decision.response_parse",

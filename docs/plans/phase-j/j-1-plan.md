@@ -45,7 +45,7 @@ Exact code for each: the dev bead agt-j-1.group-dev Signatures and design "Publi
 ## Behaviour changes the owner should know (none is pinned by a test or record I could find)
 1. attempts is set on every failure after at least one send (and on cancel); before only on http failures and cancel. REQ-SAG-0016 says "when they apply".
 2. decision.api_status and quota actions now use error()'s generic text; api_status category stays 'other'.
-3. Anthropic reply text is read at /content/0/text (before: first block with text).
+3. Anthropic reply text remains the first content block with a string text; thinking blocks are skipped.
 4. decidr's cancelled message is "request cancelled" (was "interrupted").
 5. Each Decision impl runs schema() (ask for the compat impls, the Jev impl for Jev), so Decision::decide returns a schema-checked reply or decision.schema_mismatch (REQ-SAG-0901); send() no longer calls schema().
    10. A cancel after a finished request overrides only a success; a lower-layer error (http.auth, ...) is kept (J-1-05).
@@ -100,7 +100,11 @@ fn ask(llm: &impl Llm, route: &Route<'_>, req: &DecisionRequest) -> Result<Decis
             fields.retain(|_, field| !field.is_null());
         }
         let reply = self.post(path, auth, &body)?;
-        let text = reply.pointer(at).and_then(Value::as_str);
+        let text = reply.pointer(at).and_then(|value| {
+            value.as_str().or_else(|| {
+                value.as_array()?.iter().find_map(|block| block.get("text")?.as_str())
+            })
+        });
         let text = text.ok_or_else(|| {
             error(
                 "decision.response_parse",
@@ -1012,13 +1016,13 @@ impl Llm for AnthropicCompat<'_> {
             .as_ref()
             .map(|schema| json!({"format":{"type":"json_schema","schema":schema}}));
         let body = json!({"model":self.0.model,"max_tokens":ANTHROPIC_MAX_TOKENS,"messages":req.messages,"system":req.system,"output_config":format});
-        self.0.text("messages", ANTHROPIC, body, "/content/0/text")
+        self.0.text("messages", ANTHROPIC, body, "/content")
     }
 }
 ```
 Replaces: (new) 
 Deletes: nothing
-Body rule: max_tokens is the Messages API's required field, set to the one constant ANTHROPIC_MAX_TOKENS (a provider limit, not an sc-agent cap; rule 0); system top-level; schema as output_config.format; text at /content/0/text.
+Body rule: max_tokens is the Messages API's required field, set to the one constant ANTHROPIC_MAX_TOKENS (a provider limit, not an sc-agent cap; rule 0); system top-level; schema as output_config.format; text from the first content block with a string text (thinking blocks are skipped).
 Test: anthropic_compat_call_returns_the_json_the_model_wrote
 Requirement: ['ANC-013']
 Source: scratchpad/j-1-signatures.md; starting code on sprint/j-1 @b4be55e6.
