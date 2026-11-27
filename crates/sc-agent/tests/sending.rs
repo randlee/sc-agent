@@ -438,8 +438,8 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
         permits
             .lock()
             .map_err(|e| e.to_string())?
-            .recv()
-            .map_err(|e| e.to_string())?;
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| format!("missing keyring release permit: {e}"))?;
         Ok("test-secret".into())
     };
     let (result, workers) = std::thread::scope(
