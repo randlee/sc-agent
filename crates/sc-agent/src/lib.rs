@@ -2040,6 +2040,10 @@ pub mod route_tests {
         let wait = |delay| {
             let mut waits = waits.lock().map_err(|e| error("http.network", e))?;
             waits.push(delay);
+            // Two waits are expected; a third means holdoff is not reaching its deadline.
+            if waits.len() > 2 {
+                return Err(error("test.excess_wait", format!("{waits:?}")));
+            }
             if waits.len() == 1 {
                 holdoffs
                     .deadlines
