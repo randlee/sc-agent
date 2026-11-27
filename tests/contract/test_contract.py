@@ -582,13 +582,21 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             env = dict(os.environ, SC_INTERRUPT_CHILD="1")
             command = [sys.executable, "-m", "unittest", "discover", "-s", str(Path(__file__).parent),
                        "-p", "test_contract.py", "-k", "test_pending_python_interrupt_cancels_inflight_send"]
-            run = subprocess.run(command, env=env, text=True, capture_output=True, timeout=30)
+            try:
+                run = subprocess.run(command, env=env, text=True, capture_output=True, timeout=30)
+            except subprocess.TimeoutExpired as error:
+                self.fail(f"interrupt child timed out; stdout={error.stdout!r}; stderr={error.stderr!r}")
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
             return
+        previous_handler = signal.signal(signal.SIGINT, signal.default_int_handler)
+        self.addCleanup(signal.signal, signal.SIGINT, previous_handler)
         release = threading.Event()
+        expired = threading.Event()
         def respond(body):
             _thread.interrupt_main()
             if not release.wait(20):
+                expired.set()
+                release.set()
                 return 500, {}, {"error": "send_batch did not return while reply was withheld"}
             return 200, {}, ANSWER
         with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
@@ -598,6 +606,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                                           general_log=self.api.logger("decidr")["value"], base_url=url)
             finally:
                 release.set()
+        self.assertFalse(expired.is_set(), f"response backstop expired; received={received!r}, got={got!r}")
         self.assertTrue(got["ok"], got)
         self.assertEqual(len(received), 1)
         self.assertEqual([self.error(item["result"])["id"] for item in got["value"]], ["decision.cancelled"] * 3)
