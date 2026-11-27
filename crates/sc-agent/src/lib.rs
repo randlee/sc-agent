@@ -1465,7 +1465,13 @@ impl Run {
         &self.logger
     }
     pub fn close(&self) -> Result<(), Error> {
-        finish_logger(&self.logger, self.owned)
+        let flushed = self.logger.flush().map_err(|e| error("log.flush", e));
+        let stopped = if self.owned {
+            self.logger.shutdown().map_err(|e| error("log.shutdown", e))
+        } else {
+            Ok(())
+        };
+        flushed.and(stopped)
     }
     pub fn send(&self, request: &Value) -> Result<Value, Error> {
         let (options, logger, cancel) = (&self.options, self.logger(), &*self.cancel);
@@ -1621,15 +1627,6 @@ impl Run {
             )
         }))
     }
-}
-pub fn finish_logger(logger: &Logger, owned: bool) -> Result<(), Error> {
-    let flushed = logger.flush().map_err(|e| error("log.flush", e));
-    let stopped = if owned {
-        logger.shutdown().map_err(|e| error("log.shutdown", e))
-    } else {
-        Ok(())
-    };
-    flushed.and(stopped)
 }
 pub fn repository() -> Result<(PathBuf, String), Error> {
     let cwd = std::env::current_dir().map_err(|e| error("config.repo", e))?;
