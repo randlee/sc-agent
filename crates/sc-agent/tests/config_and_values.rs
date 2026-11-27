@@ -392,6 +392,36 @@ fn req_sag_0019_model_entry_accepts_released_date_and_rejects_malformed_date() -
 }
 
 #[test]
+fn configured_release_dates_keep_calendar_and_format_boundaries() -> Test {
+    for (date, valid) in [
+        ("2000-02-29", true),
+        ("2024-02-29", true),
+        ("0000-02-29", true),
+        ("9999-12-31", true),
+        ("1900-02-29", false),
+        ("2025-02-29", false),
+        ("2026-04-31", false),
+        ("2026-00-01", false),
+        ("2026-01-00", false),
+        ("2026-1-01", false),
+        ("2026-01-1", false),
+        ("026-01-01", false),
+        ("+2026-01-01", false),
+        (" 2026-01-01", false),
+        ("2026-01-01T00:00:00Z", false),
+    ] {
+        let result = configured_models(json!({"luna": {
+            "provider":"nous", "id":"openai/gpt-6.1-luna", "released":date
+        }}));
+        assert_eq!(result.is_ok(), valid, "release date {date}");
+        if let Err(error) = result {
+            assert!(error.to_string().contains("config.invalid"), "{error}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn req_sag_0101_configured_model_with_unknown_provider_is_rejected() -> Test {
     let failure = configured_models(json!({"x": {"provider": "nowhere", "id": "x-1"}}))
         .err()
