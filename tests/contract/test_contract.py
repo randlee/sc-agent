@@ -1240,7 +1240,7 @@ class Cli(Isolated):
         root = Path(__file__).resolve().parents[2]
         for binary, args in (("decidr", ["models"]), ("sitr", ["languages"]), ("sitr", ["queries", "--language", "rust"])):
             with self.subTest(binary=binary, args=args), tempfile.TemporaryDirectory() as folder:
-                env = {"PATH": os.defpath, "GIT_CEILING_DIRECTORIES": str(Path(self.directory.name).parent.resolve()), f"{binary.upper()}_LOG_ROOT": folder}
+                env = {"PATH": os.defpath, "SC_AGENT_HOME": folder, "GIT_CEILING_DIRECTORIES": str(Path(self.directory.name).parent.resolve()), f"{binary.upper()}_LOG_ROOT": folder}
                 got = subprocess.run([str(root / "target/debug" / binary), *args],
                                      env=env, cwd=folder, text=True, capture_output=True, timeout=20)
                 self.assertEqual(got.returncode, 0, got.stderr)
