@@ -10,7 +10,7 @@ Rand (ANC-015, ANC-016, rule 0): "judge-jev and plan-anchor simply supply tool n
 
 | file | holds |
 |---|---|
-| crates/sc-agent-py/python/sc_agent/templates/consumer.py.j2 | the consumer module: Result types, `open_run`, `FailedRun`, calls, consent gate, batch pump, `/2` lines, redaction |
+| crates/sc-agent-py/python/sc_agent/templates/consumer.py.j2 | the consumer module: Result types, `open_run`, calls, consent gate, batch pump, `/2` lines, redaction |
 | crates/sc-agent-py/python/sc_agent/testing.py (new) | `FakeRun`, `fake_open_run` (test fake of a Run; generated code never imports it) |
 | crates/sc-agent-py/src/lib.rs | sitr pyfunctions gain `tool=` (see Budget; rule-7 item) |
 | crates/sc-agent-py/python/sc_agent/_native.pyi | sitr stubs gain `tool: str \| None = None` |
