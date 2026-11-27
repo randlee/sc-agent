@@ -152,6 +152,54 @@ pub struct Runner {
 pub struct ModelEntry {
     pub provider: String,
     pub id: String,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_model_release",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub released: Option<String>,
+}
+
+fn deserialize_model_release<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let released = Option::<String>::deserialize(deserializer)?;
+    if let Some(date) = released.as_deref() {
+        let mut parts = date.split('-');
+        let year_part = parts.next().unwrap_or_default();
+        let month_part = parts.next().unwrap_or_default();
+        let day_part = parts.next().unwrap_or_default();
+        let valid_shape = year_part.len() == 4
+            && month_part.len() == 2
+            && day_part.len() == 2
+            && parts.next().is_none()
+            && [year_part, month_part, day_part]
+                .iter()
+                .all(|part| part.bytes().all(|byte| byte.is_ascii_digit()));
+        let valid_date = if valid_shape {
+            let year = year_part.parse::<u32>().unwrap_or(0);
+            let month = month_part.parse::<u32>().unwrap_or(0);
+            let day = day_part.parse::<u32>().unwrap_or(0);
+            let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+            let days = match month {
+                1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+                4 | 6 | 9 | 11 => 30,
+                2 if leap => 29,
+                2 => 28,
+                _ => 0,
+            };
+            day > 0 && day <= days
+        } else {
+            false
+        };
+        if !valid_date {
+            return Err(serde::de::Error::custom(
+                "released must be a YYYY-MM-DD date",
+            ));
+        }
+    }
+    Ok(released)
 }
 #[derive(Clone, Debug, Serialize)]
 pub struct Settings {

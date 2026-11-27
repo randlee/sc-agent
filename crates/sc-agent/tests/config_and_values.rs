@@ -314,6 +314,36 @@ fn req_sag_0101_configured_models_override_and_extend_the_built_in_table() -> Te
 }
 
 #[test]
+fn req_sag_0019_model_entry_accepts_released_date_and_rejects_malformed_date() -> Test {
+    let configured = configured_models(json!({
+        "luna": {
+            "provider": "nous",
+            "id": "openai/gpt-6.1-luna",
+            "released": "2026-11-20"
+        }
+    }))?;
+    let model = configured
+        .models
+        .get("luna")
+        .ok_or("missing configured luna")?;
+    assert_eq!(model.provider, "nous");
+    assert_eq!(model.id, "openai/gpt-6.1-luna");
+    assert_eq!(model.released.as_deref(), Some("2026-11-20"));
+
+    let failure = configured_models(json!({
+        "luna": {
+            "provider": "nous",
+            "id": "openai/gpt-6.1-luna",
+            "released": "2026-02-30"
+        }
+    }))
+    .err()
+    .ok_or("invalid release date accepted")?;
+    assert!(failure.to_string().contains("config.invalid"));
+    Ok(())
+}
+
+#[test]
 fn req_sag_0101_configured_model_with_unknown_provider_is_rejected() -> Test {
     let failure = configured_models(json!({"x": {"provider": "nowhere", "id": "x-1"}}))
         .err()
