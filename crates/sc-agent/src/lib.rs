@@ -109,6 +109,7 @@ pub fn error(id: &'static str, message: impl ToString) -> Error {
         "http.quota_exhausted" => "quota",
         "decision.cancelled" => "cancelled",
         "decision.response_parse" | "decision.schema_mismatch" => "response_invalid",
+        s if s.starts_with("log.") => "log",
         s if s.starts_with("config.") => "config",
         _ => "validation",
     };

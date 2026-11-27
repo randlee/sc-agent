@@ -249,6 +249,7 @@ fn req_sag_0002_0016_0017_errors_have_stable_ids_categories_and_omit_unset_attem
         ("http.auth", "auth"),
         ("http.quota_exhausted", "quota"),
         ("decision.cancelled", "cancelled"),
+        ("log.flush", "log"),
         ("config.invalid", "config"),
         ("decision.schema_mismatch", "response_invalid"),
         ("decision.request_parse", "validation"),
