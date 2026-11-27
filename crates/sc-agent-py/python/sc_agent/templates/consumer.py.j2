@@ -1,6 +1,6 @@
 ---
 name: sc-agent-consumer
-version: 1.0.0
+version: 2.0.0
 format: python
 description: Shared decision client with optional syntax queries and overridable consent policy.
 required_variables:
@@ -26,26 +26,20 @@ override that named block without changing decision or batch processing.
 """
 from __future__ import annotations
 
-import hashlib
 import importlib
 import json
 import math
 import pathlib
 import re
 import sys
-import threading
-from collections.abc import Callable, Container, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeGuard, cast
-
-if TYPE_CHECKING:
-    from sc_agent import Run
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import Any, Generic, Literal, NamedTuple, TypeGuard, TypeVar, cast
 
 SC_DECIDR_VERSION = "{{ sc_decidr_version }}"
 CLIENT_NAME = "{{ client_name }}"
 TOOL_VERSION = "{{ tool_version }}"
 Record = dict[str, Any]
-_logger_handle: Any = None
-_logger_lock = threading.Lock()
 
 DECIDR_CATEGORY_CODES = {
     "auth": "AUTH.CREDENTIALS", "quota": "DECIDR.RATE_LIMITED", "busy": "DECIDR.OVERLOADED",
@@ -54,8 +48,62 @@ DECIDR_CATEGORY_CODES = {
     "config": "DECIDR.CONFIG", "log": "DECIDR.LOG", "other": "DECIDR.ERROR",
     "context_exceeded": "DECIDR.CONTEXT_EXCEEDED",
 }
-_CLIENT_IDS = {"DEPENDENCY.SC_DECIDR", "DECIDR.INVALID_OPTION"}  # failures made here keep their id as the code
 _ALLOWED_ABORT_ON = (frozenset[str](), frozenset({"auth"}), frozenset({"auth", "quota"}))
+
+
+T = TypeVar("T")
+E = TypeVar("E")
+
+@dataclass(frozen=True)
+class Ok(Generic[T]):
+    value: T
+    ok: Literal[True] = field(default=True, init=False)
+
+@dataclass(frozen=True)
+class Err(Generic[E]):
+    error: E
+    ok: Literal[False] = field(default=False, init=False)
+
+Result = Ok[T] | Err[E]
+
+@dataclass(frozen=True)
+class ToolError:
+    code: str
+    message: str
+    action: str | None = None
+    data: Any = None
+
+    def to_json(self) -> dict[str, Any]:
+        return {"code": self.code, "message": self.message, "recoverable": False, "suggested_action": self.action}
+
+def err(code: str, message: str, action: str | None = None, data: Any = None) -> Err[ToolError]:
+    return Err(ToolError(code, message, action, data))
+
+def utf8_stdio() -> None:
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure: Any = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8")
+            except (ValueError, OSError):
+                pass
+
+def run_main(main: Callable[[], int]) -> int:
+    try:
+        utf8_stdio()
+        return main()
+    except KeyboardInterrupt:
+        try:
+            write_stdout_line(json.dumps(canceled_envelope(), ensure_ascii=False) + "\n")
+        except (OSError, ValueError):
+            pass
+        return CANCELED_EXIT
+
+@dataclass(frozen=True)
+class Reply:
+    answers: Mapping[str, Any]
+    session_id: str | None
+    cached: bool
 
 
 class ClientError(RuntimeError):
@@ -149,161 +197,125 @@ def typed_answer(answer: Any) -> Any:
     return wire
 
 
-def _failure(code: str, message: str, category: str = "other",
-             action: str = "Read the error and fix the named input or dependency.") -> Record:
-    """A failure in the wheel's own result shape."""
-    return {"ok": False, "error": {"id": code, "message": message, "action": action, "category": category}}
-
-
-def _failed(error: ClientError) -> Record:
-    return {"ok": False, "error": error, "position": None, "line": None, "attempts": error.attempts}
-
-
-def load_wheel():
+def load_wheel() -> Result[Any, ClientError]:
     try:
         import sc_agent
+        return Ok(sc_agent)
     except ImportError as exc:
-        return _failure("DEPENDENCY.SC_DECIDR", str(exc), action="Install sc-decidr in the active Python environment.")
-    return sc_agent
+        return Err(ClientError("DEPENDENCY.SC_DECIDR", str(exc), action="Install sc-decidr in the active Python environment."))
 
 
-def _logger(create: Callable[[str], Record], injected: Any) -> Record:
-    """The caller's Logger, else this client's one Logger, created on first use."""
-    global _logger_handle
-    with _logger_lock:
-        if injected is None and _logger_handle is None:
-            created = create(CLIENT_NAME)
-            if not created["ok"]:
-                return created
-            _logger_handle = created["value"]
-        return {"ok": True, "value": _logger_handle if injected is None else injected}
+def open_run(*, model: str | None = None, project: str | None = None, cache: bool | None = None,
+             config_dir: str | None = None, timeout_secs: float | None = None,
+             workers: int | None = None, seams: Mapping[str, Any] | None = None) -> Result[Any, ClientError]:
+    wheel = load_wheel()
+    if isinstance(wheel, Err):
+        return wheel
+    return Ok(wheel.value.Run(tool=CLIENT_NAME, tool_version=TOOL_VERSION, agent_role=CLIENT_NAME,
+                              model=model, project=project, cache=cache, config_dir=config_dir,
+                              timeout_secs=timeout_secs, workers=workers, **(seams or {})))
 
 
 def wheel_error(detail: Record, *, category_codes: Mapping[str, str] | None = None) -> ClientError:
     """The wheel's error value as a ClientError coded by its category."""
     codes = {**DECIDR_CATEGORY_CODES, **(category_codes or {})}
     identifier, category = detail.get("id"), detail.get("category", "other")
-    if identifier in _CLIENT_IDS:
-        code = identifier
-    else:
-        code = codes.get("context_exceeded" if identifier == "decision.context_exceeded" else category, codes["other"])
+    code = codes.get("context_exceeded" if identifier == "decision.context_exceeded" else category, codes["other"])
     counts = {key: value if type(value := detail.get(key)) is int and value >= 0 else None
               for key in ("status", "retry_after_ms", "attempts")}
     return ClientError(code, detail.get("message", "invalid result"), category in {"busy", "network"},
                        detail.get("action"), **counts, data=dict(detail))
 
 
-def decode_result(value: str | Record, *, category_codes: Mapping[str, str] | None = None) -> Record:
-    """The wheel's result envelope as the consumer's result record."""
+def decode_result(value: str | Mapping[str, Any], *, category_codes: Mapping[str, str] | None = None) -> Result[Reply, ClientError]:
     try:
-        decoded: object = json.loads(value) if isinstance(value, str) else value
-        if not isinstance(decoded, dict) or type(cast(Record, decoded).get("ok")) is not bool:
+        envelope: Mapping[str, Any] = json.loads(value) if isinstance(value, str) else value
+        if type(envelope.get("ok")) is not bool:
             return _invalid_result("expected an ok/value or ok/error envelope")
-        envelope = cast(Record, decoded)
-        line = json.dumps(envelope)
-        if envelope["ok"]:
-            body: Record = envelope["value"]
-            result: Record = {"ok": True, "value": {key: typed_answer(answer) for key, answer in body["answers"].items()},
-                              "usage": body.get("usage"), "model_answered": body.get("model")}
-        else:
-            body = envelope["error"]
-            result = _failed(wheel_error(body, category_codes=category_codes))
-        result.update(position=envelope.get("index"), session_id=body.get("session_id"),
-                      digests=body.get("question_digests", {}), line=line, attempts=body.get("attempts"))
-        return result
+        if not envelope["ok"]:
+            return Err(wheel_error(envelope["error"], category_codes=category_codes))
+        body = envelope["value"]
+        return Ok(Reply({key: typed_answer(answer) for key, answer in body["answers"].items()},
+                        body.get("session_id"), body.get("cached", False)))
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
         return _invalid_result(exc)
 
 
-def _invalid_result(reason: object) -> Record:
-    return _failed(ClientError("DECIDR.INVALID_RESULT", f"sc-decidr returned an invalid result: {reason}",
-                               action="Inspect the invalid sc-decidr result and check the wheel and client versions."))
+def _invalid_result(reason: object) -> Err[ClientError]:
+    return Err(ClientError("DECIDR.INVALID_RESULT", f"sc-decidr returned an invalid result: {reason}",
+                           action="Inspect the invalid sc-decidr result and check the wheel and client versions."))
 
 
-def _abort_if_selected(line: object, abort_on: frozenset[str], run: Run) -> None:
-    error = cast(Record, line).get("error") if isinstance(line, dict) else None
-    if isinstance(error, dict) and cast(Record, error).get("category") in abort_on:
-        run.cancel()
-
-
-def _as_text(request: str | Record) -> str:
-    return json.dumps(request) if isinstance(request, dict) else request
-
-
-def _start(abort_on: frozenset[str], category_codes: Mapping[str, str] | None, repository_root: str, consent_what: str):
-    """Check ``abort_on`` and consent, then load the wheel: the wheel module, or a failed record."""
-    try:
-        valid_abort = frozenset(abort_on) in _ALLOWED_ABORT_ON
-    except (TypeError, ValueError):
-        valid_abort = False
-    if not valid_abort:
-        invalid = _failure("DECIDR.INVALID_OPTION", "abort_on must be {}, {'auth'}, or {'auth', 'quota'}", "validation")
-        return decode_result(invalid, category_codes=category_codes)
-    allowed = remote_preflight(repository_root, consent_what)
-    if not allowed["ok"]:
-        return allowed
-    sc_agent = load_wheel()
-    return decode_result(sc_agent, category_codes=category_codes) if isinstance(sc_agent, dict) else sc_agent
-
-
-def call_result(request: str | Record, *, model: str, project: str | None = None,
-                abort_on: frozenset[str] = frozenset(), category_codes: Mapping[str, str] | None = None,
-                config_dir: str | None = None, general_log: Any = None,
-                timeout_secs: float | None = None, repository_root: str = ".",
-                consent_what: str = "The request text") -> Record:
-    """Send one decision request and return the consumer result record."""
-    sc_agent = _start(abort_on, category_codes, repository_root, consent_what)
-    if isinstance(sc_agent, dict):
-        return sc_agent
-    logger = _logger(sc_agent.logger, general_log)
-    if not logger["ok"]:
-        return decode_result(logger, category_codes=category_codes)
-    with sc_agent.Run(tool=CLIENT_NAME, tool_version=TOOL_VERSION, model=model, project=project, agent_role=CLIENT_NAME,
-                      config_dir=config_dir, general_log=logger["value"], timeout_secs=timeout_secs) as run:
-        try:
-            line: Any = run.send(_as_text(request))
-        except KeyboardInterrupt:
+def _abort_if_selected(line: object, abort_on: frozenset[str], run: Any) -> None:
+    if isinstance(line, dict):
+        detail: Any = cast(dict[str, Any], line).get("error")
+        if isinstance(detail, dict) and cast(dict[str, Any], detail).get("category") in abort_on:
             run.cancel()
-            line = _failure("decision.cancelled", "interrupted", "cancelled")
-        _abort_if_selected(line, abort_on, run)
+
+
+def _as_text(request: str | Mapping[str, Any]) -> str:
+    return request if isinstance(request, str) else json.dumps(request)
+
+
+def _start(run: Any, abort_on: frozenset[str], category_codes: Mapping[str, str] | None,
+           repository_root: str, consent_what: str) -> Result[None, ClientError]:
+    try:
+        valid = frozenset(abort_on) in _ALLOWED_ABORT_ON
+    except (TypeError, ValueError):
+        valid = False
+    if not valid:
+        return Err(ClientError("DECIDR.INVALID_OPTION", "abort_on must be {}, {'auth'}, or {'auth', 'quota'}"))
+    wheel = load_wheel()
+    if isinstance(wheel, Err):
+        return wheel
+    target = run.sends_to(wheel.value.TYPESAFE)
+    if not target.get("ok"):
+        return Err(wheel_error(target.get("error", {}), category_codes=category_codes))
+    return remote_judge_consent(repository_root, consent_what) if target.get("value") else Ok(None)
+
+
+def call_result(run: Any, request: str | Mapping[str, Any], *, cache: bool | None = None,
+                abort_on: frozenset[str] = frozenset(), category_codes: Mapping[str, str] | None = None,
+                repository_root: str = ".", consent_what: str = "The request text") -> Result[Reply, ClientError]:
+    start = _start(run, abort_on, category_codes, repository_root, consent_what)
+    if isinstance(start, Err):
+        return start
+    try:
+        line = run.send(_as_text(request), cache=cache)
+    except KeyboardInterrupt:
+        run.cancel()
+        line = {"ok": False, "error": {"id": "decision.cancelled", "category": "cancelled", "message": "interrupted"}}
+    except (TypeError, ValueError) as exc:
+        return Err(ClientError("DECIDR.INVALID_OPTION", str(exc)))
+    _abort_if_selected(line, abort_on, run)
     return decode_result(line, category_codes=category_codes)
 
 
-def call_batch_results(requests: Sequence[str | Record], *, model: str, project: str | None = None,
+def call_batch_results(run: Any, requests: Sequence[str | Mapping[str, Any]], *, cache: bool | None = None,
                        abort_on: frozenset[str] = frozenset(), category_codes: Mapping[str, str] | None = None,
-                       config_dir: str | None = None, general_log: Any = None,
-                       timeout_secs: float | None = None, repository_root: str = ".",
-                       consent_what: str = "The request text", workers: int | None = None,
-                       on_result: Callable[[Record], None] | None = None) -> Record:
-    """Send a batch; the records come back in input order, ``on_result`` sees each as it finishes."""
-    sc_agent = _start(abort_on, category_codes, repository_root, consent_what)
-    if isinstance(sc_agent, dict):
-        return sc_agent
-    logger = _logger(sc_agent.logger, general_log)
-    if not logger["ok"]:
-        return decode_result(logger, category_codes=category_codes)
-    with sc_agent.Run(tool=CLIENT_NAME, tool_version=TOOL_VERSION, model=model, project=project, agent_role=CLIENT_NAME,
-                      config_dir=config_dir, general_log=logger["value"], timeout_secs=timeout_secs, workers=workers) as run:
-        finished: list[Record] = []
+                       repository_root: str = ".", consent_what: str = "The request text") -> Result[list[Result[Reply, ClientError]], ClientError]:
+    start = _start(run, abort_on, category_codes, repository_root, consent_what)
+    if isinstance(start, Err):
+        return start
+    finished: dict[int, Any] = {}
+    def handle(index: int, line: Any) -> None:
+        finished[index] = line
+        _abort_if_selected(line, abort_on, run)
+    try:
+        batch: Any = run.send_batch([_as_text(request) for request in requests], cache=cache, on_result=handle)
+    except KeyboardInterrupt:
+        run.cancel()
+        batch = {"ok": True, "value": [{"index": i, "result": finished.get(i, {"ok": False, "error": {"id": "decision.cancelled", "category": "cancelled", "message": "interrupted"}})} for i in range(len(requests))]}
+    except (TypeError, ValueError) as exc:
+        return Err(ClientError("DECIDR.INVALID_OPTION", str(exc)))
+    if not batch.get("ok"):
+        return Err(wheel_error(batch.get("error", {}), category_codes=category_codes))
+    return Ok([decode_result(item["result"], category_codes=category_codes) for item in batch["value"]])
 
-        def handle(index: int, line: Record) -> None:
-            line = dict(line, index=index)
-            finished.append(line)
-            _abort_if_selected(line, abort_on, run)
-            if on_result is not None:
-                on_result(decode_result(line, category_codes=category_codes))
 
-        try:
-            batch = run.send_batch([_as_text(request) for request in requests], on_result=handle)
-        except KeyboardInterrupt:
-            run.cancel()
-            lines = finished
-        else:
-            if not batch["ok"]:
-                _abort_if_selected(batch, abort_on, run)
-                return decode_result(batch, category_codes=category_codes)
-            lines = [dict(item["result"], index=item["index"]) for item in batch["value"]]
-    return {"ok": True, "value": [decode_result(line, category_codes=category_codes) for line in lines]}
+def log_event(run: Any, target: str, action: str, correlation_id: str | None, fields: Mapping[str, Any]) -> Result[None, ClientError]:
+    result = run.log({"target": target, "action": action, "correlation_id": correlation_id, "fields": redact_secrets(fields)})
+    return Ok(None) if result.get("ok") else Err(wheel_error(result.get("error", {})))
 
 
 {% block consent %}
@@ -313,54 +325,45 @@ REPO_ROOT_HELP = (f"any path inside the repository; the nearest {REMOTE_JUDGE_SE
                   "allow_remote_judge (read for live Jev calls only; default .)")
 
 
-def remote_judge_consent(repository_root: str = ".", what: str = "The request text") -> Record:
+def remote_judge_consent(repository_root: str = ".", what: str = "The request text") -> Result[None, ClientError]:
     """Require an affirmative, repository-local consent setting before any remote send."""
     try:
         settings = importlib.import_module("{{ client_name | replace("-", "_") }}_settings")
     except ImportError as exc:
-        return _failed(ClientError("DEPENDENCY.SETTINGS", f"the consent settings module could not be imported: {exc}",
+        return Err(ClientError("DEPENDENCY.SETTINGS", f"the consent settings module could not be imported: {exc}",
                                    action="Install the consumer's settings module before making a live Jev call."))
     start = pathlib.Path(repository_root or ".").resolve()
     root = settings.find_repo_root(start)
     if not root.ok:
-        return _failed(from_tool_error(root.error))
+        return Err(from_tool_error(root.error))
     answer = settings.remote_judge_consent(start)
     if answer.ok and answer.value is True:
-        return {"ok": True, "value": None}
+        return Ok(None)
     disabled = f"Sending text to TypeSafe is disabled. {what} would leave this machine."
     if answer.ok:
-        return _failed(ClientError("POLICY.REMOTE_JUDGE_DISABLED",
+        return Err(ClientError("POLICY.REMOTE_JUDGE_DISABLED",
                                    f"{disabled} {REMOTE_JUDGE_SETTING} sets allow_remote_judge: false.",
                                    action="The user declined remote judging; only the user changes this setting and commits it. Use --dry-run to inspect the request instead."))
     if answer.error.code == "SETTINGS.REMOTE_JUDGE_UNSET":
-        return _failed(ClientError("POLICY.REMOTE_JUDGE_DISABLED",
+        return Err(ClientError("POLICY.REMOTE_JUDGE_DISABLED",
                                    f"{disabled} {REMOTE_JUDGE_SETTING} does not set allow_remote_judge.",
                                    action=f"Ask the user once whether this text may be sent to TypeSafe (Jev), record the answer with `{REMOTE_JUDGE_SET}`, and commit {REMOTE_JUDGE_SETTING}. Never infer consent from prior runs. Use --dry-run to inspect the request instead."))
-    return _failed(from_tool_error(answer.error))
+    return Err(from_tool_error(answer.error))
 
 
-def remote_preflight(repository_root: str = ".", what: str = "The request text") -> Record:
-    """Shared send gate; callers cannot inject or override the consent value."""
-    return remote_judge_consent(repository_root, what)
-
-
-BATCH_RESULT_SCHEMA = "jev-batch-result/1"
-BATCH_MAX_WORKERS = 4
-BATCH_RETRIES = 1
-BATCH_FIXTURE_ERROR = "__error__"
 {% endblock %}
+
+BATCH_RESULT_SCHEMA = "jev-batch-result/2"
+BATCH_FIXTURE_ERROR = "__error__"
 
 BATCH_ID_RE = r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
 
 
 class BatchSettings(NamedTuple):
     gate: str
-    model: str
     repeat: int
     prefix: str
     threshold: float
-    timeout: float
-    max_workers: int
     dry_run: bool
 
 
@@ -376,9 +379,25 @@ class BatchJob(NamedTuple):
     kind: str
 
 
+class ResultLine(NamedTuple):
+    schema: str
+    tool: str
+    tool_version: str
+    run_id: str | None
+    session_id: str | None
+    request_id: str
+    project: str | None
+    agent_role: str
+    threshold: float
+    verdict: str | None
+    min_confidence: float | None
+    leaning: str | None
+    ok: bool
+    error: ClientError | None
+
+
 class StreamedResult(NamedTuple):
-    failed: list[Record]
-    attempts: int
+    failed: list[ResultLine]
 
 
 def batch_request_id(prefix: str, item_id: str, anchor_id: str | None, candidate_id: str, repeat: int) -> str:
@@ -387,19 +406,10 @@ def batch_request_id(prefix: str, item_id: str, anchor_id: str | None, candidate
     return f"{prefix}/{item_id}/{anchor_id}/{candidate_id}/r{repeat}"
 
 
-def _sha256(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def questions_digest(questions: Record) -> str:
-    """The canonical questions digest."""
-    return _sha256(json.dumps(questions, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
-
-
-def safe_id(value: object, what: str) -> Record:
+def safe_id(value: object, what: str) -> Result[str, ClientError]:
     if isinstance(value, str) and re.fullmatch(BATCH_ID_RE, value):
-        return {"ok": True, "value": value}
-    return _failed(ClientError("VALIDATION.INPUT", f"{what} {value!r} is not a safe id (letters, digits and _.:- only)",
+        return Ok(value)
+    return Err(ClientError("VALIDATION.INPUT", f"{what} {value!r} is not a safe id (letters, digits and _.:- only)",
                                action="See the consumer's Jev batch request schema."))
 
 
@@ -414,31 +424,21 @@ def _fixture_missing(keys: tuple[str, ...]) -> ClientError:
                        action=f"Add an entry for {keys[0]} to the answers file.")
 
 
-def fixture_attempt(
-        job: BatchJob, fixture: Mapping[str, Any], attempt: int, *,
-        transient_codes: Container[str] = frozenset()) -> Record:
+def fixture_answer(job: BatchJob, fixture: Mapping[str, Any]) -> Result[Reply, ClientError]:
     keys = _fixture_keys(job)
     entry = next((fixture[key] for key in keys if key in fixture), None)
     if entry is None:
-        return _failed(_fixture_missing(keys))
-    if isinstance(entry, list):
-        attempts = cast(list[Any], entry)
-        if not attempts:
-            return _failed(ClientError("FIXTURE.MISSING", f"answers fixture entry for {keys[0]} is an empty list"))
-        entry = attempts[min(attempt, len(attempts)) - 1]
+        return Err(_fixture_missing(keys))
     if not isinstance(entry, dict):
-        return _failed(ClientError("INPUT.MALFORMED", f"answers fixture entry for {keys[0]} must be an object"))
-    wire = cast(Record, entry)
+        return Err(ClientError("INPUT.MALFORMED", f"answers fixture entry for {keys[0]} must be an object"))
+    wire = cast(Mapping[str, Any], entry)
     if BATCH_FIXTURE_ERROR in wire:
         code = str(wire[BATCH_FIXTURE_ERROR])
-        return _failed(ClientError(code, f"fixture failure {code}", code in transient_codes))
+        return Err(ClientError(code, f"fixture failure {code}"))
     answers = {key: typed_answer(answer) for key, answer in wire.items()}
-    if set(answers) != set(job.questions):
-        return _failed(ClientError("DECIDR.RESPONSE_INVALID", "fixture answer IDs do not match question IDs"))
-    for key, answer in answers.items():
-        if not _valid_fixture_answer(answer, job.questions[key]):
-            return _failed(ClientError("DECIDR.RESPONSE_INVALID", f"invalid fixture answer for {key}"))
-    return {"ok": True, "value": {"model": "fixture", "answers": answers}}
+    if set(answers) != set(job.questions) or any(not _valid_fixture_answer(answer, job.questions[key]) for key, answer in answers.items()):
+        return Err(ClientError("DECIDR.RESPONSE_INVALID", "fixture answers do not match the questions"))
+    return Ok(Reply(answers, None, False))
 
 
 def _number(value: object) -> TypeGuard[int | float]:
@@ -487,113 +487,66 @@ def _valid_fixture_answer(answer: object, question: object) -> bool:
             return False
 
 
-def batch_settings(args: Any, prefix: str, *, check_threshold: Callable[[Any], Any]) -> Record:
-    """Common batch settings; the consumer supplies its threshold rule. Requests have no size cap."""
+def batch_settings(args: Any, prefix: str, *, check_threshold: Callable[[Any], Any]) -> Result[BatchSettings, ClientError]:
     gate, repeat = getattr(args, "gate", "plan"), getattr(args, "repeat", 1)
     if repeat < 1:
-        return _failed(ClientError("VALIDATION.INPUT", "--repeat must be at least 1"))
-    if not 1 <= args.max_workers <= BATCH_MAX_WORKERS:
-        return _failed(ClientError("VALIDATION.INPUT", f"--max-workers must be between 1 and {BATCH_MAX_WORKERS}"))
+        return Err(ClientError("VALIDATION.INPUT", "--repeat must be at least 1"))
     if not prefix or any(char.isspace() for char in prefix):
-        return _failed(ClientError("VALIDATION.INPUT", "--request-prefix must be non-empty and contain no whitespace"))
+        return Err(ClientError("VALIDATION.INPUT", "--request-prefix must be non-empty and contain no whitespace"))
     threshold = check_threshold(getattr(args, "threshold", 0.6))
     if not threshold.ok:
-        return _failed(from_tool_error(threshold.error))
-    return {"ok": True, "value": BatchSettings(gate, args.model, repeat, prefix, threshold.value, args.timeout,
-                                               args.max_workers, bool(args.dry_run))}
+        return Err(from_tool_error(threshold.error))
+    return Ok(BatchSettings(gate, repeat, prefix, threshold.value, bool(getattr(args, "dry_run", False))))
 
 
-def result_line(
-        job: BatchJob, settings: BatchSettings, raw: Record | None, attempts: list[Record],
-        error: ClientError | None, dry_run: bool, *,
-        result_fields: Callable[[BatchJob, BatchSettings, Record | None], Record] | None = None,
-        error_message_limit: int | None = None) -> Record:
-    """The one durable batch result line. ``raw`` is a raw answer or a successful call record."""
-    sends = None
-    if raw is not None and type(raw.get("ok")) is bool:  # a call record
-        sends = raw.get("attempts")
-        if raw["ok"]:
-            raw = {"model": raw.get("model_answered"), "answers": raw.get("value"), "sends": sends}
-        else:
-            error, raw = from_tool_error(raw.get("error")), None
-    elif error is not None:
-        sends = error.attempts
-    if type(sends) is not int or sends < 0:
-        sends = None
-    line: Record = {
-        "schema": BATCH_RESULT_SCHEMA, "request_id": job.request_id, "run_id": _sha256(job.request_id)[:16],
-        "item_id": job.item_id, "anchor_id": job.anchor_id, "candidate_id": job.candidate_id, "repeat": job.repeat,
-        "request_sha256": _sha256(json.dumps(job.body, allow_nan=False)),
-        "questions_sha256": questions_digest(job.questions), "request": job.body, "roles": job.roles, "kind": job.kind,
-        "dry_run": dry_run, "ok": raw is not None, "raw_response": raw,
-        "answers": None if raw is None else raw.get("answers"),
-        "model_answered": None if raw is None else raw.get("model"),
-        "sends": sends,
-        "threshold": settings.threshold, "verdict": None, "min_confidence": None, "leaning": None,
-        "retry_count": max((len(attempts) if sends is None else sends) - 1, 0), "attempts": attempts,
-        "error": None if error is None else {"code": error.code, "message": error.message[:error_message_limit],
-                                             "recoverable": error.retryable},
-    }
-    if error is not None and error.action is not None:
-        line["error"]["suggested_action"] = error.action
-    line.update(result_fields(job, settings, raw) if result_fields is not None else {})
-    return line
+def result_line(job: BatchJob, settings: BatchSettings, run_id: str | None, project: str | None,
+                result: Result[Reply, ClientError], *, verdict: Callable[..., tuple[str | None, float | None, str | None]] | None = None) -> ResultLine:
+    answers: Mapping[str, Any] | None = result.value.answers if isinstance(result, Ok) else None
+    decision, confidence, leaning = verdict(job, settings, answers) if verdict else (None, None, None)
+    return ResultLine(BATCH_RESULT_SCHEMA, CLIENT_NAME, TOOL_VERSION, run_id,
+                      result.value.session_id if isinstance(result, Ok) else None, job.request_id, project, CLIENT_NAME,
+                      settings.threshold, decision, confidence, leaning, result.ok, None if isinstance(result, Ok) else result.error)
 
 
 def _jobs(lines: list[Any], settings: BatchSettings, question_sets: Any,
-          make_jobs: Callable[[Any, int, BatchSettings, Any], Any]) -> Record:
+          make_jobs: Callable[[Any, int, BatchSettings, Any], Any]) -> Result[list[BatchJob], ClientError]:
     """Every job of the request stream, or the first invalid line or repeated request id."""
     jobs: list[BatchJob] = []
     request_ids: set[str] = set()
     for number, line in enumerate(lines, start=1):
         made = make_jobs(line, number, settings, question_sets)
         if not made.ok:
-            return _failed(from_tool_error(made.error))
+            return Err(from_tool_error(made.error))
         for job in made.value:
             if job.request_id in request_ids:
-                return _failed(ClientError("VALIDATION.INPUT", f"request {job.request_id} appears twice in the stream",
+                return Err(ClientError("VALIDATION.INPUT", f"request {job.request_id} appears twice in the stream",
                                            action="Pair each item, anchor and candidate once; use --repeat for repeats."))
             request_ids.add(job.request_id)
             jobs.append(job)
-    return {"ok": True, "value": jobs}
+    return Ok(jobs)
 
 
 def validate_request_lines(lines: list[Any], settings: BatchSettings, question_sets: Any,
-                           make_jobs: Callable[[Any, int, BatchSettings, Any], Any]) -> Record:
+                           make_jobs: Callable[[Any, int, BatchSettings, Any], Any]) -> Result[int, ClientError]:
     """Validate all input before sending; the value is the number of jobs."""
     jobs = _jobs(lines, settings, question_sets, make_jobs)
-    return {"ok": True, "value": len(jobs["value"])} if jobs["ok"] else jobs
-
-
-def check_fixture_coverage(lines: list[Any], settings: BatchSettings, question_sets: Any,
-                           make_jobs: Callable[[Any, int, BatchSettings, Any], Any], fixture: Any) -> Record:
-    """Check every fixture key before the first request, so an incomplete fixture cannot partially run."""
-    if fixture is None or settings.dry_run:
-        return {"ok": True, "value": None}
-    jobs = _jobs(lines, settings, question_sets, make_jobs)
-    if not jobs["ok"]:
-        return jobs
-    for job in jobs["value"]:
-        keys = _fixture_keys(job)
-        if not any(key in fixture for key in keys):
-            return _failed(_fixture_missing(keys))
-    return {"ok": True, "value": None}
+    return Ok(len(jobs.value)) if isinstance(jobs, Ok) else jobs
 
 
 def load_answers_fixture(path: str, keyed_by: str, loader: Callable[[str, str], Any], *,
-                         validate_envelope: Callable[[Any, str], Any] | None = None) -> Record:
+                         validate_envelope: Callable[[Any, str], Any] | None = None) -> Result[Any, ClientError]:
     """Load the consumer's answer fixture using its strict JSON/question schema parser."""
     if not path:
-        return {"ok": True, "value": None}
+        return Ok(None)
     loaded = loader(path, "answers fixture")
     if not loaded.ok:
-        return _failed(from_tool_error(loaded.error))
+        return Err(from_tool_error(loaded.error))
     fixture: Any = loaded.value
     if not isinstance(fixture, dict):
-        return _failed(ClientError("INPUT.MALFORMED", f"answers fixture must be an object keyed by {keyed_by} (or '*')"))
+        return Err(ClientError("INPUT.MALFORMED", f"answers fixture must be an object keyed by {keyed_by} (or '*')"))
     if validate_envelope is not None and (error := validate_envelope(fixture, f"answers fixture {path}")) is not None:
-        return _failed(from_tool_error(error))
-    return {"ok": True, "value": fixture}
+        return Err(from_tool_error(error))
+    return Ok(cast(dict[str, Any], fixture))
 
 
 def write_stdout_line(text: str) -> None:
@@ -629,41 +582,118 @@ def json_answers(value: Any) -> Any:
             return value
 
 
-def _unserializable(value: object) -> Record:
-    return _failure("DECIDR.INVALID_RESULT", f"Object of type {type(value).__name__} is not JSON serializable")
+BEARER_RE = re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{16,}")
 
 
-def encode_result_line(line: Record, *, redact: Callable[[Any], Any] | None = None) -> str:
-    serializable = json_answers(line)
-    return json.dumps(redact(serializable) if redact is not None else serializable,
-                      ensure_ascii=False, default=_unserializable) + "\n"
+def redact_secrets(value: Any) -> Any:
+    wheel = load_wheel()
+    keys: list[str] = wheel.value.provider_keys() if isinstance(wheel, Ok) else []
+    import os
+    secrets = [os.environ.get(key, "") for key in keys]
+    def redact_text(text: str) -> str:
+        text = BEARER_RE.sub(r"\1[redacted]", text)
+        for secret in secrets:
+            if secret:
+                text = text.replace(secret, "[redacted]")
+        return text
+    root: list[Any] = [None]
+    pending: list[tuple[Any, Any, Any]] = [(root, 0, value)]
+    while pending:
+        parent, key, item = pending.pop()
+        if isinstance(item, str):
+            parent[key] = redact_text(item)
+        elif isinstance(item, Mapping):
+            source = cast(Mapping[Any, Any], item)
+            pairs = [(redact_text(k) if isinstance(k, str) else k, v) for k, v in source.items()]
+            child: dict[Any, Any] = dict.fromkeys(k for k, _ in pairs)
+            parent[key] = child
+            pending.extend((child, k, v) for k, v in pairs)
+        elif isinstance(item, (list, tuple)):
+            values = cast(Sequence[Any], item)
+            child_list: list[Any] = [None] * len(values)
+            parent[key] = child_list
+            pending.extend((child_list, i, v) for i, v in enumerate(values))
+        else:
+            parent[key] = item
+    return root[0]
 
 
-def total_attempts(results: list[Record]) -> int:
-    """Sends across result lines; a line without a valid ``sends`` counts its attempt records."""
-    total = 0
-    for result in results:
-        sends, attempts = result.get("sends"), result.get("attempts")
-        if type(sends) is int and sends >= 0:
-            total += sends
-        elif isinstance(attempts, list):
-            total += len(cast(list[Any], attempts))
-    return total
+def encode_result_line(line: ResultLine) -> str:
+    data: dict[str, Any] = dict(line._asdict())
+    error = line.error
+    if error is not None:
+        raw_data: Any = error.data
+        detail: Mapping[str, Any] = cast(dict[str, Any], raw_data) if isinstance(raw_data, dict) else {}
+        data["error"] = {"id": detail.get("id"), "code": error.code, "message": error.message,
+                         "action": error.action, "category": detail.get("category"), "recoverable": error.retryable,
+                         "attempts": error.attempts, "data": raw_data}
+    return json.dumps(redact_secrets(data), ensure_ascii=False) + "\n"
 
 
-def streamed_result(results: list[Record]) -> StreamedResult:
-    return StreamedResult([line for line in results if not line.get("ok") and not line.get("dry_run")],
-                          total_attempts(results))
+def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings, *,
+              on_line: Callable[[ResultLine, Mapping[str, Any] | None], object], project: str | None = None,
+              fixture: Mapping[str, Any] | None = None, on_request: Callable[[Any], object] | None = None,
+              cache: bool | None = None, abort_on: frozenset[str] = frozenset(),
+              category_codes: Mapping[str, str] | None = None, repository_root: str = ".",
+              consent_what: str = "The request text", verdict: Callable[..., tuple[str | None, float | None, str | None]] | None = None) -> Result[StreamedResult, ClientError]:
+    if settings.dry_run:
+        return Ok(StreamedResult([]))
+    if fixture is not None:
+        for job in jobs:
+            if not any(key in fixture for key in _fixture_keys(job)):
+                return Err(_fixture_missing(_fixture_keys(job)))
+        results = [fixture_answer(job, fixture) for job in jobs]
+    elif run is None:
+        return Err(ClientError("DECIDR.INVALID_OPTION", "run is required"))
+    else:
+        if on_request:
+            try:
+                for job in jobs:
+                    on_request(job.body)
+            except Exception as exc:
+                return Err(ClientError("DECIDR.ERROR", str(exc)))
+        sent = call_batch_results(run, [job.body for job in jobs], cache=False if settings.repeat > 1 else cache,
+                                  abort_on=abort_on, category_codes=category_codes, repository_root=repository_root,
+                                  consent_what=consent_what)
+        if isinstance(sent, Err):
+            return sent
+        results = sent.value
+    failed: list[ResultLine] = []
+    for job, result in zip(jobs, results):
+        line = result_line(job, settings, getattr(run, "run_id", None), project, result, verdict=verdict)
+        try:
+            on_line(line, result.value.answers if isinstance(result, Ok) else None)
+        except Exception as exc:
+            return Err(ClientError("DECIDR.ERROR", str(exc)))
+        if not line.ok:
+            failed.append(line)
+    return Ok(StreamedResult(failed))
+
+
+def answers_for(lines: Sequence[Mapping[str, Any]]) -> Result[dict[str, dict[str, Any]], ClientError]:
+    wheel = load_wheel()
+    if isinstance(wheel, Err):
+        return wheel
+    groups: dict[Any, list[Any]] = {}
+    for line in lines:
+        if line.get("ok") and line.get("session_id"):
+            groups.setdefault(line.get("project"), []).append(line)
+    answers: dict[str, dict[str, Any]] = {}
+    for project, group in groups.items():
+        result: dict[str, Any] = wheel.value.session_rows([line["session_id"] for line in group], agent_role=CLIENT_NAME, project=project)
+        if not result.get("ok"):
+            return Err(wheel_error(result.get("error", {})))
+        rows = result["value"]
+        for line in group:
+            answers[line["request_id"]] = rows[line["session_id"]]["result"]["value"]["answers"]
+    return Ok(answers)
 {% if sitr %}
 
 
-def extract(language: str, source: str, query: str, *, general_log: Any = None) -> Record:
-    """Run a sitr syntax query with this client's Logger."""
-    sc_agent = load_wheel()
-    if isinstance(sc_agent, dict):
-        return sc_agent
-    logger = _logger(sc_agent.logger, general_log)
-    if not logger["ok"]:
-        return logger
-    return sc_agent.sitr.query(language, source, query, general_log=logger["value"])
+def extract(language: str, source: str, query: str) -> Result[Any, ClientError]:
+    wheel = load_wheel()
+    if isinstance(wheel, Err):
+        return wheel
+    result: dict[str, Any] = wheel.value.sitr.query(language, source, query, tool=CLIENT_NAME)
+    return Ok(result["value"]) if result.get("ok") else Err(wheel_error(result.get("error", {})))
 {% endif %}
