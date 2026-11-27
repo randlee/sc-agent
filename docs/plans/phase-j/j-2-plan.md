@@ -1,6 +1,6 @@
 # j-2 plan: the Run, on Rust, decidr and the wheel
 
-Base: sprint/j-1 @d81b1892 (gate 2404/2580). Line refs are file:line at that commit. Written by reading the code; the Rust parts were prototyped on this branch (see Budget).
+Base: sprint/j-1 @f8bb024a (gate 2404/2580). Line refs are file:line at that commit. Written by reading the code; the Rust parts were prototyped on this branch (see Budget).
 
 ## Goal
 
@@ -116,7 +116,7 @@ struct ConfigEnv(String, Vec<(OsString, OsString)>);   // prefix = tool upper-ca
 ```
 For tool "decidr" behaviour is byte-for-byte what it is now (REQ-SAG-0003, REQ-SAG-0020). Replaces config() hard-coded `"decidr.json"`, `"decidr.local.json"` (lib.rs:262) and `"DECIDR_"` (:201, :209), and `load`/`doctor` copies of "decidr" (:1490). `missing_setting(tool, path)` (:142) and `Settings::project_required` (:170) build their text from `prefix(tool)` and `layers(tool)`; `Settings` gains `#[serde(skip)] pub tool: String`, set by `config`; `setting()` takes `tool`. For "decidr" the messages are byte-identical (existing config tests are the check); a tool "judge-jev" is told `JUDGE_JEV_` and `judge-jev.json`.
 
-Python `tool`: `Run(tool=...)` is required unless `general_log` is given. `tool` names the layered config and the default log root; a given `general_log` (the test path) is used as passed and logs where it logs. Neither -> `sc_agent_py.invalid_option` "tool is required", stored and returned by every call; it is not logged (no logger exists). No `"decidr"` default exists in the wheel; decidr passes "decidr".
+Python `tool`: `Run(tool=...)` is always required and names the layered config and the log root. A given `general_log` (a public extension point of the library; tests use the same path) is used as passed and logs where it logs; otherwise the default logger logs to the tool's log root. A missing tool -> `sc_agent_py.invalid_option` "tool is required", stored and returned by every call; it is not logged (no logger exists). No `"decidr"` default exists in the wheel; decidr passes "decidr".
 
 `Route` (:1038), `Jev`/`OpenAiCompat`/`AnthropicCompat`, `model_with` and every j-1 error id are unchanged; `Run::send` builds the `Route` from `self`.
 
