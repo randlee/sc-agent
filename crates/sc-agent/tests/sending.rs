@@ -469,14 +469,15 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
             Ok((result, workers))
         },
     )?;
-    assert_eq!(
-        permit_error
-            .into_inner()
-            .map_err(|_| "keyring permit error recorder poisoned")?,
-        None,
-        "keyring permit failed"
-    );
-    let workers = workers?;
+    let permit_error = permit_error
+        .into_inner()
+        .map_err(|_| "keyring permit error recorder poisoned")?;
+    let workers = workers.map_err(|error| {
+        std::io::Error::other(format!(
+            "worker arrival deadline expired: {error}; permit_error={permit_error:?}; batch={result:?}"
+        ))
+    })?;
+    assert_eq!(permit_error, None, "keyring permit failed");
     assert_ne!(workers.first(), workers.last());
     assert_eq!(result.as_array().ok_or("missing batch results")?.len(), 2);
     assert_eq!(stub.finish()?.len(), 2);
