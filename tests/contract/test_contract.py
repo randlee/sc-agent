@@ -221,7 +221,7 @@ class Wheel(Isolated):
         binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
         model_config = Path(self.directory.name) / "decidr.json"
         model_config.write_text(json.dumps({"models": {
-            "contract-model": {"provider": "openai", "id": "gpt-contract", "released": "2026-11-20"}
+            "luna": {"provider": "nous", "id": "openai/gpt-6.1-luna", "released": "2026-11-20"}
         }}))
         found = subprocess.run([str(binary), "--config-dir", self.directory.name, "models"],
                                capture_output=True, text=True, timeout=20, cwd=self.directory.name)
@@ -231,8 +231,11 @@ class Wheel(Isolated):
             python_result = self.api.models()
         self.assertTrue(python_result["ok"], python_result)
         self.assertEqual(python_result, cli_catalog)
-        openai = next(provider for provider in cli_catalog["value"] if provider["name"] == "openai")
-        self.assertIn(["contract-model", "gpt-contract", "2026-11-20"], openai["models"])
+        providers = {provider["name"]: provider["models"] for provider in cli_catalog["value"]}
+        self.assertIn(["luna", "gpt-6-luna", "2026-09-22"], providers["openai"])
+        for provider in ("openrouter", "together", "nous"):
+            self.assertIn(["luna", "openai/gpt-6-luna", "2026-09-22"], providers[provider])
+        self.assertIn(["luna", "openai/gpt-6.1-luna", "2026-11-20"], providers["nous"])
 
     def test_module_exports_only_the_run_api(self):
         self.assertEqual(set(self.api.__all__), {"Logger", "Run", "TYPESAFE", "digest", "flush", "log", "logger", "models", "provider_keys", "sitr"})

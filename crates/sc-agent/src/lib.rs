@@ -1780,12 +1780,6 @@ pub fn model_catalog(
         let Some(models) = provider.get_mut("models").and_then(Value::as_array_mut) else {
             continue;
         };
-        models.retain(|row| {
-            row.as_array()
-                .and_then(|columns| columns.first())
-                .and_then(Value::as_str)
-                .is_none_or(|alias| !configuration.config.models.contains_key(alias))
-        });
         for (alias, entry) in &configuration.config.models {
             if entry.provider == name {
                 models.push(json!([alias, entry.id, entry.released]));
