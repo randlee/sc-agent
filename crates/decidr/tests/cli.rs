@@ -3,9 +3,13 @@ mod cli;
 use clap::Parser;
 use std::{
     fs,
+    io::Read,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
+    sync::{Arc, Mutex, mpsc},
+    time::{Duration, Instant},
 };
+use wait_timeout::ChildExt;
 
 fn isolated_command(command: &mut Command, root: &Path) {
     command
@@ -101,19 +105,78 @@ fn local_timeout_default_is_120_seconds() -> Result<(), Box<dyn std::error::Erro
             "--nocapture",
         ]);
         isolated_command(&mut command, &root);
-        let output = command
+        let mut child = command
             .env("SC_AGENT_DEFAULT_TIMEOUT_CHILD", "1")
-            .output()?;
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+        let stdout = child.stdout.take().ok_or("missing child stdout")?;
+        let stderr = child.stderr.take().ok_or("missing child stderr")?;
+        let captured = Arc::new(Mutex::new([Vec::new(), Vec::new()]));
+        let (done_tx, done_rx) = mpsc::channel();
+        for (index, mut stream) in [
+            (0, Box::new(stdout) as Box<dyn Read + Send>),
+            (1, Box::new(stderr) as Box<dyn Read + Send>),
+        ] {
+            let captured = Arc::clone(&captured);
+            let done = done_tx.clone();
+            std::thread::spawn(move || {
+                let mut bytes = [0; 4096];
+                let result = loop {
+                    match stream.read(&mut bytes) {
+                        Ok(0) => break Ok(()),
+                        Ok(n) => match captured.lock() {
+                            Ok(mut output) => output[index].extend_from_slice(&bytes[..n]),
+                            Err(_) => break Err("capture lock poisoned".to_string()),
+                        },
+                        Err(error) => break Err(error.to_string()),
+                    }
+                };
+                let _ = done.send(result);
+            });
+        }
+        let deadline = Instant::now() + Duration::from_secs(30);
+        let status = child.wait_timeout(deadline.saturating_duration_since(Instant::now()))?;
+        if status.is_none() {
+            let killed = child.kill();
+            child.wait()?;
+            if let Err(error) = killed {
+                return Err(format!("could not kill timed-out child: {error}").into());
+            }
+        }
+        let drain_deadline = if status.is_none() {
+            Instant::now() + Duration::from_secs(5)
+        } else {
+            deadline
+        };
+        let mut drain_error = None;
+        for _ in 0..2 {
+            match done_rx.recv_timeout(drain_deadline.saturating_duration_since(Instant::now())) {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => drain_error = Some(error),
+                Err(error) => {
+                    drain_error = Some(error.to_string());
+                    break;
+                }
+            }
+        }
+        let captured = captured.lock().map_err(|_| "capture lock poisoned")?;
+        let stdout = String::from_utf8_lossy(&captured[0]);
+        let stderr = String::from_utf8_lossy(&captured[1]);
+        let status = status.ok_or_else(|| format!("child timed out:\n{stdout}\n{stderr}"))?;
+        if let Some(error) = drain_error {
+            return Err(format!("child output drain failed: {error}\n{stdout}\n{stderr}").into());
+        }
         assert!(
-            output.status.success(),
+            status.success(),
             "child test failed:\n{}\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
+            stdout,
+            stderr
         );
         assert!(
-            String::from_utf8_lossy(&output.stdout).contains("1 passed"),
+            stdout.contains("1 passed"),
             "child did not report one passing test:\n{}",
-            String::from_utf8_lossy(&output.stdout)
+            stdout
         );
         return Ok(());
     }
