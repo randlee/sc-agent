@@ -9,7 +9,6 @@ use std::{
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, Receiver, Sender},
     },
     thread::JoinHandle,
     time::Duration,
@@ -120,8 +119,6 @@ pub struct Stub {
     listener: TcpListener,
     stop: Arc<AtomicBool>,
     worker: Option<JoinHandle<CapturedRequests>>,
-    observed: Receiver<()>,
-    notify: Sender<()>,
 }
 impl Stub {
     pub fn new(replies: Vec<Reply>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
@@ -130,8 +127,6 @@ impl Stub {
         let owned_listener = listener.try_clone()?;
         let stop = Arc::new(AtomicBool::new(false));
         let stopped = stop.clone();
-        let (notify, observed) = mpsc::channel();
-        let server_notify = notify.clone();
         let worker = std::thread::spawn(move || {
             let mut seen = vec![];
             for reply in replies {
@@ -144,7 +139,6 @@ impl Stub {
                 stream.set_write_timeout(Some(Duration::from_secs(5)))?;
                 let request = read_request(&mut stream)?;
                 seen.push(request);
-                let _ = server_notify.send(());
                 match reply {
                     Reply::Disconnect => stream.shutdown(std::net::Shutdown::Both)?,
                     Reply::Truncated => {
@@ -173,15 +167,7 @@ impl Stub {
             listener: owned_listener,
             stop,
             worker: Some(worker),
-            observed,
-            notify,
         })
-    }
-    pub fn wait_for_request(&self) -> Result<(), mpsc::RecvError> {
-        self.observed.recv()
-    }
-    pub fn request_signal(&self) -> Sender<()> {
-        self.notify.clone()
     }
     pub fn finish(mut self) -> Result<Vec<Request>, Box<dyn std::error::Error + Send + Sync>> {
         self.stop();
