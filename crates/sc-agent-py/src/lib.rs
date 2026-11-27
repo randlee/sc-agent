@@ -73,6 +73,21 @@ fn logger_of(value: &Bound<'_, PyAny>) -> Result<Arc<Logger>, Error> {
         .map(|v| v.0.clone())
         .map_err(invalid)
 }
+fn logger_for(given: Option<&Bound<'_, PyAny>>, name: &str) -> Result<Arc<Logger>, Error> {
+    match given.filter(|value| !value.is_none()) {
+        Some(value) => logger_of(value),
+        None => sc_agent::default_logger(name).map(Arc::new),
+    }
+}
+fn respond_error(given: Option<&Bound<'_, PyAny>>, name: &str, original: Error) -> Value {
+    match logger_for(given, name) {
+        Ok(logger) => {
+            let value = sc_agent::report(&logger, Err(original));
+            finish(&logger, given.is_none_or(|value| value.is_none()), value)
+        }
+        Err(failure) => finish_error(sc_agent::result(Err(original)), "log.write", failure),
+    }
+}
 fn respond(
     py: Python<'_>,
     given: Option<&Bound<'_, PyAny>>,
@@ -87,10 +102,7 @@ fn respond_value(
     run: impl FnOnce(&Logger) -> Result<Value, Error>,
 ) -> Value {
     let owned = given.is_none_or(|v| v.is_none());
-    let logger = match given.filter(|v| !v.is_none()) {
-        Some(value) => logger_of(value),
-        None => sc_agent::default_logger(name).map(Arc::new),
-    };
+    let logger = logger_for(given, name);
     match logger {
         Err(error) => sc_agent::result(Err(error)),
         Ok(logger) => {
@@ -271,7 +283,7 @@ fn logger(py: Python<'_>, name: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
         envelope.set_item("value", value).map_err(invalid)?;
         Ok(envelope.into_any().unbind())
     })();
-    created.unwrap_or_else(|e| respond(py, None, "decidr", |_| Err(e)))
+    created.unwrap_or_else(|e| raw(py, respond_error(None, "decidr", e)))
 }
 
 #[pyfunction(signature=(logger=None,event=None))]
@@ -307,7 +319,7 @@ fn flush(py: Python<'_>, logger: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
                     .map_err(|e| error("log.flush", e)),
             ),
         ),
-        Err(error) => respond(py, None, "decidr", |_| Err(error)),
+        Err(error) => raw(py, respond_error(None, "decidr", error)),
     }
 }
 #[pyfunction(signature=(request=None,question=None,*,general_log=None))]
@@ -367,17 +379,7 @@ impl PyRun {
             if name.is_none() && general_log.is_none_or(|value| value.is_none()) {
                 return sc_agent::result(Err(e));
             }
-            let original = json!({"ok":false, "error":e});
-            let called = std::cell::Cell::new(false);
-            let reported = respond_value(general_log, name.unwrap_or("decidr"), |_| {
-                called.set(true);
-                Err(e)
-            });
-            if called.get() {
-                reported
-            } else {
-                finish_error(original, "log.write", reported)
-            }
+            respond_error(general_log, name.unwrap_or("decidr"), e)
         };
         let tool = match arg::<String>(tool, "tool") {
             Ok(tool) => tool.unwrap_or_default(),
@@ -731,7 +733,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
                         Err(failure) => {
                             let given = kwargs.and_then(|v| v.get_item("general_log").ok().flatten());
                             let name = if matches!(stringify!($function), "languages" | "queries" | "query" | "run") { "sitr" } else { "decidr" };
-                            respond(py, given.as_ref(), name, |_| Err(error("sc_agent_py.invalid_option", failure)))
+                            raw(py, respond_error(given.as_ref(), name, error("sc_agent_py.invalid_option", failure)))
                         },
                     }
                 },
@@ -798,17 +800,21 @@ mod tests {
         let message = kept["error"]["message"].as_str().ok_or("message absent")?;
         assert!(message.contains("original error"));
         assert!(message.contains("log.flush"));
+        let logger_failure = sc_agent::default_logger("invalid logger name")
+            .err()
+            .ok_or("invalid logger name accepted")?;
+        let logger_detail = logger_failure.to_string();
         let creation = finish_error(
             sc_agent::result(Err(error("types.unknown_short_name", "bad model"))),
             "log.write",
-            "logger unavailable",
+            logger_failure,
         );
         assert_eq!(creation["error"]["id"], "types.unknown_short_name");
         let message = creation["error"]["message"]
             .as_str()
             .ok_or("message absent")?;
         assert!(message.contains("bad model"));
-        assert!(message.contains("logger unavailable"));
+        assert!(message.contains(&logger_detail));
         let failure = finish(&logger, false, sc_agent::result(Ok(json!("success"))));
         assert_eq!(failure["error"]["id"], "log.flush");
         assert_eq!(

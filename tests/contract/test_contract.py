@@ -282,6 +282,13 @@ class Wheel(Isolated):
             self.assertIn(original_message, detail["message"])
             self.assertIn("log.flush", detail["message"])
 
+    def test_signature_error_survives_an_invalid_logger(self):
+        detail = self.error(self.api.sitr.queries(bogus=1, general_log=object()))
+        self.assertEqual(detail["id"], "sc_agent_py.invalid_option")
+        self.assertIn("bogus", detail["message"])
+        self.assertIn("Logger", detail["message"])
+        self.assertIn("log.write", detail["message"])
+
     def test_invalid_logger_preserves_run_creation_error(self):
         run = self.api.Run(tool="decidr", tool_version="test", model="no-such-model",
                            agent_role="contract", general_log=object())
