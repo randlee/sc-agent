@@ -245,16 +245,17 @@ pub struct Configuration {
     pub rows: Vec<Value>,
     pub files: Vec<Value>,
 }
-struct ConfigEnv(Vec<(OsString, OsString)>);
+struct ConfigEnv(String, Vec<(OsString, OsString)>);
 impl LayerSource for ConfigEnv {
     fn load(&self, base: &Value) -> Result<Option<Layer>, ConfigError> {
+        let prefix = format!("{}_", self.0.to_uppercase().replace('-', "_"));
         let variables = self
-            .0
+            .1
             .iter()
             .filter(|(name, _)| {
                 let key = name
                     .to_str()
-                    .and_then(|name| name.strip_prefix("DECIDR_"))
+                    .and_then(|name| name.strip_prefix(prefix.as_str()))
                     .and_then(|key| key.split("__").next())
                     .unwrap_or("")
                     .to_ascii_lowercase();
@@ -262,7 +263,7 @@ impl LayerSource for ConfigEnv {
             })
             .cloned()
             .collect();
-        EnvSource::new("DECIDR_", variables)
+        EnvSource::new(prefix, variables)
             .alias("SC_PROJECT", ["project"])
             .load(base)
     }
@@ -291,6 +292,7 @@ fn invalid_setting(resolved: &Resolved, path: &str, failure: impl ToString) -> E
     )
 }
 pub fn config(
+    tool: &str,
     local: Option<&Path>,
     global: Option<&Path>,
     environment: &[(OsString, OsString)],
@@ -322,7 +324,11 @@ pub fn config(
     let mut files = Vec::new();
     for (slot, folder) in [(Slot::User, Some(global.as_path())), (Slot::Local, local)] {
         if let Some(folder) = folder {
-            for name in ["sc-agent.json", "decidr.json", "decidr.local.json"] {
+            for name in [
+                "sc-agent.json".into(),
+                format!("{tool}.json"),
+                format!("{tool}.local.json"),
+            ] {
                 let path = folder.join(name);
                 files.push(json!({"path":path,"exists":path.exists()}));
                 layers = layers.insert(
@@ -338,7 +344,7 @@ pub fn config(
         .map(|project| json!({"project":project}))
         .unwrap_or(json!({}));
     let resolved = layers
-        .insert(Slot::Env, ConfigEnv(environment.to_vec()))
+        .insert(Slot::Env, ConfigEnv(tool.into(), environment.to_vec()))
         .flags(flags)
         .resolve()
         .map_err(config_error)?;
@@ -1424,7 +1430,11 @@ impl Run {
         logger: Option<Arc<Logger>>,
         cancel: Arc<Cancel>,
     ) -> Result<Self, Error> {
-        let (loaded, root, repo) = load(args.config_dir.as_deref(), args.project.as_deref())?;
+        let (loaded, root, repo) = load(
+            &args.tool,
+            args.config_dir.as_deref(),
+            args.project.as_deref(),
+        )?;
         let mut settings = loaded.config;
         if let Some(count) = args.workers {
             settings.workers = workers(count)?;
@@ -1683,6 +1693,7 @@ pub fn repository_identity(origin: Option<&str>, host: &str, root: &Path) -> Res
 }
 
 pub fn load(
+    tool: &str,
     config_dir: Option<&Path>,
     project: Option<&str>,
 ) -> Result<(Configuration, PathBuf, String), Error> {
@@ -1691,14 +1702,18 @@ pub fn load(
     let environment = std::env::vars_os().collect::<Vec<_>>();
     let local = root.join(".git").exists().then_some(local.as_path());
     Ok((
-        config(local, config_dir, &environment, project)?,
+        config(tool, local, config_dir, &environment, project)?,
         root,
         repo,
     ))
 }
-pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error> {
-    let (loaded, ..) = load(config_dir, project)?;
-    Ok(json!({"settings":loaded.rows, "files":loaded.files, "log_root":log_root("decidr")?}))
+pub fn doctor(
+    tool: &str,
+    config_dir: Option<&Path>,
+    project: Option<&str>,
+) -> Result<Value, Error> {
+    let (loaded, ..) = load(tool, config_dir, project)?;
+    Ok(json!({"settings":loaded.rows, "files":loaded.files, "log_root":log_root(tool)?}))
 }
 
 pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {
