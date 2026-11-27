@@ -620,7 +620,7 @@ Both are new capability, counted separately from the -77 restructure. Code lands
 
 Goal (Rand's words): O4 "restore decider (Strands Decider) as a local model exactly like laya ... --model decider" (REQ-SAG-0801: decider resolves to the 4b row; each runner's model has a fixed id in the table; address from configuration). O5 "haiku/luna required for all tools with no TYPESAFE_API_KEY ... send works keyless for haiku/luna via provider keys" (REQ-SAG-0103: prefer a keyless provider; else the first whose key is found). Measure: the named tests below pass; no provider or model name is compared outside PROVIDERS.
 
-Layout: crates/sc-agent/src/lib.rs (all of it; providers.rs is j-1's v1 plan, not this branch's); scripts/integration.py and tests/contract/test_integration.py (export); crates/sc-agent/tests/{config_and_values,sending,records,wires,support}.rs; tests/contract/test_contract.py and crates/sc-agent-py/tests/loopback.py (laya fixtures lose "model").
+Layout: crates/sc-agent/src/lib.rs (all of it, no providers.rs); scripts/integration.py and tests/contract/test_integration.py (export); crates/sc-agent/tests/{config_and_values,sending,records,wires,support}.rs; tests/contract/test_contract.py and crates/sc-agent-py/tests/loopback.py (laya fixtures lose "model").
 
 ### Public surface
 O4-1..O4-6 and O5-1..O5-5 are the closed items O45-01..O45-11 of agt-j-1.group-dev (one copy), plus O45-12 (rows newest first, REQ-SAG-0102, restructure net 0).
