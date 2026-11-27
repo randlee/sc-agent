@@ -888,9 +888,9 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         sessions = [path.read_text() for path in Path(self.directory.name).rglob("sessions.jsonl")]
         diagnostics = (f"got={got!r}; received={received!r}; observed={observed!r}; "
                        f"expired_backstops={expired_backstops!r}; sessions={sessions!r}")
-        self.assertTrue(got.get("ok"), diagnostics)
         self.assertFalse(expired_backstops,
                          f"event wait backstop(s) expired: {expired_backstops!r}; {diagnostics}")
+        self.assertTrue(got.get("ok"), diagnostics)
         items = got.get("value")
         self.assertIsInstance(items, list, diagnostics)
         self.assertTrue(all(isinstance(item, dict) and item.get("result", {}).get("ok")
