@@ -30,8 +30,19 @@ class Runner:
         self.expected_count = expected_count
         self.received = []
         self.lock = threading.Lock()
+        self.active_handlers = 0
+        self.handlers_done = threading.Event()
+        self.handlers_done.set()
+
+        def handler_finished():
+            with self.lock:
+                self.active_handlers -= 1
+                if self.active_handlers == 0:
+                    self.handlers_done.set()
 
         class Handler(BaseHTTPRequestHandler):
+            timeout = 5
+
             def log_message(self, *_args):
                 pass
 
@@ -52,9 +63,27 @@ class Runner:
                 handler.end_headers()
                 handler.wfile.write(encoded)
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.server.daemon_threads = True
-        self.thread = threading.Thread(target=self.server.serve_forever)
+        class ObservedServer(ThreadingHTTPServer):
+            daemon_threads = True
+
+            def process_request(server, request, client_address):
+                with self.lock:
+                    self.active_handlers += 1
+                    self.handlers_done.clear()
+                try:
+                    super().process_request(request, client_address)
+                except BaseException:
+                    handler_finished()
+                    raise
+
+            def process_request_thread(server, request, client_address):
+                try:
+                    super().process_request_thread(request, client_address)
+                finally:
+                    handler_finished()
+
+        self.server = ObservedServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
 
     @property
     def address(self):
@@ -65,9 +94,30 @@ class Runner:
         return self
 
     def __exit__(self, *_args):
-        self.server.shutdown()
-        self.thread.join(5)
+        failures = []
+
+        def shutdown():
+            try:
+                self.server.shutdown()
+            except BaseException as failure:
+                failures.append(f"shutdown failed: {failure!r}")
+
+        shutdown_thread = threading.Thread(target=shutdown, daemon=True)
+        shutdown_thread.start()
+        shutdown_thread.join(15)
+        if shutdown_thread.is_alive():
+            failures.append("shutdown backstop expired")
+        if not self.handlers_done.wait(15):
+            failures.append("handler drain backstop expired")
         self.server.server_close()
+        self.thread.join(15)
+        if self.thread.is_alive():
+            failures.append("serve-thread join backstop expired")
+        if failures:
+            raise AssertionError(f"{'; '.join(failures)}; received={self.received!r}; "
+                                 f"active_handlers={self.active_handlers}; "
+                                 f"shutdown_thread_alive={shutdown_thread.is_alive()}; "
+                                 f"serve_thread_alive={self.thread.is_alive()}")
 
 
 def rendered(path):

@@ -619,6 +619,12 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
     #[test]
     fn callback_failure_keeps_a_later_logging_failure() -> Result<(), Box<dyn std::error::Error>> {
         for outcome in [
@@ -651,7 +657,13 @@ mod tests {
     }
     #[test]
     fn respond_mapping_returns_closed_logger_failure() -> Result<(), Box<dyn std::error::Error>> {
-        let root = std::env::temp_dir().join(format!("wheel-finish-{}", std::process::id()));
+        let root = (0..1000)
+            .map(|counter| {
+                std::env::temp_dir().join(format!("wheel-finish-{}-{counter}", std::process::id()))
+            })
+            .find(|path| std::fs::create_dir(path).is_ok())
+            .ok_or("cannot create logger-test directory")?;
+        let _cleanup = Cleanup(root.clone());
         let mut config = sc_observability::LoggerConfig::default_for(
             sc_observability::ServiceName::new("wheel-test")?,
             root.clone(),
@@ -690,7 +702,6 @@ mod tests {
                 .ok_or("closed logger flushed")?
                 .to_string()
         );
-        let _ = std::fs::remove_dir_all(root);
         Ok(())
     }
 }
