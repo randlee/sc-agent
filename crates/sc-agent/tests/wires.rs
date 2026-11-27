@@ -574,3 +574,38 @@ fn anthropic_compat_skips_thinking_blocks_before_the_first_text_answer() -> Test
     }
     Ok(())
 }
+
+#[test]
+fn llm_decision_backends_reject_answers_outside_the_requested_schema() -> Test {
+    for (question, answer) in [
+        (
+            json!({"type":"choice","criteria":{"a":"A"}}),
+            json!({"type":"choice","choice":"outside","confidence":0.8,"probabilities":{}}),
+        ),
+        (json!({"type":"box"}), json!({"type":"box","box":null})),
+    ] {
+        for (provider, model) in [("openai", "luna"), ("anthropic", "haiku")] {
+            let root = Temp::new()?;
+            let reply = json!({"answers":{"q":answer}}).to_string();
+            let wire = model_with(model, Some(provider), &Default::default())?
+                .0
+                .wire;
+            let raw = match wire {
+                sc_agent::Wire::Messages => json!({"content":[{"type":"text","text":reply}]}),
+                sc_agent::Wire::Chat => json!({"choices":[{"message":{"content":reply}}]}),
+                sc_agent::Wire::Jev => return Err("expected an LLM wire".into()),
+            };
+            let stub = Stub::new(vec![http(200, raw)])?;
+            let opts = options(&root, &stub.url);
+            let request = json!({"questions":{"q":question}});
+            let failure = with_route(&opts, (provider, model), &stub.url, |route| match wire {
+                sc_agent::Wire::Messages => AnthropicCompat(route).decide(&request),
+                sc_agent::Wire::Chat => OpenAiCompat(route).decide(&request),
+                sc_agent::Wire::Jev => Jev(route).decide(&request),
+            })?;
+            assert_eq!(result(failure)["error"]["id"], "decision.schema_mismatch");
+            assert_eq!(stub.finish()?.len(), 1);
+        }
+    }
+    Ok(())
+}

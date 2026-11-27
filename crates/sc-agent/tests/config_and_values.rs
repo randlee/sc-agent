@@ -210,8 +210,14 @@ fn req_sag_0007_0201_distinct_answer_types_and_schema_failures() -> Test {
     ] {
         let typed: Answer = serde_json::from_value(answer.clone())?;
         assert_eq!(serde_json::to_value(typed)?, answer);
+        let mut question = json!({"type":answer["type"]});
+        match answer["type"].as_str() {
+            Some("choice") => question["criteria"] = json!({"yes":"true"}),
+            Some("score") => question["criteria"] = json!(["low"]),
+            _ => {}
+        }
         schema(
-            &json!({"questions":{"q":{"type":answer["type"]}}}),
+            &json!({"questions":{"q":question}}),
             &json!({"answers":{"q":answer}}),
         )?;
     }
@@ -654,4 +660,75 @@ fn built_in_rows_are_newest_first() {
             provider.name
         );
     }
+}
+
+#[test]
+fn generated_answer_schema_rejects_invalid_answer_fields() -> Test {
+    let choice = json!({"type":"choice","choice":"a","confidence":0.875,"probabilities":{"a":0.123456789,"b":0.2}});
+    let score = json!({"type":"score","score":0.123456789,"confidence":0.8,"legend":{"0":"low","1":"high"},"probabilities":{"0":0.3,"1":0.4}});
+    let bounds = json!({"top":0.1,"bottom":0.9,"left":0.2,"right":0.8});
+    let boxed = json!({"type":"box","box":bounds,"confidence":null});
+    let noul = json!({"type":"noul","noul":0.875});
+    let changed = |original: &serde_json::Value, field: &str, value| {
+        let mut answer = original.clone();
+        answer[field] = value;
+        answer
+    };
+    for (question, valid, invalid) in [
+        (
+            json!({"type":"choice","criteria":{"a":"A","b":"B"}}),
+            choice.clone(),
+            vec![
+                changed(&choice, "choice", json!("outside")),
+                changed(&choice, "probabilities", json!({})),
+                changed(
+                    &choice,
+                    "probabilities",
+                    json!({"a":0.1,"b":0.2,"extra":0.3}),
+                ),
+                changed(&choice, "extra", json!(true)),
+            ],
+        ),
+        (
+            json!({"type":"score","criteria":["low","high"]}),
+            score.clone(),
+            vec![
+                changed(&score, "legend", json!({"0":"low"})),
+                changed(&score, "probabilities", json!({"0":0.1})),
+            ],
+        ),
+        (
+            json!({"type":"box"}),
+            boxed.clone(),
+            vec![
+                json!({"type":"box","box":null}),
+                changed(&boxed, "box", changed(&bounds, "extra", json!(1))),
+            ],
+        ),
+        (
+            json!({"type":"noul"}),
+            noul.clone(),
+            vec![changed(&noul, "extra", json!(true))],
+        ),
+    ] {
+        let request = json!({"questions":{"q":question}});
+        schema(
+            &request,
+            &json!({"model":"reply-metadata","answers":{"q":valid}}),
+        )?;
+        for answer in invalid {
+            let failure = schema(&request, &json!({"answers":{"q":answer}}))
+                .err()
+                .ok_or_else(|| format!("accepted invalid answer {answer}"))?;
+            let failure = serde_json::to_value(failure)?;
+            assert_eq!(failure["id"], "decision.schema_mismatch");
+            assert!(
+                failure["message"]
+                    .as_str()
+                    .ok_or("no error message")?
+                    .contains('q')
+            );
+        }
+    }
+    Ok(())
 }

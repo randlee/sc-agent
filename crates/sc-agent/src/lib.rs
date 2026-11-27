@@ -929,6 +929,47 @@ pub enum Answer {
     },
 }
 pub fn schema(request: &Value, response: &Value) -> Result<(), Error> {
+    fn check_shape(value: &Value, shape: &Value, path: &str) -> Result<(), Error> {
+        if let Some(values) = shape.get("enum").and_then(Value::as_array)
+            && !values.contains(value)
+        {
+            return Err(error(
+                "decision.schema_mismatch",
+                format!("{path}: value is outside requested choices"),
+            ));
+        }
+        if let (Some(fields), Some(properties)) = (
+            value.as_object(),
+            shape.get("properties").and_then(Value::as_object),
+        ) {
+            for key in shape
+                .get("required")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+            {
+                if !fields.contains_key(key) {
+                    return Err(error(
+                        "decision.schema_mismatch",
+                        format!("{path}.{key}: required field is missing"),
+                    ));
+                }
+            }
+            for (key, child) in fields {
+                if let Some(rule) = properties.get(key) {
+                    check_shape(child, rule, &format!("{path}.{key}"))?;
+                } else if shape.get("additionalProperties").and_then(Value::as_bool) == Some(false)
+                {
+                    return Err(error(
+                        "decision.schema_mismatch",
+                        format!("{path}.{key}: unexpected field"),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
     let questions = request
         .get("questions")
         .and_then(Value::as_object)
@@ -949,12 +990,7 @@ pub fn schema(request: &Value, response: &Value) -> Result<(), Error> {
             .ok_or_else(|| error("decision.schema_mismatch", format!("missing answer {id}")))?;
         let _: Answer = serde_json::from_value(answer.clone())
             .map_err(|e| error("decision.schema_mismatch", format!("{id}: {e}")))?;
-        if answer.get("type") != question.get("type") {
-            return Err(error(
-                "decision.schema_mismatch",
-                format!("{id}: wrong question type"),
-            ));
-        }
+        check_shape(answer, &answer_schema(question), id)?;
     }
     Ok(())
 }
