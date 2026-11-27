@@ -2074,6 +2074,24 @@ pub mod route_tests {
     }
 
     #[test]
+    fn cancel_signals_a_waiter_on_the_condition() -> Test {
+        let cancel = Cancel::default();
+        let state = cancel.state.lock().map_err(|_| "cancel poisoned")?;
+        let expired = std::thread::scope(|scope| {
+            // The canceller cannot take the lock until wait_timeout releases it.
+            scope.spawn(|| cancel.cancel());
+            // The deadline is a failure-only watchdog: cancel() must signal first.
+            cancel
+                .changed
+                .wait_timeout(state, Duration::from_secs(20))
+                .map(|(_, watchdog)| watchdog.timed_out())
+                .map_err(|_| "cancel poisoned")
+        })?;
+        assert!(!expired, "cancel() did not signal the waiter");
+        Ok(())
+    }
+
+    #[test]
     fn timeout_is_per_call_and_sets_the_transport_configuration() -> Test {
         let root = Temp::new()?;
         let cancel = Cancel::default();
