@@ -584,15 +584,22 @@ mod resolve_test {
 mod keyring_timeout_test {
     use super::*;
     #[test]
-    fn nonresponding_reader_is_a_typed_timeout() {
+    fn nonresponding_reader_is_a_typed_timeout() -> Result<(), Box<dyn std::error::Error>> {
         let (release, wait) = std::sync::mpsc::channel::<()>();
-        let value = keyring_wait(
-            move || {
-                let _ = wait.recv();
-                Ok("unused".into())
-            },
-            Duration::ZERO,
-        );
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        std::thread::spawn(move || {
+            let value = keyring_wait(
+                move || {
+                    let _ = wait.recv();
+                    Ok("unused".into())
+                },
+                Duration::ZERO,
+            );
+            let _ = sender.send(value);
+        });
+        let received = receiver.recv_timeout(Duration::from_secs(10));
+        let _ = release.send(());
+        let value = received.map_err(|e| format!("keyring timeout test did not finish: {e}"))?;
         let result = key(
             "TYPESAFE_API_KEY",
             &[],
@@ -602,7 +609,6 @@ mod keyring_timeout_test {
                 _ => Err(KeyringError::Read("unexpected".into())),
             },
         );
-        let _ = release.send(());
         let error = serde_json::to_value(result.err()).ok();
         assert_eq!(
             error
@@ -632,6 +638,7 @@ mod keyring_timeout_test {
                 .and_then(Value::as_str)
                 .is_some_and(|s| s.contains(".env"))
         );
+        Ok(())
     }
 
     #[test]
