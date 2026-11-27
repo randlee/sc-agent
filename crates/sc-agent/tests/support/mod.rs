@@ -198,7 +198,10 @@ impl Stub {
                             for (key, value) in headers {
                                 write!(stream, "{key}: {value}\r\n")?;
                             }
-                            write!(stream, "\r\n{body}")?;
+                            write!(stream, "\r\n")?;
+                            for chunk in body.as_bytes().chunks(64 * 1024) {
+                                stream.write_all(chunk)?;
+                            }
                         }
                     }
                     unserved.fetch_sub(1, Ordering::SeqCst);
