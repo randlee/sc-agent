@@ -155,6 +155,23 @@ class Isolated(unittest.TestCase):
         self.environment.start()
         self.addCleanup(self.environment.stop)
 
+    def run_subprocess(self, command, **options):
+        try:
+            return subprocess.run(command, **options)
+        except subprocess.TimeoutExpired as error:
+            self.fail(f"subprocess timed out after {error.timeout}s; command={error.cmd!r}; "
+                      f"stdout={error.stdout!r}; stderr={error.stderr!r}")
+
+    def test_run_subprocess_timeout_reports_command_and_captured_output(self):
+        command = ["tool", "--check"]
+        timeout = subprocess.TimeoutExpired(command, 20, output="partial stdout", stderr="partial stderr")
+        with patch("subprocess.run", side_effect=timeout):
+            with self.assertRaises(AssertionError) as raised:
+                self.run_subprocess(command, capture_output=True, text=True, timeout=20)
+        self.assertIn(repr(command), str(raised.exception))
+        self.assertIn("partial stdout", str(raised.exception))
+        self.assertIn("partial stderr", str(raised.exception))
+
 
 class Wheel(Isolated):
     @classmethod
@@ -278,7 +295,7 @@ class Wheel(Isolated):
         model_config.write_text(json.dumps({"models": {
             "luna": {"provider": "nous", "id": "openai/gpt-6.1-luna", "released": "2026-11-20"}
         }}))
-        found = subprocess.run([str(binary), "--config-dir", self.directory.name, "models"],
+        found = self.run_subprocess([str(binary), "--config-dir", self.directory.name, "models"],
                                capture_output=True, text=True, timeout=20, cwd=self.directory.name)
         self.assertEqual(found.returncode, 0, found.stdout + found.stderr)
         cli_catalog = json.loads(found.stdout)
@@ -409,7 +426,7 @@ assert rows == [], rows
 events = [json.loads(line) for line in (root / "logs/decidr.log.jsonl").read_text().splitlines()]
 assert sum(event["fields"].get("id") == result["error"]["id"] for event in events) == 1, events
 '''
-        got = subprocess.run([sys.executable, "-c", code, str(root)], env=dict(os.environ),
+        got = self.run_subprocess([sys.executable, "-c", code, str(root)], env=dict(os.environ),
                              cwd=root, text=True, capture_output=True, timeout=20)
         self.assertEqual(got.returncode, 0, got.stderr)
 
@@ -438,7 +455,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         for order in ("decidr-first", "sitr-first"):
             with self.subTest(order=order), tempfile.TemporaryDirectory() as folder:
                 env = {"PATH": os.defpath, "GIT_CEILING_DIRECTORIES": str(Path(self.directory.name).parent.resolve()), "DECIDR_LOG_ROOT": folder, "SITR_LOG_ROOT": folder}
-                got = subprocess.run([sys.executable, "-c", code, folder, order], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
+                got = self.run_subprocess([sys.executable, "-c", code, folder, order], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
                 self.assertEqual(got.returncode, 0, got.stderr)
 
     def test_callback_exception_is_a_returned_error_with_its_message(self):
@@ -581,7 +598,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         self.assertEqual(list(Path(self.directory.name).rglob("sessions.jsonl")), [])
 
     def test_project_precedence_through_session_paths(self):
-        initialized = subprocess.run(["git", "init", "--quiet"], capture_output=True, text=True, timeout=20)
+        initialized = self.run_subprocess(["git", "init", "--quiet"], capture_output=True, text=True, timeout=20)
         self.assertEqual(initialized.returncode, 0, initialized.stderr)
         root = Path.cwd()
         local = root / ".sc/sc-agent"
@@ -1028,7 +1045,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 subprocess.run(["git", "remote", "set-url", "origin", origin], check=True, timeout=20)
                 send(url)
         rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
-        host = subprocess.run(["hostname"], check=True, text=True, capture_output=True, timeout=20).stdout.strip()
+        host = self.run_subprocess(["hostname"], check=True, text=True, capture_output=True, timeout=20).stdout.strip()
         self.assertEqual(sorted(row["repo"] for row in rows), sorted([f"local/{host}/{Path.cwd().name}", "github.com/example/project", "github.com/example/project", "example.com/o/r", "example.com/o/r"]))
 
     def test_network_errors_are_returned_and_attempts_bounded(self):
@@ -1053,7 +1070,7 @@ class Cli(Isolated):
     def check_version_and_help(self, name):
         binary = Path(__file__).resolve().parents[2] / "target/debug" / name
         for flag in ("--version", "--help"):
-            got = subprocess.run([str(binary), flag], env={"PATH": os.defpath, "GIT_CEILING_DIRECTORIES": str(Path(self.directory.name).parent.resolve()), name.upper() + "_LOG_ROOT": self.directory.name},
+            got = self.run_subprocess([str(binary), flag], env={"PATH": os.defpath, "GIT_CEILING_DIRECTORIES": str(Path(self.directory.name).parent.resolve()), name.upper() + "_LOG_ROOT": self.directory.name},
                                  cwd=self.directory.name, text=True, capture_output=True, timeout=20)
             self.assertEqual(got.returncode, 0, got.stderr + got.stdout)
             self.assertIn(name, got.stdout)
@@ -1066,7 +1083,7 @@ class Cli(Isolated):
         Path(self.directory.name, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": 1}}))
         cases = [(["--batch", "--workers", str(workers)], "{}", "decidr.invalid_workers") for workers in (-1, 0)]
         for flags, text, expected in cases:
-            got = subprocess.run([str(binary), "--config-dir", self.directory.name, "send", "--model", "laya",
+            got = self.run_subprocess([str(binary), "--config-dir", self.directory.name, "send", "--model", "laya",
                                  "--agent-role", "contract", *flags],
                                  input=text, env={"PATH": os.defpath, "GIT_CEILING_DIRECTORIES": str(Path(self.directory.name).parent.resolve()), "DECIDR_LOG_ROOT": self.directory.name},
                                  cwd=self.directory.name, text=True, capture_output=True, timeout=20)
@@ -1079,7 +1096,7 @@ class Cli(Isolated):
             source = Path(folder) / "input.rs"
             source.write_text("fn f() { match 1 { 1 => (), _ => () } }")
             env = {"PATH": os.defpath, "GIT_CEILING_DIRECTORIES": str(Path(self.directory.name).parent.resolve()), "SITR_LOG_ROOT": folder}
-            got = subprocess.run([str(binary), "query", "rust", "match-arms", str(source)], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
+            got = self.run_subprocess([str(binary), "query", "rust", "match-arms", str(source)], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
             self.assertEqual(got.returncode, 0, got.stderr)
             self.assertEqual([item["text"] for item in json.loads(got.stdout)["value"]], ["1", "_"])
             self.assertTrue((Path(folder) / "logs/sitr.log.jsonl").is_file())
@@ -1091,11 +1108,11 @@ class Cli(Isolated):
         local, global_config = root / ".sc/sc-agent", root / "global"
         local.mkdir(parents=True)
         global_config.mkdir()
-        initialized = subprocess.run(["git", "init", "--quiet", str(root)], env=dict(os.environ), text=True, capture_output=True, timeout=20)
+        initialized = self.run_subprocess(["git", "init", "--quiet", str(root)], env=dict(os.environ), text=True, capture_output=True, timeout=20)
         self.assertEqual(initialized.returncode, 0, initialized.stderr)
         (local / "sc-agent.json").write_text('{"project":"local"}')
         (global_config / "decidr.json").write_text('{"workers":3}')
-        got = subprocess.run([str(binary), "--config-dir", str(global_config), "doctor"], cwd=root,
+        got = self.run_subprocess([str(binary), "--config-dir", str(global_config), "doctor"], cwd=root,
                              env=dict(os.environ), text=True, capture_output=True, timeout=20)
         self.assertEqual(got.returncode, 0, got.stderr + got.stdout)
         value = json.loads(got.stdout)["value"]
@@ -1106,7 +1123,7 @@ class Cli(Isolated):
         self.assertEqual(project["source"], str(local / "sc-agent.json"))
 
     def doctor(self, root, environment=None):
-        return subprocess.run([str(Path(__file__).resolve().parents[2] / "target/debug/decidr"),
+        return self.run_subprocess([str(Path(__file__).resolve().parents[2] / "target/debug/decidr"),
                                "--config-dir", str(root / "global"), "doctor"], cwd=root,
                               env={**dict(os.environ), "DECIDR_LOG_ROOT": str(root / "log-root"),
                                    "GIT_CEILING_DIRECTORIES": str(root.parent), **(environment or {})},
@@ -1134,7 +1151,7 @@ class Cli(Isolated):
         workers = next(row for row in json.loads(got.stdout)["value"]["settings"] if row["path"] == "workers")
         self.assertEqual((workers["value"], workers["source"]), ("2", str(local)))
         binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
-        overridden = subprocess.run([str(binary), "--config-dir", str(root / "global"), "--project", "test", "send",
+        overridden = self.run_subprocess([str(binary), "--config-dir", str(root / "global"), "--project", "test", "send",
                                      "--batch", "--model", "laya", "--agent-role", "test", "--workers", "0"],
                                     input="{}", cwd=root, env={**dict(os.environ), "DECIDR_WORKERS": "3"},
                                     text=True, capture_output=True, timeout=20)
@@ -1150,7 +1167,7 @@ class Cli(Isolated):
         environment = {"PATH": os.defpath, "SC_AGENT_HOME": str(user),
                        "DECIDR_LOG_ROOT": str(root / "logs"),
                        "GIT_CEILING_DIRECTORIES": str(root.parent)}
-        got = subprocess.run([str(binary), "doctor"], cwd=root, env=environment,
+        got = self.run_subprocess([str(binary), "doctor"], cwd=root, env=environment,
                              capture_output=True, text=True, timeout=20)
         self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
         value = json.loads(got.stdout)["value"]
@@ -1217,7 +1234,7 @@ class Cli(Isolated):
             if override is not None:
                 environment["DECIDR_LOG_ROOT"] = override
             binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
-            got = subprocess.run([str(binary), "--config-dir", str(root), "doctor"], cwd=root, env=environment,
+            got = self.run_subprocess([str(binary), "--config-dir", str(root), "doctor"], cwd=root, env=environment,
                                  text=True, capture_output=True, timeout=20)
             self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
             actual = Path(json.loads(got.stdout)["value"]["log_root"])
@@ -1232,7 +1249,7 @@ class Cli(Isolated):
         file = root / "large.rs"
         file.write_text('fn f(){match "" { "' + 'x' * (1024 * 1024) + '" => () }}')
         binary = Path(__file__).resolve().parents[2] / "target/debug/sitr"
-        got = subprocess.run([str(binary), "query", "rust", "match-arms", str(file)], cwd=root,
+        got = self.run_subprocess([str(binary), "query", "rust", "match-arms", str(file)], cwd=root,
                              env=dict(os.environ), text=True, capture_output=True, timeout=20)
         self.assertNotEqual(got.returncode, 0)
         self.assertEqual(json.loads(got.stdout)["error"]["id"], "log.write")
@@ -1246,7 +1263,7 @@ class Cli(Isolated):
             config.write_text(json.dumps({"project": "contract", "workers": 2, "laya": {"host": "127.0.0.1", "port": port}}))
             env = {"PATH": os.defpath, "DECIDR_LOG_ROOT": folder,
                    "GIT_CEILING_DIRECTORIES": str(Path(folder).parent.resolve())}
-            doctor = subprocess.run([str(binary), "--config-dir", folder, "doctor"], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
+            doctor = self.run_subprocess([str(binary), "--config-dir", folder, "doctor"], env=env, cwd=folder, text=True, capture_output=True, timeout=20)
             self.assertEqual(doctor.returncode, 0, doctor.stderr)
             self.assertFalse((Path(folder) / "logs").exists())
             project = next(row for row in json.loads(doctor.stdout)["value"]["settings"] if row["path"] == "project")
@@ -1258,7 +1275,7 @@ class Cli(Isolated):
                 {"path": str(config), "exists": True},
                 {"path": str(Path(folder) / "sc-agent.json"), "exists": False},
             ])
-            sent = subprocess.run([str(binary), "--config-dir", folder, "send", "--model", "laya",
+            sent = self.run_subprocess([str(binary), "--config-dir", folder, "send", "--model", "laya",
                                    "--agent-role", "contract"], input=json.dumps(REQUEST), env=env,
                                   cwd=folder, text=True, capture_output=True, timeout=20)
             self.assertEqual(sent.returncode, 0, sent.stderr + sent.stdout)
@@ -1270,7 +1287,7 @@ class Cli(Isolated):
     def test_send_requires_agent_role(self):
         binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
         with tempfile.TemporaryDirectory() as folder:
-            got = subprocess.run([str(binary), "--config-dir", folder, "send", "--model", "laya"],
+            got = self.run_subprocess([str(binary), "--config-dir", folder, "send", "--model", "laya"],
                                  input=json.dumps(REQUEST), env={"PATH": os.defpath, "GIT_CEILING_DIRECTORIES": str(Path(self.directory.name).parent.resolve()), "DECIDR_LOG_ROOT": folder},
                                  cwd=folder, text=True, capture_output=True, timeout=20)
             self.assertNotEqual(got.returncode, 0)
@@ -1357,7 +1374,7 @@ class Cli(Isolated):
         for binary, args in (("decidr", ["models"]), ("sitr", ["languages"]), ("sitr", ["queries", "--language", "rust"])):
             with self.subTest(binary=binary, args=args), tempfile.TemporaryDirectory() as folder:
                 env = {"PATH": os.defpath, "SC_AGENT_HOME": folder, "GIT_CEILING_DIRECTORIES": str(Path(self.directory.name).parent.resolve()), f"{binary.upper()}_LOG_ROOT": folder}
-                got = subprocess.run([str(root / "target/debug" / binary), *args],
+                got = self.run_subprocess([str(root / "target/debug" / binary), *args],
                                      env=env, cwd=folder, text=True, capture_output=True, timeout=20)
                 self.assertEqual(got.returncode, 0, got.stderr)
                 self.assertTrue(json.loads(got.stdout)["ok"])
