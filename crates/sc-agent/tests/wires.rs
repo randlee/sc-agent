@@ -59,16 +59,21 @@ fn jev_decide_posts_the_request_with_the_resolved_model() -> Test {
 }
 
 #[test]
-fn openai_compat_call_returns_the_json_the_model_wrote() -> Test {
+fn non_decision_llm_selected_by_short_name_returns_the_json_the_model_wrote() -> Test {
     let root = Temp::new()?;
     let raw = json!({"choices":[{"message":{"content":"{\"a\":1}"}}]});
     let stub = Stub::new(vec![http(200, raw)])?;
     let opts = options(&root, &stub.url);
-    let reply = with_route(&opts, ("openai", "luna"), &stub.url, |route| {
+    let reply = with_route(&opts, ("openai", "sol"), &stub.url, |route| {
         OpenAiCompat(route).call(&llm_request())
     })??;
     assert_eq!(reply, json!({"a":1}));
     let seen = stub.finish()?;
+    assert_eq!(seen.len(), 1);
+    assert_eq!(
+        seen[0].body["model"],
+        model_with("sol", Some("openai"), &Default::default())?.1
+    );
     assert_eq!(seen[0].path, "/v1/chat/completions");
     assert_eq!(
         seen[0].body["messages"],
