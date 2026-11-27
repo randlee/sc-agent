@@ -431,15 +431,16 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
     let (arrivals, arrived) = mpsc::channel();
     let (release, permits) = mpsc::channel();
     let permits = Mutex::new(permits);
+    let permit_error = Mutex::new(None);
     let keys = |_: &str| {
         arrivals
             .send(std::thread::current().id())
             .map_err(|e| e.to_string())?;
-        permits
-            .lock()
-            .map_err(|e| e.to_string())?
-            .recv_timeout(Duration::from_secs(5))
-            .map_err(|e| format!("missing keyring release permit: {e}"))?;
+        if let Err(error) = permits.lock().map_err(|e| e.to_string())?.recv() {
+            *permit_error.lock().map_err(|e| e.to_string())? =
+                Some(format!("missing keyring release permit: {error}"));
+            return Err("platform keyring is unavailable".to_owned().into());
+        }
         Ok("test-secret".into())
     };
     let (result, workers) = std::thread::scope(
@@ -458,13 +459,24 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
             let workers = (0..2)
                 .map(|_| arrived.recv_timeout(Duration::from_secs(5)))
                 .collect::<Result<Vec<_>, _>>();
-            for _ in 0..2 {
-                release.send(())?;
+            if workers.is_ok() {
+                for _ in 0..2 {
+                    release.send(())?;
+                }
             }
+            drop(release);
             let result = work.join().map_err(|_| "batch panicked")??;
-            Ok((result, workers?))
+            Ok((result, workers))
         },
     )?;
+    assert_eq!(
+        permit_error
+            .into_inner()
+            .map_err(|_| "keyring permit error recorder poisoned")?,
+        None,
+        "keyring permit failed"
+    );
+    let workers = workers?;
     assert_ne!(workers.first(), workers.last());
     assert_eq!(result.as_array().ok_or("missing batch results")?.len(), 2);
     assert_eq!(stub.finish()?.len(), 2);
