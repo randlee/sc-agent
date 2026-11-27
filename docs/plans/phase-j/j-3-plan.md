@@ -1,6 +1,6 @@
 # j-3 plan: session log, run identity, result cache, session-row reader
 
-Base: sprint/j-2 @3b9797fd (planned end state of docs/plans/phase-j/j-2-plan.md: `Run`, `RunArgs`, `Options` without `provider`, config/load/doctor taking `tool`, PyO3 `PyRun`/`PyLogger`; j-2 end about 2,421/2,580 with restructure counted 0). Line refs are file:line at that commit (Rust `Run` built; PyO3 and tests still to land from j-2, so PyO3 refs are to the j-2 plan). Written by reading the code and the records on origin/plan/phase-j (REQ-SAG-0002/0003/0004/0005/0011/0017/0703, ADR-SAG-0019 decision 14, ADR-SAG-0021 Session log/Paths/Session identity). The bead's old prose is intent only.
+Base: sprint/j-2 @2ca9e027 (planned end state of docs/plans/phase-j/j-2-plan.md: `Run`, `RunArgs`, `Options` without `provider`, config/load/doctor taking `tool`, PyO3 `PyRun`/`PyLogger`; j-2 end about 2,421/2,580 with restructure counted 0). Line refs are file:line at that commit (Rust `Run` built; PyO3 and tests still to land from j-2, so PyO3 refs are to the j-2 plan). Written by reading the code and the records on origin/plan/phase-j (REQ-SAG-0002/0003/0004/0005/0011/0017/0703, ADR-SAG-0019 decision 14, ADR-SAG-0021 Session log/Paths/Session identity). The bead's old prose is intent only.
 
 ## Goal
 
@@ -124,7 +124,7 @@ fn session_rows(py: Python<'_>, session_ids: Option<&Bound<'_, PyAny>>, extra: &
 // template: front matter `required_variables` gains `tool_version`; `TOOL_VERSION = "{{ tool_version }}"`; the two Run call sites pass `tool_version=TOOL_VERSION`; wheel README render command and scripts/check_consumer_template.py vars gain tool_version
 // crates/decidr/src/main.rs: RunArgs { tool_version: env!("CARGO_PKG_VERSION").into(), cache: None, .. }
 ```
-j-2's "tool is required" `sc_agent_py.invalid_option` check in `PyRun::new` is dropped: the empty tool reaches `Run::new` and returns `decision.missing_tool` from one place. With `general_log`, the tool is still that logger's service name (j-2).
+j-2's "tool is required" `sc_agent_py.invalid_option` check in `PyRun::new` is dropped: the empty tool reaches `Run::new` and returns `decision.missing_tool` from one place. With `general_log`, an explicit `tool` still wins; the logger's service name is the tool only when `tool` is empty (j-2).
 
 Python (names added by j-3; `_native.pyi`/`__init__.py`/`__init__.pyi`): `Run.__init__(..., tool_version: str|None=None, cache: bool|None=None)`, `Run.run_id: str|None`, `Run.send(request, *, cache: bool|None=None)`, `Run.send_batch(requests, *, cache: bool|None=None, on_result=None)`, `Run.log(event: Mapping[str, Any]) -> Envelope`, `session_rows(session_ids: Iterable[str], *, agent_role: str, project: str|None=None) -> Envelope`; `__all__` gains `"session_rows"`.
 
