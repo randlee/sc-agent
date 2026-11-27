@@ -1,6 +1,6 @@
 # j-3 plan: session log, run identity, result cache, session-row reader
 
-Base: sprint/j-2 @c5225ca6 (planned end state of docs/plans/phase-j/j-2-plan.md: `Run`, `RunArgs`, `Options` without `provider`, config/load/doctor taking `tool`, PyO3 `PyRun`/`PyLogger`; j-2 end about 2,419/2,580 with restructure counted 0). Line refs are file:line at that commit (Rust `Run` built; PyO3 and tests still to land from j-2, so PyO3 refs are to the j-2 plan). Written by reading the code and the records on origin/plan/phase-j (REQ-SAG-0002/0003/0004/0005/0011/0017/0703, ADR-SAG-0019 decision 14, ADR-SAG-0021 Session log/Paths/Session identity). The bead's old prose is intent only.
+Base: sprint/j-2 @c5225ca6 (planned end state of docs/plans/phase-j/j-2-plan.md: `Run`, `RunArgs`, `Options` without `provider`, config/load/doctor taking `tool`, PyO3 `PyRun`/`PyLogger`; j-2 end about 2,423/2,580 with restructure counted 0). Line refs are file:line at that commit (Rust `Run` built; PyO3 and tests still to land from j-2, so PyO3 refs are to the j-2 plan). Written by reading the code and the records on origin/plan/phase-j (REQ-SAG-0002/0003/0004/0005/0011/0017/0703, ADR-SAG-0019 decision 14, ADR-SAG-0021 Session log/Paths/Session identity). The bead's old prose is intent only.
 
 ## Goal
 
@@ -14,8 +14,39 @@ Rand (ANC-004, ANC-005, ANC-008; owner rulings 2026-11-24): "These limits are cl
 | crates/sc-agent-py/src/lib.rs | `PyRun` keywords `tool_version`, `cache`; getter `run_id`; `#[pyfunction] session_rows` |
 | crates/sc-agent-py/python/sc_agent/{__init__.py,__init__.pyi,_native.pyi} | `session_rows` export and stub; `Run` stub gains `tool_version`, `cache`, `run_id` |
 | crates/decidr/src/main.rs | `tool_version` in its `RunArgs` |
+| crates/sc-agent-py/python/sc_agent/templates/consumer.py.j2, crates/sc-agent-py/README.md, scripts/check_consumer_template.py | only the `tool_version` wiring (render variable, `TOOL_VERSION`, two call-site arguments, render command, check vars) |
+| crates/sc-agent-py/src/lib.rs (sitr) | the four sitr pyfunctions gain `tool=` |
 | crates/sc-agent/Cargo.toml | no new dependency (sc-observability, ulid, sc-sha already linked) |
 | tests: crates/sc-agent/tests/{support/mod.rs,records.rs,sending.rs,wires.rs,config_and_values.rs,cache.rs (new)}, crates/decidr/tests/cli.rs, tests/contract/{test_session.py (new),test_contract.py} | see Done checks |
+
+## Deliverables
+1. J3-S01: Options.tool_version
+2. J3-S02: RunArgs.tool_version and RunArgs.cache
+3. J3-S03: Run::from_options without tool param, with decision.missing_tool
+4. J3-S04: Run::send and send_batch per-call cache (lead decision, rule 0)
+5. J3-S05: Settings.cache + KEYS + default
+6. J3-S06: Run.run_id
+7. J3-S07: Exchange and Route.exchange
+8. J3-S08: session_dir
+9. J3-S09: session_rows
+10. J3-S10: error ids and log category
+11. J3-S11: private sink writer: event/append/rows/sha
+12. J3-S12: decision.result fields
+13. J3-S13: PyRun kwargs tool_version, cache
+14. J3-S14: PyRun.run_id getter
+15. J3-S15: PyO3 session_rows
+16. J3-S16: decidr RunArgs fields
+17. J3-S17: Python stubs
+18. J3-S18: PyRun.log over `log_as` (new capability, accessor for j-4 log_event / j-6)
+19. J3-S19: sitr pyfunctions `tool=` (new capability)
+20. J3-S20: template tool_version wiring
+
+Exact code for each: the dev bead agt-j-3.group-dev Signatures and design "Public surface".
+
+## Does Not Close
+- `Run.project`, `cached` on errors, an in-memory cache index.
+- The template rewrite: j-4 (j-3 adds only the `tool_version` wiring of J3-S20).
+- `seed_session` (OWNER_FIX 2026-11-26: not an owner mandate; offline tests use a real Run with an injected logger and a stub).
 
 ## Public surface (exact Rust)
 
@@ -51,18 +82,21 @@ pub struct Exchange {
     pub sha: RefCell<Option<String>>,     // sha256 of the exact posted body bytes
     pub raw: RefCell<Value>,              // {"model","usage"} of the first 2xx body that parsed; Null otherwise
     pub hit: RefCell<Option<Value>>,      // the cached success value when the cache answered
+    pub cache: bool,                      // this call's cache setting: `Run::send` builds `Exchange { cache: cache.unwrap_or(self.options.settings.cache), ..Default::default() }`; `Route::post` reads it (no other path, no new Route field)
 }
 pub struct Route<'a> { /* fields unchanged except */ pub exchange: &'a Exchange }   // `sends` removed
 
 /// The one session-log layout: <log_root>/sessions/<repo>/<agent_role>/<project>. Private: writer (Run::send) and reader (session_rows) are both in lib.rs.
 fn session_dir(log_root: &Path, repo: &str, agent_role: &str, project: &str) -> PathBuf;
-/// The one reader of the session log. Name of the log root and config files is `agent_role` (a generated client's role is its tool name, REQ-SAG-0003).
+/// The one reader of the session log. Its log root is `log_root(agent_role)`, the same private `session_root(name)` function the Run's default logger uses with the tool name (one function, two callers). They meet when agent_role == tool, which a generated client guarantees (its role is its tool name, REQ-SAG-0003); the reader's `agent_role` argument is documented as "the tool name that owns the log root".
 /// Ok(object keyed by session_id -> row); a missing id is Err `session.not_found` naming the ids; `project` None resolves like a send.
 pub fn session_rows(ids: &[String], agent_role: &str, project: Option<&str>) -> Result<Value, Error>;
 
 // private (latitude inside bodies, shapes fixed):
-fn event(service: &ServiceName, action: &str, fields: Value) -> Result<LogEvent, Error>;     // private; `pub fn log(logger, action, fields)` (lib.rs:987) keeps its public signature and only its body becomes logger.log(event(..)?)
-fn append(path: PathBuf, action: &str, fields: Value) -> Result<(), Error>;                 // JsonlFileSink::open(path, NEVER).write(&event) ; NEVER = RetainedLogPolicy{rotation_max_bytes: ByteCount::from_bytes(u64::MAX), rotation_max_files and retention_max_age at their maxima, rest default}; sc-observability 1.5.0 has no disable/no-rotation mode (RetainedLogPolicy fields are all required; RetentionMaxAge must be non-zero), so maxima are the only way and rotation can't trigger
+fn event(service: &ServiceName, target: &str, action: &str, correlation_id: Option<&str>, fields: Value) -> Result<LogEvent, Error>;     // private
+pub fn log_as(logger: &Logger, target: &str, action: &str, correlation_id: Option<&str>, fields: Value) -> Result<(), Error>;   // new capability: logger.log(event(..)?); the one writer of a caller-named event
+// `pub fn log(logger, action, fields)` (lib.rs:987) keeps its public signature: log_as(logger, "sc-agent", action, None, fields)
+fn append(path: PathBuf, action: &str, fields: Value) -> Result<(), Error>;                 // JsonlFileSink::open(path, NEVER).write(&event) ; NEVER = RetainedLogPolicy{rotation_max_bytes: ByteCount::from_bytes(u64::MAX), rotation_max_files at its maximum, retention_max_age = 100 years (3_153_600_000 s), rest default}; sc-observability 1.5.0 has no disable/no-rotation mode (RetainedLogPolicy fields are all required; RetentionMaxAge must be non-zero) and computes `SystemTime::now() - age` (sinks.rs:277), which panics for the type's maximum, so the age is a large representable one and rotation can't trigger (REQ-SAG-0002: no panic on a library path)
 fn rows(path: &Path, keep: impl FnMut(&Value) -> bool) -> Result<Vec<Value>, Error>;        // unwraps each line's `fields`; skips an unparsable (partial) line; Err `session.unreadable` when the file exists and cannot be read
 fn sha(bytes: &[u8]) -> Result<String, Error>;                                               // shared by `digest` and the body hash
 ```
@@ -70,7 +104,7 @@ fn sha(bytes: &[u8]) -> Result<String, Error>;                                  
 Error ids (`error()` lib.rs:75): new `decision.missing_tool` (validation), `log.session_write` (log), `session.unreadable` (log), `session.not_found` (validation; ADR-SAG-0021 Paths). The category arm `"log.write" | "log.flush" | "log.shutdown" | "log.session_write" | "session.unreadable" => "log"` (REQ-SAG-0017 and ADR-SAG-0019 decision 6 list `log`); `log.invalid_slug`, `log.invalid_event` stay `validation`; every other id unchanged. `config.invalid` for `DECIDR_CACHE=1` comes from the existing typed setting (bool).
 
 Behaviour of `Run::send` (call order; private):
-1. cancel, project and slug checks (unchanged) -> wire. `Route::post` serializes the body once to bytes (replaces `send_json`), sets `exchange.sha`, and, when `cache.unwrap_or(options.settings.cache)`, `rows(sessions.jsonl, same request_sha256 && same model_requested && result.ok)` -> the row with the greatest `session_id`; on a hit it stores the row's `result.value` in `exchange.hit` and returns it without a model call, holdoff or wait; `text()` passes a hit through unparsed. Unreadable file: `session.unreadable`, no model call.
+1. cancel, project and slug checks (unchanged) -> wire. `Route::post` serializes the body once to bytes (replaces `send_json`), sets `exchange.sha`, and, when `self.exchange.cache` (the call's `cache.unwrap_or(options.settings.cache)`), `rows(sessions.jsonl, same request_sha256 && same model_requested && result.ok)` -> the row with the greatest `session_id`; on a hit it stores the row's `result.value` in `exchange.hit` and returns it without a model call, holdoff or wait; `text()` passes a hit through unparsed. Unreadable file: `session.unreadable`, no model call.
 2. On a 2xx body that parses, `exchange.raw` takes `{model, usage}`.
 3. Hit: link `{run_id, session_id (the row's), cached: true}` to `runs.jsonl`; log `decision.result {session_id, cached: true}`; flush; return the value with `cached: true`. No row.
 4. Miss: success value gains `attempts`, `session_id`, `question_digests`, `cached: false` (as `attempts`/`session_id`/`question_digests` today :1451-1458); append the row to `sessions.jsonl`, then the link `{run_id, session_id, false}` to `runs.jsonl`. Row append or link failure: log `log.session_write` once; a success outcome returns that error (carrying `session_id`), an error outcome is returned unchanged. Then log `decision.result {session_id, cached}` (success only; no `response` field), flush.
@@ -80,17 +114,21 @@ Per-call cache override (one cache mechanism): `send` and `send_batch` take `cac
 
 ```rust
 // crates/sc-agent-py/src/lib.rs (PyRun, as in j-2: never raises, stores the error envelope)
-// PyRun `send`/`send_batch` gain `cache=None` (arg::<bool>, passed to Run::send/send_batch); PyRun gains `fn log(&self, event: &Bound<'_, PyDict>) -> Py<PyAny>`: Envelope over the kept pub fn `log(logger, action, fields)` with event {target, action, correlation_id, fields}, then flush (new capability, the accessor j-4's `log_event` calls)
+// PyRun `send`/`send_batch` gain `cache=None` (arg::<bool>, passed to Run::send/send_batch); PyRun gains `fn log(&self, event: &Bound<'_, PyDict>) -> Py<PyAny>`: Envelope over `log_as(logger, target, action, correlation_id, fields)` from the event {target, action, correlation_id, fields} (target and action required strings, correlation_id str or None, fields a dict; else `sc_agent_py.invalid_option`), then flush (new capability, the accessor j-4's `log_event` calls; the Rust `log` is not used because it fixes target `sc-agent` and has no correlation_id)
 // PyRun::new signature gains `tool_version=None, cache=None` (kwargs `arg::<String>` / `arg::<bool>` into RunArgs.tool_version/.cache; None tool/tool_version -> "")
 #[pymethods] impl PyRun { #[getter] fn run_id(&self) -> Option<String>; }   // Run.run_id.to_string(); None when creation failed
 #[pyfunction(signature=(session_ids=None, *extra, agent_role=None, project=None, **rest))]
 fn session_rows(py: Python<'_>, session_ids: Option<&Bound<'_, PyAny>>, extra: &Bound<'_, PyTuple>, agent_role: Option<&Bound<'_, PyAny>>,
                 project: Option<&Bound<'_, PyAny>>, rest: Option<&Bound<'_, PyDict>>) -> Py<PyAny>;  // respond_value(None, agent_role, |_| sc_agent::session_rows(..)): errors go to the default logger named by the role
+// sitr pyfunctions `languages|queries|query|run(..., tool: Option<String>)`: `respond(py, general_log, tool.as_deref().unwrap_or("sitr"), ..)` (+~6; stub `tool: str | None = None` in _native.pyi)
+// template: front matter `required_variables` gains `tool_version`; `TOOL_VERSION = "{{ tool_version }}"`; the two Run call sites pass `tool_version=TOOL_VERSION`; wheel README render command and scripts/check_consumer_template.py vars gain tool_version
 // crates/decidr/src/main.rs: RunArgs { tool_version: env!("CARGO_PKG_VERSION").into(), cache: None, .. }
 ```
 j-2's "tool is required" `sc_agent_py.invalid_option` check in `PyRun::new` is dropped: the empty tool reaches `Run::new` and returns `decision.missing_tool` from one place. With `general_log`, the tool is still that logger's service name (j-2).
 
 Python (names added by j-3; `_native.pyi`/`__init__.py`/`__init__.pyi`): `Run.__init__(..., tool_version: str|None=None, cache: bool|None=None)`, `Run.run_id: str|None`, `Run.send(request, *, cache: bool|None=None)`, `Run.send_batch(requests, *, cache: bool|None=None, on_result=None)`, `Run.log(event: Mapping[str, Any]) -> Envelope`, `session_rows(session_ids: Iterable[str], *, agent_role: str, project: str|None=None) -> Envelope`; `__all__` gains `"session_rows"`.
+
+Owner question (not decided here): when a Run is given an injected logger, j-2's `Run::new` takes log_root from that logger's service name, silently overriding an explicit `tool` (ADR-SAG-0021, REQ-SAG-0004). j-3 leaves j-2's rule as is and only shares the one root function between writer and reader.
 
 ## Replaces (item -> existing construct; what is deleted with it)
 
@@ -106,7 +144,9 @@ Python (names added by j-3; `_native.pyi`/`__init__.py`/`__init__.pyi`): `Run.__
 | `Options.tool_version`, `Run::from_options` minus `tool` | j-2's separate `tool: String` parameter of `from_options` | the parameter and the matching `args.tool` pass-through |
 | `decision.missing_tool` | j-2's PyO3 "tool is required" `invalid_option` | that check |
 | category arm | `_ => "validation"` for `log.write`/`log.flush`/`log.shutdown` | - |
-| per-call `cache` of `send`/`send_batch`, `PyRun.log`, `Run.run_id`, `RunArgs.cache`, `Settings.cache`, `Exchange.hit`, links, `session_rows`, `PyRun.run_id`, PyO3 `session_rows`, `session.not_found`, `session.unreadable`, `log.session_write`, `decision.missing_tool` | none: new capability (REQ-SAG-0005, REQ-SAG-0004, REQ-SAG-0703, ADR-SAG-0019 d14, ADR-SAG-0021) | - |
+| `sitr` pyfunctions `tool=` (`languages`, `queries`, `query`, `run`) | `respond(py, general_log, "sitr", ..)` hard-coded name, crates/sc-agent-py/src/lib.rs (j-2 end) | the literal as the only name (new capability: the tool passes its name, ANC-015/016; moved here from j-4 so one sprint owns lib.rs and the .pyi stubs) |
+| template `tool_version` wiring | j-2's template call sites (no tool_version) | nothing (without it j-3's `decision.missing_tool` breaks every rendered client) |
+| per-call `cache` of `send`/`send_batch`, `PyRun.log`, `log_as`, `Run.run_id`, `RunArgs.cache`, `Settings.cache`, `Exchange.hit`, links, `session_rows`, `PyRun.run_id`, PyO3 `session_rows`, `session.not_found`, `session.unreadable`, `log.session_write`, `decision.missing_tool` | none: new capability (REQ-SAG-0005, REQ-SAG-0004, REQ-SAG-0703, ADR-SAG-0019 d14, ADR-SAG-0021) | - |
 
 ## External contracts (examples)
 
@@ -139,6 +179,12 @@ CLI: no new flag; `decidr send` writes `tool: "decidr"`, `tool_version` = the CL
 - Tests: `req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once` (sending.rs:597; replaced by `j3_session_write_failure`). `req_sag_0005_one_mib_request_is_recorded_whole` (records.rs:59) is replaced by `j3_largest_request_that_fits_is_recorded_whole` (owner, 2026-11-24, approved): the largest request whose enveloped row fits the sink's 1 MiB event cap is sent and its row read back whole; one byte larger is still sent whole to the model, writes no row and no link, and returns `log.session_write` (logged once).
 - Nothing else: `model_with`, Route fields, wire impls, batch code are untouched.
 
+## Owner rulings applied (2026-11-24, j1-bead.txt:352-354)
+
+1. Event-wrapped session row accepted: the sink is used as ADR-SAG-0021 says; the row is the `fields` of the event (see External contracts).
+2. 1 MiB: the largest request that fits is recorded whole; a larger one gives no row and a `log.session_write` error (the request itself is still sent whole, so ANC-004 holds). Covered by `j3_largest_request_that_fits_is_recorded_whole`; the failure path is the `log.session_write` rule in Run::send step 4.
+3. A cache hit writes no new row and returns the `session_id` of the row holding the result with `cached: true`: Run::send step 3 (link only; the value is the older row's `result.value`, whose `session_id` is that row's). Checked against `j3_cache_hit_one_model_call`.
+
 ## Budget (rewrite.py counting; against the 2,580 phase cap; j-1 end 2,404)
 
 Rule 2 counting: restructuring must net <= 0 against what it replaces and is counted 0 here; only new capability grows the total. The restructure estimates (j-2 about -11, this sprint about -4) are unbuilt and are not used to buy room.
@@ -150,23 +196,18 @@ Rule 2 counting: restructuring must net <= 0 against what it replaces and is cou
 | New capability: per-call `cache` argument on `send`/`send_batch` (Rust) | about +4 | estimate |
 | New capability: `run_id`, `tool_version`, `missing_tool`, links, `log` category arm, `session.unreadable` | about +30 | estimate |
 | New capability: `session_rows` + `rows` reader incl. `session.not_found` | about +25 | estimate |
-| New capability: `PyRun.log` (event dict -> `log` + flush) | about +8 | estimate |
+| New capability: `log_as` + `PyRun.log` (event dict -> `log_as` + flush) | about +11 | estimate |
+| New capability: sitr `tool=` on 4 pyfunctions (J3-S19; moved from j-4) | about +6 | estimate |
 | New capability: PyO3 kwargs, `run_id` getter, `session_rows` pyfunction, per-call `cache` kwarg; decidr 2 | about +27 | estimate |
-| **This sprint** | restructure 0, new capability about +139 | not built |
-| **Phase** | j-1 2,404 + j-2 new capability 15 + this sprint 139 = **about 2,558 / 2,580 (about 22 under, new capability only)** | with the unbuilt restructure estimates (-15) about 2,543 (37 under) |
-At the cap the dev stops at the gate and reports the line; the first cut is `session.not_found`, then `PyRun.log`. No per-function counts.
+| **This sprint** | restructure 0, new capability about +148 | not built |
+| **Phase** | j-1 2,404 + j-2 new capability 19 + this sprint 148 = **about 2,571 / 2,580 (about 9 under, new capability only)** | with the unbuilt restructure estimates (-15) about 2,556 (24 under) |
+At the cap the dev stops at the gate and reports the line. No per-function counts.
 
 ## Done checks
 
 - Build: `RUSTUP_TOOLCHAIN=1.98.1 cargo build --workspace --locked`; `cargo clippy --workspace --all-targets --all-features -- -D warnings`; `cargo fmt --check --all`.
 - Gate: `RUSTUP_TOOLCHAIN=1.98.1 python3 scripts/gate/rewrite.py` all PASS and Rust source <= 2,580, run at every push.
 - Greps: `grep -rn 'SESSION_APPEND\|OpenOptions\|send_json\|config.session' crates/sc-agent/src` none; `grep -n 'sends: &' crates/sc-agent/src` none; `grep -rn 'struct SessionRow\|struct RunLink\|struct CacheKey' crates` none.
-- Rust tests (deterministic: loopback Stub, injected wait seam, controlled files; no sleeps): records.rs `j3_sinks_never_rotate` (both files pre-created sparse past `RetainedLogPolicy::default().rotation_max_bytes`, mtime UNIX_EPOCH; one send adds exactly one line each, no sibling file), `j3_row_v2_per_wire` (messages, chat/completions, systemone: exact schema/tool/tool_version/provider/model_requested/model_answered/usage, `request_sha256` = sc-sha of the stub-recorded body bytes, no `run_id`, `usage` null without usage; `decision.result` fields keys exactly `session_id`,`cached`), `j3_session_write_failure` (sessions path obstructed: 200 -> `log.session_write` with `session_id`; 401 -> `http.auth` whole; once in the general log; no runs.jsonl), `j3_link_write_failure`, `j3_batch_links` (batch of 3 -> 3 links `{run_id,row session_id,false}`), `j3_interrupt_keeps_finished_rows` (REQ-SAG-0011; workers 1, cancel after result 1 of 3 -> 1 row, 2 `decision.cancelled`); kept `old_session_file_survives_a_new_decision_unchanged`. cache.rs `j3_cache_hit_one_model_call` (second send: same value + session_id, `cached: true`, 1 row, links false then true), `j3_cache_hit_skips_holdoff_and_wait` (second stub reply would be 529 Retry-After 3600; 0 requests, 0 wait calls), `j3_cache_newest_success_only` (two hand-written ok rows -> greater session_id; error row only -> model call; unreadable file mode 000 (skipped as root) -> `session.unreadable`, 0 requests), `j3_cache_misses` (table: other model, project, agent role, `cache` false), `j3_per_call_cache_overrides_the_run` (Some(false) and Some(true) against the Run's setting, send and send_batch), `j3_cache_batch_per_item` (batch of 10 resent with 2 changed -> 2 requests, 10 results in order, 8 `cached: true`), `j3_error_row_is_not_a_hit` (401 row has `model_answered: null`; resend makes a model call). config_and_values.rs `j3_cache_setting` (default true; `DECIDR_CACHE=false`; `DECIDR_CACHE=1` -> `config.invalid`; doctor row), `j3_missing_tool` (empty tool or tool_version -> `decision.missing_tool`, 0 requests, no row), `j3_log_categories` (table over the ids above and the unchanged ids), `j3_session_rows` (found ids, missing id -> `session.not_found`, unreadable -> `session.unreadable`). wires.rs: mechanical `Route.exchange`. support/mod.rs: `options` gains `tool_version` and `settings.tool`/`settings.cache` (named exception to the j-1 freeze); `rows()` reads `fields`.
+- Rust tests (deterministic: loopback Stub, injected wait seam, controlled files; no sleeps): records.rs `j3_sinks_never_rotate` (both files pre-created sparse past `RetainedLogPolicy::default().rotation_max_bytes`, mtime UNIX_EPOCH; one send adds exactly one line each, no sibling file), `j3_row_v2_per_wire` (messages, chat/completions, systemone: exact schema/tool/tool_version/provider/model_requested/model_answered/usage, `request_sha256` = sc-sha of the stub-recorded body bytes, no `run_id`, `usage` null without usage; `decision.result` fields keys exactly `session_id`,`cached`), `j3_session_write_failure` (sessions path obstructed: 200 -> `log.session_write` with `session_id`; 401 -> `http.auth` whole; once in the general log; no runs.jsonl), `j3_link_write_failure`, `j3_batch_links` (batch of 3 -> 3 links `{run_id,row session_id,false}`), `j3_interrupt_keeps_finished_rows` (REQ-SAG-0011; workers 1, cancel after result 1 of 3 -> 1 row, 2 `decision.cancelled`); kept `old_session_file_survives_a_new_decision_unchanged`. cache.rs `j3_cache_hit_one_model_call` (second send: same value + session_id, `cached: true`, 1 row, links false then true), `j3_cache_hit_skips_holdoff_and_wait` (second stub reply would be 529 Retry-After 3600; 0 requests, 0 wait calls), `j3_cache_newest_success_only` (two hand-written ok rows -> greater session_id; error row only -> model call; unreadable file mode 000 (skipped as root) -> `session.unreadable`, 0 requests), `j3_cache_misses` (table: other model, project, agent role, `cache` false), `j3_per_call_cache_overrides_the_run` (Some(false) and Some(true) against the Run's setting, send and send_batch; the value reaches Route::post through `Exchange.cache`), `j3_cache_batch_per_item` (batch of 10 resent with 2 changed -> 2 requests, 10 results in order, 8 `cached: true`), `j3_error_row_is_not_a_hit` (401 row has `model_answered: null`; resend makes a model call). config_and_values.rs `j3_cache_setting` (default true; `DECIDR_CACHE=false`; `DECIDR_CACHE=1` -> `config.invalid`; doctor row), `j3_missing_tool` (empty tool or tool_version -> `decision.missing_tool`, 0 requests, no row), `j3_log_categories` (table over the ids above and the unchanged ids), `j3_session_rows` (found ids, missing id -> `session.not_found`, unreadable -> `session.unreadable`). wires.rs: mechanical `Route.exchange`. support/mod.rs: `options` gains `tool_version` and `settings.tool`/`settings.cache` (named exception to the j-1 freeze); `rows()` reads `fields`.
 - decidr cli.rs: `j3_decidr_row_identity` (row under `<log_root>/sessions/github.com/randlee/sc-agent/rust-developer/phase-b/`, tool `decidr`, tool_version = CLI version).
-- Python (tests/contract/test_session.py new, test_contract.py): `test_run_id_and_links` (26-char ULID = links' run_id; two Runs differ), `test_missing_tool_refuses` (None and "" for tool/tool_version from every call), `test_run_cache_override` (Run `cache=False` -> 2 stub requests), `test_send_cache_argument_overrides_the_run` (None follows the Run; `cache=False` on a caching Run -> 2 requests; `cache=True` on a Run with cache False -> hit), `test_run_log_writes_event_and_flushes` (event reaches the general log with target/action/correlation_id/fields), `test_session_rows_reader` (child process, `<CLIENT>_LOG_ROOT` set, temporary git repo: found ids; missing id `session.not_found`; no log-root parameter), `test_cli_and_wheel_rows_match` (equal except session_id/tool/tool_version), `test_sitr_default_log_root` (REQ-SAG-0003, `SC_AGENT_HOME`), existing `test_session_and_general_log_share_fixed_root` kept; `test_native_stub_declares_every_export` still passes.
-
-## Owner rulings applied (2026-11-24, j1-bead.txt:352-354)
-
-1. Event-wrapped session row accepted: the sink is used as ADR-SAG-0021 says; the row is the `fields` of the event (see External contracts).
-2. 1 MiB: the largest request that fits is recorded whole; a larger one gives no row and a `log.session_write` error (the request itself is still sent whole, so ANC-004 holds). Covered by `j3_largest_request_that_fits_is_recorded_whole`; the failure path is the `log.session_write` rule in Run::send step 4.
-3. A cache hit writes no new row and returns the `session_id` of the row holding the result with `cached: true`: Run::send step 3 (link only; the value is the older row's `result.value`, whose `session_id` is that row's). Checked against `j3_cache_hit_one_model_call`.
+- Python (tests/contract/test_session.py new, test_contract.py): `test_run_id_and_links` (26-char ULID = links' run_id; two Runs differ), `test_missing_tool_refuses` (None and "" for tool/tool_version from every call), `test_run_cache_override` (Run `cache=False` -> 2 stub requests), `test_send_cache_argument_overrides_the_run` (None follows the Run; `cache=False` on a caching Run -> 2 requests; `cache=True` on a Run with cache False -> hit), `test_run_log_writes_event_and_flushes` (event reaches the general log with the given target, action, correlation_id and fields, not target sc-agent; a bad event is `sc_agent_py.invalid_option`), `test_sitr_tool_kwarg_names_the_log` (sitr call with tool= logs under that tool), `test_rendered_template_passes_tool_version` (render with tool_version; Run opened with it; render without it fails --strict), `test_session_rows_reader` (child process, `<CLIENT>_LOG_ROOT` set, temporary git repo: found ids; missing id `session.not_found`; no log-root parameter), `test_cli_and_wheel_rows_match` (equal except session_id/tool/tool_version), `test_sitr_default_log_root` (REQ-SAG-0003, `SC_AGENT_HOME`), existing `test_session_and_general_log_share_fixed_root` kept; `test_native_stub_declares_every_export` still passes.
