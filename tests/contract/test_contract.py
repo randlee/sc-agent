@@ -758,9 +758,9 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name, general_log=logger, base_url=url, sleep=wait) as run_9:
                 return run_9.send(json.dumps(REQUEST))
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}), server(
-                [(429, {}, {}), (429, {}, {}), (200, {}, ANSWER)]) as (first, _), server(
-                [(200, {}, ANSWER)], host="::1") as (second, _):
-            worker = threading.Thread(target=lambda: results.append(send(first, sleep)))
+                [(429, {}, {}), (429, {}, {}), (200, {}, ANSWER)]) as (first, first_received), server(
+                [(200, {}, ANSWER)], host="::1") as (second, second_received):
+            worker = threading.Thread(target=lambda: results.append(send(first, sleep)), daemon=True)
             worker.start()
             try:
                 self.assertTrue(entered.wait(10), "busy reply did not reach holdoff")
@@ -769,8 +769,12 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             finally:
                 finished.set()
                 worker.join(15)
-        self.assertFalse(worker.is_alive())
-        self.assertEqual(completed_during_holdoff, [True, True])
+        diagnostics = (f"first requests={first_received!r}; second requests={second_received!r}; "
+                       f"waits={waits!r}; results={results!r}; "
+                       f"completed_during_holdoff={completed_during_holdoff!r}")
+        self.assertFalse(worker.is_alive(), f"worker.join(15) backstop expired; {diagnostics}")
+        self.assertEqual(completed_during_holdoff, [True, True],
+                         f"finished.wait(10) backstop expired; {diagnostics}")
         self.assertEqual(waits, [1, 2])
         self.assertTrue(results[0]["ok"], results)
 
