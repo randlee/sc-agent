@@ -347,6 +347,13 @@ def prepare(runtime, sanity):
                 "findings", "each item requires {deliverable: nonnegative int (0 = verification-wide evidence deficiency), issue: nonempty string}")
     require(verdict != "PASS" or not findings, "findings", "PASS cannot contain missing items")
     require(verdict != "FAIL" or bool(findings), "findings", "FAIL must identify missing items or lint failure")
+    # The dev rejected the finding and sanity accepted the rejection: nothing to QA (owner ruling 2026-11-19).
+    rejected = verdict == "PASS" and (values.get("nr") in (True, "true") or values.get("outcome") == "not_reproducible")
+    qa_id = (dev.get("metadata") or {}).get("qa_bead")
+    if rejected:
+        require(isinstance(qa_id, str) and bool(qa_id), "checked_bead.metadata.qa_bead",
+                "required to close the QA bead of a not-reproducible PASS", "phase-lead")
+        runtime.bead(qa_id)
     history = runtime.events(task)
     assignments = [event for event in history if event.get("event") in ASSIGNMENTS]
     require(bool(assignments), "assignment", "sanity task has no assignment", "phase-lead")
@@ -378,6 +385,8 @@ def prepare(runtime, sanity):
     if verdict == "PASS":
         if sanity.get("status") != "closed":
             writes.append([task, "close", {"reason": f"PASS at {commit}"}, {}])
+        if rejected:  # the drain treats an already closed bead as applied
+            writes.append([qa_id, "close", {"reason": f"not reproducible: rejection accepted by sanity at {commit}; no QA"}, {}])
     else:
         try:
             template, dispatch = close_fields.reassignment(runtime.root, runtime.envelope["phase"], dev,
