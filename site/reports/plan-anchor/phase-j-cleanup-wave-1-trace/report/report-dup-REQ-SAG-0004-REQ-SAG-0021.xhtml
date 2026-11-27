@@ -1,0 +1,49 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-duplicate" id="dup-REQ-SAG-0004-REQ-SAG-0021">
+  <div class="section-head">
+    <h2>REQ-SAG-0004 restates REQ-SAG-0021</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="[
+  {
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;possible&quot;,
+    &quot;confidence&quot;: 0.43,
+    &quot;item&quot;: &quot;REQ-SAG-0004&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0021&quot;,
+    &quot;session_id&quot;: &quot;01M8FMB82M4TFPYZ5RNJWJAJJ1&quot;,
+    &quot;statement&quot;: &quot;A session with no project/phase MUST be refused with an error.&quot;,
+    &quot;statement_index&quot;: 3
+  }
+]">{}</button>
+    </div>
+  </div>
+  <p class="small">sc-agent · sc-agent</p>
+  <h3>Possibly duplicated statement</h3>
+  <ul>
+    <li>REQ-SAG-0021 statement 4 (0.43): A session with no project/phase MUST be refused with an error.</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+  </ul>
+  <h3>REQ-SAG-0004 Session log identity: repo, agent role, project and tool</h3>
+  <h3>Statements</h3>
+  <ul>
+    <li>Every session row MUST carry its identity.</li>
+    <li>sc-agent MUST refuse every query whose identity is not valid.</li>
+    <li>In a git repository, a query&#x27;s repository MUST be that repository&#x27;s origin name.</li>
+    <li>Outside a git repository, a query&#x27;s repository MUST be `local/&lt;host&gt;/&lt;folder-name&gt;`.</li>
+    <li>A query&#x27;s project MUST be the project that REQ-SAG-0021 resolves for it.</li>
+    <li>The `decidr` CLI MUST accept an agent role from its user.</li>
+    <li>The Python bindings of sc-agent MUST accept an agent role from their caller.</li>
+    <li>A generated consumer client MUST set the agent role to the client&#x27;s product name.</li>
+    <li>A generated consumer client MUST NOT let its user set the agent role.</li>
+  </ul>
+  <h3>REQ-SAG-0021 The project/phase setting is required and shared</h3>
+  <h3>Statements</h3>
+  <ul>
+    <li>The `project` setting MUST be resolved through every project layer.</li>
+    <li>The PyO3 bindings MUST take `project` from the first project layer that sets it.</li>
+    <li>In the PyO3 bindings, a `project` argument MUST take the place of the `--project` flag layer.</li>
+    <li>A session with no project/phase MUST be refused with an error.</li>
+    <li>When no project layer sets `project`, a session write MUST NOT send a session.</li>
+    <li>When no project layer sets `project`, a session write MUST NOT write a session.</li>
+    <li>`project` MUST NOT have a built-in default.</li>
+  </ul>
+</section>

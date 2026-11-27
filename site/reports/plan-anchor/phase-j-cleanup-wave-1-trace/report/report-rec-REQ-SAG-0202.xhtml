@@ -1,0 +1,130 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0202">
+  <div class="section-head">
+    <h2>REQ-SAG-0202 Question digest computed by sc-sha</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0202&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When sc-agent sends a question to a decision model, sc-agent MUST compute the question digest of that question.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;sc-agent MUST record each question digest with the decision model&#x27;s response to the question the digest was computed from.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0004&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0703&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0202&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Recording the digest with the response lets a response be retrieved from the exact information and question that produced it.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When sc-agent sends a question to a decision model, sc-agent MUST compute the question digest of that question.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;sc-agent MUST record each question digest with the decision model&#x27;s response to the question the digest was computed from.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: The information is everything sent to the decision model with a question, other than the questions themselves. A single question is one question of the request. The question digest is the SHA-256 digest of the information plus one single question.\n\nThe result cache is specified by REQ-SAG-0703. Its key is the hash of the full request text and the requested model, not the question digest.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test shows two sends of the same information and the same single question record the same question digest.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test shows that changing any part of the information, or the question, changes the question digest.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test shows a request with three questions records three question digests, one per question.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Question digest computed by sc-sha&quot;,
+    &quot;version&quot;: &quot;0.2.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.2.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>When sc-agent sends a question to a decision model, sc-agent MUST compute the question digest of that question.</li>
+    <li>sc-agent MUST record each question digest with the decision model&#x27;s response to the question the digest was computed from.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: The information is everything sent to the decision model with a question, other than the questions themselves. A single question is one question of the request. The question digest is the SHA-256 digest of the information plus one single question.
+
+The result cache is specified by REQ-SAG-0703. Its key is the hash of the full request text and the requested model, not the question digest.</p>
+  <h3>Rationale</h3>
+  <p>Recording the digest with the response lets a response be retrieved from the exact information and question that produced it.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A unit test shows two sends of the same information and the same single question record the same question digest.</li>
+    <li>A unit test shows that changing any part of the information, or the question, changes the question digest.</li>
+    <li>A unit test shows a request with three questions records three question digests, one per question.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>REQ-SAG-0004</li>
+    <li>REQ-SAG-0703</li>
+  </ul>
+</section>

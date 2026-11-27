@@ -1,0 +1,204 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0703">
+  <div class="section-head">
+    <h2>REQ-SAG-0703 Result cache: a repeated request returns the existing session&#x27;s result without a model call</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0703&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When no cache setting is given, sc-agent MUST treat the cache flag as on.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;On a cache hit, sc-agent MUST return the cached result.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When a batch is sent, sc-agent MUST decide a cache hit for each item on its own.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;On a cache hit, sc-agent MUST NOT make a model call.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;On a cache hit, sc-agent MUST NOT write a new session row.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;When the matching session row records an error, sc-agent MUST NOT treat the query as a cache hit.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-24&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0005&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0016&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0702&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0801&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0021&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0703&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Tools resend the same request often; answering it from the session log saves the API call. The key includes the model because different models answer differently. A per-item cache means a batch of 10 with 2 changed items makes 2 model calls. The cache also lets offline tests run without a model.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When no cache setting is given, sc-agent MUST treat the cache flag as on.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;On a cache hit, sc-agent MUST return the cached result.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When a batch is sent, sc-agent MUST decide a cache hit for each item on its own.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;On a cache hit, sc-agent MUST NOT make a model call.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;On a cache hit, sc-agent MUST NOT write a new session row.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;When the matching session row records an error, sc-agent MUST NOT treat the query as a cache hit.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: the cache flag is a setting that turns the result cache on or off. The request hash is the SHA-256 digest of the full text sc-agent sends to the model. A cache hit is a query, with the cache flag on, whose request hash and requested model match an existing session row. The cached result is the matching session row&#x27;s result together with that row&#x27;s session identifier. A session row records an error when its result is an error rather than a value. A batch is one call that sends several requests; each request is an item.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test: with no cache setting, two sends of one request to one model make one model call.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test: the second of two identical sends returns the first&#x27;s result and `session_id`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test: when the only matching session row records an error, a resend makes a model call.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test: a batch of 10 items, 2 of them changed since a previous run, makes 2 model calls.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test: on a cache hit, the model client records no call.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test: on a cache hit, the session row count does not change.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Result cache: a repeated request returns the existing session&#x27;s result without a model call&quot;,
+    &quot;version&quot;: &quot;0.6.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.6.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>When no cache setting is given, sc-agent MUST treat the cache flag as on.</li>
+    <li>On a cache hit, sc-agent MUST return the cached result.</li>
+    <li>When a batch is sent, sc-agent MUST decide a cache hit for each item on its own.</li>
+    <li>On a cache hit, sc-agent MUST NOT make a model call.</li>
+    <li>On a cache hit, sc-agent MUST NOT write a new session row.</li>
+    <li>When the matching session row records an error, sc-agent MUST NOT treat the query as a cache hit.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: the cache flag is a setting that turns the result cache on or off. The request hash is the SHA-256 digest of the full text sc-agent sends to the model. A cache hit is a query, with the cache flag on, whose request hash and requested model match an existing session row. The cached result is the matching session row&#x27;s result together with that row&#x27;s session identifier. A session row records an error when its result is an error rather than a value. A batch is one call that sends several requests; each request is an item.</p>
+  <h3>Rationale</h3>
+  <p>Tools resend the same request often; answering it from the session log saves the API call. The key includes the model because different models answer differently. A per-item cache means a batch of 10 with 2 changed items makes 2 model calls. The cache also lets offline tests run without a model.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A unit test: with no cache setting, two sends of one request to one model make one model call.</li>
+    <li>A unit test: the second of two identical sends returns the first&#x27;s result and `session_id`.</li>
+    <li>A unit test: when the only matching session row records an error, a resend makes a model call.</li>
+    <li>A unit test: a batch of 10 items, 2 of them changed since a previous run, makes 2 model calls.</li>
+    <li>A unit test: on a cache hit, the model client records no call.</li>
+    <li>A unit test: on a cache hit, the session row count does not change.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>REQ-SAG-0005</li>
+    <li>REQ-SAG-0016</li>
+    <li>REQ-SAG-0019</li>
+    <li>REQ-SAG-0702</li>
+    <li>REQ-SAG-0801</li>
+    <li>ADR-SAG-0019</li>
+    <li>ADR-SAG-0021</li>
+  </ul>
+</section>
