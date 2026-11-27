@@ -84,7 +84,7 @@ fn main() {
                             .map_err(|e| sc_agent::error("decidr.input_read", e))?
                     }
                 };
-                let result = if batch {
+                if batch {
                     let requests = text
                         .lines()
                         .enumerate()
