@@ -139,18 +139,26 @@ impl Stub {
         let unserved = remaining.clone();
         let (finished, outcome) = mpsc::channel();
         let worker = std::thread::spawn(move || {
-            let result = (|| {
-                let mut seen = vec![];
-                for reply in replies {
+            let mut seen = vec![];
+            let mut stage = "accept";
+            let mut index = 0;
+            let result: CapturedRequests = (|| {
+                for (i, reply) in replies.into_iter().enumerate() {
+                    index = i + 1;
+                    stage = "accept";
                     let (mut stream, _) = listener.accept()?;
                     if stopped.load(Ordering::SeqCst) {
                         break;
                     }
                     // Deadlines are hang guards only; no test waits for or asserts on elapsed time.
+                    stage = "set read timeout";
                     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
+                    stage = "set write timeout";
                     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+                    stage = "read request";
                     let request = read_request(&mut stream)?;
                     seen.push(request);
+                    stage = "write response";
                     match reply {
                         Reply::Redirect(location) => {
                             write!(
@@ -179,8 +187,12 @@ impl Stub {
                     }
                     unserved.fetch_sub(1, Ordering::SeqCst);
                 }
-                Ok(seen)
-            })();
+                Ok(())
+            })()
+            .map(|()| std::mem::take(&mut seen))
+            .map_err(|error: Box<dyn std::error::Error + Send + Sync>| {
+                format!("stub reply {index} at {stage}: {error}; captured requests: {seen:?}").into()
+            });
             let _ = finished.send(result);
         });
         Ok(Self {
@@ -217,7 +229,25 @@ impl Stub {
 impl Drop for Stub {
     fn drop(&mut self) {
         if self.worker.is_some() {
-            let _ = self.stop();
+            let result = self
+                .stop()
+                .map_err(|e| format!("stub wake-up failed: {e}"))
+                .and_then(|()| {
+                    self.outcome
+                        .recv_timeout(Duration::from_secs(10))
+                        .map_err(|e| {
+                            format!(
+                                "stub worker did not finish; {} unserved replies: {e}",
+                                self.remaining.load(Ordering::SeqCst)
+                            )
+                        })?
+                        .map_err(|e| e.to_string())
+                })
+                .map(|_| ());
+            if let Err(error) = result {
+                assert!(std::thread::panicking(), "{error}");
+                eprintln!("{error}");
+            }
         }
     }
 }
