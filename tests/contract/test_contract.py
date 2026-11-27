@@ -235,6 +235,15 @@ class Wheel(Isolated):
             self.assertEqual(sum(row["fields"].get("id") == "sc_agent_py.invalid_option" for row in rows),
                              index)
 
+    def test_invalid_logger_preserves_run_creation_error(self):
+        run = self.api.Run(tool="decidr", tool_version="test", model="no-such-model",
+                           agent_role="contract", general_log=object())
+        result = run.send({})
+        detail = self.error(result)
+        self.assertEqual(detail["id"], "sc_agent_py.invalid_option")
+        self.assertIn("Logger", detail["message"])
+        self.assertIn("log.write", detail["message"])
+
     def test_bad_signature_logs_once_to_injected_logger(self):
         logger = self.api.logger("decidr")["value"]
         with self.api.Run(tool="decidr", tool_version="test", cache=False, bogus=1, general_log=logger, agent_role="contract") as run_1:
