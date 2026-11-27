@@ -663,5 +663,5 @@ def extract(language: str, source: str, query: str, *, general_log: Any = None) 
     logger = _logger(sc_agent.logger, general_log)
     if not logger["ok"]:
         return logger
-    return sc_agent.sitr.query(language, source, query, general_log=logger["value"])
+    return sc_agent.sitr.query(language, source, query, general_log=logger["value"], tool=CLIENT_NAME)
 {% endif %}

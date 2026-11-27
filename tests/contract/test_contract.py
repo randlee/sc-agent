@@ -584,6 +584,35 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         with_other = {**REQUEST, "questions": {**REQUEST["questions"], "other": REQUEST["questions"]["q"]}}
         self.assertEqual(got, self.api.digest(with_other, "q"))
 
+    def test_caller_tool_names_default_binding_logs(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {
+            "MY_TOOL_LOG_ROOT": folder, "BORROWED_LOG_ROOT": folder, "DECIDR_LOG_ROOT": folder, "SITR_LOG_ROOT": folder,
+        }):
+            self.assertTrue(self.api.digest(REQUEST, "q", tool="my-tool")["ok"])
+            self.assertTrue(self.api.sitr.languages(tool="my-tool")["ok"])
+            self.assertTrue(self.api.sitr.queries("rust", tool="my-tool")["ok"])
+            self.assertTrue(self.api.sitr.query("rust", "fn f() {}", "(function_item) @f", tool="my-tool")["ok"])
+            self.assertTrue(self.api.sitr.run("rust", "match-arms", "fn f() {}", tool="my-tool")["ok"])
+            self.assertEqual(self.error(self.api.logger(None, tool="my-tool"))["id"], "sc_agent_py.invalid_option")
+            self.assertEqual(self.error(self.api.flush(None, tool="my-tool"))["id"], "sc_agent_py.invalid_option")
+            self.assertEqual(self.error(self.api.digest(None, "q", tool="my-tool"))["id"], "sc_agent_py.invalid_option")
+            self.assertEqual(self.error(self.api.sitr.queries("not-a-language", tool="my-tool"))["id"], "treesitter.unknown_language")
+            for function in (self.api.logger, self.api.log, self.api.flush):
+                with self.subTest(function=function.__name__):
+                    self.assertEqual(self.error(function(bogus=1, tool="my-tool"))["id"], "sc_agent_py.invalid_option")
+            log = Path(folder) / "logs/my-tool.log.jsonl"
+            events = [json.loads(line) for line in log.read_text().splitlines()]
+            self.assertTrue(events)
+            self.assertTrue(all(event["service"] == "my-tool" for event in events))
+            self.assertFalse((Path(folder) / "logs/decidr.log.jsonl").exists())
+            self.assertFalse((Path(folder) / "logs/sitr.log.jsonl").exists())
+            borrowed = self.api.logger("borrowed")["value"]
+            self.assertTrue(self.api.sitr.languages(general_log=borrowed, tool="my-tool")["ok"])
+            self.assertTrue(self.api.flush(borrowed)["ok"])
+            events = [json.loads(line) for line in (Path(folder) / "logs/borrowed.log.jsonl").read_text().splitlines()]
+            self.assertTrue(events)
+            self.assertTrue(all(event["service"] == "borrowed" for event in events))
+
     def test_native_logger_shared_with_sitr(self):
         with tempfile.TemporaryDirectory() as folder:
             previous = os.environ.get("T_LOG_ROOT")

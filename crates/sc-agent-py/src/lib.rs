@@ -254,8 +254,8 @@ fn interruptible(
     })
 }
 
-#[pyfunction(signature=(name=None))]
-fn logger(py: Python<'_>, name: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
+#[pyfunction(signature=(name=None,*,tool="decidr"))]
+fn logger(py: Python<'_>, name: Option<&Bound<'_, PyAny>>, tool: &str) -> Py<PyAny> {
     let created = (|| -> Result<Py<PyAny>, Error> {
         let logger = sc_agent::default_logger(&text(name)?)?;
         let value = Py::new(py, PyLogger(Arc::new(logger))).map_err(invalid)?;
@@ -264,16 +264,17 @@ fn logger(py: Python<'_>, name: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
         envelope.set_item("value", value).map_err(invalid)?;
         Ok(envelope.into_any().unbind())
     })();
-    created.unwrap_or_else(|e| raw(py, respond_error(None, "decidr", e)))
+    created.unwrap_or_else(|e| raw(py, respond_error(None, tool, e)))
 }
 
-#[pyfunction(signature=(logger=None,event=None))]
+#[pyfunction(signature=(logger=None,event=None,*,tool="decidr"))]
 fn log(
     py: Python<'_>,
     logger: Option<&Bound<'_, PyAny>>,
     event: Option<&Bound<'_, PyAny>>,
+    tool: &str,
 ) -> Py<PyAny> {
-    respond(py, logger, "decidr", |logger| {
+    respond(py, logger, tool, |logger| {
         let supplied = decode(required(event)?)?;
         let mut event = json!({"version":"v1", "timestamp":sc_observability::Timestamp::now_utc(),
                               "service":logger.service_name(), "identity":sc_observability::ProcessIdentity::default(),
@@ -288,8 +289,8 @@ fn log(
         Ok(Value::Null)
     })
 }
-#[pyfunction(signature=(logger=None))]
-fn flush(py: Python<'_>, logger: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
+#[pyfunction(signature=(logger=None,*,tool="decidr"))]
+fn flush(py: Python<'_>, logger: Option<&Bound<'_, PyAny>>, tool: &str) -> Py<PyAny> {
     match required(logger).and_then(|v| logger_of(v)) {
         Ok(logger) => raw(
             py,
@@ -300,17 +301,18 @@ fn flush(py: Python<'_>, logger: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
                     .map_err(|e| error("log.flush", e)),
             ),
         ),
-        Err(error) => raw(py, respond_error(None, "decidr", error)),
+        Err(error) => raw(py, respond_error(None, tool, error)),
     }
 }
-#[pyfunction(signature=(request=None,question=None,*,general_log=None))]
+#[pyfunction(signature=(request=None,question=None,*,general_log=None,tool="decidr"))]
 fn digest(
     py: Python<'_>,
     request: Option<&Bound<'_, PyAny>>,
     question: Option<&Bound<'_, PyAny>>,
     general_log: Option<&Bound<'_, PyAny>>,
+    tool: &str,
 ) -> Py<PyAny> {
-    respond(py, general_log, "decidr", |_| {
+    respond(py, general_log, tool, |_| {
         sc_agent::digest(&decode(required(request)?)?, &text(question)?).map(Value::String)
     })
 }
@@ -523,34 +525,36 @@ fn provider_keys(py: Python<'_>) -> Py<PyAny> {
 fn models(py: Python<'_>) -> Py<PyAny> {
     raw(py, sc_agent::result(Ok(json!(sc_agent::PROVIDERS))))
 }
-#[pyfunction(signature=(*,general_log=None))]
-fn languages(py: Python<'_>, general_log: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
-    respond(py, general_log, "sitr", |logger| {
+#[pyfunction(signature=(*,general_log=None,tool="sitr"))]
+fn languages(py: Python<'_>, general_log: Option<&Bound<'_, PyAny>>, tool: &str) -> Py<PyAny> {
+    respond(py, general_log, tool, |logger| {
         sc_agent::log(logger, "sitr.languages", json!({}))?;
         Ok(sc_treesitter::languages())
     })
 }
-#[pyfunction(signature=(language=None,*,general_log=None))]
+#[pyfunction(signature=(language=None,*,general_log=None,tool="sitr"))]
 fn queries(
     py: Python<'_>,
     language: Option<&Bound<'_, PyAny>>,
     general_log: Option<&Bound<'_, PyAny>>,
+    tool: &str,
 ) -> Py<PyAny> {
-    respond(py, general_log, "sitr", |logger| {
+    respond(py, general_log, tool, |logger| {
         let value = sc_treesitter::queries(&text(language)?)?;
         sc_agent::log(logger, "sitr.queries", json!({}))?;
         Ok(value)
     })
 }
-#[pyfunction(signature=(language=None,source=None,query=None,*,general_log=None))]
+#[pyfunction(signature=(language=None,source=None,query=None,*,general_log=None,tool="sitr"))]
 fn query(
     py: Python<'_>,
     language: Option<&Bound<'_, PyAny>>,
     source: Option<&Bound<'_, PyAny>>,
     query: Option<&Bound<'_, PyAny>>,
     general_log: Option<&Bound<'_, PyAny>>,
+    tool: &str,
 ) -> Py<PyAny> {
-    respond(py, general_log, "sitr", |logger| {
+    respond(py, general_log, tool, |logger| {
         let value = sc_treesitter::query(
             &sc_treesitter::language(&text(language)?)?,
             &text(source)?,
@@ -560,15 +564,16 @@ fn query(
         Ok(value)
     })
 }
-#[pyfunction(signature=(language=None,name=None,source=None,*,general_log=None))]
+#[pyfunction(signature=(language=None,name=None,source=None,*,general_log=None,tool="sitr"))]
 fn run(
     py: Python<'_>,
     language: Option<&Bound<'_, PyAny>>,
     name: Option<&Bound<'_, PyAny>>,
     source: Option<&Bound<'_, PyAny>>,
     general_log: Option<&Bound<'_, PyAny>>,
+    tool: &str,
 ) -> Py<PyAny> {
-    respond(py, general_log, "sitr", |logger| {
+    respond(py, general_log, tool, |logger| {
         let value = sc_treesitter::predefined(&text(language)?, &text(name)?, &text(source)?)?;
         sc_agent::log(logger, "sitr.run", json!({}))?;
         Ok(value)
@@ -588,7 +593,9 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
                         Err(failure) => {
                             let given = kwargs.and_then(|v| v.get_item("general_log").ok().flatten());
                             let name = if matches!(stringify!($function), "languages" | "queries" | "query" | "run") { "sitr" } else { "decidr" };
-                            raw(py, respond_error(given.as_ref(), name, error("sc_agent_py.invalid_option", failure)))
+                            let tool = kwargs.and_then(|v| v.get_item("tool").ok().flatten())
+                                .and_then(|v| v.extract::<String>().ok());
+                            raw(py, respond_error(given.as_ref(), tool.as_deref().unwrap_or(name), error("sc_agent_py.invalid_option", failure)))
                         },
                     }
                 },
