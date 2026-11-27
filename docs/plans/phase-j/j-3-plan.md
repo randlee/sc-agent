@@ -1,6 +1,6 @@
 # j-3 plan: session log, run identity, result cache, session-row reader
 
-Base: sprint/j-2 @72c02c36 (planned end state of docs/plans/phase-j/j-2-plan.md: `Run`, `RunArgs`, `Options` without `provider`, config/load/doctor taking `tool`, PyO3 `PyRun`/`PyLogger`; j-2 end about 2,345/2,500). Line refs are file:line at that commit (Rust `Run` built; PyO3 and tests still to land from j-2, so PyO3 refs are to the j-2 plan). Written by reading the code and the records on origin/plan/phase-j (REQ-SAG-0002/0003/0004/0005/0011/0017/0703, ADR-SAG-0019 decision 14, ADR-SAG-0021 Session log/Paths/Session identity). The bead's old prose is intent only.
+Base: sprint/j-2 @46e9c51e (planned end state of docs/plans/phase-j/j-2-plan.md: `Run`, `RunArgs`, `Options` without `provider`, config/load/doctor taking `tool`, PyO3 `PyRun`/`PyLogger`; j-2 end about 2,408/2,500). Line refs are file:line at that commit (Rust `Run` built; PyO3 and tests still to land from j-2, so PyO3 refs are to the j-2 plan). Written by reading the code and the records on origin/plan/phase-j (REQ-SAG-0002/0003/0004/0005/0011/0017/0703, ADR-SAG-0019 decision 14, ADR-SAG-0021 Session log/Paths/Session identity). The bead's old prose is intent only.
 
 ## Goal
 
@@ -40,7 +40,7 @@ impl Run {
     pub fn from_options(options: Options, logger: Option<Arc<Logger>>, cancel: Arc<Cancel>) -> Result<Self, Error>;
 }                                         // new, send, send_batch, close, provider, logger: j-2 signatures unchanged
 
-/// Per-call exchange state the wire code fills (replaces the `sends: &Cell<u32>` field of `Route`, lib.rs Route :978).
+/// Per-call exchange state the wire code fills (replaces the `sends: &Cell<u32>` field of `Route`, lib.rs Route :1076).
 #[derive(Default)]
 pub struct Exchange {
     pub sends: Cell<u32>,
@@ -57,7 +57,7 @@ fn session_dir(log_root: &Path, repo: &str, agent_role: &str, project: &str) -> 
 pub fn session_rows(ids: &[String], agent_role: &str, project: Option<&str>) -> Result<Value, Error>;
 
 // private (latitude inside bodies, shapes fixed):
-fn event(service: &ServiceName, action: &str, fields: Value) -> Result<LogEvent, Error>;     // private; `pub fn log(logger, action, fields)` (lib.rs:889) keeps its public signature and only its body becomes logger.log(event(..)?)
+fn event(service: &ServiceName, action: &str, fields: Value) -> Result<LogEvent, Error>;     // private; `pub fn log(logger, action, fields)` (lib.rs:987) keeps its public signature and only its body becomes logger.log(event(..)?)
 fn append(path: PathBuf, action: &str, fields: Value) -> Result<(), Error>;                 // JsonlFileSink::open(path, NEVER).write(&event) ; NEVER = RetainedLogPolicy{rotation_max_bytes: ByteCount::from_bytes(u64::MAX), rotation_max_files and retention_max_age at their maxima, rest default}; sc-observability 1.5.0 has no disable/no-rotation mode (RetainedLogPolicy fields are all required; RetentionMaxAge must be non-zero), so maxima are the only way and rotation can't trigger
 fn rows(path: &Path, keep: impl FnMut(&Value) -> bool) -> Result<Vec<Value>, Error>;        // unwraps each line's `fields`; skips an unparsable (partial) line; Err `session.unreadable` when the file exists and cannot be read
 fn sha(bytes: &[u8]) -> Result<String, Error>;                                               // shared by `digest` and the body hash
@@ -69,7 +69,7 @@ Behaviour of `Run::send` (call order; private):
 1. cancel, project and slug checks (unchanged) -> wire. `Route::post` serializes the body once to bytes (replaces `send_json`), sets `exchange.sha`, and, when `settings.cache`, `rows(sessions.jsonl, same request_sha256 && same model_requested && result.ok)` -> the row with the greatest `session_id`; on a hit it stores the row's `result.value` in `exchange.hit` and returns it without a model call, holdoff or wait; `text()` passes a hit through unparsed. Unreadable file: `session.unreadable`, no model call.
 2. On a 2xx body that parses, `exchange.raw` takes `{model, usage}`.
 3. Hit: link `{run_id, session_id (the row's), cached: true}` to `runs.jsonl`; log `decision.result {session_id, cached: true}`; flush; return the value with `cached: true`. No row.
-4. Miss: success value gains `attempts`, `session_id`, `question_digests`, `cached: false` (as `attempts`/`session_id`/`question_digests` today :1355-1362); append the row to `sessions.jsonl`, then the link `{run_id, session_id, false}` to `runs.jsonl`. Row append or link failure: log `log.session_write` once; a success outcome returns that error (carrying `session_id`), an error outcome is returned unchanged. Then log `decision.result {session_id, cached}` (success only; no `response` field), flush.
+4. Miss: success value gains `attempts`, `session_id`, `question_digests`, `cached: false` (as `attempts`/`session_id`/`question_digests` today :1451-1458); append the row to `sessions.jsonl`, then the link `{run_id, session_id, false}` to `runs.jsonl`. Row append or link failure: log `log.session_write` once; a success outcome returns that error (carrying `session_id`), an error outcome is returned unchanged. Then log `decision.result {session_id, cached}` (success only; no `response` field), flush.
 5. `send_batch` is unchanged: it calls `self.send` per item, so cache hits and links are per item (REQ-SAG-0703).
 
 Per-call cache override is not planned: no record has one (ADR-SAG-0019 decision 14 sets `cache=` on the Run; REQ-SAG-0702 refuses per-call overrides). Tests that resend on purpose build the Run with `cache` false.
@@ -91,13 +91,13 @@ Python (names added by j-3; `_native.pyi`/`__init__.py`/`__init__.pyi`): `Run.__
 
 | item | replaces | deleted with it |
 |---|---|---|
-| `append`, `event`, `NEVER` policy | `static SESSION_APPEND` :1186 and the `OpenOptions` append block with `config.session` :1368-1392; the body of `log` :889-894 becomes `event` + `logger.log` | the static, the lock, the manual create_dir_all/writeln, `config.session` id |
-| `session_dir` (private) | inline `.join("sessions").join(repo).join(role).join(project)` :1370-1374 | the inline join (reader and writer share the layout fn) |
-| `sha` | the sc-sha call in `digest` :871-876 | the duplicate call |
-| `Exchange`, `Route.exchange` | `Route.sends: &Cell<u32>` and `let sends = Cell::new(0)` in `send` :1308 | the field and the local |
-| body bytes in `Route::post` | `post.send_json(&sending)` :1128, `body.clone()` :1126 | both |
-| row `json!` with schema/tool/provider/model/usage/sha | the row literal :1368 | the literal |
-| `decision.result {session_id, cached}` | `json!({"response":value})` :1394 | the `response` field |
+| `append`, `event`, `NEVER` policy | `static SESSION_APPEND` :1284 and the `OpenOptions` append block with `config.session` :1464-1488; the body of `log` :987-992 becomes `event` + `logger.log` | the static, the lock, the manual create_dir_all/writeln, `config.session` id |
+| `session_dir` (private) | inline `.join("sessions").join(repo).join(role).join(project)` :1466-1470 | the inline join (reader and writer share the layout fn) |
+| `sha` | the sc-sha call in `digest` :969-974 | the duplicate call |
+| `Exchange`, `Route.exchange` | `Route.sends: &Cell<u32>` and `let sends = Cell::new(0)` in `send` :1407 | the field and the local |
+| body bytes in `Route::post` | `post.send_json(&sending)` :1226, `body.clone()` :1224 | both |
+| row `json!` with schema/tool/provider/model/usage/sha | the row literal :1464 | the literal |
+| `decision.result {session_id, cached}` | `json!({"response":value})` :1490 | the `response` field |
 | `Options.tool_version`, `Run::from_options` minus `tool` | j-2's separate `tool: String` parameter of `from_options` | the parameter and the matching `args.tool` pass-through |
 | `decision.missing_tool` | j-2's PyO3 "tool is required" `invalid_option` | that check |
 | category arm | `_ => "validation"` for `log.write`/`log.flush`/`log.shutdown` | - |
@@ -129,12 +129,12 @@ CLI: no new flag; `decidr send` writes `tool: "decidr"`, `tool_version` = the CL
 
 ## Deletions
 
-- crates/sc-agent/src/lib.rs: `static SESSION_APPEND` :1186; the append block :1368-1392 and `config.session`; the `sends` local :1308 and `Route.sends`; `send_json` :1128 and `body.clone()` :1126; the duplicate sc-sha call :871-876; the `response` field :1394.
+- crates/sc-agent/src/lib.rs: `static SESSION_APPEND` :1284; the append block :1464-1488 and `config.session`; the `sends` local :1407 and `Route.sends`; `send_json` :1226 and `body.clone()` :1224; the duplicate sc-sha call :969-974; the `response` field :1490.
 - crates/sc-agent-py (j-2 plan): the "tool is required" check.
-- Tests: `req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once` (sending.rs:599; replaced by `j3_session_write_failure`). `req_sag_0005_one_mib_request_is_recorded_whole` (records.rs:59) is replaced by `j3_largest_request_that_fits_is_recorded_whole` (owner, 2026-11-24, approved): the largest request whose enveloped row fits the sink's 1 MiB event cap is sent and its row read back whole; one byte larger is still sent whole to the model, writes no row and no link, and returns `log.session_write` (logged once).
+- Tests: `req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once` (sending.rs:597; replaced by `j3_session_write_failure`). `req_sag_0005_one_mib_request_is_recorded_whole` (records.rs:59) is replaced by `j3_largest_request_that_fits_is_recorded_whole` (owner, 2026-11-24, approved): the largest request whose enveloped row fits the sink's 1 MiB event cap is sent and its row read back whole; one byte larger is still sent whole to the model, writes no row and no link, and returns `log.session_write` (logged once).
 - Nothing else: `model_with`, Route fields, wire impls, batch code are untouched.
 
-## Budget (rewrite.py counting; against the 2,500 phase cap, starting from j-2's planned end about 2,345)
+## Budget (rewrite.py counting; against the 2,500 phase cap, starting from j-2's planned end about 2,408)
 
 | | lines | basis |
 |---|---|---|
@@ -143,7 +143,7 @@ CLI: no new flag; `decidr send` writes `tool: "decidr"`, `tool_version` = the CL
 | New capability: `run_id`, `tool_version`, `missing_tool`, links, `log` category arm, `session.unreadable` | about +30 | estimate |
 | New capability: `session_rows` + `rows` reader incl. `session.not_found` | about +25 | estimate |
 | New capability: PyO3 kwargs, `run_id` getter, `session_rows` pyfunction; decidr 2 | about +27 | estimate |
-| **Sprint** | restructure about -4, new capability about +127; **total about 2,468 / 2,500** (margin about 30) | not built |
+| **Sprint** | restructure about -4, new capability about +127; **total about 2,531 / 2,500** (about 31 over) | not built |
 Over the cap the dev stops at the gate and reports the line; the first cut is `session.not_found`. No per-function counts.
 
 ## Done checks
