@@ -587,7 +587,7 @@ BEARER_RE = re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{16,}")
 
 def redact_secrets(value: Any) -> Any:
     wheel = load_wheel()
-    keys: list[str] = wheel.value.provider_keys() if isinstance(wheel, Ok) else []
+    keys: list[str] = wheel.value.provider_keys().get("value", []) if isinstance(wheel, Ok) else []
     import os
     secrets = [os.environ.get(key, "") for key in keys]
     def redact_text(text: str) -> str:
