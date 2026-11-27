@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 import threading
+import traceback
 import types
 import subprocess
 import ast
@@ -30,10 +31,20 @@ class Runner:
         self.expected_count = expected_count
         self.received = []
         self.lock = threading.Lock()
+        self.errors = []
+        self.active_handlers = 0
+        self.handlers_done = threading.Event()
+        self.handlers_done.set()
+        runner = self
 
         class Handler(BaseHTTPRequestHandler):
+            timeout = 5
+
             def log_message(self, *_args):
                 pass
+
+            def log_error(self, message, *args):
+                runner.errors.append(message % args)
 
             def do_POST(handler):
                 body = json.loads(handler.rfile.read(int(handler.headers["Content-Length"])))
@@ -52,9 +63,36 @@ class Runner:
                 handler.end_headers()
                 handler.wfile.write(encoded)
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.server.daemon_threads = True
-        self.thread = threading.Thread(target=self.server.serve_forever)
+        class ObservedServer(ThreadingHTTPServer):
+            daemon_threads = True
+
+            def process_request(self, request, client_address):
+                runner._count_handler(1)
+                try:
+                    super().process_request(request, client_address)
+                except BaseException:
+                    runner._count_handler(-1)
+                    raise
+
+            def process_request_thread(self, request, client_address):
+                try:
+                    super().process_request_thread(request, client_address)
+                finally:
+                    runner._count_handler(-1)
+
+            def handle_error(self, request, client_address):
+                runner.errors.append(traceback.format_exc())
+
+        self.server = ObservedServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+
+    def _count_handler(self, change):
+        with self.lock:
+            self.active_handlers += change
+            if self.active_handlers:
+                self.handlers_done.clear()
+            else:
+                self.handlers_done.set()
 
     @property
     def address(self):
@@ -65,9 +103,22 @@ class Runner:
         return self
 
     def __exit__(self, *_args):
-        self.server.shutdown()
-        self.thread.join(5)
+        # The deadlines are failure-only backstops.
+        shutdown = threading.Thread(target=self.server.shutdown, daemon=True)
+        shutdown.start()
+        shutdown.join(15)
+        failures = []
+        if shutdown.is_alive():
+            failures.append("server.shutdown backstop expired")
+        if not self.handlers_done.wait(15):
+            failures.append("handler completion backstop expired")
         self.server.server_close()
+        self.thread.join(15)
+        if self.thread.is_alive():
+            failures.append("serve thread join backstop expired")
+        if failures:
+            raise AssertionError(f"{'; '.join(failures)}; received={self.received!r}; "
+                                 f"active_handlers={self.active_handlers}; errors={self.errors!r}")
 
 
 def rendered(path):
