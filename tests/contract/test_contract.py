@@ -219,6 +219,20 @@ class Wheel(Isolated):
             with self.subTest(function=function.__name__):
                 self.assertEqual(self.error(function(*args, **kwargs))["id"], "sc_agent_py.invalid_option")
 
+    def test_run_errors_are_flushed_before_each_call_returns(self):
+        root = Path(self.directory.name)
+        logger = self.api.logger("decidr")["value"]
+        run = self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract",
+                           agent_role="contract", config_dir=str(root), general_log=logger)
+        self.addCleanup(run.__exit__, None, None, None)
+        calls = (lambda: run.send(None), lambda: run.send_batch(None), lambda: run.sends_to(None))
+        for index, call in enumerate(calls, start=1):
+            result = call()
+            self.assertEqual(self.error(result)["id"], "sc_agent_py.invalid_option")
+            rows = [json.loads(line) for line in (root / "logs/decidr.log.jsonl").read_text().splitlines()]
+            self.assertEqual(sum(row["fields"].get("id") == "sc_agent_py.invalid_option" for row in rows),
+                             index)
+
     def test_bad_signature_logs_once_to_injected_logger(self):
         logger = self.api.logger("decidr")["value"]
         with self.api.Run(tool="decidr", tool_version="test", cache=False, bogus=1, general_log=logger, agent_role="contract") as run_1:

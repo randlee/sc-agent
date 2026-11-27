@@ -323,7 +323,7 @@ impl PyRun {
         raw(
             py,
             match &self.0 {
-                Ok(run) => sc_agent::report(run.logger(), f(run)),
+                Ok(run) => finish(run.logger(), false, sc_agent::report(run.logger(), f(run))),
                 Err(e) => e.clone(),
             },
         )
