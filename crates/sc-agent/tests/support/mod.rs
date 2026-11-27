@@ -44,7 +44,7 @@ pub fn options(root: &Temp, url: &str) -> Options {
             project: Some("phase-b".into()),
             workers: 1,
             models: Default::default(),
-            laya: None,
+            local: Default::default(),
             max_sends: 5,
             decidr: Default::default(),
         },

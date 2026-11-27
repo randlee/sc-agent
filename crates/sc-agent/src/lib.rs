@@ -121,7 +121,6 @@ pub fn result(value: Result<Value, Error>) -> Value {
 pub struct Runner {
     pub host: String,
     pub port: u16,
-    pub model: String,
 }
 /// A configured model: the built-in provider it belongs to and the id sent on the wire.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -136,7 +135,7 @@ pub struct Settings {
     pub workers: usize,
     /// Configured model names; an entry wins over the built-in table.
     pub models: BTreeMap<String, ModelEntry>,
-    pub laya: Option<Runner>,
+    pub local: BTreeMap<String, Runner>,
     pub max_sends: u32,
     pub decidr: BTreeMap<String, String>,
 }
@@ -151,14 +150,17 @@ fn missing_setting(path: &str) -> Error {
 }
 fn setting<T: serde::de::DeserializeOwned>(
     resolved: &Resolved,
-    path: &'static str,
+    path: &str,
     default: Value,
 ) -> Result<T, Error> {
     let selected = resolved
         .value
         .pointer(&format!("/{}", path.replace('.', "/")));
-    if selected.is_none() && path.starts_with("laya.") {
-        return Err(invalid_setting(resolved, "laya", missing_setting(path)));
+    if selected.is_none()
+        && let Some((head, _)) = path.split_once('.')
+        && PROVIDERS.iter().any(|p| p.url.is_empty() && p.name == head)
+    {
+        return Err(invalid_setting(resolved, head, missing_setting(path)));
     }
     serde_json::from_value(selected.cloned().unwrap_or(default))
         .map_err(|e| invalid_setting(resolved, path, e))
@@ -174,7 +176,10 @@ const KEYS: &[&str] = &[
     "models",
     "laya.host",
     "laya.port",
-    "laya.model",
+    "decider_4b.host",
+    "decider_4b.port",
+    "decider_2b.host",
+    "decider_2b.port",
     "max_sends",
     "decidr.luna-system-prompt",
     "decidr.haiku-system-prompt",
@@ -274,19 +279,23 @@ pub fn config(
         .flags(flags)
         .resolve()
         .map_err(config_error)?;
+    let mut local = BTreeMap::new();
+    for name in PROVIDERS
+        .iter()
+        .filter(|p| p.url.is_empty())
+        .map(|p| p.name)
+    {
+        if resolved.value.get(name).is_some_and(Value::is_object) {
+            let host = setting(&resolved, &format!("{name}.host"), Value::Null)?;
+            let port = setting(&resolved, &format!("{name}.port"), Value::Null)?;
+            local.insert(name.into(), Runner { host, port });
+        }
+    }
     let config = Settings {
         project: setting(&resolved, "project", Value::Null)?,
         workers: setting(&resolved, "workers", json!(8))?,
         models: setting(&resolved, "models", json!({}))?,
-        laya: if resolved.value.get("laya").is_some_and(Value::is_object) {
-            Some(Runner {
-                host: setting(&resolved, "laya.host", Value::Null)?,
-                port: setting(&resolved, "laya.port", Value::Null)?,
-                model: setting(&resolved, "laya.model", Value::Null)?,
-            })
-        } else {
-            setting(&resolved, "laya", Value::Null)?
-        },
+        local,
         max_sends: setting(&resolved, "max_sends", json!(5))?,
         decidr: setting(&resolved, "decidr", json!({}))?,
     };
@@ -467,6 +476,39 @@ pub fn os_keyring(variable: &str) -> Result<String, KeyringError> {
     )
 }
 
+#[cfg(test)]
+mod resolve_test {
+    use super::*;
+    #[test]
+    fn a_keyless_candidate_beats_a_keyed_one_and_is_never_looked_up() {
+        let seam = |_: &str| -> Result<String, KeyringError> { Err(KeyringError::Timeout) };
+        let options = Options {
+            environment: vec![("ANTHROPIC_API_KEY".into(), "held".into())],
+            settings: Settings {
+                project: None,
+                workers: 1,
+                models: BTreeMap::new(),
+                local: BTreeMap::new(),
+                max_sends: 1,
+                decidr: BTreeMap::new(),
+            },
+            model: String::new(),
+            provider: None,
+            agent_role: String::new(),
+            timeout: Duration::ZERO,
+            base_url: None,
+            root: PathBuf::new(),
+            log_root: PathBuf::new(),
+            repo: String::new(),
+        };
+        let keyed = || (&PROVIDERS[1], "keyed".to_owned());
+        let keyless = || (&PROVIDERS[6], "keyless".to_owned());
+        let picked = resolve(vec![keyed(), keyless()], &options, &seam);
+        assert!(matches!(picked, Ok((p, id)) if p.key.is_empty() && id == "keyless"));
+        let picked = resolve(vec![(&PROVIDERS[3], "x".into()), keyed()], &options, &seam);
+        assert!(matches!(picked, Ok((p, _)) if p.name == "anthropic"));
+    }
+}
 #[cfg(test)]
 mod keyring_timeout_test {
     use super::*;
@@ -705,15 +747,34 @@ pub static PROVIDERS: &[Provider] = &[
         url: "https://inference-api.nousresearch.com/v1",
         key: "NOUS_API_KEY",
         wire: "chat/completions",
-        models: &[],
+        models: &[
+            ("haiku", "anthropic/claude-haiku-5.5", "2026-10-07"),
+            ("luna", "openai/gpt-6-luna", "2026-09-22"),
+        ],
         open: true,
     },
     Provider {
-        name: "local",
+        name: "laya",
         url: "",
         key: "",
         wire: "systemone",
-        models: &[("laya", "laya", "")],
+        models: &[("laya", "laya:en", "2026-09-23")],
+        open: false,
+    },
+    Provider {
+        name: "decider_4b",
+        url: "",
+        key: "",
+        wire: "systemone",
+        models: &[("decider", "decider-4b-v2.1", "2026-09-24")],
+        open: false,
+    },
+    Provider {
+        name: "decider_2b",
+        url: "",
+        key: "",
+        wire: "systemone",
+        models: &[("decider", "decider-2b-v11", "2026-09-24")],
         open: false,
     },
 ];
@@ -727,41 +788,82 @@ fn provider_named(name: &str) -> Result<&'static Provider, Error> {
 pub fn model(name: &str, provider: Option<&str>) -> Result<(&'static Provider, String), Error> {
     model_with(name, provider, &BTreeMap::new())
 }
-/// Resolve a model name; a configured entry for `name` wins over the built-in
-/// tables unless an explicit `provider` names a different provider.
+/// Resolve a model name to its first candidate; a configured entry for `name`
+/// wins over the built-in tables unless an explicit `provider` names a different one.
 pub fn model_with(
     name: &str,
     provider: Option<&str>,
     configured: &BTreeMap<String, ModelEntry>,
 ) -> Result<(&'static Provider, String), Error> {
+    Ok(candidates(name, provider, configured)?.remove(0))
+}
+/// Every provider row that serves `name`, newest release first, equal dates in table order.
+fn candidates(
+    name: &str,
+    provider: Option<&str>,
+    configured: &BTreeMap<String, ModelEntry>,
+) -> Result<Vec<(&'static Provider, String)>, Error> {
     if let Some(entry) = configured.get(name) {
         let p = provider_named(&entry.provider)?;
         if provider.is_none_or(|requested| requested == entry.provider) {
-            return Ok((p, entry.id.clone()));
+            return Ok(vec![(p, entry.id.clone())]);
         }
     }
-    let rows = |p: &Provider| {
-        p.models
-            .iter()
-            .filter(|(short, id, _)| *short == name || *id == name)
-            .max_by_key(|(_, _, date)| *date)
-            .map(|(_, id, _)| (*id).to_owned())
-    };
-    if let Some(provider) = provider {
-        let p = PROVIDERS
-            .iter()
-            .find(|p| p.name == provider)
-            .ok_or_else(|| error("types.unknown_provider", provider))?;
-        if let Some(id) = rows(p) {
-            return Ok((p, id));
+    let chosen = provider.map(provider_named).transpose()?;
+    let mut rows = Vec::new();
+    for p in PROVIDERS
+        .iter()
+        .filter(|p| chosen.is_none_or(|c| c.name == p.name))
+    {
+        for (_, id, date) in p.models.iter().filter(|(s, i, _)| *s == name || *i == name) {
+            rows.push((*date, p, (*id).to_owned()));
         }
-        if p.open {
-            return Ok((p, name.into()));
-        }
-    } else if let Some(found) = PROVIDERS.iter().find_map(|p| rows(p).map(|id| (p, id))) {
-        return Ok(found);
     }
-    Err(error("types.unknown_short_name", name))
+    rows.sort_by_key(|row| std::cmp::Reverse(row.0));
+    let mut found = rows
+        .into_iter()
+        .map(|(_, p, id)| (p, id))
+        .collect::<Vec<_>>();
+    if let Some(p) = chosen.filter(|p| p.open && found.is_empty()) {
+        found.push((p, name.into()));
+    }
+    if found.is_empty() {
+        return Err(error("types.unknown_short_name", name));
+    }
+    Ok(found)
+}
+/// Pick the candidate to send to: a keyless provider first, else the first whose key is held.
+fn resolve(
+    found: Vec<(&'static Provider, String)>,
+    options: &Options,
+    keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
+) -> Result<(&'static Provider, String), Error> {
+    let single = found.first().filter(|_| found.len() == 1);
+    if let Some(row) = found.iter().find(|(p, _)| p.key.is_empty()).or(single) {
+        return Ok(row.clone());
+    }
+    let mut last = None;
+    for (p, id) in &found {
+        match key(p.key, &options.environment, &options.root, keyring) {
+            Ok(_) => return Ok((p, id.clone())),
+            Err(Error::Failure {
+                id: "secrets.key_missing",
+                ..
+            }) => {}
+            Err(other) => last = Some(other),
+        }
+    }
+    let mut names = found.iter().map(|(p, _)| p.key).collect::<Vec<_>>();
+    names.dedup();
+    Err(last.unwrap_or_else(|| {
+        error(
+            "secrets.key_missing",
+            format!(
+                "No key was found for {} in the environment, repository .env, or platform keyring.",
+                names.join(", ")
+            ),
+        )
+    }))
 }
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Bounds {
@@ -1191,23 +1293,16 @@ pub fn send(
         let project = options.settings.project_required()?;
         slug(project)?;
         slug(&options.agent_role)?;
-        let (provider, model) = model_with(
+        let found = candidates(
             &options.model,
             options.provider.as_deref(),
             &options.settings.models,
         )?;
-        let (base, model) = if provider.url.is_empty() {
-            let runner = options
-                .settings
-                .laya
-                .as_ref()
-                .ok_or_else(|| missing_setting("laya.host"))?;
-            (
-                format!("http://{}:{}/v1", runner.host, runner.port),
-                runner.model.clone(),
-            )
-        } else {
-            (provider.url.into(), model)
+        let (provider, model) = resolve(found, options, keyring)?;
+        let base = match options.settings.local.get(provider.name) {
+            _ if !provider.url.is_empty() => provider.url.into(),
+            Some(runner) => format!("http://{}:{}/v1", runner.host, runner.port),
+            None => return Err(missing_setting(&format!("{}.host", provider.name))),
         };
         let route = Route {
             options,

@@ -27,21 +27,38 @@ class IntegrationExportTests(unittest.TestCase):
         self.assertIn("unrecognized arguments: --venv", stderr.getvalue())
 
     def test_export_uses_current_provider_variables_and_injected_lookup(self):
-        keys = {"typesafe": "fixture-typesafe", "anthropic": None, "openai": "fixture-openai"}
+        keys = {"TYPESAFE_API_KEY": "fixture-typesafe", "OPENAI_API_KEY": "fixture-openai", "NOUS_API_KEY": "fixture-nous"}
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "keys.env"
             with patch.dict(os.environ, {}, clear=True), \
                  patch.object(sys, "argv", [str(SCRIPT), "--export-env", str(output)]), \
-                 patch.object(runner, "key_for", side_effect=lambda provider, variable: keys[provider]) as lookup:
+                 patch.object(runner, "key_for", side_effect=lambda provider, variable: keys.get(variable)) as lookup:
                 self.assertEqual(runner.main(), 0)
             self.assertEqual(lookup.call_args_list, [
                 call("typesafe", "TYPESAFE_API_KEY"),
                 call("anthropic", "ANTHROPIC_API_KEY"),
                 call("openai", "OPENAI_API_KEY"),
+                call("openrouter", "OPENROUTER_API_KEY"),
+                call("together", "TOGETHER_API_KEY"),
+                call("nous", "NOUS_API_KEY"),
             ])
-            self.assertEqual(output.read_text(), "TYPESAFE_API_KEY=fixture-typesafe\nOPENAI_API_KEY=fixture-openai\n")
+            self.assertEqual(output.read_text(), "TYPESAFE_API_KEY=fixture-typesafe\nOPENAI_API_KEY=fixture-openai\nNOUS_API_KEY=fixture-nous\n")
             if os.name == "posix":
                 self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
+
+    def test_export_requires_one_of_typesafe_anthropic_nous(self):
+        for keys, accepted in [({"NOUS_API_KEY": "n"}, True), ({"ANTHROPIC_API_KEY": "a"}, True),
+                               ({"OPENAI_API_KEY": "o", "OPENROUTER_API_KEY": "r"}, False)]:
+            with tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "keys.env"
+                with patch.object(sys, "argv", [str(SCRIPT), "--export-env", str(output)]), \
+                     patch.object(runner, "key_for", side_effect=lambda provider, variable: keys.get(variable)):
+                    if accepted:
+                        self.assertEqual(runner.main(), 0)
+                        self.assertEqual(output.read_text(), "".join(f"{k}={v}\n" for k, v in keys.items()))
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, "NOUS_API_KEY is required"):
+                            runner.main()
 
 
 if __name__ == "__main__":

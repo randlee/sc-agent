@@ -16,13 +16,13 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
         ("openrouter", "haiku", "/v1/chat/completions"),
         ("together", "luna", "/v1/chat/completions"),
         ("nous", "custom/model", "/v1/chat/completions"),
-        ("local", "laya", "/v1/systemone"),
+        ("laya", "laya", "/v1/systemone"),
     ] {
         let root = Temp::new()?;
         let logger = logger(&root)?;
         let raw = match provider {
             "anthropic" => json!({"content":[{"type":"text","text":answer().to_string()}]}),
-            "typesafe" | "local" => answer(),
+            "typesafe" | "laya" => answer(),
             _ => json!({"choices":[{"message":{"content":answer().to_string()}}]}),
         };
         let stub = Stub::new(vec![http(200, raw)])?;
@@ -34,12 +34,14 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
             ("TOGETHER_API_KEY".into(), "test-secret".into()),
             ("NOUS_API_KEY".into(), "test-secret".into()),
         ]);
-        if provider == "local" {
-            opts.settings.laya = Some(Runner {
-                host: "127.0.0.1".into(),
-                port: 1,
-                model: "configured-local".into(),
-            });
+        if provider == "laya" {
+            opts.settings.local.insert(
+                "laya".into(),
+                Runner {
+                    host: "127.0.0.1".into(),
+                    port: 1,
+                },
+            );
         }
         let value = send(
             &request(),
@@ -54,13 +56,9 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
         let seen = stub.finish()?;
         let first = seen.first().ok_or("request missing")?;
         assert_eq!(first.path, path);
-        if ["typesafe", "local"].contains(&provider) {
+        if ["typesafe", "laya"].contains(&provider) {
             let mut expected = request();
-            expected["model"] = json!(if provider == "local" {
-                "configured-local".to_owned()
-            } else {
-                sc_agent::model(model, Some(provider))?.1
-            });
+            expected["model"] = json!(sc_agent::model(model, Some(provider))?.1);
             assert_eq!(first.body, expected);
         } else {
             let schema = if provider == "anthropic" {
@@ -83,7 +81,7 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
                     .iter()
                     .any(|(k, v)| k == "x-api-key" && v == "test-secret")
             );
-        } else if provider != "local" {
+        } else if provider != "laya" {
             assert!(
                 first
                     .headers

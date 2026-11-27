@@ -32,10 +32,9 @@ def main():
                         help="Write a new mode-0600 credential .env outside the checkout")
     args = parser.parse_args()
     variables = credential_variables()
-    providers = ("typesafe", "anthropic", "openai")
-    keys = {provider: key_for(provider, variables[f"{provider.upper()}_API_KEY"]) for provider in providers}
-    if not keys["typesafe"]:
-        raise RuntimeError("TypeSafe key is required (environment or platform keychain)")
+    keys = {variable: key_for(variable.removesuffix("_API_KEY").lower(), variable) for variable in variables}
+    if not any(keys.get(variable) for variable in ("TYPESAFE_API_KEY", "ANTHROPIC_API_KEY", "NOUS_API_KEY")):
+        raise RuntimeError("one of TYPESAFE_API_KEY, ANTHROPIC_API_KEY or NOUS_API_KEY is required (environment or platform keychain)")
     destination = args.export_env.resolve()
     if ROOT in destination.parents:
         raise RuntimeError("temporary credential export must be outside the checkout")
@@ -43,9 +42,9 @@ def main():
         raise RuntimeError("credential contains a newline")
     descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w") as output:
-        for provider, key in keys.items():
+        for variable, key in keys.items():
             if key:
-                output.write(f"{variables[f'{provider.upper()}_API_KEY']}={key}\n")
+                output.write(f"{variable}={key}\n")
     return 0
 
 

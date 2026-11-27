@@ -149,15 +149,18 @@ fn req_sag_0004_config_injected_env_nested_keys_and_outside_git() -> Test {
         ("DECIDR_WORKERS", "3"),
         ("DECIDR_LAYA__HOST", "example.invalid"),
         ("DECIDR_LAYA__PORT", "9000"),
-        ("DECIDR_LAYA__MODEL", "local-model"),
     ]
     .map(|(k, v)| (k.into(), v.into()));
     let loaded = config(None, Some(&root.0), &environment, None)?;
     assert_eq!(loaded.config.workers, 3);
-    let runner = loaded.config.laya.ok_or("runner not decoded")?;
+    let runner = loaded
+        .config
+        .local
+        .get("laya")
+        .ok_or("runner not decoded")?;
     assert_eq!(
-        (runner.host.as_str(), runner.port, runner.model.as_str()),
-        ("example.invalid", 9000, "local-model")
+        (runner.host.as_str(), runner.port),
+        ("example.invalid", 9000)
     );
     let without_override = config(None, Some(&root.0), &[], None)?;
     assert_eq!(without_override.config.workers, 8);
@@ -270,7 +273,8 @@ fn req_sag_0101_models_use_provider_tables_and_reseller_passthrough() -> Test {
     ] {
         assert_eq!(model(name, provider)?.1, id);
     }
-    assert_eq!(model("laya", None)?.0.name, "local");
+    assert_eq!(model("laya", None)?.0.name, "laya");
+    assert_eq!(model("decider", None)?.1, "decider-4b-v2.1");
     assert!(model("missing", None).is_err());
     assert!(model("jev", Some("missing")).is_err());
     Ok(())
@@ -411,7 +415,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
     assert!(failure.contains("laya.port"), "{failure}");
     fs::write(
         &file,
-        json!({"laya":{"host":"localhost","port":9000,"model":"local"}}).to_string(),
+        json!({"laya":{"host":"localhost","port":9000}}).to_string(),
     )?;
     let env = vec![("DECIDR_LAYA__PORT".into(), "bad".into())];
     let failure = config(None, Some(&root.0), &env, None)
@@ -434,7 +438,7 @@ fn partial_runner_across_layers_names_missing_key_and_all_sources() -> Test {
     )?;
     fs::write(
         root.0.join("sc-agent.json"),
-        json!({"laya":{"model":"local"}}).to_string(),
+        json!({"laya":{"host":"remote"}}).to_string(),
     )?;
     let failure = config(Some(&local), Some(&root.0), &[], None)
         .err()
@@ -512,35 +516,35 @@ fn config_home_and_file_acceptance_are_explicit_and_read_only() -> Test {
 fn environment_json_and_strings_share_file_validation() -> Test {
     let root = Temp::new()?;
     let file = root.0.join("decidr.json");
-    let runner = json!({"host":"localhost", "port":9000, "model":"local"});
+    let runner = json!({"host":"localhost", "port":9000});
     for raw in ["1", "true", "null", "[1]", "{\"nested\":1}"] {
         fs::write(&file, json!({"laya":runner}).to_string())?;
-        let env = vec![("DECIDR_LAYA__MODEL".into(), raw.into())];
+        let env = vec![("DECIDR_LAYA__HOST".into(), raw.into())];
         let failure = config(None, Some(&root.0), &env, None)
             .err()
-            .ok_or("non-string env model accepted")?
+            .ok_or("non-string env host accepted")?
             .to_string();
-        assert!(failure.contains("DECIDR_LAYA__MODEL"), "{failure}");
-        assert!(failure.contains("laya.model"), "{failure}");
+        assert!(failure.contains("DECIDR_LAYA__HOST"), "{failure}");
+        assert!(failure.contains("laya.host"), "{failure}");
         let mut invalid = runner.clone();
-        invalid["model"] = serde_json::from_str(raw)?;
+        invalid["host"] = serde_json::from_str(raw)?;
         fs::write(&file, json!({"laya":invalid}).to_string())?;
         let failure = config(None, Some(&root.0), &[], None)
             .err()
-            .ok_or("non-string file model accepted")?
+            .ok_or("non-string file host accepted")?
             .to_string();
         assert!(
             failure.contains(file.to_str().ok_or("non-UTF8 path")?),
             "{failure}"
         );
-        assert!(failure.contains("laya.model"), "{failure}");
+        assert!(failure.contains("laya.host"), "{failure}");
     }
     fs::write(&file, json!({"laya":runner}).to_string())?;
     for raw in ["plain", "\"1\""] {
-        let env = vec![("DECIDR_LAYA__MODEL".into(), raw.into())];
+        let env = vec![("DECIDR_LAYA__HOST".into(), raw.into())];
         let loaded = config(None, Some(&root.0), &env, None)?;
         assert_eq!(
-            loaded.config.laya.ok_or("missing runner")?.model,
+            loaded.config.local["laya"].host,
             if raw == "plain" { "plain" } else { "1" }
         );
     }
@@ -587,5 +591,53 @@ fn max_sends_and_system_prompt_keys_load_default_and_report() -> Test {
         json!({"decidr":{"sonnet-system-prompt":"P"}}).to_string(),
     )?;
     assert!(config(None, Some(&root.0), &[], None).is_err());
+    Ok(())
+}
+
+#[test]
+fn config_local_endpoints() -> Test {
+    let root = Temp::new()?;
+    let file = root.0.join("decidr.json");
+    fs::write(
+        &file,
+        json!({"decider_4b":{"host":"h4","port":18001},"decider_2b":{"host":"h2","port":18000}})
+            .to_string(),
+    )?;
+    let loaded = config(None, Some(&root.0), &[], None)?;
+    let ports = loaded
+        .config
+        .local
+        .iter()
+        .map(|(n, r)| (n.as_str(), r.host.as_str(), r.port));
+    assert_eq!(
+        ports.collect::<Vec<_>>(),
+        [("decider_2b", "h2", 18000), ("decider_4b", "h4", 18001)]
+    );
+    let paths = loaded
+        .rows
+        .iter()
+        .map(|row| row["path"].as_str().unwrap_or(""));
+    let paths = paths.collect::<Vec<_>>();
+    for key in [
+        "decider_4b.host",
+        "decider_4b.port",
+        "decider_2b.host",
+        "decider_2b.port",
+    ] {
+        assert!(paths.contains(&key), "{key}");
+    }
+    assert!(!paths.contains(&"laya.model"));
+    fs::write(
+        &file,
+        json!({"laya":{"host":"h","port":1,"model":"x"}}).to_string(),
+    )?;
+    let failure = config(None, Some(&root.0), &[], None)
+        .err()
+        .ok_or("laya.model accepted")?
+        .to_string();
+    assert!(
+        failure.contains("config.invalid") && failure.contains("laya.model"),
+        "{failure}"
+    );
     Ok(())
 }

@@ -1,7 +1,7 @@
 pub mod support;
 use sc_agent::{
     AnthropicCompat, Cancel, DEFAULT_SYSTEM_PROMPT, Decision, Jev, Llm, LlmRequest, OpenAiCompat,
-    Options, Route, model_with, result, send,
+    Options, Route, Runner, model_with, result, send,
 };
 use serde_json::{Value, json};
 use std::cell::Cell;
@@ -223,5 +223,194 @@ fn compat_call_reports_response_parse_for_text_that_is_not_json_or_missing() -> 
         assert!(message.contains(expected), "{message}");
         let _ = stub.finish()?;
     }
+    Ok(())
+}
+
+fn runner(stub: &Stub) -> Result<Runner, Box<dyn std::error::Error + Send + Sync>> {
+    let address = stub
+        .url
+        .trim_start_matches("http://")
+        .trim_end_matches("/v1");
+    let (host, port) = address.split_once(':').ok_or("stub address")?;
+    Ok(Runner {
+        host: host.into(),
+        port: port.parse()?,
+    })
+}
+fn sent(root: &Temp, opts: &Options) -> Result<Value, sc_agent::Error> {
+    let logger = logger(root).map_err(|e| sc_agent::error("config.logger", e))?;
+    let reply = send(
+        &request(),
+        opts,
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    );
+    logger
+        .shutdown()
+        .map_err(|e| sc_agent::error("config.logger", e))?;
+    reply
+}
+
+#[test]
+fn local_endpoints() -> Test {
+    for (model, name, id) in [
+        ("decider", "decider_4b", "decider-4b-v2.1"),
+        ("decider-2b-v11", "decider_2b", "decider-2b-v11"),
+        ("laya", "laya", "laya:en"),
+    ] {
+        let root = Temp::new()?;
+        let stub = Stub::new(vec![http(200, answer())])?;
+        let mut opts = options(&root, "");
+        opts.base_url = None;
+        opts.model = model.into();
+        opts.settings.local.insert(name.into(), runner(&stub)?);
+        sent(&root, &opts)?;
+        let seen = stub.finish()?;
+        assert_eq!(seen[0].path, "/v1/systemone");
+        assert_eq!(seen[0].body["model"], id);
+        for secret in ["authorization", "x-api-key"] {
+            assert_eq!(header(&seen[0], secret), None);
+        }
+    }
+    let root = Temp::new()?;
+    let mut opts = options(&root, "");
+    opts.model = "decider-2b-v11".into();
+    opts.settings.local.insert(
+        "decider_4b".into(),
+        Runner {
+            host: "h".into(),
+            port: 1,
+        },
+    );
+    let failure = sent(&root, &opts).err().ok_or("unset runner sent")?;
+    let failure = serde_json::to_value(failure)?;
+    assert_eq!(failure["id"], "config.missing_setting");
+    assert!(
+        failure["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("decider_2b.host"))
+    );
+    Ok(())
+}
+
+#[test]
+fn keyless_resolution() -> Test {
+    let anthropic = json!({"content":[{"type":"text","text":answer().to_string()}]});
+    let chat = json!({"choices":[{"message":{"content":answer().to_string()}}]});
+    for (model, keys, path, id) in [
+        (
+            "haiku",
+            &["ANTHROPIC_API_KEY"][..],
+            "/v1/messages",
+            "claude-haiku-5-5",
+        ),
+        (
+            "haiku",
+            &["NOUS_API_KEY"],
+            "/v1/chat/completions",
+            "anthropic/claude-haiku-5.5",
+        ),
+        (
+            "luna",
+            &["NOUS_API_KEY"],
+            "/v1/chat/completions",
+            "openai/gpt-6-luna",
+        ),
+        (
+            "anthropic/claude-haiku-5.5",
+            &["OPENROUTER_API_KEY"],
+            "/v1/chat/completions",
+            "anthropic/claude-haiku-5.5",
+        ),
+        (
+            "haiku",
+            &["TOGETHER_API_KEY", "NOUS_API_KEY"],
+            "/v1/chat/completions",
+            "anthropic/claude-haiku-5-5",
+        ),
+    ] {
+        let root = Temp::new()?;
+        let stub = Stub::new(vec![http(
+            200,
+            if path == "/v1/messages" {
+                anthropic.clone()
+            } else {
+                chat.clone()
+            },
+        )])?;
+        let mut opts = options(&root, &stub.url);
+        opts.environment = keys.iter().map(|k| ((*k).into(), "held".into())).collect();
+        opts.model = model.into();
+        sent(&root, &opts)?;
+        let seen = stub.finish()?;
+        assert_eq!(
+            (seen[0].path.as_str(), &seen[0].body["model"]),
+            (path, &json!(id)),
+            "{model} {keys:?}"
+        );
+    }
+    let root = Temp::new()?;
+    let mut opts = options(&root, "http://127.0.0.1:1/v1");
+    opts.environment = vec![];
+    opts.model = "haiku".into();
+    let failure = serde_json::to_value(sent(&root, &opts).err().ok_or("sent without a key")?)?;
+    assert_eq!(failure["id"], "secrets.keyring_read");
+    Ok(())
+}
+
+#[test]
+fn keyless_resolution_names_every_missing_key_and_redacts_the_used_one() -> Test {
+    let root = Temp::new()?;
+    let mut opts = options(&root, "http://127.0.0.1:1/v1");
+    opts.environment = vec![];
+    opts.model = "haiku".into();
+    let logger = logger(&root)?;
+    let empty = |_: &str| Ok(String::new());
+    let failure = send(
+        &request(),
+        &opts,
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &empty,
+    )
+    .err()
+    .ok_or("sent without a key")?;
+    let failure = serde_json::to_value(failure)?;
+    assert_eq!(failure["id"], "secrets.key_missing");
+    let message = failure["message"].as_str().ok_or("message")?;
+    for variable in [
+        "ANTHROPIC_API_KEY",
+        "OPENROUTER_API_KEY",
+        "TOGETHER_API_KEY",
+        "NOUS_API_KEY",
+    ] {
+        assert!(message.contains(variable), "{message}");
+    }
+    let stub = Stub::new(vec![http(401, json!({"echo":"nous-secret"}))])?;
+    let mut opts = options(&root, &stub.url);
+    opts.environment = vec![("NOUS_API_KEY".into(), "nous-secret".into())];
+    opts.model = "luna".into();
+    let failure = send(
+        &request(),
+        &opts,
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &empty,
+    )
+    .err()
+    .ok_or("401 accepted")?;
+    let failure = serde_json::to_value(failure)?;
+    assert_eq!(failure["id"], "http.auth");
+    let message = failure["message"].as_str().ok_or("message")?;
+    assert!(
+        message.contains("[redacted]") && !message.contains("nous-secret"),
+        "{message}"
+    );
+    stub.finish()?;
+    logger.shutdown()?;
     Ok(())
 }
