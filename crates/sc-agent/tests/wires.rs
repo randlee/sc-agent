@@ -325,7 +325,7 @@ fn keyless_resolution() -> Test {
             "openai/gpt-6-luna",
         ),
         (
-            "anthropic/claude-haiku-5.5",
+            "haiku",
             &["OPENROUTER_API_KEY"],
             "/v1/chat/completions",
             "anthropic/claude-haiku-5.5",
