@@ -50,19 +50,21 @@ class Reply:
 
 def load_wheel() -> Result[Any, ClientError]          # Err(DEPENDENCY.SC_DECIDR); sc_agent imported only here
 def open_run(*, model: str | None = None, project: str | None = None, cache: bool | None = None,
-             repeat: int = 1, config_dir: str | None = None, timeout_secs: float | None = None,
+             config_dir: str | None = None, timeout_secs: float | None = None,
              workers: int | None = None, seams: Mapping[str, Any] | None = None) -> Result[Any, ClientError]
     # sc_agent.Run(tool=CLIENT_NAME, tool_version=TOOL_VERSION, agent_role=CLIENT_NAME, model=model,
-    #   project=project, cache=False if repeat > 1 else cache, config_dir=..., timeout_secs=..., workers=...,
+    #   project=project, cache=cache, config_dir=..., timeout_secs=..., workers=...,
     #   **(seams or {}))) ; Err(DEPENDENCY.SC_DECIDR) when the wheel cannot be imported.  seams keys: general_log, base_url, sleep, keyring_lookup (tests only)
 
-def call_result(run: Any, request: str | Mapping[str, Any], *, abort_on: frozenset[str] = frozenset(),
+def call_result(run: Any, request: str | Mapping[str, Any], *, cache: bool | None = None, abort_on: frozenset[str] = frozenset(),
                 category_codes: Mapping[str, str] | None = None, repository_root: str = ".",
                 consent_what: str = "The request text") -> Result[Reply, ClientError]
-def call_batch_results(run: Any, requests: Sequence[str | Mapping[str, Any]], *, abort_on: frozenset[str] = frozenset(),
+def call_batch_results(run: Any, requests: Sequence[str | Mapping[str, Any]], *, cache: bool | None = None, abort_on: frozenset[str] = frozenset(),
                        category_codes: Mapping[str, str] | None = None, repository_root: str = ".",
                        consent_what: str = "The request text") -> Result[list[Result[Reply, ClientError]], ClientError]
     # KeyboardInterrupt: run.cancel(); raise   (REQ-SAG-0018)
+def log_event(run: Any, target: str, action: str, correlation_id: str | None, fields: Mapping[str, Any]) -> Result[None, ClientError]
+    # redact_secrets(fields); run.log({"target","action","correlation_id","fields"}); flush on the Run's logger (the accessor j-6 needs; wheel: PyRun.log, j-3)
 def decode_result(value: str | Mapping[str, Any], *, category_codes: Mapping[str, str] | None = None) -> Result[Reply, ClientError]
 def remote_judge_consent(repository_root: str = ".", what: str = "The request text") -> Result[None, ClientError]
 
@@ -85,7 +87,7 @@ def result_line(job: BatchJob, settings: BatchSettings, run_id: str | None, proj
 def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings, *,
               on_line: Callable[[ResultLine, Mapping[str, Any] | None], object],
               project: str | None = None, fixture: Mapping[str, Any] | None = None,
-              on_request: Callable[[Any], object] | None = None, abort_on: frozenset[str] = frozenset(),
+              on_request: Callable[[Any], object] | None = None, cache: bool | None = None, abort_on: frozenset[str] = frozenset(),
               category_codes: Mapping[str, str] | None = None, repository_root: str = ".",
               consent_what: str = "The request text",
               verdict: Callable[[BatchJob, BatchSettings, Mapping[str, Any] | None], tuple[str | None, float | None, str | None]] | None = None
@@ -107,12 +109,13 @@ Rust (new capability, rule-7 item 1): `#[pyfunction] languages|queries|query|run
 ```python
 class FakeRun:
     def __init__(self, script: Mapping[str, Any], **open_args: Any) -> None   # .open_args, .sent: list[list[Any]], .cancels: int
-    provider: str | None          # script["provider"]
+    def sends_to(self, provider: str) -> bool                                  # provider == script["provider"]
+    def log(self, event: Mapping[str, Any]) -> dict[str, Any]                  # appends to .logged; Envelope ok
     run_id: str | None            # script["run_id"]
     def __enter__(self) -> FakeRun
     def __exit__(self, *exc: object) -> bool                                  # False
-    def send(self, request: Any) -> dict[str, Any]                            # send_batch([request]) item 0's result
-    def send_batch(self, requests: Sequence[Any], *,
+    def send(self, request: Any, *, cache: bool | None = None) -> dict[str, Any]   # send_batch([request]) item 0's result; records cache in .sent
+    def send_batch(self, requests: Sequence[Any], *, cache: bool | None = None,
                    on_result: Callable[[int, dict[str, Any]], object] | None = None) -> dict[str, Any]
         # pops script["envelopes"] in order; after cancel() the rest are decision.cancelled errors;
         # raises KeyboardInterrupt at index script.get("interrupt_at")
@@ -132,7 +135,7 @@ def fake_open_run(module: types.ModuleType, script: Mapping[str, Any]) -> Iterat
 | `load_wheel` -> Result | `load_wheel` :160-165, `_failure` :150-153, `_failed` :156-157 | `_failure`, `_failed` |
 | `open_run` -> Result | per-call Run wiring in `call_result` :247-262 and `call_batch_results` :270-296; `_logger` :168-177, `_logger_handle`/`_logger_lock` :45-46 | per-call `model, project, cancel, config_dir, general_log, timeout_secs, workers`; the module Logger; `import threading` |
 | `call_result`, `call_batch_results` on a Run | same, :247-305 | `on_result` callback, `sc_agent.Cancel()`, synthesized cancelled results :263-265, :297-299 |
-| consent gate in `_start` keyed on `run.provider == sc_agent.TYPESAFE` | `_start` :231-244 (consent on every call), `remote_preflight` :341-343 | `remote_preflight` |
+| consent gate in `_start` asks `run.sends_to(sc_agent.TYPESAFE)` (the library's per-send resolution: keyless first, then the first held key; no provider guess) | `_start` :231-244 (consent on every call), `remote_preflight` :341-343 | `remote_preflight` |
 | `remote_judge_consent` -> Result | :315-338 | dict returns |
 | `wheel_error` | :180-191 | `_CLIENT_IDS` :55, branch :184-185 |
 | `_abort_if_selected(line, abort_on, run)` | :221-224 (`cancel: Cancel`) | `TYPE_CHECKING`/`Cancel` import :37-40 |
@@ -166,7 +169,7 @@ Render: `sc-compose render --file consumer.py.j2 --var-file vars.json --strict` 
 
 Use:
 ```python
-with client.open_run(model=args.model, repeat=settings.repeat, workers=args.workers) as run:
+with client.open_run(model=args.model, workers=args.workers) as run:
     out = client.run_batch(run, jobs, settings, project=args.project, on_line=write)
 ```
 Paths: general log `<PLAN_ANCHOR_LOG_ROOT|~/.sc-agent>/logs/plan-anchor.log.jsonl` (wheel default); sitr calls in the judge-jev render log to `judge-jev.log.jsonl` (via `tool=`). Consent: `.sc/<client>/settings.yaml` `allow_remote_judge`, read only for a TypeSafe Run.
@@ -187,10 +190,10 @@ tests: test_template.py:33 assertions on `fixture_attempt`/`total_attempts`; loo
 
 ## Budget
 
-Gate count (non-test Rust, scripts/gate/rewrite.py): this branch measures 2,503/2,500 today (j-3 partial). j-4 restructure: 0 Rust. New capability: sitr `tool=` about +6 Rust (rule-7 item 1); without it, 0. Python (not in the gate): consumer.py.j2 roughly 668 -> 700 (about -150 deleted, +~110 new incl. run_batch/ResultLine/redaction, +~70 moved Result block); testing.py about +45 new. Restructure net zero is a Rust rule; the template's Python delta is reported, not capped.
+Gate count (non-test Rust, scripts/gate/rewrite.py): this branch measures 2,503/2,500 today (j-3 partial). j-4 restructure: 0 Rust. New capability: sitr `tool=` about +6 Rust (rule-7 item 1); without it, 0. Per-call `cache` pass-through and `log_event` are Python (0 Rust here; `PyRun.log` +8 and the per-call `cache` +4 Rust are counted in j-3). Python (not in the gate): consumer.py.j2 roughly 668 -> 700 (about -150 deleted, +~110 new incl. run_batch/ResultLine/redaction, +~70 moved Result block); testing.py about +45 new. Restructure net zero is a Rust rule; the template's Python delta is reported, not capped.
 
 ## Plan decisions (rule 0, no question to Rand)
 
 1. sitr `tool=`: tools pass their name and the library picks the default logger (rule 0, ANC-015, ANC-016), so the 4 sitr pyfunctions gain `tool=` (+~6 Rust, new capability) and the template passes no Logger. Conflicting record text to delete on develop: ADR-SAG-0019 d1 l.57 "The generated client gets one Logger from the wheel, named after the client and writing `~/.sc-agent/logs/<client>.log.jsonl`, and gives it to its Run and every sitr call."
-2. Repeats: j-3 has no per-call cache override (REQ-SAG-0702), so `open_run(repeat=)` sets `cache=False` on the Run when repeat > 1 (plan-anchor REQ-085).
+2. Repeats: j-3's `Run.send`/`send_batch` take a per-call `cache` (one cache mechanism), so `call_result`/`call_batch_results`/`run_batch` take `cache: bool | None = None` and pass it through; `run_batch` passes `False` when `settings.repeat > 1` and the caller's `cache` otherwise (plan-anchor REQ-085). `open_run` has no `repeat`; its `cache` is the Run's setting.
 3. /2 is generic only (owner ruling, j1-bead.txt:364-368): no open `result_fields` dict; a typed `verdict` callback returns `(verdict, min_confidence, leaning)` and fills exactly those 3 of the 14 fields. Jev does not return them; each tool's `decide()` computes them (result interpretation is the consumer's, ADR-SAG-0019 d1).
