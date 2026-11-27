@@ -19,6 +19,7 @@ import unittest
 
 REQUEST = {"state": "evidence", "questions": {"q": {"type": "choice", "instructions": "True?", "criteria": {"yes": "true", "no": "false"}}}}
 ANSWER = {"model": "jev-1.14.0", "answers": {"q": {"type": "choice", "choice": "yes", "confidence": 0.73123456789, "probabilities": {"yes": 0.73123456789, "no": 0.26876543211}}}}
+INTERRUPT_CHILD = os.environ.get("SC_INTERRUPT_CHILD") == "1"
 
 
 @contextmanager
@@ -576,14 +577,27 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         self.assertTrue(got["value"][0]["result"]["ok"])
         self.assertEqual([self.error(item["result"])["id"] for item in got["value"][1:]], ["decision.cancelled"] * 2)
 
-    def test_pending_python_interrupt_ends_native_busy_wait(self):
+    def test_pending_python_interrupt_cancels_inflight_send(self):
+        if not INTERRUPT_CHILD:
+            env = dict(os.environ, SC_INTERRUPT_CHILD="1")
+            command = [sys.executable, "-m", "unittest", "discover", "-s", str(Path(__file__).parent),
+                       "-p", "test_contract.py", "-k", "test_pending_python_interrupt_cancels_inflight_send"]
+            run = subprocess.run(command, env=env, text=True, capture_output=True, timeout=30)
+            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+            return
+        release = threading.Event()
         def respond(body):
             _thread.interrupt_main()
-            return 429, {"Retry-After": "600"}, {}
+            if not release.wait(20):
+                return 500, {}, {"error": "send_batch did not return while reply was withheld"}
+            return 200, {}, ANSWER
         with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            got = self.api.send_batch([REQUEST] * 3, workers=1,
-                                      project="contract", agent_role="contract", config_dir=self.directory.name,
-                                      general_log=self.api.logger("decidr")["value"], base_url=url)
+            try:
+                got = self.api.send_batch([REQUEST] * 3, workers=1,
+                                          project="contract", agent_role="contract", config_dir=self.directory.name,
+                                          general_log=self.api.logger("decidr")["value"], base_url=url)
+            finally:
+                release.set()
         self.assertTrue(got["ok"], got)
         self.assertEqual(len(received), 1)
         self.assertEqual([self.error(item["result"])["id"] for item in got["value"]], ["decision.cancelled"] * 3)

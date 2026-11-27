@@ -68,6 +68,12 @@ impl Cancel {
     }
     pub fn wait(&self, delay: Duration) {
         if let Ok(state) = self.state.lock() {
+            #[cfg(test)]
+            route_tests::WAIT_ENTERED.with(|hook| {
+                if let Some(waiting) = hook.borrow_mut().take() {
+                    waiting();
+                }
+            });
             let _ = self
                 .changed
                 .wait_timeout_while(state, delay, |state| !*state);
@@ -1642,6 +1648,33 @@ mod route_tests {
 
     thread_local! {
         pub(super) static LOCK_WAIT: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+        pub(super) static WAIT_ENTERED: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+    }
+
+    #[test]
+    fn cancel_ends_busy_holdoff_after_wait_is_entered() -> Test {
+        let cancel = Arc::new(Cancel::default());
+        let (entered, waiting) = std::sync::mpsc::channel();
+        let (finished, outcome) = std::sync::mpsc::channel();
+        let worker_cancel = cancel.clone();
+        let worker = std::thread::spawn(move || {
+            WAIT_ENTERED.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || {
+                    let _ = entered.send(());
+                }))
+            });
+            worker_cancel.wait(Duration::from_secs(600));
+            let _ = finished.send(());
+        });
+        waiting
+            .recv_timeout(Duration::from_secs(10))
+            .map_err(|e| format!("holdoff wait not entered: {e}"))?;
+        std::thread::spawn(move || cancel.cancel());
+        outcome
+            .recv_timeout(Duration::from_secs(10))
+            .map_err(|e| format!("cancel did not release holdoff: {e}"))?;
+        worker.join().map_err(|_| "holdoff waiter panicked")?;
+        Ok(())
     }
 
     #[test]
