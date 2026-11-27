@@ -465,18 +465,7 @@ impl From<String> for KeyringError {
         Self::Read(value)
     }
 }
-impl KeyringError {
-    fn received(
-        received: Result<Result<String, keyring::Error>, RecvTimeoutError>,
-    ) -> Result<String, Self> {
-        match received {
-            Ok(Err(keyring::Error::NoEntry)) => Ok(String::new()),
-            Ok(value) => value.map_err(|error| KeyringError::Read(error.to_string())),
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(KeyringError::Timeout),
-            Err(error) => Err(KeyringError::Read(error.to_string())),
-        }
-    }
-}
+
 pub fn key(
     variable: &str,
     environment: &[(OsString, OsString)],
@@ -537,7 +526,12 @@ fn keyring_wait(
     std::thread::spawn(move || {
         let _ = sender.send(reader());
     });
-    KeyringError::received(receiver.recv_timeout(timeout))
+    match receiver.recv_timeout(timeout) {
+        Ok(Err(keyring::Error::NoEntry)) => Ok(String::new()),
+        Ok(value) => value.map_err(|error| KeyringError::Read(error.to_string())),
+        Err(RecvTimeoutError::Timeout) => Err(KeyringError::Timeout),
+        Err(error) => Err(KeyringError::Read(error.to_string())),
+    }
 }
 
 pub fn os_keyring(variable: &str) -> Result<String, KeyringError> {
@@ -642,9 +636,14 @@ mod keyring_timeout_test {
 
     #[test]
     fn reader_failure_keeps_read_error() -> Result<(), Box<dyn std::error::Error>> {
-        let value = KeyringError::received(Ok(Err(keyring::Error::PlatformFailure(Box::new(
-            std::io::Error::other("controlled refusal"),
-        )))));
+        let value = keyring_wait(
+            || {
+                Err(keyring::Error::PlatformFailure(Box::new(
+                    std::io::Error::other("controlled refusal"),
+                )))
+            },
+            Duration::from_secs(30),
+        );
         let result = key("TYPESAFE_API_KEY", &[], Path::new("/nonexistent"), &|_| {
             Err(match &value {
                 Err(KeyringError::Read(message)) => KeyringError::Read(message.clone()),
@@ -674,7 +673,7 @@ mod keyring_timeout_test {
     #[test]
     fn missing_key_names_environment_dotenv_and_keyring() -> Result<(), Box<dyn std::error::Error>>
     {
-        let value = KeyringError::received(Ok(Err(keyring::Error::NoEntry)))
+        let value = keyring_wait(|| Err(keyring::Error::NoEntry), Duration::from_secs(30))
             .map_err(|e| format!("{e:?}"))?;
         assert!(value.is_empty());
         let result = key("TYPESAFE_API_KEY", &[], Path::new("/nonexistent"), &|_| {
@@ -708,7 +707,7 @@ mod keyring_timeout_test {
             keyring::Error::PlatformFailure(Box::new(std::io::Error::other("missing service"))),
         ];
         for cause in errors {
-            let detail = match KeyringError::received(Ok(Err(cause))) {
+            let detail = match keyring_wait(move || Err(cause), Duration::from_secs(30)) {
                 Err(KeyringError::Read(detail)) => detail,
                 other => return Err(format!("keyring error lost: {other:?}").into()),
             };
@@ -1477,12 +1476,10 @@ impl Run {
         logger: Option<Arc<Logger>>,
         cancel: Arc<Cancel>,
     ) -> Result<Self, Error> {
-        let environment = std::env::vars_os().collect::<Vec<_>>();
-        let (loaded, root, repo) = load(
+        let (loaded, root, repo, environment) = load(
             &args.tool,
             args.config_dir.as_deref(),
             args.project.as_deref(),
-            &environment,
         )?;
         let mut settings = loaded.config;
         if let Some(count) = args.workers {
@@ -1765,19 +1762,17 @@ pub fn repository_identity(origin: Option<&str>, host: &str, root: &Path) -> Res
     Ok(name)
 }
 
-pub fn load(
-    tool: &str,
-    config_dir: Option<&Path>,
-    project: Option<&str>,
-    environment: &[(OsString, OsString)],
-) -> Result<(Configuration, PathBuf, String), Error> {
+type Loaded = (Configuration, PathBuf, String, Vec<(OsString, OsString)>);
+pub fn load(tool: &str, config_dir: Option<&Path>, project: Option<&str>) -> Result<Loaded, Error> {
+    let environment = std::env::vars_os().collect::<Vec<_>>();
     let (root, repo) = repository()?;
     let local = root.join(".sc/sc-agent");
     let local = root.join(".git").exists().then_some(local.as_path());
     Ok((
-        config(tool, local, config_dir, environment, project)?,
+        config(tool, local, config_dir, &environment, project)?,
         root,
         repo,
+        environment,
     ))
 }
 pub fn model_catalog(
@@ -1814,12 +1809,7 @@ pub fn doctor(
     config_dir: Option<&Path>,
     project: Option<&str>,
 ) -> Result<Value, Error> {
-    let (loaded, ..) = load(
-        tool,
-        config_dir,
-        project,
-        &std::env::vars_os().collect::<Vec<_>>(),
-    )?;
+    let (loaded, ..) = load(tool, config_dir, project)?;
     Ok(json!({"settings":loaded.rows, "files":loaded.files, "log_root":log_root(tool)?}))
 }
 
