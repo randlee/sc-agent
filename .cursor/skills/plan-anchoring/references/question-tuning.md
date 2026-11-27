@@ -1,6 +1,6 @@
 ---
 name: question-tuning
-version: 0.13.0
+version: 0.16.1
 description: When and how to replace the generic Jev questions with anchor-specific wording, where the overrides live, how to test a question set with fixtures and known beads before trusting it, and when to stop tuning.
 ---
 
@@ -42,9 +42,7 @@ repository containing `--repository-root`; relative paths start at that root.
 Symlink escapes, duplicate JSON keys, malformed descriptors and mismatched
 digests are refused before credential lookup or transport. Dry-run and fixture
 modes remain offline. Live use still requires the repository's recorded
-`allow_remote_judge: true`; context does not grant consent. Oversized requests
-with explicit inputs fail before sending or emitting a partial request; intent
-is never truncated.
+`allow_remote_judge: true`; context does not grant consent.
 
 Each context/custom-rubric entry records `inputs.question_seal`,
 `inputs.request_sha256` (canonical JSON of the complete request before output

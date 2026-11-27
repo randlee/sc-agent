@@ -1,6 +1,6 @@
 ---
 name: development-gate
-version: 0.13.0
+version: 0.16.1
 description: Running the development gate (sprint review) end to end - what evidence to pass, what Jev sees, the command and exit codes, pairing with deterministic checks, and how to read the results.
 ---
 
@@ -14,7 +14,7 @@ Judges delivered work. The same anchors are asked of an account of what was buil
 | --- | --- | --- |
 | Sprint | the sprint text the caller already has, as `item_file`: the Markdown sprint file, or `"$ANCHOR_TRACKER" show <id> --json` composed with `compose-item --show-json <file> [--children-json <file>] --for dev`, or text from the caller's context | Item ID and text for the run, unchanged; any layout is accepted |
 | Anchor tracker | `anchor_tracker.py resolve` | Passed as `anchor_tracker`; the agent resolves it again and rejects a mismatch |
-| Evidence | sprint report file, PR number or body file, test summary file | In that order; the request cap at this gate is 64,000 bytes (`jev-api.md`) and Jev reads the start most reliably (measured-behaviour.md) |
+| Evidence | sprint report file, PR number or body file, test summary file | In that order; Jev reads the start most reliably (measured-behaviour.md) |
 | Anchors | `$A`: `docs/plans/phase-<current>/anchors.json` | `locked` and `promoted` only |
 | Question overrides | each anchor's dev-questions bead | Fenced JSON; `{}` means defaults |
 | Script | `scripts/jev_judge.py` next to `SKILL.md`, absolute | Passed as `script` |
