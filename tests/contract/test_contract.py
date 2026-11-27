@@ -1,5 +1,6 @@
 """Product contracts. Only loopback HTTP, controlled synchronization and temporary files."""
 import importlib
+import io
 import _thread
 import signal
 import json
@@ -12,7 +13,7 @@ import tempfile
 import threading
 import tomllib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stderr
 from unittest.mock import patch
 import unittest
 
@@ -40,7 +41,11 @@ def server(replies, respond=None, host="127.0.0.1"):
             with lock:
                 index = len(received)
                 received.append((self.path, {key.lower(): value for key, value in self.headers.items()}, body))
-            status, headers, answer = respond(body) if respond else replies[index]
+            response = respond(body) if respond else replies[index]
+            if response is None:
+                self.close_connection = True
+                return
+            status, headers, answer = response
             if status is None:
                 self.close_connection = True
                 self.connection.shutdown(socket.SHUT_RDWR)
@@ -1110,8 +1115,9 @@ class Cli(Isolated):
                 def respond(body):
                     process.send_signal(interrupt)
                     release.wait()
-                    return 200, {}, ANSWER
-                with server([None], respond) as (url, received):
+                    return None
+                server_errors = io.StringIO()
+                with redirect_stderr(server_errors), server([None], respond) as (url, received):
                     port = int(url.split(":")[2].split("/")[0])
                     Path(folder, "decidr.json").write_text(json.dumps({"project": "contract", "laya": {"host": "127.0.0.1", "port": port}}))
                     env = {"PATH": os.defpath, "DECIDR_LOG_ROOT": folder,
@@ -1145,6 +1151,7 @@ class Cli(Isolated):
                                         pipe.close()
                             finally:
                                 release.set()
+                self.assertEqual(server_errors.getvalue(), "")
                 self.assertNotEqual(process.returncode, 0, stdout + stderr)
                 results = json.loads(stdout)
                 self.assertTrue(results["ok"], results)
