@@ -1,6 +1,6 @@
 # j-2 plan: the Run, on Rust, decidr and the wheel
 
-Base: sprint/j-1 @f8bb024a (gate 2404/2580). Line refs are file:line at that commit. Written by reading the code; the Rust parts were prototyped on this branch (see Budget).
+Base: sprint/j-1 @d81b1892 (gate 2402/2580). Line refs are file:line at that commit. Written by reading the code; the Rust parts were prototyped on this branch (see Budget).
 
 ## Goal
 
