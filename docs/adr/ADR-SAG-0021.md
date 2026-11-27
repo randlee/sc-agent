@@ -41,7 +41,7 @@ Every general-log record of a process must reach one Logger that the process's e
 
 ### Decision
 
-**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.
+**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.
 
 **The wheel exposes the crate's Logger.** The sc-decidr wheel returns the sc-observability crate's `Logger` to Python, named by the caller. Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue. The wheel has no dependency on the `sc-observability` Python package.
 
