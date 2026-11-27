@@ -287,7 +287,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         self.assertEqual(list(Path(self.directory.name).rglob("sessions.jsonl")), [])
 
     def test_project_precedence_through_session_paths(self):
-        initialized = subprocess.run(["git", "init", "--quiet"], capture_output=True, text=True)
+        initialized = subprocess.run(["git", "init", "--quiet"], capture_output=True, text=True, timeout=20)
         self.assertEqual(initialized.returncode, 0, initialized.stderr)
         root = Path.cwd()
         local = root / ".sc/sc-agent"
@@ -590,14 +590,14 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             self.assertTrue(got["ok"], got)
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret", "HOSTNAME": "not-the-host"}), server([(200, {}, ANSWER)] * 5) as (url, _):
             send(url)
-            subprocess.run(["git", "init", "--quiet"], check=True)
-            subprocess.run(["git", "remote", "add", "origin", "https://github.com/example/project.git"], check=True)
+            subprocess.run(["git", "init", "--quiet"], check=True, timeout=20)
+            subprocess.run(["git", "remote", "add", "origin", "https://github.com/example/project.git"], check=True, timeout=20)
             send(url)
             for origin in ("git@github.com:example/project.git", "https://example.com:8443/o/r.git", "ssh://git@example.com:2222/o/r.git"):
-                subprocess.run(["git", "remote", "set-url", "origin", origin], check=True)
+                subprocess.run(["git", "remote", "set-url", "origin", origin], check=True, timeout=20)
                 send(url)
         rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
-        host = subprocess.run(["hostname"], check=True, text=True, capture_output=True).stdout.strip()
+        host = subprocess.run(["hostname"], check=True, text=True, capture_output=True, timeout=20).stdout.strip()
         self.assertEqual(sorted(row["repo"] for row in rows), sorted([f"local/{host}/{Path.cwd().name}", "github.com/example/project", "github.com/example/project", "example.com/o/r", "example.com/o/r"]))
 
     def test_network_errors_are_returned_and_attempts_bounded(self):
