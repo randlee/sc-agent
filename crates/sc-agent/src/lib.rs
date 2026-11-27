@@ -1733,9 +1733,16 @@ mod route_tests {
         let held = host.lock().map_err(|_| "holdoff poisoned")?;
         let (finished, outcome) = std::sync::mpsc::channel();
         let waiting_cancel = cancel.clone();
+        let reached = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let worker_reached = reached.clone();
         let work = std::thread::spawn(move || {
             let flag = waiting_cancel.clone();
-            LOCK_WAIT.with(|hook| *hook.borrow_mut() = Some(Box::new(move || flag.cancel())));
+            LOCK_WAIT.with(|hook| {
+                *hook.borrow_mut() = Some(Box::new(move || {
+                    worker_reached.store(true, Ordering::SeqCst);
+                    flag.cancel();
+                }));
+            });
             let result = waiting_cancel.lock(&same_host).map(|_| json!(null));
             let _ = finished.send(result);
         });
@@ -1743,8 +1750,8 @@ mod route_tests {
         drop(held);
         if matches!(result, Err(RecvTimeoutError::Timeout)) {
             return Err(format!(
-                "lock waiter timed out; cancel.is_cancelled()={}",
-                cancel.is_cancelled()
+                "lock waiter timed out; contention hook reached={}",
+                reached.load(Ordering::SeqCst)
             )
             .into());
         }
