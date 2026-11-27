@@ -633,3 +633,38 @@ fn cancel_after_a_lower_layer_error_keeps_it() -> Test {
     logger.shutdown()?;
     Ok(())
 }
+
+#[test]
+fn resolving_and_sending_read_the_selected_credential_once() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let text = answer().to_string();
+    let stub = Stub::new(vec![http(
+        200,
+        json!({
+            "content":[{"type":"text","text":text}],
+            "choices":[{"message":{"content":text}}]
+        }),
+    )])?;
+    let mut opts = options(&root, &stub.url);
+    opts.model = "haiku".into();
+    opts.environment.clear();
+    let reads = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let called = reads.clone();
+    let mut client = run(opts, &logger)?;
+    client.keyring = Box::new(move |_| {
+        if called.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+            Ok("controlled-secret".into())
+        } else {
+            Err(sc_agent::KeyringError::Read(
+                "credential read more than once".into(),
+            ))
+        }
+    });
+    let outcome = client.send(&request());
+    assert_eq!(reads.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(outcome?["answers"], answer()["answers"]);
+    assert_eq!(stub.finish()?.len(), 1);
+    logger.shutdown()?;
+    Ok(())
+}

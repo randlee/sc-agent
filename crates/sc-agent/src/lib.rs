@@ -322,8 +322,7 @@ pub fn config(
                 .find(|(name, value)| name == "SC_AGENT_HOME" && !value.is_empty())
                 .map(|(_, value)| PathBuf::from(value))
         })
-        .or_else(|| std::env::home_dir().map(|home| home.join(".sc-agent")))
-        .ok_or_else(|| error("config.home", "Home directory unavailable"))?;
+        .map_or_else(home_root, Ok)?;
     let context = StandardContext::new(
         AppName::new("sc-agent").map_err(config_error)?,
         vec![],
@@ -381,9 +380,8 @@ pub fn config(
         decidr: setting(tool, &resolved, "decidr", json!({}))?,
         tool: tool.into(),
     };
-    if config.workers == 0 {
-        return Err(invalid_setting(&resolved, "workers", "must be positive"));
-    }
+    workers(config.workers)
+        .map_err(|_| invalid_setting(&resolved, "workers", "must be positive"))?;
     if config.max_sends == 0 {
         return Err(invalid_setting(&resolved, "max_sends", "must be positive"));
     }
@@ -437,16 +435,16 @@ pub fn slug(value: &str) -> Result<(), Error> {
     }
     Ok(())
 }
+fn home_root() -> Result<PathBuf, Error> {
+    std::env::home_dir()
+        .map(|home| home.join(".sc-agent"))
+        .ok_or_else(|| error("config.home", "Home directory unavailable"))
+}
 pub fn log_root(name: &str) -> Result<PathBuf, Error> {
     std::env::var_os(format!("{}LOG_ROOT", prefix(name)))
         .filter(|s| !s.is_empty())
         .map(PathBuf::from)
-        .map(Ok)
-        .unwrap_or_else(|| {
-            std::env::home_dir()
-                .map(|p| p.join(".sc-agent"))
-                .ok_or_else(|| error("config.home", "Home directory unavailable"))
-        })
+        .map_or_else(home_root, Ok)
 }
 pub fn default_logger(name: &str) -> Result<Logger, Error> {
     slug(name)?;
@@ -465,6 +463,18 @@ pub enum KeyringError {
 impl From<String> for KeyringError {
     fn from(value: String) -> Self {
         Self::Read(value)
+    }
+}
+impl KeyringError {
+    fn received(
+        received: Result<Result<String, keyring::Error>, RecvTimeoutError>,
+    ) -> Result<String, Self> {
+        match received {
+            Ok(Err(keyring::Error::NoEntry)) => Ok(String::new()),
+            Ok(value) => value.map_err(|error| KeyringError::Read(error.to_string())),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(KeyringError::Timeout),
+            Err(error) => Err(KeyringError::Read(error.to_string())),
+        }
     }
 }
 pub fn key(
@@ -519,38 +529,24 @@ pub fn key(
     }
     Ok(value)
 }
-fn keyring_result(result: Result<String, keyring::Error>) -> Result<String, String> {
-    match result {
-        Ok(value) => Ok(value),
-        Err(keyring::Error::NoEntry) => Ok(String::new()),
-        Err(error) => Err(error.to_string()),
-    }
-}
 fn keyring_wait(
-    reader: impl FnOnce() -> Result<String, String> + Send + 'static,
+    reader: impl FnOnce() -> Result<String, keyring::Error> + Send + 'static,
     timeout: Duration,
 ) -> Result<String, KeyringError> {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     std::thread::spawn(move || {
         let _ = sender.send(reader());
     });
-    match receiver.recv_timeout(timeout) {
-        Ok(value) => value.map_err(KeyringError::Read),
-        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(KeyringError::Timeout),
-        Err(error) => Err(KeyringError::Read(error.to_string())),
-    }
+    KeyringError::received(receiver.recv_timeout(timeout))
 }
+
 pub fn os_keyring(variable: &str) -> Result<String, KeyringError> {
     let variable = variable.to_owned();
     let account = std::env::var("USER")
         .or_else(|_| std::env::var("USERNAME"))
         .map_err(|e| KeyringError::Read(e.to_string()))?;
     keyring_wait(
-        move || {
-            let result =
-                keyring::Entry::new(&variable, &account).and_then(|entry| entry.get_password());
-            keyring_result(result)
-        },
+        move || keyring::Entry::new(&variable, &account).and_then(|entry| entry.get_password()),
         Duration::from_secs(15),
     )
 }
@@ -583,9 +579,11 @@ mod resolve_test {
         let keyed = || (&PROVIDERS[1], "keyed".to_owned());
         let keyless = || (&PROVIDERS[6], "keyless".to_owned());
         let picked = resolve(vec![keyed(), keyless()], &options, &seam);
-        assert!(matches!(picked, Ok((p, id)) if p.key.is_empty() && id == "keyless"));
+        assert!(
+            matches!(picked, Ok(resolved) if resolved.provider.key.is_empty() && resolved.model == "keyless")
+        );
         let picked = resolve(vec![(&PROVIDERS[3], "x".into()), keyed()], &options, &seam);
-        assert!(matches!(picked, Ok((p, _)) if p.name == "anthropic"));
+        assert!(matches!(picked, Ok(resolved) if resolved.provider.name == "anthropic"));
     }
 }
 #[cfg(test)]
@@ -644,7 +642,9 @@ mod keyring_timeout_test {
 
     #[test]
     fn reader_failure_keeps_read_error() -> Result<(), Box<dyn std::error::Error>> {
-        let value = keyring_wait(|| Err("controlled refusal".into()), Duration::from_secs(60));
+        let value = KeyringError::received(Ok(Err(keyring::Error::PlatformFailure(Box::new(
+            std::io::Error::other("controlled refusal"),
+        )))));
         let result = key("TYPESAFE_API_KEY", &[], Path::new("/nonexistent"), &|_| {
             Err(match &value {
                 Err(KeyringError::Read(message)) => KeyringError::Read(message.clone()),
@@ -674,10 +674,11 @@ mod keyring_timeout_test {
     #[test]
     fn missing_key_names_environment_dotenv_and_keyring() -> Result<(), Box<dyn std::error::Error>>
     {
-        let value = keyring_result(Err(keyring::Error::NoEntry));
-        assert!(matches!(&value, Ok(value) if value.is_empty()));
+        let value = KeyringError::received(Ok(Err(keyring::Error::NoEntry)))
+            .map_err(|e| format!("{e:?}"))?;
+        assert!(value.is_empty());
         let result = key("TYPESAFE_API_KEY", &[], Path::new("/nonexistent"), &|_| {
-            value.clone().map_err(KeyringError::Read)
+            Ok(value.clone())
         });
         let error = serde_json::to_value(result.err()).ok();
         assert_eq!(
@@ -707,9 +708,10 @@ mod keyring_timeout_test {
             keyring::Error::PlatformFailure(Box::new(std::io::Error::other("missing service"))),
         ];
         for cause in errors {
-            let detail = keyring_result(Err(cause))
-                .err()
-                .ok_or("keyring error lost")?;
+            let detail = match KeyringError::received(Ok(Err(cause))) {
+                Err(KeyringError::Read(detail)) => detail,
+                other => return Err(format!("keyring error lost: {other:?}").into()),
+            };
             let result = key("TYPESAFE_API_KEY", &[], Path::new("/nonexistent"), &|_| {
                 Err(KeyringError::Read(detail.clone()))
             });
@@ -872,15 +874,8 @@ fn provider_named(name: &str) -> Result<&'static Provider, Error> {
         .find(|p| p.name == name)
         .ok_or_else(|| error("types.unknown_provider", name))
 }
-/// Resolve a model name to its first configured or catalog candidate.
-pub fn model_with(
-    name: &str,
-    configured: &BTreeMap<String, ModelEntry>,
-) -> Result<(&'static Provider, String), Error> {
-    Ok(candidates(name, configured)?.remove(0))
-}
 /// Every provider row that serves `name`, newest release first, equal dates in table order.
-fn candidates(
+pub fn candidates(
     name: &str,
     configured: &BTreeMap<String, ModelEntry>,
 ) -> Result<Vec<(&'static Provider, String)>, Error> {
@@ -904,20 +899,35 @@ fn candidates(
     }
     Ok(found)
 }
+struct SelectedModel {
+    provider: &'static Provider,
+    model: String,
+    key: Option<String>,
+}
 /// Pick the candidate to send to: a keyless provider first, else the first whose key is held.
 fn resolve(
     found: Vec<(&'static Provider, String)>,
     options: &Options,
     keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
-) -> Result<(&'static Provider, String), Error> {
+) -> Result<SelectedModel, Error> {
     let single = found.first().filter(|_| found.len() == 1);
     if let Some(row) = found.iter().find(|(p, _)| p.key.is_empty()).or(single) {
-        return Ok(row.clone());
+        return Ok(SelectedModel {
+            provider: row.0,
+            model: row.1.clone(),
+            key: None,
+        });
     }
     let mut last = None;
     for (p, id) in &found {
         match key(p.key, &options.environment, &options.root, keyring) {
-            Ok(_) => return Ok((p, id.clone())),
+            Ok(key) => {
+                return Ok(SelectedModel {
+                    provider: p,
+                    model: id.clone(),
+                    key: Some(key),
+                });
+            }
             Err(mut failure) => {
                 if let Some(mut previous) = last.take() {
                     // Missing keys add context without replacing an earlier failure.
@@ -1155,6 +1165,7 @@ pub struct Route<'a> {
     pub cancel: &'a Cancel,
     pub wait: &'a (dyn Fn(Duration) -> Result<(), Error> + Sync),
     pub keyring: &'a (dyn Fn(&str) -> Result<String, KeyringError> + Sync),
+    pub key: Option<&'a str>,
     pub sends: &'a Cell<u32>,
     pub holdoffs: &'a Holdoffs,
 }
@@ -1316,15 +1327,19 @@ impl Route<'_> {
                 ),
             ));
         }
-        let key = match provider.key {
-            "" => String::new(),
-            name => key(
-                name,
-                &self.options.environment,
-                &self.options.root,
-                self.keyring,
-            )?,
-        };
+        let key = self
+            .key
+            .map(str::to_owned)
+            .map(Ok)
+            .unwrap_or_else(|| match provider.key {
+                "" => Ok(String::new()),
+                name => key(
+                    name,
+                    &self.options.environment,
+                    &self.options.root,
+                    self.keyring,
+                ),
+            })?;
         let redact = |text: String| {
             if key.is_empty() {
                 text
@@ -1423,8 +1438,9 @@ impl Route<'_> {
 }
 static SESSION_APPEND: Mutex<()> = Mutex::new(());
 
-pub fn workers(value: i64) -> Result<usize, Error> {
-    usize::try_from(value)
+pub fn workers(value: impl TryInto<usize>) -> Result<usize, Error> {
+    value
+        .try_into()
         .ok()
         .filter(|v| *v > 0)
         .ok_or_else(|| error("decidr.invalid_workers", "workers must be positive"))
@@ -1461,17 +1477,19 @@ impl Run {
         logger: Option<Arc<Logger>>,
         cancel: Arc<Cancel>,
     ) -> Result<Self, Error> {
+        let environment = std::env::vars_os().collect::<Vec<_>>();
         let (loaded, root, repo) = load(
             &args.tool,
             args.config_dir.as_deref(),
             args.project.as_deref(),
+            &environment,
         )?;
         let mut settings = loaded.config;
         if let Some(count) = args.workers {
             settings.workers = workers(count)?;
         }
         let options = Options {
-            environment: std::env::vars_os().collect(),
+            environment,
             settings,
             model: args.model.unwrap_or_else(|| "jev".into()),
             agent_role: args.agent_role,
@@ -1482,11 +1500,10 @@ impl Run {
             log_root: log_root(&args.tool)?,
             repo,
         };
-        Self::from_options(options, args.tool, logger, cancel)
+        Self::from_options(options, logger, cancel)
     }
     pub fn from_options(
         options: Options,
-        tool: String,
         logger: Option<Arc<Logger>>,
         cancel: Arc<Cancel>,
     ) -> Result<Self, Error> {
@@ -1494,7 +1511,7 @@ impl Run {
         let owned = logger.is_none();
         let logger = match logger {
             Some(logger) => logger,
-            None => Arc::new(default_logger(&tool)?),
+            None => Arc::new(default_logger(&options.settings.tool)?),
         };
         let waiting = cancel.clone();
         Ok(Self {
@@ -1508,12 +1525,13 @@ impl Run {
             owned,
         })
     }
-    fn resolve(&self) -> Result<(&'static Provider, String), Error> {
+    fn resolve(&self) -> Result<SelectedModel, Error> {
         resolve(self.found.clone(), &self.options, &*self.keyring)
     }
     /// Whether the next send resolves to the named provider (keyless first, then the first held key).
     pub fn sends_to(&self, provider: &str) -> Result<bool, Error> {
-        self.resolve().map(|(p, _)| p.name == provider)
+        self.resolve()
+            .map(|resolved| resolved.provider.name == provider)
     }
     pub fn logger(&self) -> &Logger {
         &self.logger
@@ -1549,7 +1567,11 @@ impl Run {
             let project = options.settings.project_required()?;
             slug(project)?;
             slug(&options.agent_role)?;
-            let (provider, model) = self.resolve()?;
+            let SelectedModel {
+                provider,
+                model,
+                key,
+            } = self.resolve()?;
             let base = match options.settings.local.get(provider.name) {
                 _ if !provider.url.is_empty() => provider.url.into(),
                 Some(runner) => format!("http://{}:{}/v1", runner.host, runner.port),
@@ -1568,6 +1590,7 @@ impl Run {
                 cancel,
                 wait: &*self.wait,
                 keyring: &*self.keyring,
+                key: key.as_deref(),
                 sends: &sends,
                 holdoffs: &self.holdoffs,
             };
@@ -1650,9 +1673,7 @@ impl Run {
         requests: &[Value],
         on_result: &(dyn Fn(usize, &Value) + Sync),
     ) -> Result<Value, Error> {
-        if self.options.settings.workers == 0 {
-            return Err(error("decidr.invalid_workers", "workers must be positive"));
-        }
+        workers(self.options.settings.workers)?;
         let next = std::sync::atomic::AtomicUsize::new(0);
         let (sender, receiver) = std::sync::mpsc::channel();
         Ok(std::thread::scope(|scope| {
@@ -1748,13 +1769,13 @@ pub fn load(
     tool: &str,
     config_dir: Option<&Path>,
     project: Option<&str>,
+    environment: &[(OsString, OsString)],
 ) -> Result<(Configuration, PathBuf, String), Error> {
     let (root, repo) = repository()?;
     let local = root.join(".sc/sc-agent");
-    let environment = std::env::vars_os().collect::<Vec<_>>();
     let local = root.join(".git").exists().then_some(local.as_path());
     Ok((
-        config(tool, local, config_dir, &environment, project)?,
+        config(tool, local, config_dir, environment, project)?,
         root,
         repo,
     ))
@@ -1793,7 +1814,12 @@ pub fn doctor(
     config_dir: Option<&Path>,
     project: Option<&str>,
 ) -> Result<Value, Error> {
-    let (loaded, ..) = load(tool, config_dir, project)?;
+    let (loaded, ..) = load(
+        tool,
+        config_dir,
+        project,
+        &std::env::vars_os().collect::<Vec<_>>(),
+    )?;
     Ok(json!({"settings":loaded.rows, "files":loaded.files, "log_root":log_root(tool)?}))
 }
 
@@ -1958,6 +1984,7 @@ pub mod route_tests {
                 cancel: &run.cancel,
                 wait: &*run.wait,
                 keyring: &keyring,
+                key: None,
                 sends: &sends,
                 holdoffs: &Holdoffs::default(),
             };
@@ -1970,7 +1997,6 @@ pub mod route_tests {
         let configured = defaults.settings.workers;
         let next = self::super::Run::from_options(
             defaults,
-            "decidr".into(),
             Some(logger.clone()),
             Arc::new(Cancel::default()),
         )?;
@@ -2055,6 +2081,7 @@ pub mod route_tests {
             cancel: &Cancel::default(),
             wait: &wait,
             keyring: &keyring,
+            key: None,
             sends: &Cell::new(0),
             holdoffs: &holdoffs,
         };
@@ -2156,6 +2183,7 @@ pub mod route_tests {
                 cancel: &cancel,
                 wait: &no_wait,
                 keyring: &keyring,
+                key: None,
                 sends: &sends,
                 holdoffs: &Holdoffs::default(),
             };

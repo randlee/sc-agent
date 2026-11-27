@@ -297,7 +297,6 @@ pub fn rows(root: &Temp) -> Result<Vec<Value>, Box<dyn std::error::Error + Send 
 pub fn run(options: Options, logger: &Arc<Logger>) -> Result<sc_agent::Run, sc_agent::Error> {
     let mut run = sc_agent::Run::from_options(
         options,
-        "decidr".into(),
         Some(logger.clone()),
         Arc::new(sc_agent::Cancel::default()),
     )?;
@@ -322,4 +321,12 @@ pub fn pinned_model(
         .map(|(_, id, _)| *id)
         .unwrap_or(name);
     Ok((provider, id.into()))
+}
+
+// Only tests select the first candidate without credential resolution.
+pub fn model_with(
+    name: &str,
+    configured: &std::collections::BTreeMap<String, sc_agent::ModelEntry>,
+) -> Result<(&'static sc_agent::Provider, String), sc_agent::Error> {
+    Ok(sc_agent::candidates(name, configured)?.remove(0))
 }

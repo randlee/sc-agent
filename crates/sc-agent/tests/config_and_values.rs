@@ -1,5 +1,5 @@
 pub mod support;
-use sc_agent::{Answer, config, digest, error, key, model_with, result, schema, slug};
+use sc_agent::{Answer, config, digest, error, key, result, schema, slug};
 use serde_json::json;
 use std::{cell::RefCell, ffi::OsString, fs};
 use support::*;

@@ -36,6 +36,7 @@ fn with_route<T>(
         cancel: &Cancel::default(),
         wait: &no_wait,
         keyring: &keyring,
+        key: None,
         sends: &sends,
         holdoffs: &sc_agent::Holdoffs::default(),
     };
