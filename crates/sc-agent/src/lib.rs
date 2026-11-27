@@ -499,9 +499,9 @@ pub fn key(
         None => match dotenv()? {
             Some(value) => value,
             None => keyring(variable).map_err(|e| match e {
-                KeyringError::Read(detail) => error(
+                KeyringError::Read(_) => error(
                     "secrets.keyring_read",
-                    format!("The platform keyring is unavailable for {variable}: {detail}. Set {variable} in the environment or repository .env."),
+                    format!("The platform keyring is unavailable for {variable} (keyring detail redacted). Set {variable} in the environment or repository .env."),
                 ),
                 KeyringError::Timeout => error("secrets.keyring_timeout", format!("OS keychain did not answer for {variable}; it may be waiting for approval. Approve access or set {variable} in the environment or .env.")),
             })?,

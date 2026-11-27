@@ -55,7 +55,8 @@ fn req_sag_0401_env_dotenv_keyring_order_and_invalid_credentials() -> Test {
     assert!(message.contains("TYPESAFE_API_KEY"));
     assert!(message.contains("environment"));
     assert!(message.contains(".env"));
-    assert!(message.contains("controlled refusal"));
+    assert!(!message.contains("controlled refusal"));
+    assert!(message.contains("keyring detail redacted"));
     Ok(())
 }
 
