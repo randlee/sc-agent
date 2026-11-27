@@ -99,17 +99,26 @@ fn respond_value(
         }
     }
 }
-fn finish(logger: &Logger, owned: bool, value: Value) -> Value {
-    let flush = logger.flush();
-    let shutdown = if owned { logger.shutdown() } else { Ok(()) };
-    if value.get("ok").and_then(Value::as_bool) == Some(false) {
+fn finish_error(mut value: Value, id: &'static str, failure: impl ToString) -> Value {
+    if let Some(detail) = value.get_mut("error").and_then(Value::as_object_mut) {
+        let message = detail.get("message").and_then(Value::as_str).unwrap_or("");
+        detail.insert(
+            "message".into(),
+            json!(format!("{message}; {id}: {}", failure.to_string())),
+        );
         value
     } else {
-        match flush {
-            Err(e) => sc_agent::result(Err(error("log.flush", e))),
-            Ok(()) => sc_agent::after_shutdown(value, shutdown),
-        }
+        sc_agent::result(Err(error(id, failure)))
     }
+}
+fn finish(logger: &Logger, owned: bool, mut value: Value) -> Value {
+    if let Err(e) = logger.flush() {
+        value = finish_error(value, "log.flush", e);
+    }
+    if owned && let Err(e) = logger.shutdown() {
+        value = finish_error(value, "log.shutdown", e);
+    }
+    value
 }
 
 fn arg<T: for<'a, 'py> FromPyObject<'a, 'py>>(
@@ -415,7 +424,19 @@ impl PyRun {
             }
             Ok(run)
         })();
-        Self(created.map_err(|e| respond_value(general_log, &tool, |_| Err(e))))
+        Self(created.map_err(|e| {
+            let original = json!({"ok":false, "error":e});
+            let called = std::cell::Cell::new(false);
+            let reported = respond_value(general_log, &tool, |_| {
+                called.set(true);
+                Err(e)
+            });
+            if called.get() {
+                reported
+            } else {
+                finish_error(original, "log.write", reported)
+            }
+        }))
     }
     #[getter]
     fn run_id(&self) -> Option<String> {
@@ -760,7 +781,22 @@ mod tests {
         let logger = Logger::new(config)?;
         logger.shutdown()?;
         let original = sc_agent::result(Err(error("http.auth", "original error")));
-        assert_eq!(finish(&logger, false, original.clone()), original);
+        let kept = finish(&logger, false, original);
+        assert_eq!(kept["error"]["id"], "http.auth");
+        let message = kept["error"]["message"].as_str().ok_or("message absent")?;
+        assert!(message.contains("original error"));
+        assert!(message.contains("log.flush"));
+        let creation = finish_error(
+            sc_agent::result(Err(error("types.unknown_short_name", "bad model"))),
+            "log.write",
+            "logger unavailable",
+        );
+        assert_eq!(creation["error"]["id"], "types.unknown_short_name");
+        let message = creation["error"]["message"]
+            .as_str()
+            .ok_or("message absent")?;
+        assert!(message.contains("bad model"));
+        assert!(message.contains("logger unavailable"));
         let failure = finish(&logger, false, sc_agent::result(Ok(json!("success"))));
         assert_eq!(failure["error"]["id"], "log.flush");
         assert_eq!(
