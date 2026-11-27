@@ -205,7 +205,7 @@ let run = Run::new(RunArgs { tool: "decidr".into(), agent_role: "r".into(), ..De
 // tests: Run::from_options(options, "decidr".into(), None, Arc::new(Cancel::default()))?
 let v = run.send(&request)?; run.close()?;
 ```
-CLI: `decidr send --agent-role r [--model jev] [--input f] [--batch] [--workers n] [--timeout-secs 120]`; `--provider x` -> clap error -> `decidr.usage`. `decidr models` unchanged (`json!(PROVIDERS)`). Config: `models.<name>.provider` selects the provider (REQ-SAG-0103).
+CLI: `decidr send --agent-role r [--model name] [--input f] [--batch] [--workers n] [--timeout-secs seconds]`; omitted `--model` and `--timeout-secs` stay `None` in clap and `Run::new` owns the defaults (`jev` and 120 seconds). `--provider x` -> clap error -> `decidr.usage`. `decidr models` unchanged (`json!(PROVIDERS)`). Config: `models.<name>.provider` selects the provider (REQ-SAG-0103).
 Paths: default logger `<DECIDR_LOG_ROOT|~/.sc-agent>/logs/decidr.log.jsonl`; sessions unchanged.
 
 ## Deletions
@@ -224,7 +224,7 @@ Paths: default logger `<DECIDR_LOG_ROOT|~/.sc-agent>/logs/decidr.log.jsonl`; ses
 - Record text deleted on develop (owner), design unchanged: REQ-SAG-0701's definition of batch cancel as the `Cancel` object passed to `send_batch` as its `cancel` argument (cancelling a batch is cancelling its Run; the MUST to stop every unfinished request stays); ADR-SAG-0020's "and no others" (any tool name gets its own files and prefix).
 - REQ-SAG-0504 (a schema-invalid batch refused before any send) is a pre-existing gap and not in phase j: `Run::send_batch` keeps today's behaviour; deferred, not claimed.
 
-- ANC-001 "config can override default": met by a `models.jev` entry (j-1); no `Settings.model` key added, `--model`/`model=` default stays "jev".
+- ANC-001 "config can override default": met by a `models.jev` entry (j-1); no `Settings.model` key is added. `Run::new` supplies the single default model name `jev` when callers omit `model`, and the configured `models.jev` row can select its provider and wire id.
 - The wheel's `Run` takes neither `tool_version` nor `cache` in j-2 (no stub declares a name the native module lacks). j-3 adds both with their storage and, in the same sprint, the template's `TOOL_VERSION`/`tool_version` render variable, the two call sites' `tool_version=TOOL_VERSION`, the wheel README render command and `check_consumer_template.py` vars, so j-3's decision.missing_tool never meets a template that omits it.
 - Old-bead items dropped as not in the code: Model class, J1-13 block, `configured`, `decidr models` `{providers, models}` shape, `tool_version`/`cache` (moved to j-3 with their storage; `tool` is in j-2).
 

@@ -115,7 +115,7 @@
           "long_help": "",
           "value_name": "MODEL",
           "required": false,
-          "default_value": "jev",
+          "default_value": null,
           "choices": [],
           "min_values": null,
           "max_values": null
@@ -128,7 +128,7 @@
           "long_help": "",
           "value_name": "TIMEOUT_SECS",
           "required": false,
-          "default_value": "120",
+          "default_value": null,
           "choices": [],
           "min_values": null,
           "max_values": null
