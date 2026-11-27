@@ -147,7 +147,7 @@ fn adr_sag_0021_send_and_report_return_logger_failures() -> Test {
     let cancelled = std::sync::Arc::new(Cancel::default());
     cancelled.cancel();
     let outcome = {
-        let mut run = run(options(&root, "http://127.0.0.1:1").clone(), &logger)?;
+        let mut run = run(options(&root, "http://127.0.0.1:1"), &logger)?;
         run.cancel = cancelled.clone();
 
         run.keyring = Box::new(move |_| panic!("cancelled send read a key"));
