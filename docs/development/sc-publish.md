@@ -2,7 +2,7 @@
 
 sc-agent publishes through the shared
 **[sc-publish](https://github.com/randlee/sc-publish)** kit (ADR-SAG-0017,
-ADR-SAG-0018; [REQ-SAG-0803](../requirements/REQ-SAG-0803.md)). The kit owns release workflows, scripts, agents, and rendered
+ADR-SAG-0018). The kit owns release workflows, scripts, agents, and rendered
 manifests. This repository owns the pin, consumer input JSON, and the PR
 dry-run gate.
 
@@ -24,7 +24,7 @@ After install, see [`README.sc-publish.md`](../../README.sc-publish.md),
 | `scripts/sc-publish-dry-run.sh` | sc-agent | Local and PR release dry-run |
 | `.github/workflows/sc-publish-dry-run.yml` | sc-agent | Runs the dry-run on every PR |
 
-Never hand-edit kit or rendered files (REQ-SAG-0131). Change consumer input or
+Never hand-edit kit or rendered files. Change consumer input or
 the pin, then re-run install.
 
 ## Consumer input (current workspace)

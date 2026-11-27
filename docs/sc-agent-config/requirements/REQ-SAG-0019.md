@@ -14,24 +14,13 @@
 
 ### Requirement Statement
 
-Definitions: A CLI is an sc-agent command-line program that reads configuration, such as `decidr`; `<cli>` is its program name. `sitr` reads no configuration. The shared file is `sc-agent.json`. A CLI file is `<cli>.json` or its optional override file `<cli>.local.json`. The global folder is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform, relocated to the folder named by `SC_AGENT_HOME` when that variable is nonempty. An explicit `--config-dir` (or wheel `config_dir`) takes precedence over that variable. `<worktree>` is the root of the git work tree containing the folder the CLI runs in. The local folder is `<worktree>/.sc/sc-agent/`. A layer is one source of a setting's value. The local-folder layers are layers 3, 4 and 5 below. A typed error is an error value (REQ-SAG-0016). The key path is the dotted path of a configuration key within its file, such as `laya.port`. The shared settings are the defaults for configuration-reading CLIs that `sc-agent.json` holds. A model request is a request that asks a model for a reply, as `decidr send` does. The settings table has one row per setting and the columns `path`, `value` and `source`. The source of a value is the layer it comes from, shown as the flag, the environment variable name, the file path or `default`. A missing-setting error is a typed error that names the setting and every layer that can set it. A local endpoint is a keyless provider that runs a local model, such as laya and decider; its address is its host and port. A paid API is a remote model provider that requires an API key; its key is sent only to that provider's built-in base address. The failure location of a load error is the file path and the key path. A model entry is the configuration object `models.<alias>`; it adds a model row named `<alias>`.
+Definitions: A CLI is an sc-agent command-line program that reads configuration, such as `decidr`; `<cli>` is its program name. `sitr` reads no configuration. The shared file is `sc-agent.json`. A CLI file is `<cli>.json` or its optional override file `<cli>.local.json`. The global folder is `~/.sc-agent/`, the user's home directory joined with `.sc-agent` on every platform, relocated to the folder named by `SC_AGENT_HOME` when that variable is nonempty. An explicit `--config-dir` (or wheel `config_dir`) takes precedence over that variable. `<worktree>` is the root of the git work tree containing the folder the CLI runs in. The local folder is `<worktree>/.sc/sc-agent/`. A layer is one source of a setting's value. The local-folder layers are layers 3, 4 and 5. A typed error is an error value (REQ-SAG-0016). The key path is the dotted path of a configuration key within its file, such as `laya.port`. The shared settings are the defaults for configuration-reading CLIs that `sc-agent.json` holds. A model request is a request that asks a model for a reply, as `decidr send` does. The settings table has one row per setting and the columns `path`, `value` and `source`. The source of a value is the layer it comes from, shown as the flag, the environment variable name, the file path or `default`. A missing-setting error is a typed error that names the setting and every layer that can set it. A local endpoint is a keyless provider that runs a local model, such as laya and decider; its address is its host and port. A paid API is a remote model provider that requires an API key; its key is sent only to that provider's built-in base address. The failure location of a load error is the file path and the key path. A model entry is the configuration object `models.<alias>`; it adds a model row named `<alias>`.
 
 **MUST statements:**
 
-- For each setting, each CLI MUST use the value from the first of these nine layers, in this order, that sets it:
-  1. the CLI flag;
-  2. the environment variable (REQ-SAG-0020);
-  3. `<cli>.local.json` in the local folder;
-  4. `<cli>.json` in the local folder;
-  5. `sc-agent.json` in the local folder;
-  6. `<cli>.local.json` in the global folder;
-  7. `<cli>.json` in the global folder;
-  8. `sc-agent.json` in the global folder;
-  9. the built-in default.
 - When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.
 - Each configuration file MUST accept the shared settings.
 - A CLI file MUST accept that CLI's settings.
-- A file in the local folder MUST accept the same keys as the same-named file in the global folder.
 - An unknown key in a configuration file MUST cause a typed load error.
 - The `cache` setting MUST default to `true`.
 - A model entry MUST add one row to the model table.
@@ -62,15 +51,11 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Acceptance Criteria:**
 
-- [ ] Unit test (layer order): in either folder, `<cli>.local.json` overrides `<cli>.json`; any local-folder value overrides every global-folder value.
 - [ ] CLI run (`decidr doctor`): with `SC_AGENT_HOME` set, global files are read from that folder and doctor reports those paths; an explicit configuration directory overrides it.
 - [ ] CLI run (`decidr doctor`): with `workers` set to 4 in the global `decidr.json` and 2 in the local `decidr.json`, decidr uses 2 and reports the local `decidr.json` as its source.
 - [ ] Unit test (shared settings): with `project` set only in the global `sc-agent.json`, decidr uses it.
-- [ ] Unit test (layer order): with a setting in the local `sc-agent.json` and the global `decidr.json`, decidr uses the local `sc-agent.json` value.
-- [ ] Unit test (layer order): a flag value beats the same setting in the environment and in every file.
 - [ ] Unit test (missing setting): with a required setting set in no layer, the load fails with a missing-setting error.
 - [ ] Unit test (CLI file): a `decidr` setting in `decidr.local.json` is accepted.
-- [ ] Unit test (same keys): a key accepted in the global `decidr.json` is accepted in the local `decidr.json`.
 - [ ] Unit test (unknown key): an unknown key in the local `decidr.json` fails the load with a typed error naming that file and key path.
 - [ ] Unit test (work tree): outside a git work tree, a `.sc/sc-agent/decidr.json` in the current folder is not read.
 - [ ] CLI run (`decidr doctor`): with `"project": "phase-a"` in `<worktree>/.sc/sc-agent/decidr.json`, `decidr doctor` reports the row `project | phase-a | <worktree>/.sc/sc-agent/decidr.json`.

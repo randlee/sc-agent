@@ -23,12 +23,9 @@ Definitions:
 - To clamp a value is to replace it with the nearest bound of a range when it falls outside that range.
 - An invalid send timeout is a send timeout that is negative or not a number.
 - An invalid worker count is a worker count below 1.
-- The configured send timeout is 120 s unless configuration sets another value (REQ-SAG-0015).
+- The configured send timeout is 120 s unless configuration sets another value.
 - A model's context is the largest request, in tokens, that the model accepts.
 - The provider's error is the error value `decision.api_status` whose message is the provider's reply text.
-- The fixed send count is the number of sends defined in REQ-SAG-0601.
-- A batch result is the result of one request of a batch, carrying that request's input position.
-- The batch callback is the function a caller passes with a batch to receive results while the batch runs.
 
 **MUST statements:**
 
@@ -37,12 +34,9 @@ Definitions:
 - A Run's `timeout_secs` MUST replace the 120 s default send timeout for that Run.
 - When a Run has an override, every call through that Run MUST use the override in place of the configured value.
 - When a Run has no override, every call through that Run MUST use the configured value.
-- When a Run is given an invalid send timeout, it MUST return the error value `decidr.invalid_request_timeout`.
-- When a Run is given an invalid worker count, it MUST return the error value `decidr.invalid_workers`.
+- When a Run is given an invalid send timeout, it MUST return an error.
+- When a Run is given an invalid worker count, it MUST return an error.
 - When a provider rejects a request as too large for the model's context, the call MUST return the provider's error.
-- When a send exceeds the send timeout and fewer than 5 sends of that request have been made, the Run MUST resend it.
-- A batch MUST return one batch result per request.
-- The batch callback MUST receive each result when that result finishes.
 
 **MUST NOT statements:**
 
@@ -54,8 +48,6 @@ Definitions:
 
 Different callers in one process need different parallelism and different patience. Without overrides both are fixed by configuration, so consumers refuse or ignore their own flags. The selected model's context is the only size rule for a request. Values that do not vary between the calls of one command are set once on the Run, so an override cannot leak into another Run. Error values rather than exceptions keep every Python result typed.
 
-Owner ruling (2026-11-21), Rand Lee: "I do not require results in request order."
-
 ### Success Criteria
 
 **Acceptance Criteria:**
@@ -65,16 +57,13 @@ Owner ruling (2026-11-21), Rand Lee: "I do not require results in request order.
 - [ ] A Rust unit test builds a Run with a worker count of 2 and checks the batch runs 2 workers.
 - [ ] A Rust unit test runs `decidr send --timeout-secs 10 --batch --workers 2` and checks the Run's send timeout is 10 s and its worker count is 2.
 - [ ] A Rust unit test builds a Run with no override after one with overrides and checks it uses the configured send timeout and worker count.
-- [ ] A Rust unit test gives a Run a negative send timeout and checks the result is the error value `decidr.invalid_request_timeout`.
-- [ ] A Rust unit test gives a Run a NaN send timeout and checks the result is the error value `decidr.invalid_request_timeout`.
-- [ ] A Rust unit test gives a Run a worker count of 0 and checks the result is the error value `decidr.invalid_workers`.
-- [ ] A Rust unit test gives a Run a worker count of -1 and checks the result is the error value `decidr.invalid_workers`.
+- [ ] A Rust unit test gives a Run a negative send timeout and checks the result is an error value.
+- [ ] A Rust unit test gives a Run a NaN send timeout and checks the result is an error value.
+- [ ] A Rust unit test gives a Run a worker count of 0 and checks the result is an error value.
+- [ ] A Rust unit test gives a Run a worker count of -1 and checks the result is an error value.
 - [ ] A Python unit test builds `sc_agent.Run` with `timeout_secs` and `workers` and checks a batch through it uses both values.
 - [ ] A Python unit test checks that `run.send` and `run.send_batch` have no `timeout_secs` or `workers` parameter.
 - [ ] A Rust unit test has a provider reject a request as too large for the model's context and checks the call returns the provider's error.
-- [ ] A Rust unit test with a loopback runner that never answers checks the result has the error id `http.network` and `attempts` equal to the fixed send count.
-- [ ] A Rust unit test sends a batch and checks it returns one result per request, each with its input position.
-- [ ] A Rust unit test sends a batch whose requests finish out of order and checks the callback sees finish order.
 - [ ] A Rust unit test gives a Run a worker count above the configured one and checks that many workers run.
 - [ ] A Rust unit test checks the configuration is unchanged after a Run with overrides.
 - [ ] A Rust unit test checks that the per-call send and batch signatures have no override parameter.
@@ -87,4 +76,3 @@ Owner ruling (2026-11-21), Rand Lee: "I do not require results in request order.
 - REQ-SAG-0701
 - REQ-SAG-0601
 - REQ-SAG-0013
-- REQ-SAG-0015

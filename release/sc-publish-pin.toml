@@ -1,4 +1,4 @@
-# sc-publish pin (REQ-SAG-0130, ADR-SAG-0018).
+# sc-publish pin (ADR-SAG-0018).
 #
 # Records the exact upstream kit revision this repository is qualified
 # against. Pin one full 40-character commit SHA; never track a moving branch.

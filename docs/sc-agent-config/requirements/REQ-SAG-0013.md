@@ -46,7 +46,6 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 
 **Related:**
 
-- REQ-SAG-0015
 - REQ-SAG-0801
 - REQ-SAG-0401
 - REQ-SAG-0002

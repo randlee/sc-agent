@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Release dry-run for sc-agent (REQ-SAG-0132, REQ-SAG-0803).
+# Release dry-run for sc-agent.
 #
 # One recipe for local use and PR CI (.github/workflows/sc-publish-dry-run.yml):
 #   kit      1. clone the sc-publish kit at the pinned SHA into .sc-publish-kit/

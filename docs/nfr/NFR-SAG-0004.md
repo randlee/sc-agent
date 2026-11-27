@@ -19,19 +19,11 @@ Definitions:
 - sc-agent is this repository: its Rust crates, the sc-decidr wheel and its scripts.
 - A shared fact is a piece of logic or data that more than one program needs, such as the provider table, the provider-key list, the model table, the session-log layout or ULID minting.
 - The owner of a shared fact is the one function, constant or table that holds it.
-- A copy is a second implementation of a shared fact, or a literal list or table that repeats an owner's values. A test fixture that asserts an owner's output is not a copy.
-- A consumer is a program built on the sc-decidr wheel, such as a module rendered from the consumer template (REQ-SAG-0018).
 
 **MUST statements:**
 
 - Every shared fact MUST have a single owner.
 - Code that needs a shared fact MUST obtain it by calling its owner.
-
-**MUST NOT statements:**
-
-- sc-agent MUST NOT contain a copy.
-- The consumer template MUST NOT contain a copy.
-- A consumer MUST NOT contain a copy.
 
 ### Rationale
 

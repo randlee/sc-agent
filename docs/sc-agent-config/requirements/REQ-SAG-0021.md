@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: The project/phase is the name of the project or phase a session belongs to, a block of time related to major changes. Its setting is named `project`. The layers are those of REQ-SAG-0019. The project layers are the layers of REQ-SAG-0019 that can set `project`, in this order: the `--project` flag, the `SC_PROJECT` environment variable, `project` in the local `<cli>.json`, `project` in the local `sc-agent.json`, `project` in the global `<cli>.json`, then `project` in the global `sc-agent.json`. The PyO3 bindings are the `sc_agent` Python module of `sc-agent-py`. A typed error is an error value (REQ-SAG-0016). A session write is a call that would write a session. A built-in default is the value that layer 7 of REQ-SAG-0019 gives a setting that no other layer sets.
+Definitions: The project/phase is the name of the project or phase a session belongs to, a block of time related to major changes. Its setting is named `project`. The layers are those of REQ-SAG-0019. The project layers are the layers of REQ-SAG-0019 that can set `project`. The PyO3 bindings are the `sc_agent` Python module of `sc-agent-py`. A typed error is an error value (REQ-SAG-0016). A session write is a call that would write a session. A built-in default is the value that layer 7 of REQ-SAG-0019 gives a setting that no other layer sets.
 
 **MUST statements:**
 

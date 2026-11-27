@@ -70,7 +70,7 @@ Model entries, `models.<alias>`, are set only in configuration files, layers 3 t
 
 Environment variables are named after the CLI: `DECIDR_<SETTING>`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).
 
-Configuration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152). `default.json`, `local.json` and the `SC_AGENT__` prefix are removed; nothing reads them. No migration is provided, because no release has users of the old layout.
+Configuration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152).
 
 **Key Principles:**
 
@@ -94,7 +94,6 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 **Negative:**
 
 - A setting can now come from nine places; `decidr doctor` reports a `path | value | source` table.
-- Existing `default.json` or `local.json` files are ignored and must be moved by hand.
 
 ### Alternatives Considered
 

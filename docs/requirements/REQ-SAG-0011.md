@@ -46,10 +46,6 @@ An interrupted batch must leave a complete, readable session log and a clear fai
 
 ### Dependencies
 
-**Requires:**
-
-- REQ-SAG-0104
-
 **Related:**
 
 - REQ-SAG-0701

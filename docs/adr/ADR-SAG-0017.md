@@ -17,10 +17,6 @@
 
 **Requirements:**
 
-- REQ-SAG-0130
-- REQ-SAG-0131
-- REQ-SAG-0132
-- REQ-SAG-0803
 
 **External References:**
 
@@ -68,4 +64,4 @@ Each channel's workflow writes its own crate list and binary names as literals.
 
 **Why Rejected:**
 
-The Key Principles of this record forbid ad-hoc per-channel workflow literals for crate lists or binary names, and REQ-SAG-0132 requires consumer extensions to use the kit seam, not forked workflows.
+The Key Principles of this record forbid ad-hoc per-channel workflow literals for crate lists or binary names.

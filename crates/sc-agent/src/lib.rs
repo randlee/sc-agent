@@ -947,19 +947,6 @@ pub fn host_holdoff(host: &str) -> Result<Arc<Mutex<()>>, Error> {
         .clone())
 }
 
-pub fn validate_request_size(request: &Value) -> Result<(), Error> {
-    if serde_json::to_vec(request)
-        .map_err(|e| error("decision.encode", e))?
-        .len()
-        > 8 * 1024 * 1024
-    {
-        return Err(error(
-            "decision.request_too_large",
-            "request exceeds the 8 MiB serialized input limit",
-        ));
-    }
-    Ok(())
-}
 pub fn workers(value: i64) -> Result<usize, Error> {
     usize::try_from(value)
         .ok()
@@ -987,7 +974,6 @@ pub fn send(
         });
     let mut sends = 0;
     let mut outcome = (|| {
-        validate_request_size(request)?;
         if cancel.is_cancelled() {
             return Err(error("decision.cancelled", "request cancelled"));
         }
@@ -1250,7 +1236,6 @@ pub fn batch(
     keyring: &(dyn Fn(&str) -> Result<String, KeyringError> + Sync),
     on_result: &(dyn Fn(usize, &Value) + Sync),
 ) -> Result<Value, Error> {
-    requests.iter().try_for_each(validate_request_size)?;
     if options.settings.workers == 0 {
         return Err(error("decidr.invalid_workers", "workers must be positive"));
     }

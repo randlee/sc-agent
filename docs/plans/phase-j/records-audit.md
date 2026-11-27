@@ -58,10 +58,10 @@ Paths: sc-agent records are under `docs/`. judge-jev records are in `docs/requir
 
 **sc-agent:**
 - ADR-SAG-0001, ADR-SAG-0002, ADR-SAG-0003, ADR-SAG-0004, ADR-SAG-0005, ADR-SAG-0017, ADR-SAG-0018, ADR-SAG-0019, ADR-SAG-0020.
-- REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0006, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0011, REQ-SAG-0012, REQ-SAG-0013, REQ-SAG-0014, REQ-SAG-0015, REQ-SAG-0016, REQ-SAG-0017, REQ-SAG-0019, REQ-SAG-0020, REQ-SAG-0021, REQ-SAG-0022.
-- REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0103, REQ-SAG-0104, REQ-SAG-0130, REQ-SAG-0131, REQ-SAG-0132, REQ-SAG-0133, REQ-SAG-0134, REQ-SAG-0201, REQ-SAG-0301, REQ-SAG-0302, REQ-SAG-0303, REQ-SAG-0401.
-- REQ-SAG-0501, REQ-SAG-0502, REQ-SAG-0503, REQ-SAG-0504, REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0702, REQ-SAG-0801, REQ-SAG-0803, REQ-SAG-0901.
-- NFR-SAG-0001, NFR-SAG-0002, NFR-SAG-0003.
+- REQ-SAG-0001, REQ-SAG-0002, REQ-SAG-0006, REQ-SAG-0007, REQ-SAG-0009, REQ-SAG-0010, REQ-SAG-0011, REQ-SAG-0013, REQ-SAG-0016, REQ-SAG-0017, REQ-SAG-0019, REQ-SAG-0020, REQ-SAG-0021.
+- REQ-SAG-0101, REQ-SAG-0102, REQ-SAG-0103, REQ-SAG-0201, REQ-SAG-0301, REQ-SAG-0302, REQ-SAG-0303, REQ-SAG-0401.
+- REQ-SAG-0501, REQ-SAG-0502, REQ-SAG-0503, REQ-SAG-0504, REQ-SAG-0601, REQ-SAG-0602, REQ-SAG-0702, REQ-SAG-0801, REQ-SAG-0901.
+- NFR-SAG-0001, NFR-SAG-0003.
 
 ADR-SAG-0019:77 and :162 ("All Jev queries and responses go to the session log") and REQ-SAG-0018:27 and :89 actively support M1. ADR-SAG-0002:46 and REQ-SAG-0003:30 support the never-rotated rule in M5.
 
@@ -81,7 +81,7 @@ REQ-082 (`anchor-runs/` in the plan folder) is consistent for phase j: the model
 
 ## Method and limits
 
-- I read in full ADR-SAG-0002, ADR-SAG-0019, ADR-SAG-0021, REQ-SAG-0003, REQ-SAG-0004, REQ-SAG-0005, REQ-SAG-0008, REQ-SAG-0018, REQ-SAG-0022, REQ-SAG-0202, NFR-SAG-0001, the judge-jev REQ, NFR and ADR files, plan-anchor's `requirements.md` headline statements, and plan-anchor ADR-001, ADR-007, ADR-010 and ADR-011.
+- I read in full ADR-SAG-0002, ADR-SAG-0019, ADR-SAG-0021, REQ-SAG-0003, REQ-SAG-0004, REQ-SAG-0005, REQ-SAG-0008, REQ-SAG-0018, REQ-SAG-0202, NFR-SAG-0001, the judge-jev REQ, NFR and ADR files, plan-anchor's `requirements.md` headline statements, and plan-anchor ADR-001, ADR-007, ADR-010 and ADR-011.
 - I checked the other sc-agent records and the other plan-anchor ADRs by keyword scan (session, log, cache, dry run, rotate, digest, raw_response, results.jsonl, anchor-runs, answers, repeat), plus their requirement-statement sections.
 - I scanned the skill references (judge-jev and plan-anchor plugin templates, and sc-agent's `.claude/agents/sc-sanity-jev.md`) with the same keywords.
 - sc-agent's installed copies under `.claude/`, `.codex/` and `.cursor/skills/{judge-jev,plan-anchoring}/references/` contain the same lines as rows 26-28, 34 and 36. They change when the tools are reinstalled, so they have no rows of their own.
