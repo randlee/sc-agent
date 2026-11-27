@@ -113,7 +113,7 @@ class Wheel(Isolated):
             self.assertEqual(len(received), 1)
 
     def test_run_invalid_arguments_return_invalid_option(self):
-        for options in ({}, {"tool":""}, {"tool":False}):
+        for options in ({}, {"tool":""}, {"tool":False}, {"general_log":None}):
             run = self.api.Run(**options)
             failures = [run.send(REQUEST), run.send_batch([]), run.cancel(), run.sends_to("typesafe"), run.sends_to(1)]
             self.assertTrue(all(self.error(value)["id"] == "sc_agent_py.invalid_option" for value in failures))
@@ -126,6 +126,33 @@ class Wheel(Isolated):
                 self.assertEqual(self.error(value)["id"], "sc_agent_py.invalid_option")
         with self.api.Run(tool="decidr", agent_role="contract", config_dir=self.directory.name, provider="openai") as run:
             self.assertIn("provider", self.error(run.send(REQUEST))["message"])
+
+    def test_identity_errors_log_once_to_an_injected_logger(self):
+        logger = self.api.logger("decidr")["value"]
+        expected = []
+        cases = (({}, "sc_agent_py.invalid_option"),
+                 ({"tool": ""}, "sc_agent_py.invalid_option"),
+                 ({"tool": False}, "sc_agent_py.invalid_option"))
+        for options, identifier in cases:
+            with self.subTest(options=options):
+                run = self.api.Run(**{"general_log": logger, **options})
+                first = run.send({})
+                self.assertEqual(self.error(first)["id"], identifier)
+                for value in (run.send_batch([]), run.cancel(), run.sends_to("typesafe")):
+                    self.assertEqual(value, first)
+                expected.append(identifier)
+                path = Path(self.directory.name) / "logs/decidr.log.jsonl"
+                rows = [json.loads(line) for line in (path.read_text() if path.exists() else "").splitlines()]
+                identifiers = [row["fields"].get("id") for row in rows]
+                self.assertEqual([value for value in identifiers if value in set(expected)], expected)
+
+    def test_identity_error_survives_an_invalid_logger(self):
+        run = self.api.Run(general_log=object())
+        detail = self.error(run.send({}))
+        self.assertEqual(detail["id"], "sc_agent_py.invalid_option")
+        self.assertIn("tool", detail["message"])
+        self.assertIn("log.write", detail["message"])
+        self.assertIn("Logger", detail["message"])
 
     def test_run_model_errors(self):
         with self.api.Run(tool="decidr", agent_role="contract", config_dir=self.directory.name, model="not-a-model") as run:

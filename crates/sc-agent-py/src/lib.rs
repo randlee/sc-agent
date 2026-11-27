@@ -361,12 +361,28 @@ impl PyRun {
         keyring_lookup: Option<&Bound<'_, PyAny>>,
         rest: Option<&Bound<'_, PyDict>>,
     ) -> Self {
+        let rejected = |name: Option<&str>, e: Error| {
+            if name.is_none() && general_log.is_none_or(|value| value.is_none()) {
+                return sc_agent::result(Err(e));
+            }
+            let original = json!({"ok":false, "error":e});
+            let called = std::cell::Cell::new(false);
+            let reported = respond_value(general_log, name.unwrap_or("decidr"), |_| {
+                called.set(true);
+                Err(e)
+            });
+            if called.get() {
+                reported
+            } else {
+                finish_error(original, "log.write", reported)
+            }
+        };
         let tool = match arg::<String>(tool, "tool").and_then(|v| {
             v.filter(|v| !v.is_empty())
                 .ok_or_else(|| invalid("tool is required"))
         }) {
             Ok(tool) => tool,
-            Err(e) => return Self(Err(sc_agent::result(Err(e)))),
+            Err(e) => return Self(Err(rejected(None, e))),
         };
         let created = (|| {
             extras(extra, rest)?;
@@ -409,19 +425,7 @@ impl PyRun {
             }
             Ok(run)
         })();
-        Self(created.map_err(|e| {
-            let original = json!({"ok":false, "error":e});
-            let called = std::cell::Cell::new(false);
-            let reported = respond_value(general_log, &tool, |_| {
-                called.set(true);
-                Err(e)
-            });
-            if called.get() {
-                reported
-            } else {
-                finish_error(original, "log.write", reported)
-            }
-        }))
+        Self(created.map_err(|e| rejected(Some(&tool), e)))
     }
     fn __enter__(slf: Py<Self>) -> Py<Self> {
         slf
