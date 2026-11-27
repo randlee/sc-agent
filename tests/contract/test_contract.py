@@ -208,6 +208,9 @@ class Wheel(Isolated):
         for function, args, kwargs in [
             (run.send, ({},), {"bogus": 1}),
             (run.send_batch, ([],), {"bogus": 1}),
+            (run.send, ({},), {"request": {}}),
+            (run.send_batch, ([{}],), {"requests": [{}]}),
+            (run.sends_to, ("x",), {"provider": "x"}),
             (self.api.log, (None, {}, None), {}),
             (self.api.sitr.languages, (1,), {}),
             (self.api.logger, ("a", "b"), {}),
