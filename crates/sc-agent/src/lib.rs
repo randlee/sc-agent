@@ -2138,19 +2138,42 @@ pub mod route_tests {
 
     #[test]
     fn cancel_signals_a_waiter_on_the_condition() -> Test {
-        let cancel = Cancel::default();
-        let state = cancel.state.lock().map_err(|_| "cancel poisoned")?;
-        let expired = std::thread::scope(|scope| {
-            // The canceller cannot take the lock until wait_timeout releases it.
-            scope.spawn(|| cancel.cancel());
-            // The deadline is a failure-only watchdog: cancel() must signal first.
-            cancel
-                .changed
-                .wait_timeout(state, Duration::from_secs(20))
-                .map(|(_, watchdog)| watchdog.timed_out())
-                .map_err(|_| "cancel poisoned")
-        })?;
-        assert!(!expired, "cancel() did not signal the waiter");
+        let cancel = Arc::new(Cancel::default());
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+        let (wait_tx, wait_rx) = std::sync::mpsc::channel();
+        let waiter = Arc::clone(&cancel);
+        std::thread::spawn(move || {
+            let outcome = (|| -> Result<(), String> {
+                let mut state = waiter.state.lock().map_err(|_| "cancel poisoned")?;
+                ready_tx.send(()).map_err(|e| e.to_string())?;
+                while !*state {
+                    let (next, watchdog) = waiter
+                        .changed
+                        .wait_timeout(state, Duration::from_secs(20))
+                        .map_err(|_| "cancel poisoned")?;
+                    if watchdog.timed_out() {
+                        return Err("cancel() did not signal the waiter".into());
+                    }
+                    state = next;
+                }
+                Ok(())
+            })();
+            let _ = wait_tx.send(outcome);
+        });
+        ready_rx
+            .recv_timeout(Duration::from_secs(30))
+            .map_err(|e| format!("waiter did not acquire the lock: {e}"))?;
+        let (cancel_tx, cancel_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            cancel.cancel();
+            let _ = cancel_tx.send(());
+        });
+        cancel_rx
+            .recv_timeout(Duration::from_secs(30))
+            .map_err(|e| format!("canceller did not finish: {e}"))?;
+        wait_rx
+            .recv_timeout(Duration::from_secs(30))
+            .map_err(|e| format!("waiter did not finish: {e}"))??;
         Ok(())
     }
 
