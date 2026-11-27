@@ -1514,7 +1514,7 @@ B06 parse-failure test is compat_call_reports_response_parse_for_text_that_is_no
 
 Plan-QA-4 additions (all deterministic; stub-driven, no sleeps):
 - wires.rs `compat_reply_missing_the_schema_is_schema_mismatch` (OpenAiCompat and AnthropicCompat Decision::decide return decision.schema_mismatch, J-1-06); `system_prompt_override_by_full_id` (haiku/luna chosen by full id uses decidr.<name>-system-prompt, J-1-12); `body_read_failure_is_resent` (a stub that drops the connection mid-body: http.network after max_sends, resent once first, J-1-14); `cancel_ends_a_wait_on_the_host_holdoff` (J-1-15).
-- sending.rs `cancel_after_a_lower_layer_error_keeps_it` (http.auth stays http.auth, J-1-05).
+- sending.rs `cancel_after_a_lower_layer_error_keeps_it` (a set cancel preserves secrets.keyring_read through send); lib.rs `cancellation_keeps_auth_errors_and_overrides_only_success` (a real 401 from send remains http.auth when cancel is then set and the error passes through after_cancel; J-1-05).
 - config_and_values.rs `built_in_rows_are_newest_first` (J-1-07).
 - tests/contract/test_contract.py: decidr batch interrupted: output has one line per request, unfinished ones decision.cancelled (J-1-16).
 

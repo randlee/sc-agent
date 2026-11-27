@@ -1802,14 +1802,29 @@ pub mod route_tests {
 
     #[test]
     fn cancellation_keeps_auth_errors_and_overrides_only_success() -> Test {
+        let root = Temp::new()?;
+        let logger = logger(&root)?;
+        let body = json!({"error":"controlled remote refusal"});
+        let stub = Stub::new(vec![http(401, body.clone())])?;
         let cancel = Cancel::default();
-        cancel.cancel();
-        let failure = result(after_cancel(
-            Err(error("http.auth", "remote refusal")),
+        let lower = send(
+            &request(),
+            &options(&root, &stub.url),
+            &logger,
             &cancel,
-        ));
+            &no_wait,
+            &keyring,
+        )
+        .err()
+        .ok_or("401 accepted")?;
+        assert!(!cancel.is_cancelled());
+        assert_eq!(stub.finish()?.len(), 1);
+        cancel.cancel();
+        let failure = result(after_cancel(Err(lower), &cancel));
         assert_eq!(failure["error"]["id"], "http.auth");
-        assert_eq!(failure["error"]["message"], "remote refusal");
+        assert_eq!(failure["error"]["message"], body.to_string());
+        assert!(cancel.is_cancelled());
+        logger.shutdown()?;
         assert_eq!(
             result(after_cancel(Ok(json!(null)), &cancel))["error"]["id"],
             "decision.cancelled"
