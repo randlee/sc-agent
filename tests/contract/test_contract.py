@@ -410,10 +410,11 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
 
     def test_cancel_ends_a_send_whose_reply_has_not_arrived(self):
         # REQ-SAG-0011: a send in flight is abandoned on cancel, not waited out to its timeout.
-        release, arrived = threading.Event(), threading.Event()
+        release, arrived, expired = threading.Event(), threading.Event(), threading.Event()
         def respond(body):
             arrived.set()
-            release.wait()
+            if not release.wait(20):
+                expired.set()
             return 200, {}, ANSWER
         results = []
         with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
@@ -433,6 +434,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                     release.set()
                     if call.is_alive():
                         call.join(10)
+        self.assertFalse(expired.is_set(), f"response backstop expired; received={received!r}, results={results!r}")
         self.assertEqual(len(received), 1)
         self.assertEqual(len(results), 1)
         self.assertEqual(self.error(results[0])["id"], "decision.cancelled")
@@ -1160,10 +1162,11 @@ class Cli(Isolated):
         binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
         for interrupt in (signal.SIGINT, signal.SIGTERM):
             with self.subTest(signal=interrupt), tempfile.TemporaryDirectory() as folder:
-                release = threading.Event()
+                release, expired = threading.Event(), threading.Event()
                 def respond(body):
                     process.send_signal(interrupt)
-                    release.wait()
+                    if not release.wait(40):  # Outlasts communicate, the drain and the process wait.
+                        expired.set()
                     return None
                 handled, server_errors = threading.Event(), []
                 with server([None], respond, handled=handled, errors=server_errors) as (url, received):
@@ -1203,6 +1206,9 @@ class Cli(Isolated):
                 self.assertTrue(handled.wait(20),
                                 f"{interrupt.name} handler did not finish; "
                                 f"received={received!r}; stdout={stdout!r}; stderr={stderr!r}")
+                self.assertFalse(expired.is_set(),
+                                 f"{interrupt.name} response backstop expired; "
+                                 f"received={received!r}; stdout={stdout!r}; stderr={stderr!r}")
                 self.assertEqual(server_errors, [])
                 self.assertNotEqual(process.returncode, 0, stdout + stderr)
                 results = json.loads(stdout)
