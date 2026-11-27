@@ -1956,6 +1956,7 @@ pub mod route_tests {
         let logger = logger(&root)?;
         let args = RunArgs {
             tool: "decidr".into(),
+            model: Some("jev".into()),
             agent_role: "test".into(),
             project: Some("test".into()),
             config_dir: Some(root.0.clone()),

@@ -950,35 +950,6 @@ fn arbitrary_configured_model_prompt_is_accepted() -> Test {
 }
 
 #[test]
-fn run_uses_configured_model_and_timeout_defaults() -> Test {
-    let root = Temp::new()?;
-    fs::write(
-        root.0.join("decidr.json"),
-        json!({"model":"haiku","timeout_secs":37.0}).to_string(),
-    )?;
-    let args = || sc_agent::RunArgs {
-        tool: "decidr".into(),
-        config_dir: Some(root.0.clone()),
-        ..Default::default()
-    };
-    let run = sc_agent::Run::new(args(), Some(logger(&root)?), Default::default())?;
-    assert_eq!(run.options.model, "haiku");
-    assert_eq!(run.options.timeout, std::time::Duration::from_secs(37));
-    let run = sc_agent::Run::new(
-        sc_agent::RunArgs {
-            model: Some("jev".into()),
-            timeout_secs: Some(19.0),
-            ..args()
-        },
-        Some(logger(&root)?),
-        Default::default(),
-    )?;
-    assert_eq!(run.options.model, "jev");
-    assert_eq!(run.options.timeout, std::time::Duration::from_secs(19));
-    Ok(())
-}
-
-#[test]
 fn consumer_declarations_supply_nested_defaults_types_and_provenance() -> Test {
     let root = Temp::new()?;
     // This consumer-owned declaration is the only change needed to add its setting.
@@ -1033,7 +1004,11 @@ fn consumer_declarations_supply_nested_defaults_types_and_provenance() -> Test {
 #[test]
 fn model_and_timeout_settings_validate_and_follow_environment_precedence() -> Test {
     let root = Temp::new()?;
-    let load = |env: &[(OsString, OsString)]| config("decidr", None, Some(&root.0), env, None, &[]);
+    let local = root.0.join("local");
+    fs::create_dir(&local)?;
+    let load = |env: &[(OsString, OsString)]| {
+        config("decidr", Some(&local), Some(&root.0), env, None, &[])
+    };
     let defaults = load(&[])?.config;
     assert_eq!(defaults.get::<String>("model")?, "jev");
     assert_eq!(defaults.get::<f64>("timeout_secs")?, 120.0);
@@ -1041,6 +1016,9 @@ fn model_and_timeout_settings_validate_and_follow_environment_precedence() -> Te
         root.0.join("decidr.json"),
         json!({"model":"haiku", "timeout_secs":37}).to_string(),
     )?;
+    let configured = load(&[])?.config;
+    assert_eq!(configured.get::<String>("model")?, "haiku");
+    assert_eq!(configured.get::<f64>("timeout_secs")?, 37.0);
     let env = [
         ("DECIDR_MODEL".into(), "luna".into()),
         ("DECIDR_TIMEOUT_SECS".into(), "17.5".into()),

@@ -145,7 +145,7 @@ fn local_timeout_default_is_120_seconds() -> Result<(), Box<dyn std::error::Erro
                     model,
                     timeout_secs,
                     project: Some("phase-b".into()),
-                    config_dir: Some(config_dir),
+                    config_dir: Some(config_dir.clone()),
                     ..Default::default()
                 },
                 None,
@@ -154,6 +154,33 @@ fn local_timeout_default_is_120_seconds() -> Result<(), Box<dyn std::error::Erro
             assert_eq!(run.options.model, "jev");
             assert_eq!(run.options.timeout.as_secs_f64(), 120.0);
             run.close()?;
+            fs::write(
+                config_dir.join("decidr.json"),
+                r#"{"model":"haiku","timeout_secs":37.0}"#,
+            )?;
+            for (model, timeout, expected_model, expected_timeout) in [
+                (None, None, "haiku", 37),
+                (Some("jev".into()), Some(19.0), "jev", 19),
+            ] {
+                let run = sc_agent::Run::new(
+                    sc_agent::RunArgs {
+                        tool: "decidr".into(),
+                        project: Some("phase-b".into()),
+                        config_dir: Some(config_dir.clone()),
+                        model,
+                        timeout_secs: timeout,
+                        ..Default::default()
+                    },
+                    None,
+                    std::sync::Arc::new(sc_agent::Cancel::default()),
+                )?;
+                assert_eq!(run.options.model, expected_model);
+                assert_eq!(
+                    run.options.timeout,
+                    std::time::Duration::from_secs(expected_timeout)
+                );
+                run.close()?;
+            }
         }
         _ => return Err("send command not selected".into()),
     }
