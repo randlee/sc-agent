@@ -267,29 +267,34 @@ fn req_sag_0002_0601_auth_quota_are_not_retried_and_remote_text_is_redacted_whol
 fn invalid_utf8_provider_error_keeps_status_and_surrounding_text() -> Test {
     let root = Temp::new()?;
     let logger = logger(&root)?;
-    let replies = (0..5)
-        .map(|_| {
-            Reply::Raw(
-                401,
-                vec![("Content-Type", "text/plain")],
-                b"before\xffafter".to_vec(),
-            )
-        })
-        .collect();
-    let stub = Stub::new(replies)?;
+    let stub = Stub::new(vec![Reply::Raw(
+        401,
+        vec![("Content-Type", "text/plain")],
+        b"before\xffafter".to_vec(),
+    )])?;
     let failure = sc_agent::result(send(
         &request(),
-        &options(&root, &stub.url),
+        &single_reply_options(&root, &stub.url),
         &logger,
         &Cancel::default(),
         &no_wait,
         &keyring,
     ));
-    let requests = stub.finish()?;
-    assert_eq!(failure["error"]["id"], "http.auth");
-    assert_eq!(failure["error"]["message"], "before?after");
-    assert_eq!(failure["error"]["attempts"], 1);
-    assert_eq!(requests.len(), 1);
+    let stub_outcome = stub.finish();
+    let error = &failure["error"];
+    let message = error["message"].as_str().unwrap_or_default();
+    let diagnostic = format!(
+        "id={}, attempts={}, message_bytes={}, prefix={:?}, stub={:?}",
+        error["id"],
+        error["attempts"],
+        message.len(),
+        message.chars().take(160).collect::<String>(),
+        stub_outcome,
+    );
+    assert_eq!(error["id"], "http.auth", "{diagnostic}");
+    assert_eq!(message, "before?after", "{diagnostic}");
+    assert_eq!(error["attempts"], 1, "{diagnostic}");
+    assert_eq!(stub_outcome?.len(), 1, "{diagnostic}");
     logger.shutdown()?;
     Ok(())
 }
