@@ -678,7 +678,7 @@ def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings
                                   on_each=deliver, abort_on=abort_on, category_codes=category_codes,
                                   repository_root=repository_root, consent_what=consent_what)
         if errors:
-            return Err(ClientError("DECIDR.ERROR", str(errors[0])))
+            return Err(errors[0] if isinstance(errors[0], ClientError) else ClientError("DECIDR.ERROR", str(errors[0])))
         if isinstance(sent, Err):
             return sent
         results = sent.value
@@ -687,7 +687,7 @@ def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings
         if errors:
             break
     if errors:
-        return Err(ClientError("DECIDR.ERROR", str(errors[0])))
+        return Err(errors[0] if isinstance(errors[0], ClientError) else ClientError("DECIDR.ERROR", str(errors[0])))
     return Ok(StreamedResult(failed))
 
 
