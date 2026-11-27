@@ -797,12 +797,14 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 rows = list(Path(self.directory.name).rglob("sessions.jsonl"))
                 if any('"state":"finished"' in path.read_text() for path in rows):
                     persisted.set()
-        with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}), server([None] * 3, respond) as (url, _):
+        with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}), server([None] * 3, respond) as (url, received):
             with self.api.Run(tool="decidr", workers=2, project="contract", agent_role="contract", config_dir=self.directory.name, base_url=url, sleep=sleep, general_log=self.api.logger("decidr")["value"]) as run_10:
                 got = run_10.send_batch([json.dumps({**REQUEST, "state": state}) for state in ("finished", "busy")], on_result=completed)
         self.assertTrue(got["ok"], got)
         self.assertTrue(all(item["result"]["ok"] for item in got["value"]), got)
-        self.assertEqual(observed, [True])
+        sessions = [path.read_text() for path in Path(self.directory.name).rglob("sessions.jsonl")]
+        self.assertEqual(observed, [True], f"persistence backstop expired; got={got!r}; "
+                         f"received={received!r}; sessions={sessions!r}")
 
     def test_batch_indices_and_finish_callbacks(self):
         first_started = threading.Event()
