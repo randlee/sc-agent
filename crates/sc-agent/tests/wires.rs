@@ -614,3 +614,10 @@ fn llm_decision_backends_reject_answers_outside_the_requested_schema() -> Test {
     }
     Ok(())
 }
+
+#[test]
+fn stub_shutdown_wakes_a_worker_with_unserved_replies() -> Test {
+    let stub = Stub::new(vec![http(200, answer()), http(200, answer())])?;
+    assert!(stub.finish()?.is_empty());
+    Ok(())
+}

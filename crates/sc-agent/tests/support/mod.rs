@@ -8,7 +8,8 @@ use std::{
     path::PathBuf,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        mpsc::{self, Receiver},
     },
     thread::JoinHandle,
     time::Duration,
@@ -123,7 +124,9 @@ pub struct Stub {
     pub url: String,
     listener: TcpListener,
     stop: Arc<AtomicBool>,
-    worker: Option<JoinHandle<CapturedRequests>>,
+    worker: Option<JoinHandle<()>>,
+    outcome: Receiver<CapturedRequests>,
+    remaining: Arc<AtomicUsize>,
 }
 impl Stub {
     pub fn new(replies: Vec<Reply>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
@@ -132,74 +135,89 @@ impl Stub {
         let owned_listener = listener.try_clone()?;
         let stop = Arc::new(AtomicBool::new(false));
         let stopped = stop.clone();
+        let remaining = Arc::new(AtomicUsize::new(replies.len()));
+        let unserved = remaining.clone();
+        let (finished, outcome) = mpsc::channel();
         let worker = std::thread::spawn(move || {
-            let mut seen = vec![];
-            for reply in replies {
-                let (mut stream, _) = listener.accept()?;
-                if stopped.load(Ordering::SeqCst) {
-                    break;
-                }
-                // Deadlines are hang guards only; no test waits for or asserts on elapsed time.
-                stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-                stream.set_write_timeout(Some(Duration::from_secs(5)))?;
-                let request = read_request(&mut stream)?;
-                seen.push(request);
-                match reply {
-                    Reply::Redirect(location) => {
-                        write!(
-                            stream,
-                            "HTTP/1.1 302 Test\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                        )?;
+            let result = (|| {
+                let mut seen = vec![];
+                for reply in replies {
+                    let (mut stream, _) = listener.accept()?;
+                    if stopped.load(Ordering::SeqCst) {
+                        break;
                     }
-                    Reply::Disconnect => stream.shutdown(std::net::Shutdown::Both)?,
-                    Reply::Truncated => {
-                        write!(
-                            stream,
-                            "HTTP/1.1 200 Test\r\nContent-Length: 100\r\nConnection: close\r\n\r\n{{"
-                        )?;
-                    }
-                    Reply::Http(status, headers, body) => {
-                        write!(
-                            stream,
-                            "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n",
-                            body.len()
-                        )?;
-                        for (key, value) in headers {
-                            write!(stream, "{key}: {value}\r\n")?;
+                    // Deadlines are hang guards only; no test waits for or asserts on elapsed time.
+                    stream.set_read_timeout(Some(Duration::from_secs(5)))?;
+                    stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+                    let request = read_request(&mut stream)?;
+                    seen.push(request);
+                    match reply {
+                        Reply::Redirect(location) => {
+                            write!(
+                                stream,
+                                "HTTP/1.1 302 Test\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                            )?;
                         }
-                        write!(stream, "\r\n{body}")?;
+                        Reply::Disconnect => stream.shutdown(std::net::Shutdown::Both)?,
+                        Reply::Truncated => {
+                            write!(
+                                stream,
+                                "HTTP/1.1 200 Test\r\nContent-Length: 100\r\nConnection: close\r\n\r\n{{"
+                            )?;
+                        }
+                        Reply::Http(status, headers, body) => {
+                            write!(
+                                stream,
+                                "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n",
+                                body.len()
+                            )?;
+                            for (key, value) in headers {
+                                write!(stream, "{key}: {value}\r\n")?;
+                            }
+                            write!(stream, "\r\n{body}")?;
+                        }
                     }
+                    unserved.fetch_sub(1, Ordering::SeqCst);
                 }
-            }
-            Ok(seen)
+                Ok(seen)
+            })();
+            let _ = finished.send(result);
         });
         Ok(Self {
             url,
             listener: owned_listener,
             stop,
             worker: Some(worker),
+            outcome,
+            remaining,
         })
     }
     pub fn finish(mut self) -> Result<Vec<Request>, Box<dyn std::error::Error + Send + Sync>> {
-        self.stop();
-        self.worker
-            .take()
-            .ok_or("stub already finished")?
-            .join()
-            .map_err(|_| "stub thread panicked")?
+        let worker = self.worker.take().ok_or("stub already finished")?;
+        self.stop()?;
+        let result = self
+            .outcome
+            .recv_timeout(Duration::from_secs(10))
+            .map_err(|e| {
+                format!(
+                    "stub worker did not finish; {} unserved replies: {e}",
+                    self.remaining.load(Ordering::SeqCst)
+                )
+            })?;
+        worker.join().map_err(|_| "stub thread panicked")?;
+        result
     }
-    fn stop(&self) {
+    fn stop(&self) -> std::io::Result<()> {
         self.stop.store(true, Ordering::SeqCst);
         // Keep a bound listener alive until shutdown finishes; the wake-up can never reach a recycled port.
-        if let Ok(address) = self.listener.local_addr() {
-            let _ = TcpStream::connect(address);
-        }
+        TcpStream::connect_timeout(&self.listener.local_addr()?, Duration::from_secs(5))?;
+        Ok(())
     }
 }
 impl Drop for Stub {
     fn drop(&mut self) {
         if self.worker.is_some() {
-            self.stop();
+            let _ = self.stop();
         }
     }
 }
