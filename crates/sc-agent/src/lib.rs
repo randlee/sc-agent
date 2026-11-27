@@ -771,7 +771,6 @@ pub struct Provider {
     pub key: &'static str,
     pub wire: Wire,
     pub models: &'static [(&'static str, &'static str, &'static str)],
-    pub open: bool,
 }
 const CLAUDE: &[(&str, &str, &str)] = &[
     ("fable", "claude-fable-5-2", "2026-11-09"),
@@ -793,7 +792,6 @@ pub static PROVIDERS: &[Provider] = &[
         key: "TYPESAFE_API_KEY",
         wire: Wire::Jev,
         models: &[("jev", "jev-latest", "2026-10-14")],
-        open: false,
     },
     Provider {
         name: "anthropic",
@@ -801,7 +799,6 @@ pub static PROVIDERS: &[Provider] = &[
         key: "ANTHROPIC_API_KEY",
         wire: Wire::Messages,
         models: CLAUDE,
-        open: false,
     },
     Provider {
         name: "openai",
@@ -809,7 +806,6 @@ pub static PROVIDERS: &[Provider] = &[
         key: "OPENAI_API_KEY",
         wire: Wire::Chat,
         models: GPT,
-        open: false,
     },
     Provider {
         name: "openrouter",
@@ -826,7 +822,6 @@ pub static PROVIDERS: &[Provider] = &[
             ("luna", "openai/gpt-6-luna", "2026-09-22"),
             ("astra", "openai/gpt-6-astra", "2026-09-03"),
         ],
-        open: true,
     },
     Provider {
         name: "together",
@@ -843,7 +838,6 @@ pub static PROVIDERS: &[Provider] = &[
             ("luna", "openai/gpt-6-luna", "2026-09-22"),
             ("astra", "openai/gpt-6-astra", "2026-09-03"),
         ],
-        open: true,
     },
     Provider {
         name: "nous",
@@ -854,7 +848,6 @@ pub static PROVIDERS: &[Provider] = &[
             ("haiku", "anthropic/claude-haiku-5.5", "2026-10-07"),
             ("luna", "openai/gpt-6-luna", "2026-09-22"),
         ],
-        open: true,
     },
     Provider {
         name: "laya",
@@ -862,7 +855,6 @@ pub static PROVIDERS: &[Provider] = &[
         key: "",
         wire: Wire::Jev,
         models: &[("laya", "laya:en", "2026-09-23")],
-        open: false,
     },
     Provider {
         name: "decider_4b",
@@ -870,7 +862,6 @@ pub static PROVIDERS: &[Provider] = &[
         key: "",
         wire: Wire::Jev,
         models: &[("decider", "decider-4b-v2.1", "2026-09-24")],
-        open: false,
     },
     Provider {
         name: "decider_2b",
@@ -878,7 +869,6 @@ pub static PROVIDERS: &[Provider] = &[
         key: "",
         wire: Wire::Jev,
         models: &[("decider", "decider-2b-v11", "2026-09-24")],
-        open: false,
     },
 ];
 fn provider_named(name: &str) -> Result<&'static Provider, Error> {
@@ -940,8 +930,7 @@ fn resolve(
                     if *id == "secrets.key_missing" {
                         std::mem::swap(&mut previous, &mut failure);
                     }
-                    let Error::Failure { message, .. } = &mut failure;
-                    message.push_str(&format!("\n{previous}"));
+                    failure = contextual(failure, previous, None);
                 }
                 last = Some(failure);
             }
@@ -1563,6 +1552,9 @@ impl Run {
             fields.insert("session_id".into(), json!(session_id));
             fields.insert("question_digests".into(), json!(digests));
         }
+        let mut session_failure = None;
+        let attach = |failure, context| contextual(failure, context, Some(&session_id));
+        let prior = || format!("original outcome: {outcome:?}");
         if let Ok(project) = options.settings.project_required()
             && slug(project).is_ok()
             && slug(&options.agent_role).is_ok()
@@ -1576,7 +1568,7 @@ impl Run {
                 .join(project);
             let _append = SESSION_APPEND
                 .lock()
-                .map_err(|e| error("config.session", e))?;
+                .map_err(|e| attach(error("config.session", e), prior()))?;
             let written = (|| -> std::io::Result<()> {
                 use std::io::Write;
                 std::fs::create_dir_all(&path)?;
@@ -1588,29 +1580,45 @@ impl Run {
                     "{row}"
                 )
             })();
-            if let Err(e) = written {
-                log(logger, "error", json!(error("log.session_write", e)))?;
+            session_failure = written
+                .err()
+                .map(|e| attach(error("log.session_write", e), prior()));
+            if let Some(failure) = &session_failure
+                && let Err(log_failure) = log(logger, "error", json!(failure))
+            {
+                outcome = Err(attach(
+                    log_failure,
+                    format!("original session error: {failure}"),
+                ));
             }
         }
-        if let Ok(value) = &outcome {
-            log(logger, "decision.result", json!({"response":value}))?;
+        let logged = match &outcome {
+            Ok(value) => log(logger, "decision.result", json!({"response":value})),
+            Err(_) => Ok(()),
+        };
+        for failure in [logged, logger.flush().map_err(|e| error("log.flush", e))]
+            .into_iter()
+            .filter_map(Result::err)
+        {
+            let context =
+                format!("original outcome: {outcome:?}; session error: {session_failure:?}");
+            outcome = Err(attach(failure, context));
         }
-        logger.flush().map_err(|e| error("log.flush", e))?;
         outcome
     }
+
     pub fn send_batch(
         &self,
         requests: &[Value],
         on_result: &(dyn Fn(usize, &Value) + Sync),
     ) -> Result<Value, Error> {
-        let options = &self.options;
-        if options.settings.workers == 0 {
+        if self.options.settings.workers == 0 {
             return Err(error("decidr.invalid_workers", "workers must be positive"));
         }
         let next = std::sync::atomic::AtomicUsize::new(0);
         let (sender, receiver) = std::sync::mpsc::channel();
         Ok(std::thread::scope(|scope| {
-            for _ in 0..options.settings.workers.min(requests.len()) {
+            for _ in 0..self.options.settings.workers.min(requests.len()) {
                 let sender = sender.clone();
                 let next = &next;
                 scope.spawn(move || {
