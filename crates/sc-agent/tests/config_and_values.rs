@@ -1038,3 +1038,102 @@ fn model_and_timeout_settings_validate_and_follow_environment_precedence() -> Te
     }
     Ok(())
 }
+
+#[test]
+fn unknown_prompt_keys_are_load_errors_with_file_and_full_path() -> Test {
+    let root = Temp::new()?;
+    let file = root.0.join("decidr.json");
+    for key in [
+        "luna-sytem-prompt",
+        "not-configured-system-prompt",
+        "system-prompt",
+        "custom.full/id-system-prompt-typo",
+    ] {
+        fs::write(
+            &file,
+            json!({"models":{"":{"provider":"openai","id":"wire"}},"decidr":{key:"instruction"}})
+                .to_string(),
+        )?;
+        let own = [sc_agent::Setting::new::<String>(
+            format!("decidr.{key}"),
+            None,
+        )];
+        let failure = config("decidr", None, Some(&root.0), &[], None, &own)
+            .err()
+            .ok_or("unknown prompt accepted")?;
+        assert_eq!(serde_json::to_value(&failure)?["id"], "config.invalid");
+        let text = failure.to_string();
+        assert!(text.contains(file.to_str().ok_or("path")?), "{text}");
+        assert!(text.contains(&format!("decidr.{key}")), "{text}");
+    }
+    Ok(())
+}
+
+#[test]
+fn doctor_keeps_unset_declarations_and_model_prompts() -> Test {
+    let root = Temp::new()?;
+    let own = [
+        sc_agent::Setting::new::<String>("consumer_note", None),
+        sc_agent::Setting::new::<String>("review.note", None),
+        sc_agent::Setting::new::<u32>("review.limit", Some(json!(7))),
+    ];
+    fs::write(
+        root.0.join("decidr.json"),
+        json!({"models":{"custom.full/id":{"provider":"openai","id":"custom-wire-id"}}})
+            .to_string(),
+    )?;
+    let loaded = config("decidr", None, Some(&root.0), &[], None, &own)?;
+    let mut expected = vec![
+        "review.note".to_owned(),
+        "consumer_note".to_owned(),
+        "decidr.custom.full/id-system-prompt".into(),
+    ];
+    for provider in sc_agent::PROVIDERS {
+        if provider.url.is_empty() {
+            expected.extend(["host", "port"].map(|key| format!("{}.{key}", provider.name)));
+        }
+        for (alias, id, _) in provider.models {
+            expected.extend([alias, id].map(|model| format!("decidr.{model}-system-prompt")));
+        }
+    }
+    for path in expected {
+        let rows = loaded
+            .rows
+            .iter()
+            .filter(|row| row["path"] == path)
+            .collect::<Vec<_>>();
+        assert_eq!(rows.len(), 1, "missing or repeated {path}: {rows:?}");
+        assert_eq!(rows[0]["value"], "unset", "{path}");
+        assert_eq!(rows[0]["source"], "default", "{path}");
+    }
+    Ok(())
+}
+
+#[test]
+fn an_environment_map_cannot_hide_an_unknown_prompt_in_a_file() -> Test {
+    let root = Temp::new()?;
+    let file = root.0.join("decidr.json");
+    fs::write(
+        &file,
+        json!({"decidr":{"luna-sytem-prompt":"bad"}}).to_string(),
+    )?;
+    let env = [(
+        "DECIDR_DECIDR".into(),
+        json!({"luna-system-prompt":"good"}).to_string().into(),
+    )];
+    let failure = config("decidr", None, Some(&root.0), &env, None, &[])
+        .err()
+        .ok_or("override hid an unknown file key")?
+        .to_string();
+    assert!(failure.contains("decidr.luna-sytem-prompt"), "{failure}");
+    assert!(failure.contains(file.to_str().ok_or("path")?), "{failure}");
+    Ok(())
+}
+
+#[test]
+fn empty_prompt_maps_remain_valid() -> Test {
+    let root = Temp::new()?;
+    fs::write(root.0.join("decidr.json"), json!({"decidr":{}}).to_string())?;
+    config("decidr", None, Some(&root.0), &[], None, &[])?;
+    Ok(())
+}
