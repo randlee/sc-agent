@@ -438,12 +438,13 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
         permits
             .lock()
             .map_err(|e| e.to_string())?
-            .recv_timeout(Duration::from_secs(5))
+            .recv()
             .map_err(|e| format!("missing keyring release permit: {e}"))?;
         Ok("test-secret".into())
     };
     let (result, workers) = std::thread::scope(
         |scope| -> Result<_, Box<dyn std::error::Error + Send + Sync>> {
+            let release = release;
             let work = scope.spawn(|| {
                 batch(
                     &vec![request(); 2],
@@ -458,10 +459,12 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
             let workers = (0..2)
                 .map(|_| arrived.recv_timeout(Duration::from_secs(5)))
                 .collect::<Result<Vec<_>, _>>();
-            for _ in 0..2 {
-                release.send(())?;
-            }
+            let releases = (0..2).map(|_| release.send(())).collect::<Vec<_>>();
+            drop(release);
             let result = work.join().map_err(|_| "batch panicked")??;
+            for released in releases {
+                released?;
+            }
             Ok((result, workers?))
         },
     )?;
