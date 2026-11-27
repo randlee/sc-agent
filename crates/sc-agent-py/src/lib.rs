@@ -302,7 +302,6 @@ impl PyRun {
     )]
     #[pyo3(signature=(*extra, tool=None, model=None, project=None, agent_role=None, config_dir=None, general_log=None, timeout_secs=None, workers=None, base_url=None, sleep=None, keyring_lookup=None, **rest))]
     fn new(
-        _py: Python<'_>,
         extra: &Bound<'_, PyTuple>,
         tool: Option<&Bound<'_, PyAny>>,
         model: Option<&Bound<'_, PyAny>>,
@@ -366,11 +365,10 @@ impl PyRun {
     }
     fn __exit__(
         &self,
-        kind: &Bound<'_, PyAny>,
-        value: &Bound<'_, PyAny>,
-        traceback: &Bound<'_, PyAny>,
+        _kind: &Bound<'_, PyAny>,
+        _value: &Bound<'_, PyAny>,
+        _traceback: &Bound<'_, PyAny>,
     ) -> bool {
-        let _ = (kind, value, traceback);
         if let Ok(run) = &self.0 {
             let _ = sc_agent::report(run.logger(), run.close().map(|()| Value::Null));
         }
