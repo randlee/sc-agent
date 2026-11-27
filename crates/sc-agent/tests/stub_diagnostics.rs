@@ -17,7 +17,12 @@ fn send_raw(stub: &Stub, body: &str) -> Test {
         body.len()
     )?;
     let mut response = Vec::new();
-    stream.read_to_end(&mut response)?;
+    stream.read_to_end(&mut response).map_err(|error| {
+        format!(
+            "stub response read failed (5s deadline): {error}; url={}; request body={body:?}; partial response={response:?}",
+            stub.url
+        )
+    })?;
     Ok(())
 }
 
