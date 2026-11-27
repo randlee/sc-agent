@@ -704,7 +704,7 @@ pub trait Decision {
 ```
 Replaces: (new) 
 Deletes: nothing
-Body rule: Owner trait, one method; the returned value is NOT schema-validated here (send validates, J1-S20).
+Body rule: Owner trait, one method; each Decision impl validates its answer against the schema, and send() does not.
 Test: wires.rs::jev_decide_posts_the_request_with_the_resolved_model: Jev.decide posts request+model=jev-latest to /v1/systemone and returns the stub answer
 Requirement: ['ANC-012']
 Source: scratchpad/j-1-signatures.md; starting code on sprint/j-1 @b4be55e6.
