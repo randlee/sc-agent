@@ -254,10 +254,11 @@ class RenderedWheelLoopback(unittest.TestCase):
                         for path in (root / "sessions").rglob("sessions.jsonl")
                         for line in path.read_text().splitlines()
                     ]
-                    self.assertEqual(len(rows), 2)
+                    self.assertEqual(len(rows), 1)
+                    self.assertTrue(rows[0]["result"]["ok"])
                     for row in rows:
                         self.assertEqual((row["project"], row["agent_role"]), ("phase-i-loopback", client.CLIENT_NAME))
-                    self.assertEqual({row["request"]["state"] for row in rows}, {"ok", "unauthorized"})
+                    self.assertEqual({row["request"]["state"] for row in rows}, {"ok"})
                     log = (root / "logs" / "consumer-test.log.jsonl").read_text()
                     self.assertIn("decision.result", log)
                     self.assertIn("http.auth", log)

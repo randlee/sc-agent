@@ -107,7 +107,10 @@ class Wheel(Isolated):
                 value = run.send(REQUEST)
                 self.assertTrue(value["ok"], value)
             self.assertEqual(len(received), 1)
-            self.assertEqual(self.error(run.send("not JSON"))["id"], "log.write")
+            detail = self.error(run.send("not JSON"))
+            self.assertEqual(detail["id"], "decision.request_parse")
+            self.assertIn("log.write", detail["message"])
+            self.assertIn("log.flush", detail["message"])
 
     def test_repeated_run_exit_reports_close_failure_to_unraisable_hook(self):
         events = []
@@ -308,7 +311,7 @@ class Wheel(Isolated):
         rows = [json.loads(line) for line in (Path(self.directory.name) / "logs/decidr.log.jsonl").read_text().splitlines()]
         self.assertEqual(sum(row["fields"].get("id") == "sc_agent_py.invalid_option" for row in rows), 1)
 
-    def test_session_and_general_log_share_fixed_root(self):
+    def test_failed_request_uses_general_log_root_without_session_rows(self):
         root = Path(self.directory.name)
         (root / "decidr.json").write_text(json.dumps({"project": "contract"}))
         code = r'''
@@ -321,7 +324,9 @@ with sc_agent.Run(tool="decidr", model="jev", project="contract", agent_role="co
 assert not result["ok"], result
 assert (root / "logs/decidr.log.jsonl").is_file()
 rows = [json.loads(line) for path in (root / "sessions").rglob("sessions.jsonl") for line in path.read_text().splitlines()]
-assert len(rows) == 1, rows
+assert rows == [], rows
+events = [json.loads(line) for line in (root / "logs/decidr.log.jsonl").read_text().splitlines()]
+assert sum(event["fields"].get("id") == result["error"]["id"] for event in events) == 1, events
 '''
         got = subprocess.run([sys.executable, "-c", code, str(root)], env=dict(os.environ),
                              cwd=root, text=True, capture_output=True, timeout=20)
@@ -367,7 +372,9 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         self.assertIn("ValueError: controlled caller failure", error["message"])
         self.assertEqual(len(received), 1)
         rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
-        self.assertEqual(len(rows), 3)
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0]["result"]["ok"])
+        self.assertEqual(rows[0]["result"]["value"]["answers"], ANSWER["answers"])
 
     def test_a_result_python_cannot_load_is_an_error_value(self):
         # REQ-SAG-0002: the loader's error is returned, not dropped as None.
@@ -790,7 +797,9 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         for item in got["value"][1:]:
             self.assertEqual(self.error(item["result"])["id"], "decision.cancelled")
         rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
-        self.assertEqual(len(rows), 3)
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0]["result"]["ok"])
+        self.assertEqual(rows[0]["result"]["value"]["answers"], ANSWER["answers"])
         self.assertEqual(sum(row["result"]["ok"] for row in rows), 1)
 
     def test_keyboard_interrupt_in_callback_cancels_unfinished_results(self):
@@ -839,8 +848,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         self.assertEqual(len(received), 1)
         self.assertEqual([self.error(item["result"])["id"] for item in got["value"]], ["decision.cancelled"] * 3)
         rows = [json.loads(line) for path in Path.cwd().rglob("sessions.jsonl") for line in path.read_text().splitlines()]
-        self.assertEqual(len(rows), 3)
-        self.assertTrue(all(row["result"]["error"]["id"] == "decision.cancelled" for row in rows))
+        self.assertEqual(rows, [])
 
     def test_repository_identity_uses_origin_and_real_host(self):
         logger = self.api.logger("decidr")["value"]
@@ -1108,7 +1116,7 @@ class Cli(Isolated):
             self.assertIn("--agent-role", error["message"])
 
     @unittest.skipUnless(os.name == "posix", "POSIX signal delivery")
-    def test_sigint_and_sigterm_cancel_and_flush_all_session_rows(self):
+    def test_sigint_and_sigterm_cancel_without_error_session_rows(self):
         binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
         for interrupt in (signal.SIGINT, signal.SIGTERM):
             with self.subTest(signal=interrupt), tempfile.TemporaryDirectory() as folder:
@@ -1162,8 +1170,7 @@ class Cli(Isolated):
                                     for row in results["value"]))
                 self.assertEqual(len(received), 1)
                 rows = [json.loads(line) for path in Path(folder).rglob("sessions.jsonl") for line in path.read_text().splitlines()]
-                self.assertEqual(len(rows), 3)
-                self.assertTrue(all(row["result"]["error"]["id"] == "decision.cancelled" for row in rows))
+                self.assertEqual(rows, [])
 
     def test_models_and_sitr_queries(self):
         root = Path(__file__).resolve().parents[2]

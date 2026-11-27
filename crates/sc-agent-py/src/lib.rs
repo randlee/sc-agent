@@ -89,7 +89,9 @@ fn respond_error(given: Option<&Bound<'_, PyAny>>, name: &str, original: Error) 
             let value = sc_agent::report(&logger, Err(original));
             finish(&logger, given.is_none_or(|value| value.is_none()), value)
         }
-        Err(failure) => finish_error(sc_agent::result(Err(original)), "log.write", failure),
+        Err(failure) => {
+            sc_agent::after_failure(sc_agent::result(Err(original)), Err(failure), "log.write")
+        }
     }
 }
 fn respond(
@@ -115,24 +117,10 @@ fn respond_value(
         }
     }
 }
-fn finish_error(mut value: Value, id: &'static str, failure: impl ToString) -> Value {
-    if let Some(detail) = value.get_mut("error").and_then(Value::as_object_mut) {
-        let message = detail.get("message").and_then(Value::as_str).unwrap_or("");
-        detail.insert(
-            "message".into(),
-            json!(format!("{message}; {id}: {}", failure.to_string())),
-        );
-        value
-    } else {
-        sc_agent::result(Err(error(id, failure)))
-    }
-}
 fn finish(logger: &Logger, owned: bool, mut value: Value) -> Value {
-    if let Err(e) = logger.flush() {
-        value = finish_error(value, "log.flush", e);
-    }
-    if owned && let Err(e) = logger.shutdown() {
-        value = finish_error(value, "log.shutdown", e);
+    value = sc_agent::after_failure(value, logger.flush(), "log.flush");
+    if owned {
+        value = sc_agent::after_failure(value, logger.shutdown(), "log.shutdown");
     }
     value
 }
@@ -671,10 +659,10 @@ mod tests {
             .err()
             .ok_or("invalid logger name accepted")?;
         let logger_detail = logger_failure.to_string();
-        let creation = finish_error(
+        let creation = sc_agent::after_failure(
             sc_agent::result(Err(error("types.unknown_short_name", "bad model"))),
+            Err(logger_failure),
             "log.write",
-            logger_failure,
         );
         assert_eq!(creation["error"]["id"], "types.unknown_short_name");
         let message = creation["error"]["message"]

@@ -154,7 +154,7 @@ fn adr_sag_0021_send_and_report_return_logger_failures() -> Test {
         run.send(&request())
     };
     let failure = sc_agent::result(outcome);
-    assert_eq!(failure["error"]["id"], "log.flush");
+    assert_eq!(failure["error"]["id"], "decision.cancelled");
     let original = logger
         .flush()
         .err()
@@ -164,7 +164,7 @@ fn adr_sag_0021_send_and_report_return_logger_failures() -> Test {
         .as_str()
         .ok_or("flush failure message absent")?;
     assert!(message.contains(&original));
-    assert!(message.contains("decision.cancelled"));
+    assert!(message.contains("request cancelled"));
     let session_id = failure["error"]["session_id"]
         .as_str()
         .ok_or("missing session id")?
@@ -184,7 +184,10 @@ fn adr_sag_0021_send_and_report_return_logger_failures() -> Test {
             }),
         );
         for field in ["id", "action", "category"] {
-            assert_eq!(failure["error"][field], original["error"][field]);
+            assert_eq!(
+                failure["error"][field],
+                json!({"id":"test.failure", "action":"Retry later.", "category":"other"})[field]
+            );
         }
         let message = failure["error"]["message"]
             .as_str()
@@ -197,7 +200,7 @@ fn adr_sag_0021_send_and_report_return_logger_failures() -> Test {
             ),
             "{message}"
         );
-        assert!(message.contains("test.failure"), "{message}");
+        assert!(message.contains("log.write"), "{message}");
         assert!(message.contains("reported error"), "{message}");
         assert_eq!(
             failure["error"].get("session_id"),
@@ -243,7 +246,7 @@ fn failed_general_logger_preserves_the_successful_session() -> Test {
     logger.shutdown()?;
     let stub = Stub::new(vec![http(200, answer())])?;
     let failure = sc_agent::result(run(options(&root, &stub.url), &logger)?.send(&request()));
-    assert_eq!(failure["error"]["id"], "log.flush");
+    assert_eq!(failure["error"]["id"], "log.write");
     assert!(failure["error"]["session_id"].as_str().is_some());
     assert!(
         failure["error"]["message"]
@@ -253,7 +256,7 @@ fn failed_general_logger_preserves_the_successful_session() -> Test {
     assert!(
         failure["error"]["message"]
             .as_str()
-            .is_some_and(|message| message.contains("log.write"))
+            .is_some_and(|message| message.contains("log.flush"))
     );
     assert_eq!(stub.finish()?.len(), 1);
     let sessions = rows(&root)?;
@@ -363,14 +366,18 @@ fn session_write_failure_survives_later_flush_failure() -> Test {
     let logger = builder.build()?;
     let stub = Stub::new(vec![http(200, answer())])?;
     let logger = std::sync::Arc::new(logger);
-    let failure = sc_agent::result(run(options(&root, &stub.url), &logger)?.send(&request()));
-    assert_eq!(failure["error"]["id"], "log.flush");
+    let failure = sc_agent::report(
+        &logger,
+        run(options(&root, &stub.url), &logger)?.send(&request()),
+    );
+    assert_eq!(failure["error"]["id"], "log.session_write");
     assert!(failure["error"]["session_id"].as_str().is_some());
     let message = failure["error"]["message"]
         .as_str()
         .ok_or("missing message")?;
-    assert!(message.contains("log.session_write"), "{message}");
+    assert!(message.contains("log.flush"), "{message}");
     assert!(message.contains(&io_error), "{message}");
+    assert!(logger.flush().is_err());
     assert!(
         sink.events
             .lock()
@@ -419,6 +426,44 @@ fn injected_test_sink_receives_every_general_record_without_default_file() -> Te
     assert_eq!(serialized[0]["action"], "decision.result");
     assert_eq!(serialized[1]["fields"]["id"], "test.error");
     assert!(!root.0.join("logs/decidr.log.jsonl").exists());
+    logger.shutdown()?;
+    Ok(())
+}
+
+#[test]
+fn failed_calls_are_general_log_errors_without_session_rows() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let stub = Stub::new(vec![
+        http(401, json!({"error":"controlled auth refusal"})),
+        http(200, answer()),
+    ])?;
+    let client = run(options(&root, &stub.url), &logger)?;
+    let failure = sc_agent::report(&logger, client.send(&request()));
+    assert_eq!(failure["error"]["id"], "http.auth");
+    assert!(!root.0.join("sessions").exists());
+    client.send(&request())?;
+    let sessions = rows(&root)?;
+    assert_eq!(sessions.len(), 1);
+    assert_eq!(sessions[0]["result"]["ok"], true);
+    assert_eq!(
+        sessions[0]["result"]["value"]["answers"],
+        answer()["answers"]
+    );
+    assert_eq!(stub.finish()?.len(), 2);
+    logger.flush()?;
+    let events = std::fs::read_to_string(root.0.join("logs/rust-test.log.jsonl"))?;
+    let events = events
+        .lines()
+        .map(serde_json::from_str::<Value>)
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event["fields"]["id"] == "http.auth")
+            .count(),
+        1
+    );
     logger.shutdown()?;
     Ok(())
 }

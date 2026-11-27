@@ -253,7 +253,7 @@ fn req_sag_0002_0601_auth_quota_are_not_retried_and_remote_text_is_redacted_whol
         logger.flush()?;
         let general = std::fs::read_to_string(root.0.join("logs/rust-test.log.jsonl"))?;
         assert!(!general.contains("test-secret"));
-        assert!(!serde_json::to_string(&rows(&root)?)?.contains("test-secret"));
+        assert!(!root.0.join("sessions").exists());
         let errors = general
             .lines()
             .map(serde_json::from_str::<Value>)
@@ -325,7 +325,7 @@ fn req_sag_0002_provider_error_over_ten_mib_is_preserved() -> Test {
 }
 
 #[test]
-fn req_sag_0010_0011_cancel_during_retry_keeps_every_batch_position_and_row() -> Test {
+fn req_sag_0010_0011_cancel_during_retry_keeps_positions_without_session_rows() -> Test {
     let root = Temp::new()?;
     let logger = logger(&root)?;
     let stub = Stub::new(vec![Reply::Http(
@@ -385,7 +385,7 @@ fn req_sag_0010_0011_cancel_during_retry_keeps_every_batch_position_and_row() ->
             .map_err(|_| "wait recorder poisoned")?,
         vec![Duration::from_secs(600)]
     );
-    assert_eq!(rows(&root)?.len(), 3);
+    assert!(!root.0.join("sessions").exists());
     logger.shutdown()?;
     Ok(())
 }
@@ -412,7 +412,7 @@ fn req_sag_0011_precancel_never_reads_a_key_and_invalid_tags_write_no_row() -> T
     });
     assert_eq!(got["error"]["id"], "decision.cancelled");
     assert_eq!(keys.load(std::sync::atomic::Ordering::SeqCst), 0);
-    assert_eq!(rows(&root)?.len(), 1);
+    assert!(!root.0.join("sessions").exists());
     // REQ-SAG-0004: invalid/missing project or invalid role is refused without creating a session.
     for invalid_role in [false, true] {
         let isolated = Temp::new()?;
@@ -465,7 +465,13 @@ fn req_sag_0702_batch_continues_after_failed_item_and_preserves_positions() -> T
         vec![(0, json!(false)), (1, json!(true))]
     );
     assert_eq!(stub.finish()?.len(), 2);
-    assert_eq!(rows(&root)?.len(), 2);
+    let sessions = rows(&root)?;
+    assert_eq!(sessions.len(), 1);
+    assert_eq!(sessions[0]["result"]["ok"], true);
+    assert_eq!(
+        sessions[0]["result"]["value"]["answers"],
+        answer()["answers"]
+    );
     let mut invalid = options(&root, "http://127.0.0.1:1/v1");
     invalid.settings.workers = 0;
     assert_eq!(
@@ -543,7 +549,7 @@ fn req_sag_0702_two_workers_reach_controlled_keyring_before_either_is_released()
 }
 
 #[test]
-fn req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once() -> Test {
+fn req_sag_0002_session_write_failure_is_reported_only_for_successful_calls() -> Test {
     for status in [200, 401] {
         let root = Temp::new()?;
         let logger = logger(&root)?;
@@ -554,13 +560,18 @@ fn req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once() ->
             json!({"error":"provider message stays whole"})
         };
         let stub = Stub::new(vec![http(status, body.clone())])?;
-        let outcome = sc_agent::result({
+        let outcome = sc_agent::report(&logger, {
             let run = run(options(&root, &stub.url), &logger)?;
 
             run.send(&request())
         });
         if status == 200 {
-            assert_eq!(outcome["value"]["answers"], body["answers"]);
+            assert_eq!(outcome["error"]["id"], "log.session_write");
+            let message = outcome["error"]["message"]
+                .as_str()
+                .ok_or("write failure message missing")?;
+            assert!(message.contains("original outcome: Ok("));
+            assert!(message.contains("0.123456789"));
         } else {
             assert_eq!(outcome["error"]["id"], "http.auth");
             assert_eq!(outcome["error"]["message"], body.to_string());
@@ -581,7 +592,18 @@ fn req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once() ->
                 .iter()
                 .filter(|event| event["fields"]["id"] == "log.session_write")
                 .count(),
+            usize::from(status == 200)
+        );
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event["action"] == "error")
+                .count(),
             1
+        );
+        assert_eq!(
+            std::fs::read_to_string(root.0.join("sessions"))?,
+            "controlled directory obstruction"
         );
         logger.shutdown()?;
     }

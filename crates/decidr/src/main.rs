@@ -107,7 +107,7 @@ fn main() {
             } else {
                 sc_agent::report(&logger, outcome)
             };
-            sc_agent::after_shutdown(value, logger.shutdown())
+            sc_agent::after_failure(value, logger.shutdown(), "log.shutdown")
         }
     };
     let status = if value.get("ok") == Some(&Value::Bool(true)) && !cancelled.is_cancelled() {

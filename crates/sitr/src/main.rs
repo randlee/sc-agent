@@ -41,12 +41,12 @@ fn main() {
                 sc_agent::log(&logger, "sitr.result", json!({"result":value}))?;
                 Ok(value)
             })();
-            let value = finished(
+            let value = sc_agent::after_failure(
                 sc_agent::report(&logger, result),
                 logger.flush(),
                 "log.flush",
             );
-            finished(value, logger.shutdown(), "log.shutdown")
+            sc_agent::after_failure(value, logger.shutdown(), "log.shutdown")
         }
     };
     let status = if value.get("ok") == Some(&Value::Bool(true)) {
@@ -60,20 +60,6 @@ fn main() {
     std::process::exit(status);
 }
 
-fn finished(mut value: Value, result: Result<(), impl ToString>, id: &'static str) -> Value {
-    if let Err(e) = result {
-        if let Some(detail) = value.get_mut("error").and_then(Value::as_object_mut) {
-            let message = detail.get("message").and_then(Value::as_str).unwrap_or("");
-            detail.insert(
-                "message".into(),
-                json!(format!("{message}; {id}: {}", e.to_string())),
-            );
-        } else {
-            return sc_agent::result(Err(sc_agent::error(id, e)));
-        }
-    }
-    value
-}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,20 +68,20 @@ mod tests {
     {
         let logger = sc_agent::default_logger("sitr-flush-test")?;
         logger.shutdown()?;
-        let failed = finished(
+        let failed = sc_agent::after_failure(
             sc_agent::result(Ok(json!("success"))),
             logger.flush(),
             "log.flush",
         );
         let original = sc_agent::result(Err(sc_agent::error("treesitter.usage", "bad input")));
-        let preserved = finished(original, logger.flush(), "log.flush");
+        let preserved = sc_agent::after_failure(original, logger.flush(), "log.flush");
         assert_eq!(preserved["error"]["id"], "treesitter.usage");
         let message = preserved["error"]["message"]
             .as_str()
             .ok_or("missing message")?;
         assert!(message.contains("bad input"));
         assert!(message.contains("log.flush"));
-        let shutdown = finished(preserved, Err("shutdown failed"), "log.shutdown");
+        let shutdown = sc_agent::after_failure(preserved, Err("shutdown failed"), "log.shutdown");
         assert_eq!(shutdown["error"]["id"], "treesitter.usage");
         assert!(
             shutdown["error"]["message"]

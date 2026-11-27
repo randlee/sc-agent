@@ -85,24 +85,25 @@ pub enum Error {
         session_id: Option<String>,
     },
 }
-pub fn after_shutdown(value: Value, shutdown: Result<(), impl std::fmt::Display>) -> Value {
-    let Err(shutdown) = shutdown else {
+/// Keep an earlier error and append a later failure's detail.
+pub fn after_failure(
+    mut value: Value,
+    completion: Result<(), impl ToString>,
+    id: &'static str,
+) -> Value {
+    let Err(failure) = completion else {
         return value;
     };
-    let original = value.get("error");
-    let message = format!("logger shutdown failed: {shutdown}; command result: {value}");
-    let mut failure = result(Err(error("log.shutdown", message)));
-    if let Some(target) = failure.get_mut("error").and_then(Value::as_object_mut) {
-        for key in ["attempts", "session_id"] {
-            if let Some(field) = original
-                .and_then(|error| error.get(key))
-                .filter(|value| !value.is_null())
-            {
-                target.entry(key).or_insert_with(|| field.clone());
-            }
-        }
+    if let Some(detail) = value.get_mut("error").and_then(Value::as_object_mut) {
+        let message = detail.get("message").and_then(Value::as_str).unwrap_or("");
+        detail.insert(
+            "message".into(),
+            json!(format!("{message}; {id}: {}", failure.to_string())),
+        );
+        value
+    } else {
+        result(Err(error(id, failure)))
     }
-    failure
 }
 pub fn error(id: &'static str, message: impl ToString) -> Error {
     let fix_input = "Fix the named input or provider response.";
@@ -1524,7 +1525,11 @@ impl Run {
         } else {
             Ok(())
         };
-        flushed.and(stopped)
+        match (flushed, stopped) {
+            (Err(original), Err(later)) => Err(contextual(original, later, None)),
+            (Err(original), _) => Err(original),
+            (_, stopped) => stopped,
+        }
     }
     pub fn send(&self, request: &Value) -> Result<Value, Error> {
         let (options, logger, cancel) = (&self.options, self.logger(), &*self.cancel);
@@ -1589,44 +1594,38 @@ impl Run {
             fields.insert("session_id".into(), json!(session_id));
             fields.insert("question_digests".into(), json!(digests));
         }
-        let mut session_failure = None;
         let attach = |failure, context| contextual(failure, context, Some(&session_id));
-        let prior = || format!("original outcome: {outcome:?}");
-        if let Ok(project) = options.settings.project_required()
+        if let Ok(value) = &outcome
+            && let Ok(project) = options.settings.project_required()
             && slug(project).is_ok()
             && slug(&options.agent_role).is_ok()
         {
-            let row = json!({"session_id":session_id,"repo":options.repo,"agent_role":options.agent_role,"project":project,"request":request,"question_digests":digests,"result":match &outcome {Ok(v)=>json!({"ok":true,"value":v}),Err(e)=>json!({"ok":false,"error":e})}});
+            let row = json!({"session_id":session_id,"repo":options.repo,"agent_role":options.agent_role,"project":project,"request":request,"question_digests":digests,"result":{"ok":true,"value":value}});
             let path = options
                 .log_root
                 .join("sessions")
                 .join(&options.repo)
                 .join(&options.agent_role)
                 .join(project);
-            let _append = SESSION_APPEND
-                .lock()
-                .map_err(|e| attach(error("config.session", e), prior()))?;
-            let written = (|| -> std::io::Result<()> {
-                use std::io::Write;
-                std::fs::create_dir_all(&path)?;
-                writeln!(
-                    std::fs::OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open(path.join("sessions.jsonl"))?,
-                    "{row}"
-                )
+            let written = (|| -> Result<(), Error> {
+                let _append = SESSION_APPEND
+                    .lock()
+                    .map_err(|e| error("config.session", e))?;
+                (|| -> std::io::Result<()> {
+                    use std::io::Write;
+                    std::fs::create_dir_all(&path)?;
+                    writeln!(
+                        std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(path.join("sessions.jsonl"))?,
+                        "{row}"
+                    )
+                })()
+                .map_err(|e| error("log.session_write", e))
             })();
-            session_failure = written
-                .err()
-                .map(|e| attach(error("log.session_write", e), prior()));
-            if let Some(failure) = &session_failure
-                && let Err(log_failure) = log(logger, "error", json!(failure))
-            {
-                outcome = Err(attach(
-                    log_failure,
-                    format!("original session error: {failure}"),
-                ));
+            if let Err(failure) = written {
+                outcome = Err(attach(failure, format!("original outcome: {outcome:?}")));
             }
         }
         let logged = match &outcome {
@@ -1637,9 +1636,11 @@ impl Run {
             .into_iter()
             .filter_map(Result::err)
         {
-            let context =
-                format!("original outcome: {outcome:?}; session error: {session_failure:?}");
-            outcome = Err(attach(failure, context));
+            let context = format!("original outcome: {outcome:?}");
+            outcome = Err(match outcome {
+                Err(original) => attach(original, failure.to_string()),
+                Ok(_) => attach(failure, context),
+            });
         }
         outcome
     }
@@ -1768,17 +1769,11 @@ pub fn doctor(
 }
 
 pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {
-    if let Err(error) = &outcome
-        && let Err(failure) = log(logger, "error", json!(error))
-    {
-        let Error::Failure { session_id, .. } = error;
-        return result(Err(contextual(
-            failure,
-            format!("original error: {error}"),
-            session_id.as_deref(),
-        )));
-    }
-    result(outcome)
+    let logged = match &outcome {
+        Err(original) => log(logger, "error", json!(original)),
+        Ok(_) => Ok(()),
+    };
+    after_failure(result(outcome), logged, "log.write")
 }
 
 #[cfg(test)]
@@ -2156,12 +2151,16 @@ pub mod route_tests {
         } = &mut original;
         *attempts = Some(1);
         *session_id = Some("session-1".into());
-        let value = after_shutdown(result(Err(original)), Err("controlled shutdown failure"));
-        assert_eq!(value["error"]["id"], "log.shutdown");
+        let value = after_failure(
+            result(Err(original)),
+            Err("controlled shutdown failure"),
+            "log.shutdown",
+        );
+        assert_eq!(value["error"]["id"], "http.auth");
         assert_eq!(value["error"]["attempts"], 1);
         assert_eq!(value["error"]["session_id"], "session-1");
         assert!(value["error"]["message"].as_str().is_some_and(|message| {
-            message.contains("http.auth")
+            message.contains("log.shutdown")
                 && message.contains("provider refused the request")
                 && message.contains("controlled shutdown failure")
         }));
