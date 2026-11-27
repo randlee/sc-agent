@@ -78,7 +78,16 @@ impl Run {
     pub fn send_batch(&self, requests: &[Value], on_result: &(dyn Fn(usize, &Value) + Sync)) -> Result<Value, Error>;
 }
 ```
-Config and logging follow rule 0: a tool passes its name and `RunArgs`; decidr and the wheel do no `load`, `vars_os`, `log_root` or `default_logger` wiring. The layered loader still reads the `decidr`-named files and `DECIDR_` variables (config() :232 is j-1's); making those follow `tool` is outside j-2.
+Config and logging follow rule 0: a tool passes its name and `RunArgs`; decidr and the wheel do no `load`, `vars_os`, `log_root` or `default_logger` wiring. The tool name also drives the layered loader (ADR-SAG-0020: each CLI's file is `<cli>.json`/`<cli>.local.json`, its variables are `<CLI>_`; `sc-agent.json` and `SC_PROJECT` stay shared):
+```rust
+pub fn config(tool: &str, local: Option<&Path>, global: Option<&Path>, environment: &[(OsString, OsString)], project: Option<&str>) -> Result<Configuration, Error>;
+pub fn load(tool: &str, config_dir: Option<&Path>, project: Option<&str>) -> Result<(Configuration, PathBuf, String), Error>;
+pub fn doctor(tool: &str, config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error>;   // log_root(tool)
+struct ConfigEnv(String, Vec<(OsString, OsString)>);   // prefix = tool upper-cased, '-' -> '_', then '_'
+```
+For tool "decidr" behaviour is byte-for-byte what it is now (REQ-SAG-0003, REQ-SAG-0020). Replaces config() hard-coded `"decidr.json"`, `"decidr.local.json"` (lib.rs:257) and `"DECIDR_"` (:196, :204), and `load`/`doctor` copies of "decidr" (:1467). The `missing_setting` texts (:147, :168) still name DECIDR_/decidr files; reworded with the tool identity in j-3.
+
+Python `tool`: `Run(tool=...)` is required unless `general_log` is given; with `general_log` the tool is that logger's service name (`logger("my-tool")` names the tool); neither -> `sc_agent_py.invalid_option` "tool is required" (stored, returned by every call). No `"decidr"` default exists in the wheel; decidr passes "decidr".
 
 `Route` (:936), `Jev`/`OpenAiCompat`/`AnthropicCompat`, `model_with` and every j-1 error id are unchanged; `Run::send` builds the `Route` from `self`.
 
@@ -128,6 +137,7 @@ Python (names frozen after j-2; `tool` is a Run keyword now because Run::new nee
 | item | replaces | deleted with it |
 |---|---|---|
 | `RunArgs`, `Run::new`, `from_options`, `provider`, `logger`, `close` | the repeated `(options, logger, cancel, wait, keyring)` parameters of `send` lib.rs:1170 and `batch` :1283; decidr main.rs:41-49 (`load`), :62-67 (workers), :80-92 (Options literal, `log_root`, `vars_os`); PyO3 `options` :144-179 and its `log_root` call :166 | the 5 parameters in 2 signatures; the 3 hand-built wirings; `Options` literals outside tests |
+| `config`, `load`, `doctor` take `tool` | hard-coded names in `config` lib.rs:196, :204, :257 and `doctor` :1467 | the literals; none of ADR-SAG-0020's names change for decidr |
 | `PyRun.__enter__`, `__exit__`, `provider` getter | none (ADR-SAG-0019 d14: `with sc_agent.Run(...)`; `run.provider`); new capability | - |
 | `Run::send` | `pub fn send` lib.rs:1170 | free fn |
 | `Run::send_batch` | `pub fn batch` lib.rs:1283 | free fn |
@@ -181,18 +191,18 @@ Paths: default logger `<DECIDR_LOG_ROOT|~/.sc-agent>/logs/decidr.log.jsonl`; ses
 
 | | lines | basis |
 |---|---|---|
-| Restructure: sc-agent `RunArgs`, `Run`, `new`, `from_options`, close, provider, minus send/batch parameter lists (lib.rs 1253 -> 1322) | +69 | measured on this branch |
-| Restructure: decidr main.rs 144 -> 124, cli.rs 33 -> 31 | -22 | measured (decidr no longer calls load, vars_os, log_root, workers) |
+| Restructure: sc-agent `RunArgs`, `Run`, `new`, `from_options`, close, provider, minus send/batch parameter lists incl. the `tool` parameter of config/load/doctor (lib.rs 1253 -> 1340) | +87 | measured on this branch |
+| Restructure: decidr main.rs 144 -> 128, cli.rs 33 -> 31 | -18 | measured (decidr no longer calls load, vars_os, log_root, workers) |
 | Restructure: PyO3 lib.rs 562 -> about 450 (module send/send_batch/Cancel/capsule/options/wait/lookup out, PyRun/PyLogger in) | about -110 | estimate, not yet built |
-| **Restructure net** | **about -63** (target <= 0) | |
+| **Restructure net** | **about -41** (target <= 0) | |
 | New capability: `TYPESAFE` +1, `provider_keys` +5, `PyRun.provider` getter +3, `__enter__`/`__exit__` +6 | about +15 | estimate |
-| **Sprint total** | **about 2,294 / 2,500** (reviewer worst case 2,364) | |
+| **Sprint total** | **about 2,316 / 2,500** (worst case 2,364) | |
 Python (uncounted by the gate): __init__.py 28 -> about 9, stubs about +30, template net <= +4, integration.py net about 0. Docs uncapped. No per-function counts.
 
 ## Done checks
 
 - Build: `RUSTUP_TOOLCHAIN=1.98.1 cargo build --workspace --locked`; `cargo clippy --workspace --all-targets --all-features -- -D warnings`; `cargo fmt --check --all`.
-- Gate: `RUSTUP_TOOLCHAIN=1.98.1 python3 scripts/gate/rewrite.py` all PASS; Rust source <= 2,342 + new capability (about 2,357); fails the sprint above 2,364.
+- Gate: `RUSTUP_TOOLCHAIN=1.98.1 python3 scripts/gate/rewrite.py` all PASS; Rust source <= 2,342 + new capability (about 2,357); the config tests pass `tool`; fails the sprint above 2,364.
 - Greps: `grep -rn 'PyCapsule\|unsafe\|invalid_call\|_new_cancel' crates/sc-agent-py/src` none; `grep -n 'pub fn send(\|pub fn batch(\|provider: Option' crates/sc-agent/src crates/decidr/src` none; `grep -rn 'recv_timeout' crates/decidr/src` none; `grep -rnE 'seed_session|TestSeams|def close|Cancel' crates/sc-agent-py/python/sc_agent/*.pyi` none.
 - Rust tests (ported to `Run`; `support::run(opts, &logger)` helper): sending.rs and records.rs existing names kept; new `run_new_resolves_the_model_once_and_rejects_unknown` (REQ-SAG-0101), `run_close_shuts_down_only_an_owned_logger` (ANC-006), `run_timeout_and_workers_apply_to_every_call` (REQ-SAG-0702), `run_with_invalid_timeout_or_workers_is_an_error` (REQ-SAG-0702); wires.rs unchanged; decidr cli.rs: `send_provider_flag_is_a_usage_error`, `local_timeout_default_is_120_seconds`.
 - Python (`python3 -m unittest discover -s tests/contract`, loopback.py, strict pyright, `check_consumer_template.py`): existing wheel tests ported by call shape (names unchanged); new `test_run_sends_through_loopback_and_closes`, `test_run_cancel_from_on_result_cancels_the_rest`, `test_run_invalid_arguments_return_invalid_option`, `test_module_exports_only_the_run_api`, `test_run_model_errors`, `test_provider_keys_typesafe_and_run_provider`, `test_native_stub_declares_every_export`; integration: `test_export_uses_current_provider_variables_and_injected_lookup` (rewritten), `test_export_with_only_an_anthropic_key`, `test_export_refuses_before_writing_without_credentials`. All deterministic (stub replies on events, sleep seam, barrier).

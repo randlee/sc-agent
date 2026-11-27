@@ -37,7 +37,11 @@ fn main() {
                     return Ok(json!(sc_agent::PROVIDERS));
                 }
                 if matches!(cli.command, Command::Doctor) {
-                    return sc_agent::doctor(cli.config_dir.as_deref(), cli.project.as_deref());
+                    return sc_agent::doctor(
+                        "decidr",
+                        cli.config_dir.as_deref(),
+                        cli.project.as_deref(),
+                    );
                 }
                 let Command::Send {
                     model,
