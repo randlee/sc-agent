@@ -10,7 +10,11 @@ use std::{
     collections::BTreeMap,
     ffi::OsString,
     path::{Path, PathBuf},
-    sync::{Arc, Condvar, Mutex, atomic::Ordering},
+    sync::{
+        Arc, Condvar, Mutex,
+        atomic::Ordering,
+        mpsc::{Receiver, RecvTimeoutError},
+    },
     time::Duration,
 };
 
@@ -28,6 +32,21 @@ impl Cancel {
     }
     pub fn is_cancelled(&self) -> bool {
         self.state.lock().map_or(true, |state| *state)
+    }
+    pub fn check(&self) -> Result<(), Error> {
+        match self.is_cancelled() {
+            true => Err(error("decision.cancelled", "request cancelled")),
+            false => Ok(()),
+        }
+    }
+    pub fn recv<T>(&self, receiver: &Receiver<T>, id: &'static str) -> Result<T, Error> {
+        loop {
+            self.check()?;
+            match receiver.recv_timeout(Duration::from_millis(20)) {
+                Err(RecvTimeoutError::Timeout) => {}
+                other => return other.map_err(|e| error(id, e)),
+            }
+        }
     }
     pub fn wait(&self, delay: Duration) {
         if let Ok(state) = self.state.lock() {
@@ -61,6 +80,7 @@ pub fn error(id: &'static str, message: impl ToString) -> Error {
         | "secrets.keyring_timeout"
         | "http.auth" => "auth",
         "http.network" => "network",
+        "decision.api_status" => "other",
         "http.provider_busy" => "busy",
         "http.quota_exhausted" => "quota",
         "decision.cancelled" => "cancelled",
@@ -910,6 +930,9 @@ pub trait Llm {
     fn call(&self, req: &LlmRequest) -> Result<Value, Error>;
 }
 pub const DEFAULT_SYSTEM_PROMPT: &str = "Answer every question in the decision request. Reply with one JSON object that matches the supplied schema, including probabilities and confidence.";
+type Auth = &'static [(&'static str, &'static str)];
+const BEARER: Auth = &[("Authorization", "Bearer {}")];
+const ANTHROPIC: Auth = &[("x-api-key", "{}"), ("anthropic-version", "2023-06-01")];
 pub struct Route<'a> {
     pub options: &'a Options,
     pub provider: &'static Provider,
@@ -923,49 +946,28 @@ pub struct Route<'a> {
 pub struct Jev<'a>(pub &'a Route<'a>);
 pub struct OpenAiCompat<'a>(pub &'a Route<'a>);
 pub struct AnthropicCompat<'a>(pub &'a Route<'a>);
-type Auth = fn(&str) -> Vec<(&'static str, String)>;
-fn bearer(key: &str) -> Vec<(&'static str, String)> {
-    vec![("Authorization", format!("Bearer {key}"))]
-}
-fn decider<'a>(route: &'a Route<'a>) -> Box<dyn Decision + 'a> {
-    match route.provider.wire {
-        "messages" => Box::new(AnthropicCompat(route)),
-        "chat/completions" => Box::new(OpenAiCompat(route)),
-        _ => Box::new(Jev(route)),
-    }
-}
 fn ask(llm: &impl Llm, route: &Route<'_>, req: &DecisionRequest) -> Result<DecisionResult, Error> {
-    let key = format!("{}-system-prompt", route.options.model);
-    let properties = req
+    let prompt = route
+        .options
+        .settings
+        .decidr
+        .get(&format!("{}-system-prompt", route.options.model));
+    let questions = req
         .get("questions")
         .and_then(Value::as_object)
-        .map(|questions| {
-            questions
-                .iter()
-                .map(|(id, question)| (id.clone(), answer_schema(question)))
-                .collect::<BTreeMap<_, _>>()
-        })
-        .unwrap_or_default();
-    let required = properties.keys().cloned().collect::<Vec<_>>();
-    let reply = llm.call(&LlmRequest {
-        system: Some(route.options.settings.decidr.get(&key).map_or(DEFAULT_SYSTEM_PROMPT, String::as_str).into()),
+        .into_iter()
+        .flatten();
+    let answers = questions
+        .map(|(id, question)| (id, answer_schema(question)))
+        .collect::<BTreeMap<_, _>>();
+    llm.call(&LlmRequest {
+        system: Some(prompt.map_or(DEFAULT_SYSTEM_PROMPT, String::as_str).into()),
         messages: json!([{"role":"user","content":req.to_string()}]),
         schema: Some(json!({
             "type":"object", "required":["answers"], "additionalProperties":false,
-            "properties":{"answers":{"type":"object","properties":properties,"required":required,"additionalProperties":false}}
+            "properties":{"answers":{"type":"object","properties":answers,"required":answers.keys().collect::<Vec<_>>(),"additionalProperties":false}}
         })),
-    })?;
-    schema(req, &reply)?;
-    Ok(reply)
-}
-fn text_json(text: Option<&str>, raw: &Value) -> Result<Value, Error> {
-    let text = text.ok_or_else(|| {
-        error(
-            "decision.response_parse",
-            format!("provider reply has no text: {raw}"),
-        )
-    })?;
-    serde_json::from_str(text).map_err(|e| error("decision.response_parse", format!("{e}: {text}")))
+    })
 }
 impl Decision for Jev<'_> {
     fn decide(&self, req: &DecisionRequest) -> Result<DecisionResult, Error> {
@@ -973,33 +975,7 @@ impl Decision for Jev<'_> {
         if let Some(body) = body.as_object_mut() {
             body.insert("model".into(), json!(self.0.model));
         }
-        let reply = self.0.post("systemone", bearer, &body)?;
-        schema(req, &reply)?;
-        Ok(reply)
-    }
-}
-impl Llm for OpenAiCompat<'_> {
-    fn call(&self, req: &LlmRequest) -> Result<Value, Error> {
-        let mut messages = req
-            .system
-            .iter()
-            .map(|text| json!({"role":"system","content":text}))
-            .collect::<Vec<_>>();
-        messages.extend(req.messages.as_array().cloned().unwrap_or_default());
-        let mut body = json!({"model":self.0.model,"messages":messages});
-        if let (Some(body), Some(schema)) = (body.as_object_mut(), &req.schema) {
-            body.insert(
-                "response_format".into(),
-                json!({"type":"json_schema","json_schema":{"name":"decision","strict":true,"schema":schema}}),
-            );
-        }
-        let reply = self.0.post("chat/completions", bearer, &body)?;
-        text_json(
-            reply
-                .pointer("/choices/0/message/content")
-                .and_then(Value::as_str),
-            &reply,
-        )
+        self.0.post("systemone", BEARER, &body)
     }
 }
 impl Decision for OpenAiCompat<'_> {
@@ -1007,52 +983,58 @@ impl Decision for OpenAiCompat<'_> {
         ask(self, self.0, req)
     }
 }
-impl Llm for AnthropicCompat<'_> {
-    fn call(&self, req: &LlmRequest) -> Result<Value, Error> {
-        let mut body = json!({"model":self.0.model,"max_tokens":8192,"messages":req.messages});
-        if let Some(body) = body.as_object_mut() {
-            if let Some(system) = &req.system {
-                body.insert("system".into(), json!(system));
-            }
-            if let Some(schema) = &req.schema {
-                body.insert(
-                    "output_config".into(),
-                    json!({"format":{"type":"json_schema","schema":schema}}),
-                );
-            }
-        }
-        let reply = self.0.post(
-            "messages",
-            |key| {
-                vec![
-                    ("x-api-key", key.into()),
-                    ("anthropic-version", "2023-06-01".into()),
-                ]
-            },
-            &body,
-        )?;
-        text_json(
-            reply
-                .get("content")
-                .and_then(Value::as_array)
-                .and_then(|items| {
-                    items
-                        .iter()
-                        .find_map(|v| v.get("text").and_then(Value::as_str))
-                }),
-            &reply,
-        )
-    }
-}
 impl Decision for AnthropicCompat<'_> {
     fn decide(&self, req: &DecisionRequest) -> Result<DecisionResult, Error> {
         ask(self, self.0, req)
     }
 }
+impl Llm for OpenAiCompat<'_> {
+    fn call(&self, req: &LlmRequest) -> Result<Value, Error> {
+        let system = req
+            .system
+            .iter()
+            .map(|text| json!({"role":"system","content":text}));
+        let messages = system
+            .chain(req.messages.as_array().cloned().unwrap_or_default())
+            .collect::<Vec<_>>();
+        let format = req.schema.as_ref().map(|schema| json!({"type":"json_schema","json_schema":{"name":"decision","strict":true,"schema":schema}}));
+        let body = json!({"model":self.0.model,"messages":messages,"response_format":format});
+        self.0.text(
+            "chat/completions",
+            BEARER,
+            body,
+            "/choices/0/message/content",
+        )
+    }
+}
+impl Llm for AnthropicCompat<'_> {
+    fn call(&self, req: &LlmRequest) -> Result<Value, Error> {
+        let format = req
+            .schema
+            .as_ref()
+            .map(|schema| json!({"format":{"type":"json_schema","schema":schema}}));
+        let body = json!({"model":self.0.model,"max_tokens":8192,"messages":req.messages,"system":req.system,"output_config":format});
+        self.0.text("messages", ANTHROPIC, body, "/content/0/text")
+    }
+}
 impl Route<'_> {
+    fn text(&self, path: &str, auth: Auth, mut body: Value, at: &str) -> Result<Value, Error> {
+        if let Some(fields) = body.as_object_mut() {
+            fields.retain(|_, field| !field.is_null());
+        }
+        let reply = self.post(path, auth, &body)?;
+        let text = reply.pointer(at).and_then(Value::as_str);
+        let text = text.ok_or_else(|| {
+            error(
+                "decision.response_parse",
+                format!("provider reply has no text: {reply}"),
+            )
+        })?;
+        serde_json::from_str(text)
+            .map_err(|e| error("decision.response_parse", format!("{e}: {text}")))
+    }
     fn post(&self, path: &str, auth: Auth, body: &Value) -> Result<Value, Error> {
-        let (cancel, wait, provider) = (self.cancel, self.wait, self.provider);
-        let max = self.options.settings.max_sends;
+        let (cancel, provider, max) = (self.cancel, self.provider, self.options.settings.max_sends);
         let url = format!("{}/{path}", self.base.trim_end_matches('/'));
         let uri = url
             .parse::<ureq::http::Uri>()
@@ -1074,15 +1056,21 @@ impl Route<'_> {
             ));
         }
         let pause = host_holdoff(&host)?;
-        let key = if provider.key.is_empty() {
-            String::new()
-        } else {
-            key(
-                provider.key,
+        let key = match provider.key {
+            "" => String::new(),
+            name => key(
+                name,
                 &self.options.environment,
                 &self.options.root,
                 self.keyring,
-            )?
+            )?,
+        };
+        let redact = |text: String| {
+            if key.is_empty() {
+                text
+            } else {
+                text.replace(&key, "[redacted]")
+            }
         };
         let agent = ureq::Agent::config_builder()
             .http_status_as_error(false)
@@ -1090,19 +1078,13 @@ impl Route<'_> {
             .build()
             .new_agent();
         for attempt in 1..=max {
-            if cancel.is_cancelled() {
-                return Err(error("decision.cancelled", "request cancelled"));
-            }
+            cancel.check()?;
             // A busy reply holds off senders to this host through its injected wait.
             drop(pause.lock().map_err(|e| error("http.network", e))?);
-            if cancel.is_cancelled() {
-                return Err(error("decision.cancelled", "request cancelled"));
-            }
+            cancel.check()?;
             let mut post = agent.post(&url).header("Content-Type", "application/json");
-            if !key.is_empty() {
-                for (name, value) in auth(&key) {
-                    post = post.header(name, value);
-                }
+            for (name, value) in auth.iter().filter(|_| !key.is_empty()) {
+                post = post.header(*name, value.replace("{}", &key));
             }
             self.sends.set(attempt);
             // A send in flight cannot be aborted, so on cancel it is abandoned and the request ends now.
@@ -1123,47 +1105,13 @@ impl Route<'_> {
                     )
                 }));
             });
-            let sent = loop {
-                if cancel.is_cancelled() {
-                    return Err(error("decision.cancelled", "request cancelled"));
-                }
-                match receiver.recv_timeout(Duration::from_millis(20)) {
-                    Ok(sent) => break sent,
-                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-                    Err(e) => return Err(error("http.network", e)),
-                }
-            };
-            let (status, delay, text) = match sent {
-                Ok((status, delay, text)) => {
-                    let text = text.map_err(|e| error("decision.response_parse", e))?;
-                    (
-                        status,
-                        delay,
-                        if key.is_empty() {
-                            text
-                        } else {
-                            text.replace(&key, "[redacted]")
-                        },
-                    )
-                }
-                Err(e) => {
-                    if attempt < max {
-                        (self.wait)(Duration::from_secs(2u64.pow(attempt - 1)));
-                        continue;
-                    }
-                    return Err(Error::Failure {
-                        id: "http.network",
-                        action: "Retry later.",
-                        message: if key.is_empty() {
-                            e.to_string()
-                        } else {
-                            e.to_string().replace(&key, "[redacted]")
-                        },
-                        category: "network",
-                        attempts: Some(attempt),
-                        session_id: None,
-                    });
-                }
+            let (status, delay, text) = match cancel.recv(&receiver, "http.network")? {
+                Ok((status, delay, text)) => (
+                    status,
+                    delay,
+                    redact(text.map_err(|e| error("decision.response_parse", e))?),
+                ),
+                Err(e) => (0, None, redact(e.to_string())),
             };
             if (200..300).contains(&status) {
                 return serde_json::from_str(&text)
@@ -1180,41 +1128,22 @@ impl Route<'_> {
                 .iter()
                 .any(|needle| low.contains(needle));
             let busy = [429, 502, 529].contains(&status) && !quota;
-            if busy && attempt < max {
-                let _hold = pause.lock().map_err(|e| error("http.network", e))?;
-                wait(delay.unwrap_or_else(|| Duration::from_secs(2u64.pow(attempt - 1))));
+            if (busy || status == 0) && attempt < max {
+                let _hold = (status != 0)
+                    .then(|| pause.lock())
+                    .transpose()
+                    .map_err(|e| error("http.network", e))?;
+                (self.wait)(delay.unwrap_or_else(|| Duration::from_secs(2u64.pow(attempt - 1))));
                 continue;
             }
-            return Err(Error::Failure {
-                id: if quota {
-                    "http.quota_exhausted"
-                } else if busy {
-                    "http.provider_busy"
-                } else if status == 401 {
-                    "http.auth"
-                } else {
-                    "decision.api_status"
-                },
-                message: text,
-                action: if busy {
-                    "Retry later."
-                } else if status == 401 {
-                    "Check the provider API key."
-                } else {
-                    "Check the provider response."
-                },
-                category: if quota {
-                    "quota"
-                } else if busy {
-                    "busy"
-                } else if status == 401 {
-                    "auth"
-                } else {
-                    "other"
-                },
-                attempts: Some(attempt),
-                session_id: None,
-            });
+            let id = match status {
+                _ if quota => "http.quota_exhausted",
+                _ if busy => "http.provider_busy",
+                0 => "http.network",
+                401 => "http.auth",
+                _ => "decision.api_status",
+            };
+            return Err(error(id, text));
         }
         Err(error("http.network", "send count exhausted"))
     }
@@ -1258,9 +1187,7 @@ pub fn send(
         });
     let sends = Cell::new(0);
     let mut outcome = (|| {
-        if cancel.is_cancelled() {
-            return Err(error("decision.cancelled", "request cancelled"));
-        }
+        cancel.check()?;
         let project = options.settings.project_required()?;
         slug(project)?;
         slug(&options.agent_role)?;
@@ -1292,10 +1219,15 @@ pub fn send(
             keyring,
             sends: &sends,
         };
-        decider(&route).decide(request)
+        let reply = match provider.wire {
+            "messages" => AnthropicCompat(&route).decide(request),
+            "chat/completions" => OpenAiCompat(&route).decide(request),
+            _ => Jev(&route).decide(request),
+        }?;
+        schema(request, &reply).map(|()| reply)
     })();
-    if cancel.is_cancelled() {
-        outcome = Err(error("decision.cancelled", "request cancelled"));
+    if let Err(e) = cancel.check() {
+        outcome = Err(e);
     }
     if let Err(Error::Failure {
         session_id: id,
@@ -1304,9 +1236,7 @@ pub fn send(
     }) = &mut outcome
     {
         *id = Some(session_id.clone());
-        if cancel.is_cancelled() {
-            *attempts = Some(sends.get());
-        }
+        *attempts = (sends.get() > 0 || cancel.is_cancelled()).then(|| sends.get());
     }
     if let Ok(value) = &mut outcome
         && let Some(fields) = value.as_object_mut()
@@ -1446,16 +1376,22 @@ pub fn repository_identity(origin: Option<&str>, host: &str, root: &Path) -> Res
     Ok(name)
 }
 
-pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error> {
-    let (root, _) = repository()?;
+pub fn load(
+    config_dir: Option<&Path>,
+    project: Option<&str>,
+) -> Result<(Configuration, PathBuf, String), Error> {
+    let (root, repo) = repository()?;
     let local = root.join(".sc/sc-agent");
-
-    let loaded = config(
-        root.join(".git").exists().then_some(local.as_path()),
-        config_dir,
-        &std::env::vars_os().collect::<Vec<_>>(),
-        project,
-    )?;
+    let environment = std::env::vars_os().collect::<Vec<_>>();
+    let local = root.join(".git").exists().then_some(local.as_path());
+    Ok((
+        config(local, config_dir, &environment, project)?,
+        root,
+        repo,
+    ))
+}
+pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error> {
+    let (loaded, ..) = load(config_dir, project)?;
     Ok(json!({"settings":loaded.rows, "files":loaded.files, "log_root":log_root("decidr")?}))
 }
 

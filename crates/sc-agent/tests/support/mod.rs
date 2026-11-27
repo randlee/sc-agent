@@ -45,6 +45,8 @@ pub fn options(root: &Temp, url: &str) -> Options {
             workers: 1,
             models: Default::default(),
             laya: None,
+            max_sends: 5,
+            decidr: Default::default(),
         },
         model: "jev".into(),
         provider: None,

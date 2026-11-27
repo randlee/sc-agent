@@ -546,3 +546,46 @@ fn environment_json_and_strings_share_file_validation() -> Test {
     }
     Ok(())
 }
+
+#[test]
+fn max_sends_and_system_prompt_keys_load_default_and_report() -> Test {
+    let root = Temp::new()?;
+    let defaults = config(None, Some(&root.0), &[], None)?;
+    assert_eq!(defaults.config.max_sends, 5);
+    let row = |loaded: &sc_agent::Configuration, path: &str| {
+        loaded.rows.iter().find(|row| row["path"] == path).cloned()
+    };
+    assert_eq!(
+        row(&defaults, "max_sends"),
+        Some(json!({"path":"max_sends","value":"5","source":"default"}))
+    );
+    fs::write(
+        root.0.join("sc-agent.json"),
+        json!({"max_sends":3,"decidr":{"luna-system-prompt":"P"}}).to_string(),
+    )?;
+    let loaded = config(None, Some(&root.0), &[], None)?;
+    assert_eq!(loaded.config.max_sends, 3);
+    assert_eq!(loaded.config.decidr["luna-system-prompt"], "P");
+    assert_eq!(
+        row(&loaded, "decidr.luna-system-prompt").ok_or("row missing")?["value"],
+        "P"
+    );
+    fs::write(
+        root.0.join("sc-agent.json"),
+        json!({"max_sends":0}).to_string(),
+    )?;
+    let failure = config(None, Some(&root.0), &[], None)
+        .err()
+        .ok_or("zero accepted")?
+        .to_string();
+    assert!(
+        failure.contains("config.invalid") && failure.contains("max_sends"),
+        "{failure}"
+    );
+    fs::write(
+        root.0.join("sc-agent.json"),
+        json!({"decidr":{"sonnet-system-prompt":"P"}}).to_string(),
+    )?;
+    assert!(config(None, Some(&root.0), &[], None).is_err());
+    Ok(())
+}
