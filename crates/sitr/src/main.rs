@@ -41,8 +41,12 @@ fn main() {
                 sc_agent::log(&logger, "sitr.result", json!({"result":value}))?;
                 Ok(value)
             })();
-            let value = flushed(sc_agent::report(&logger, result), logger.flush());
-            sc_agent::after_shutdown(value, logger.shutdown())
+            let value = finished(
+                sc_agent::report(&logger, result),
+                logger.flush(),
+                "log.flush",
+            );
+            finished(value, logger.shutdown(), "log.shutdown")
         }
     };
     let status = if value.get("ok") == Some(&Value::Bool(true)) {
@@ -56,11 +60,19 @@ fn main() {
     std::process::exit(status);
 }
 
-fn flushed(value: Value, result: Result<(), impl ToString>) -> Value {
-    match result {
-        Ok(()) => value,
-        Err(e) => sc_agent::result(Err(sc_agent::error("log.flush", e))),
+fn finished(mut value: Value, result: Result<(), impl ToString>, id: &'static str) -> Value {
+    if let Err(e) = result {
+        if let Some(detail) = value.get_mut("error").and_then(Value::as_object_mut) {
+            let message = detail.get("message").and_then(Value::as_str).unwrap_or("");
+            detail.insert(
+                "message".into(),
+                json!(format!("{message}; {id}: {}", e.to_string())),
+            );
+        } else {
+            return sc_agent::result(Err(sc_agent::error(id, e)));
+        }
     }
+    value
 }
 #[cfg(test)]
 mod tests {
@@ -70,7 +82,26 @@ mod tests {
     {
         let logger = sc_agent::default_logger("sitr-flush-test")?;
         logger.shutdown()?;
-        let failed = flushed(sc_agent::result(Ok(json!("success"))), logger.flush());
+        let failed = finished(
+            sc_agent::result(Ok(json!("success"))),
+            logger.flush(),
+            "log.flush",
+        );
+        let original = sc_agent::result(Err(sc_agent::error("treesitter.usage", "bad input")));
+        let preserved = finished(original, logger.flush(), "log.flush");
+        assert_eq!(preserved["error"]["id"], "treesitter.usage");
+        let message = preserved["error"]["message"]
+            .as_str()
+            .ok_or("missing message")?;
+        assert!(message.contains("bad input"));
+        assert!(message.contains("log.flush"));
+        let shutdown = finished(preserved, Err("shutdown failed"), "log.shutdown");
+        assert_eq!(shutdown["error"]["id"], "treesitter.usage");
+        assert!(
+            shutdown["error"]["message"]
+                .as_str()
+                .is_some_and(|s| s.contains("shutdown failed"))
+        );
         assert_eq!(failed["error"]["id"], "log.flush");
         assert_eq!(
             failed["error"]["message"],
