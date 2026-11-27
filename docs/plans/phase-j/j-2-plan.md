@@ -85,7 +85,7 @@ pub fn load(tool: &str, config_dir: Option<&Path>, project: Option<&str>) -> Res
 pub fn doctor(tool: &str, config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error>;   // log_root(tool)
 struct ConfigEnv(String, Vec<(OsString, OsString)>);   // prefix = tool upper-cased, '-' -> '_', then '_'
 ```
-For tool "decidr" behaviour is byte-for-byte what it is now (REQ-SAG-0003, REQ-SAG-0020). Replaces config() hard-coded `"decidr.json"`, `"decidr.local.json"` (lib.rs:257) and `"DECIDR_"` (:196, :204), and `load`/`doctor` copies of "decidr" (:1467). The `missing_setting` texts (:147, :168) still name DECIDR_/decidr files; reworded with the tool identity in j-3.
+For tool "decidr" behaviour is byte-for-byte what it is now (REQ-SAG-0003, REQ-SAG-0020). Replaces config() hard-coded `"decidr.json"`, `"decidr.local.json"` (lib.rs:257) and `"DECIDR_"` (:196, :204), and `load`/`doctor` copies of "decidr" (:1395). `missing_setting(tool, path)` (:143) and `Settings::project_required` (:168) build their text from `prefix(tool)` and `layers(tool)`; `Settings` gains `#[serde(skip)] pub tool: String`, set by `config`; `setting()` takes `tool`. For "decidr" the messages are byte-identical (existing config tests are the check); a tool "judge-jev" is told `JUDGE_JEV_` and `judge-jev.json`.
 
 Python `tool`: `Run(tool=...)` is required unless `general_log` is given; with `general_log` the tool is that logger's service name (`logger("my-tool")` names the tool); neither -> `sc_agent_py.invalid_option` "tool is required" (stored, returned by every call). No `"decidr"` default exists in the wheel; decidr passes "decidr".
 
@@ -137,7 +137,7 @@ Python (names frozen after j-2; `tool` is a Run keyword now because Run::new nee
 | item | replaces | deleted with it |
 |---|---|---|
 | `RunArgs`, `Run::new`, `from_options`, `provider`, `logger`, `close` | the repeated `(options, logger, cancel, wait, keyring)` parameters of `send` lib.rs:1170 and `batch` :1283; decidr main.rs:41-49 (`load`), :62-67 (workers), :80-92 (Options literal, `log_root`, `vars_os`); PyO3 `options` :144-179 and its `log_root` call :166 | the 5 parameters in 2 signatures; the 3 hand-built wirings; `Options` literals outside tests |
-| `config`, `load`, `doctor` take `tool` | hard-coded names in `config` lib.rs:196, :204, :257 and `doctor` :1467 | the literals; none of ADR-SAG-0020's names change for decidr |
+| `config`, `load`, `doctor` take `tool`; `Settings.tool` | hard-coded names in `config` lib.rs:196, :204, :257, `doctor` :1395, the texts :147 and :168 | the literals; none of ADR-SAG-0020's names change for decidr |
 | `PyRun.__enter__`, `__exit__`, `provider` getter | none (ADR-SAG-0019 d14: `with sc_agent.Run(...)`; `run.provider`); new capability | - |
 | `Run::send` | `pub fn send` lib.rs:1170 | free fn |
 | `Run::send_batch` | `pub fn batch` lib.rs:1283 | free fn |
@@ -191,12 +191,12 @@ Paths: default logger `<DECIDR_LOG_ROOT|~/.sc-agent>/logs/decidr.log.jsonl`; ses
 
 | | lines | basis |
 |---|---|---|
-| Restructure: sc-agent `RunArgs`, `Run`, `new`, `from_options`, close, provider, minus send/batch parameter lists incl. the `tool` parameter of config/load/doctor (lib.rs 1253 -> 1340) | +87 | measured on this branch |
+| Restructure: sc-agent `RunArgs`, `Run`, `new`, `from_options`, close, provider, minus send/batch parameter lists incl. the `tool` parameter of config/load/doctor (lib.rs 1253 -> 1369) | +116 | measured on this branch |
 | Restructure: decidr main.rs 144 -> 128, cli.rs 33 -> 31 | -18 | measured (decidr no longer calls load, vars_os, log_root, workers) |
 | Restructure: PyO3 lib.rs 562 -> about 450 (module send/send_batch/Cancel/capsule/options/wait/lookup out, PyRun/PyLogger in) | about -110 | estimate, not yet built |
-| **Restructure net** | **about -41** (target <= 0) | |
+| **Restructure net** | **about -12** (target <= 0) | |
 | New capability: `TYPESAFE` +1, `provider_keys` +5, `PyRun.provider` getter +3, `__enter__`/`__exit__` +6 | about +15 | estimate |
-| **Sprint total** | **about 2,316 / 2,500** (worst case 2,364) | |
+| **Sprint total** | **about 2,345 / 2,500** (worst case 2,364) | |
 Python (uncounted by the gate): __init__.py 28 -> about 9, stubs about +30, template net <= +4, integration.py net about 0. Docs uncapped. No per-function counts.
 
 ## Done checks
@@ -211,4 +211,4 @@ Python (uncounted by the gate): __init__.py 28 -> about 9, stubs about +30, temp
 ## Assumptions
 
 - ANC-001 "config can override default": met by a `models.jev` entry (j-1); no `Settings.model` key added, `--model`/`model=` default stays "jev".
-- Old-bead items dropped as not in the code: Model class, J1-13 block, `configured`, `decidr models` `{providers, models}` shape, `tool`/`tool_version`/`cache` (moved to j-3 with their storage).
+- Old-bead items dropped as not in the code: Model class, J1-13 block, `configured`, `decidr models` `{providers, models}` shape, `tool_version`/`cache` (moved to j-3 with their storage; `tool` is in j-2).
