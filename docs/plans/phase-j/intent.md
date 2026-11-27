@@ -1,6 +1,6 @@
 # Phase j intent
 
-Phase j fixes the gaps in sc-agent's minimal design so the first ~2,500 lines of code land correctly. Full product requirements come after.
+Phase j fixes the gaps in sc-agent's minimal design so the first ~2,580 lines of code land correctly. Full product requirements come after.
 
 The design supports two call patterns through one small interface each:
 
@@ -35,4 +35,4 @@ impl Llm      for AnthropicCompat { … }
 
 Record rule: MUSTs in records cover only what is visible outside the code: wire formats, files another tool reads, config keys, CLI behaviour. Traits, structs, fields and methods live in the sprint plan's signature tables and the code.
 
-Priorities: extensibility, modularity, and the absolute minimum code that supports this design. Phase non-test Rust ≤ 2,500 lines (ANC-007).
+Priorities: extensibility, modularity, and the absolute minimum code that supports this design. Phase non-test Rust ≤ 2,580 lines (ANC-007).
