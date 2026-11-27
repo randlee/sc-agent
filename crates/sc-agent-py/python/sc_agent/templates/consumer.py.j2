@@ -292,6 +292,7 @@ def call_result(run: Any, request: str | Mapping[str, Any], *, cache: bool | Non
 
 
 def call_batch_results(run: Any, requests: Sequence[str | Mapping[str, Any]], *, cache: bool | None = None,
+                       on_each: Callable[[int, Result[Reply, ClientError]], object] | None = None,
                        abort_on: frozenset[str] = frozenset(), category_codes: Mapping[str, str] | None = None,
                        repository_root: str = ".", consent_what: str = "The request text") -> Result[list[Result[Reply, ClientError]], ClientError]:
     start = _start(run, abort_on, category_codes, repository_root, consent_what)
@@ -301,6 +302,8 @@ def call_batch_results(run: Any, requests: Sequence[str | Mapping[str, Any]], *,
     def handle(index: int, line: Any) -> None:
         finished[index] = line
         _abort_if_selected(line, abort_on, run)
+        if on_each:
+            on_each(index, decode_result(line, category_codes=category_codes))
     try:
         batch: Any = run.send_batch([_as_text(request) for request in requests], cache=cache, on_result=handle)
     except KeyboardInterrupt:
@@ -646,27 +649,45 @@ def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings
     elif run is None:
         return Err(ClientError("DECIDR.INVALID_OPTION", "run is required"))
     else:
+        results = None
         if on_request:
             try:
                 for job in jobs:
                     on_request(job.body)
             except Exception as exc:
                 return Err(ClientError("DECIDR.ERROR", str(exc)))
-        sent = call_batch_results(run, [job.body for job in jobs], cache=False if settings.repeat > 1 else cache,
-                                  abort_on=abort_on, category_codes=category_codes, repository_root=repository_root,
-                                  consent_what=consent_what)
-        if isinstance(sent, Err):
-            return sent
-        results = sent.value
     failed: list[ResultLine] = []
-    for job, result in zip(jobs, results):
-        line = result_line(job, settings, getattr(run, "run_id", None), project, result, verdict=verdict)
+    delivered: set[int] = set()
+    errors: list[Exception] = []
+    def deliver(index: int, result: Result[Reply, ClientError]) -> None:
+        if errors or index in delivered:
+            return
+        delivered.add(index)
+        line = result_line(jobs[index], settings, getattr(run, "run_id", None), project, result, verdict=verdict)
         try:
             on_line(line, result.value.answers if isinstance(result, Ok) else None)
         except Exception as exc:
-            return Err(ClientError("DECIDR.ERROR", str(exc)))
+            errors.append(exc)
+            if results is None:
+                run.cancel()
+            return
         if not line.ok:
             failed.append(line)
+    if results is None:
+        sent = call_batch_results(run, [job.body for job in jobs], cache=False if settings.repeat > 1 else cache,
+                                  on_each=deliver, abort_on=abort_on, category_codes=category_codes,
+                                  repository_root=repository_root, consent_what=consent_what)
+        if errors:
+            return Err(errors[0] if isinstance(errors[0], ClientError) else ClientError("DECIDR.ERROR", str(errors[0])))
+        if isinstance(sent, Err):
+            return sent
+        results = sent.value
+    for index, result in enumerate(results):
+        deliver(index, result)
+        if errors:
+            break
+    if errors:
+        return Err(errors[0] if isinstance(errors[0], ClientError) else ClientError("DECIDR.ERROR", str(errors[0])))
     return Ok(StreamedResult(failed))
 
 
