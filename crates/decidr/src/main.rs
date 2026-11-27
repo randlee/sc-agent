@@ -86,7 +86,7 @@ fn main() {
                     log_root,
                     repo,
                 };
-                let result = if batch {
+                if batch {
                     let requests = text
                         .lines()
                         .enumerate()
@@ -119,9 +119,7 @@ fn main() {
                         &|delay| cancelled.wait(delay),
                         &sc_agent::os_keyring,
                     )
-                };
-                cancelled.check()?;
-                result
+                }
             })();
             let value = if doctor {
                 sc_agent::result(outcome)
@@ -132,7 +130,7 @@ fn main() {
             value
         }
     };
-    let status = if value.get("ok") == Some(&Value::Bool(true)) {
+    let status = if value.get("ok") == Some(&Value::Bool(true)) && !cancelled.is_cancelled() {
         0
     } else {
         1
