@@ -262,19 +262,19 @@ class Wheel(Isolated):
             with self.subTest(function=function.__name__):
                 self.assertEqual(self.error(function(*args, **kwargs))["id"], "sc_agent_py.invalid_option")
 
-    def test_run_errors_are_flushed_before_each_call_returns(self):
-        root = Path(self.directory.name)
-        logger = self.api.logger("decidr")["value"]
+    def test_run_methods_explicitly_flush_success_and_error_results(self):
         run = self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract",
-                           agent_role="contract", config_dir=str(root), general_log=logger)
-        self.addCleanup(run.__exit__, None, None, None)
-        calls = (lambda: run.send(None), lambda: run.send_batch(None), lambda: run.sends_to(None))
-        for index, call in enumerate(calls, start=1):
-            result = call()
-            self.assertEqual(self.error(result)["id"], "sc_agent_py.invalid_option")
-            rows = [json.loads(line) for line in (root / "logs/decidr.log.jsonl").read_text().splitlines()]
-            self.assertEqual(sum(row["fields"].get("id") == "sc_agent_py.invalid_option" for row in rows),
-                             index)
+                           agent_role="contract", config_dir=self.directory.name)
+        run.__exit__(None, None, None)  # Closed sink: background writes cannot produce this oracle.
+        self.assertEqual(self.error(run.cancel())["id"], "log.flush")
+        calls = ((lambda: run.send(None), "value is required"),
+                 (lambda: run.send_batch(None), "value is required"),
+                 (lambda: run.sends_to(None), "provider is required"))
+        for call, original_message in calls:
+            detail = self.error(call())
+            self.assertEqual(detail["id"], "sc_agent_py.invalid_option")
+            self.assertIn(original_message, detail["message"])
+            self.assertIn("log.flush", detail["message"])
 
     def test_invalid_logger_preserves_run_creation_error(self):
         run = self.api.Run(tool="decidr", tool_version="test", model="no-such-model",
