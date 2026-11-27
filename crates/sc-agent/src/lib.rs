@@ -1403,14 +1403,53 @@ pub struct Run {
     pub cancel: Arc<Cancel>,
     pub wait: Box<dyn Fn(Duration) + Send + Sync>,
     pub keyring: Box<dyn Fn(&str) -> Result<String, KeyringError> + Send + Sync>,
-    pub provider: &'static Provider,
+    provider: &'static Provider,
     found: Vec<(&'static Provider, String)>,
     logger: Arc<Logger>,
     owned: bool,
 }
+pub struct RunArgs {
+    pub tool: String,
+    pub agent_role: String,
+    pub model: Option<String>,
+    pub project: Option<String>,
+    pub config_dir: Option<PathBuf>,
+    pub timeout_secs: Option<f64>,
+    pub workers: Option<i64>,
+    pub base_url: Option<String>,
+}
 impl Run {
     pub fn new(
+        args: RunArgs,
+        logger: Option<Arc<Logger>>,
+        cancel: Arc<Cancel>,
+    ) -> Result<Self, Error> {
+        let (loaded, root, repo) = load(args.config_dir.as_deref(), args.project.as_deref())?;
+        let mut settings = loaded.config;
+        if let Some(count) = args.workers {
+            settings.workers = workers(count)?;
+        }
+        let name = logger
+            .as_ref()
+            .map_or(args.tool.as_str(), |l| l.service_name().as_str())
+            .to_owned();
+        let options = Options {
+            environment: std::env::vars_os().collect(),
+            settings,
+            model: args.model.unwrap_or_else(|| "jev".into()),
+            agent_role: args.agent_role,
+            timeout: Duration::try_from_secs_f64(args.timeout_secs.unwrap_or(120.0))
+                .map_err(|e| error("decidr.invalid_request_timeout", e))?,
+            base_url: args.base_url,
+            root,
+            log_root: log_root(&name)?,
+            repo,
+        };
+        Self::from_options(options, args.tool, logger, cancel)
+    }
+    pub fn from_options(
         options: Options,
+        tool: String,
         logger: Option<Arc<Logger>>,
         cancel: Arc<Cancel>,
     ) -> Result<Self, Error> {
@@ -1419,7 +1458,7 @@ impl Run {
         let owned = logger.is_none();
         let logger = match logger {
             Some(logger) => logger,
-            None => Arc::new(default_logger("decidr")?),
+            None => Arc::new(default_logger(&tool)?),
         };
         let waiting = cancel.clone();
         Ok(Self {
@@ -1432,6 +1471,9 @@ impl Run {
             logger,
             owned,
         })
+    }
+    pub fn provider(&self) -> &'static Provider {
+        self.provider
     }
     pub fn logger(&self) -> &Logger {
         &self.logger

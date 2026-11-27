@@ -39,9 +39,6 @@ fn main() {
                 if matches!(cli.command, Command::Doctor) {
                     return sc_agent::doctor(cli.config_dir.as_deref(), cli.project.as_deref());
                 }
-                let (loaded, root, repo) =
-                    sc_agent::load(cli.config_dir.as_deref(), cli.project.as_deref())?;
-                let mut settings = loaded.config;
                 let Command::Send {
                     model,
                     agent_role,
@@ -53,9 +50,20 @@ fn main() {
                 else {
                     return Ok(Value::Null);
                 };
-                if let Some(workers) = workers {
-                    settings.workers = sc_agent::workers(workers)?;
-                }
+                let run = sc_agent::Run::new(
+                    sc_agent::RunArgs {
+                        tool: "decidr".into(),
+                        agent_role,
+                        model: Some(model),
+                        project: cli.project,
+                        config_dir: cli.config_dir,
+                        timeout_secs: Some(timeout_secs),
+                        workers,
+                        base_url: None,
+                    },
+                    Some(logger.clone()),
+                    cancelled.clone(),
+                )?;
                 cancelled.check()?;
                 let text = match input {
                     Some(path) => std::fs::read_to_string(path)
@@ -72,19 +80,6 @@ fn main() {
                             .map_err(|e| sc_agent::error("decidr.input_read", e))?
                     }
                 };
-                let options = sc_agent::Options {
-                    environment: std::env::vars_os().collect(),
-                    settings,
-                    model,
-                    agent_role,
-                    timeout: Duration::try_from_secs_f64(timeout_secs)
-                        .map_err(|e| sc_agent::error("decidr.invalid_request_timeout", e))?,
-                    base_url: None,
-                    root,
-                    log_root: sc_agent::log_root("decidr")?,
-                    repo,
-                };
-                let run = sc_agent::Run::new(options, Some(logger.clone()), cancelled.clone())?;
                 let result = if batch {
                     let requests = text
                         .lines()
