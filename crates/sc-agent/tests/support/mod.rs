@@ -58,6 +58,13 @@ pub fn options(root: &Temp, url: &str) -> Options {
         repo: "github.com/randlee/sc-agent".into(),
     }
 }
+pub fn single_reply_options(root: &Temp, url: &str) -> Options {
+    let mut options = options(root, url);
+    // Failure-only hang guard, not a response-speed assertion; never resend to an exhausted stub.
+    options.timeout = Duration::from_secs(600);
+    options.settings.max_sends = 1;
+    options
+}
 pub fn request() -> Value {
     json!({"state":"evidence", "questions":{"q":{"type":"noul"}}})
 }

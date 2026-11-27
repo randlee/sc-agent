@@ -399,7 +399,7 @@ fn keyless_resolution_names_every_missing_key_and_redacts_the_used_one() -> Test
         401,
         json!({"error":"controlled lower refusal with nous-secret; keep this detail"}),
     )])?;
-    let mut opts = options(&root, &stub.url);
+    let mut opts = single_reply_options(&root, &stub.url);
     opts.environment = vec![("NOUS_API_KEY".into(), "nous-secret".into())];
     opts.model = "luna".into();
     let failure = send(
@@ -413,17 +413,19 @@ fn keyless_resolution_names_every_missing_key_and_redacts_the_used_one() -> Test
     .err()
     .ok_or("401 accepted")?;
     let failure = serde_json::to_value(failure)?;
-    assert_eq!(failure["id"], "http.auth");
+    let stub_outcome = stub.finish();
+    let diagnostic = format!("failure={failure}; stub={stub_outcome:?}");
+    assert_eq!(failure["id"], "http.auth", "{diagnostic}");
     let message = failure["message"].as_str().ok_or("message")?;
     assert!(
         message.contains("controlled lower refusal with [redacted]; keep this detail"),
-        "{message}"
+        "{diagnostic}"
     );
     assert!(
         message.contains("[redacted]") && !message.contains("nous-secret"),
-        "{message}"
+        "{diagnostic}"
     );
-    stub.finish()?;
+    assert_eq!(stub_outcome?.len(), 1);
     logger.shutdown()?;
     Ok(())
 }
