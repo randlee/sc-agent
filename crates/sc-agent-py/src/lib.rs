@@ -229,13 +229,27 @@ fn wait(
                     && let Ok(mut first) = callback_error.lock()
                     && first.is_none()
                 {
-                    *first = Some(invalid(error));
+                    *first = Some(sc_agent::error("sc_agent_py.callback", error));
                 }
             }
         });
     } else {
         cancel.wait(delay);
     }
+}
+fn callback_result(
+    callback_error: Mutex<Option<Error>>,
+    outcome: Result<Value, Error>,
+) -> Result<Value, Error> {
+    if let Some(mut failure) = callback_error.into_inner().map_err(invalid)? {
+        let Error::Failure { message, .. } = &mut failure;
+        message.push_str(&format!(
+            "; original outcome: {}",
+            sc_agent::result(outcome)
+        ));
+        return Err(failure);
+    }
+    outcome
 }
 fn interruptible(
     py: Python<'_>,
@@ -378,23 +392,17 @@ fn send(
         let sleep = callback(sleep)?;
         let keyring = callback(keyring_lookup)?;
         let callback_error = Mutex::new(None);
-        interruptible(py, &flag, || {
-            let result = sc_agent::send(
+        let result = interruptible(py, &flag, || {
+            sc_agent::send(
                 &value,
                 &options,
                 logger,
                 &flag,
                 &|delay| wait(delay, &sleep, &flag, &callback_error),
                 &|name| lookup(name, &keyring, &flag),
-            );
-            match callback_error.lock() {
-                Ok(mut error) => error.take().map_or(result, Err),
-                Err(_) => Err(sc_agent::error(
-                    "sc_agent_py.callback",
-                    "sleep callback error recorder poisoned",
-                )),
-            }
-        })
+            )
+        });
+        callback_result(callback_error, result)
     })
 }
 #[expect(
@@ -469,10 +477,7 @@ fn send_batch(
                 &on_result,
             )
         });
-        match callback_error.into_inner().map_err(invalid)? {
-            Some(error) => Err(error),
-            None => result,
-        }
+        callback_result(callback_error, result)
     })
 }
 #[pyfunction]
@@ -580,6 +585,36 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn callback_failure_keeps_a_later_logging_failure() -> Result<(), Box<dyn std::error::Error>> {
+        for outcome in [
+            Err(sc_agent::error("log.flush", "controlled sink refusal")),
+            Ok(
+                json!([{"index":0,"result":sc_agent::result(Err(sc_agent::error("log.flush", "controlled sink refusal")))}]),
+            ),
+        ] {
+            let failure = callback_result(
+                Mutex::new(Some(sc_agent::error(
+                    "sc_agent_py.callback",
+                    "controlled callback refusal",
+                ))),
+                outcome,
+            )
+            .err()
+            .ok_or("combined failure lost")?;
+            let value = serde_json::to_value(failure)?;
+            assert_eq!(value["id"], "sc_agent_py.callback");
+            let message = value["message"].as_str().ok_or("message absent")?;
+            for detail in [
+                "controlled callback refusal",
+                "log.flush",
+                "controlled sink refusal",
+            ] {
+                assert!(message.contains(detail), "{message}");
+            }
+        }
+        Ok(())
+    }
     #[test]
     fn respond_mapping_returns_closed_logger_failure() -> Result<(), Box<dyn std::error::Error>> {
         let root = std::env::temp_dir().join(format!("wheel-finish-{}", std::process::id()));

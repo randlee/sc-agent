@@ -447,6 +447,20 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             self.assertEqual(waits, [0.125])
             self.assertEqual(received[0][2], received[1][2])
 
+    def test_sleep_callback_failure_keeps_the_lower_message(self):
+        def rejected(_):
+            raise ValueError("controlled sleep callback refusal")
+        for batch in (False, True):
+            with self.subTest(batch=batch), server([(429, {}, {})]) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
+                send = self.api.send_batch if batch else self.api.send
+                result = send([REQUEST] if batch else REQUEST, project="contract", agent_role="contract",
+                              config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"],
+                              base_url=url, sleep=rejected)
+                error = self.error(result)
+                self.assertEqual(error["id"], "sc_agent_py.callback")
+                self.assertIn("controlled sleep callback refusal", error["message"])
+                self.assertEqual(len(received), 1)
+
     def test_busy_holdoff_is_per_host_and_exponential(self):
         entered, finished = threading.Event(), threading.Event()
         waits, completed_during_holdoff, results = [], [], []

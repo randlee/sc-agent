@@ -55,11 +55,7 @@ impl Cancel {
                 Ok(guard) => return Ok(guard),
                 Err(TryLockError::WouldBlock) => {
                     #[cfg(test)]
-                    route_tests::LOCK_WAIT.with(|hook| {
-                        if let Some(waiting) = hook.borrow_mut().take() {
-                            waiting();
-                        }
-                    });
+                    route_tests::notify(&route_tests::LOCK_WAIT);
                     std::thread::park_timeout(Duration::from_millis(20))
                 }
                 Err(TryLockError::Poisoned(e)) => return Err(error("http.network", e)),
@@ -69,11 +65,7 @@ impl Cancel {
     pub fn wait(&self, delay: Duration) {
         if let Ok(state) = self.state.lock() {
             #[cfg(test)]
-            route_tests::WAIT_ENTERED.with(|hook| {
-                if let Some(waiting) = hook.borrow_mut().take() {
-                    waiting();
-                }
-            });
+            route_tests::notify(&route_tests::WAIT_ENTERED);
             let _ = self
                 .changed
                 .wait_timeout_while(state, delay, |state| !*state);
@@ -176,40 +168,8 @@ where
     D: serde::Deserializer<'de>,
 {
     let date = String::deserialize(deserializer)?;
-    {
-        let mut parts = date.split('-');
-        let year_part = parts.next().unwrap_or_default();
-        let month_part = parts.next().unwrap_or_default();
-        let day_part = parts.next().unwrap_or_default();
-        let valid_shape = year_part.len() == 4
-            && month_part.len() == 2
-            && day_part.len() == 2
-            && parts.next().is_none()
-            && [year_part, month_part, day_part]
-                .iter()
-                .all(|part| part.bytes().all(|byte| byte.is_ascii_digit()));
-        let valid_date = if valid_shape {
-            let year = year_part.parse::<u32>().unwrap_or(0);
-            let month = month_part.parse::<u32>().unwrap_or(0);
-            let day = day_part.parse::<u32>().unwrap_or(0);
-            let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
-            let days = match month {
-                1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-                4 | 6 | 9 | 11 => 30,
-                2 if leap => 29,
-                2 => 28,
-                _ => 0,
-            };
-            day > 0 && day <= days
-        } else {
-            false
-        };
-        if !valid_date {
-            return Err(serde::de::Error::custom(
-                "released must be a YYYY-MM-DD date",
-            ));
-        }
-    }
+    serde_json::from_value::<sc_observability::Timestamp>(json!(format!("{date}T00:00:00Z")))
+        .map_err(serde::de::Error::custom)?;
     Ok(Some(date))
 }
 #[derive(Clone, Debug, Serialize)]
@@ -499,9 +459,9 @@ pub fn key(
         None => match dotenv()? {
             Some(value) => value,
             None => keyring(variable).map_err(|e| match e {
-                KeyringError::Read(_) => error(
+                KeyringError::Read(detail) => error(
                     "secrets.keyring_read",
-                    format!("The platform keyring is unavailable for {variable} (keyring detail redacted). Set {variable} in the environment or repository .env."),
+                    format!("The platform keyring is unavailable for {variable} : {detail}. Set {variable} in the environment or repository .env."),
                 ),
                 KeyringError::Timeout => error("secrets.keyring_timeout", format!("OS keychain did not answer for {variable}; it may be waiting for approval. Approve access or set {variable} in the environment or .env.")),
             })?,
@@ -671,7 +631,7 @@ mod keyring_timeout_test {
         assert!(message.contains("platform keyring is unavailable"));
         assert!(message.contains("TYPESAFE_API_KEY"));
         assert!(message.contains(".env"));
-        assert!(!message.contains("controlled refusal"));
+        assert!(message.contains("controlled refusal"));
         Ok(())
     }
 
@@ -723,8 +683,7 @@ mod keyring_timeout_test {
             assert!(message.contains("platform keyring is unavailable"));
             assert!(message.contains("TYPESAFE_API_KEY"));
             assert!(message.contains(".env"));
-            assert!(!message.contains("denied"));
-            assert!(!message.contains("missing service"));
+            assert!(message.contains(&detail), "{message}");
             assert!(
                 error["action"]
                     .as_str()
@@ -1683,12 +1642,20 @@ pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {
 #[cfg(test)]
 extern crate self as sc_agent;
 #[cfg(test)]
-#[path = "../tests/support/mod.rs"]
-pub mod test_support;
-#[cfg(test)]
-mod route_tests {
+pub mod route_tests {
     use super::*;
+    pub mod test_support {
+        include!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/support/mod.rs"));
+    }
     use test_support::*;
+    type Hook = std::cell::RefCell<Option<Box<dyn FnOnce()>>>;
+    pub(super) fn notify(hook: &'static std::thread::LocalKey<Hook>) {
+        hook.with(|hook| {
+            if let Some(waiting) = hook.borrow_mut().take() {
+                waiting();
+            }
+        });
+    }
 
     #[test]
     fn resolution_failure_keeps_every_candidate_error() -> Test {

@@ -395,7 +395,10 @@ fn keyless_resolution_names_every_missing_key_and_redacts_the_used_one() -> Test
     ] {
         assert!(message.contains(variable), "{message}");
     }
-    let stub = Stub::new(vec![http(401, json!({"echo":"nous-secret"}))])?;
+    let stub = Stub::new(vec![http(
+        401,
+        json!({"error":"controlled lower refusal with nous-secret; keep this detail"}),
+    )])?;
     let mut opts = options(&root, &stub.url);
     opts.environment = vec![("NOUS_API_KEY".into(), "nous-secret".into())];
     opts.model = "luna".into();
@@ -412,6 +415,10 @@ fn keyless_resolution_names_every_missing_key_and_redacts_the_used_one() -> Test
     let failure = serde_json::to_value(failure)?;
     assert_eq!(failure["id"], "http.auth");
     let message = failure["message"].as_str().ok_or("message")?;
+    assert!(
+        message.contains("controlled lower refusal with [redacted]; keep this detail"),
+        "{message}"
+    );
     assert!(
         message.contains("[redacted]") && !message.contains("nous-secret"),
         "{message}"
