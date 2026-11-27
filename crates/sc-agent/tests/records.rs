@@ -170,7 +170,12 @@ fn adr_sag_0021_send_and_report_return_logger_failures() -> Test {
         .err()
         .ok_or("closed logger flushed")?
         .to_string();
-    assert_eq!(failure["error"]["message"], original);
+    let message = failure["error"]["message"]
+        .as_str()
+        .ok_or("flush failure message absent")?;
+    assert!(message.contains(&original));
+    assert!(message.contains("decision.cancelled"));
+    assert!(failure["error"]["session_id"].as_str().is_some());
     let failure = sc_agent::report(
         &logger,
         Err(sc_agent::error("test.failure", "reported error")),
@@ -228,7 +233,13 @@ fn failed_general_logger_preserves_the_successful_session() -> Test {
         &no_wait,
         &keyring,
     ));
-    assert_eq!(failure["error"]["id"], "log.write");
+    assert_eq!(failure["error"]["id"], "log.flush");
+    assert!(failure["error"]["session_id"].as_str().is_some());
+    assert!(
+        failure["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("Ok("))
+    );
     assert_eq!(stub.finish()?.len(), 1);
     let sessions = rows(&root)?;
     assert_eq!(sessions.len(), 1);

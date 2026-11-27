@@ -134,6 +134,25 @@ pub fn error(id: &'static str, message: impl ToString) -> Error {
         session_id: None,
     }
 }
+fn with_session_id(error: Error, session_id: &str) -> Error {
+    match error {
+        Error::Failure {
+            id,
+            message,
+            action,
+            category,
+            attempts,
+            ..
+        } => Error::Failure {
+            id,
+            message,
+            action,
+            category,
+            attempts,
+            session_id: Some(session_id.to_owned()),
+        },
+    }
+}
 pub fn result(value: Result<Value, Error>) -> Value {
     match value {
         Ok(value) => json!({"ok":true,"value":value}),
@@ -1489,9 +1508,19 @@ pub fn send(
             .join(&options.repo)
             .join(&options.agent_role)
             .join(project);
-        let _append = SESSION_APPEND
-            .lock()
-            .map_err(|e| error("config.session", e))?;
+        let _append = match SESSION_APPEND.lock() {
+            Ok(append) => append,
+            Err(e) => {
+                let original = format!("{outcome:?}");
+                return Err(with_session_id(
+                    error(
+                        "config.session",
+                        format!("{e}; original outcome: {original}"),
+                    ),
+                    &session_id,
+                ));
+            }
+        };
         let written = (|| -> std::io::Result<()> {
             use std::io::Write;
             std::fs::create_dir_all(&path)?;
@@ -1504,13 +1533,41 @@ pub fn send(
             )
         })();
         if let Err(e) = written {
-            log(logger, "error", json!(error("log.session_write", e)))?;
+            let original = format!("{outcome:?}");
+            let failure = with_session_id(
+                error(
+                    "log.session_write",
+                    format!("{e}; original outcome: {original}"),
+                ),
+                &session_id,
+            );
+            if let Err(log_failure) = log(logger, "error", json!(failure)) {
+                outcome = Err(with_session_id(
+                    error(
+                        "log.write",
+                        format!("{log_failure}; original session error: {failure}"),
+                    ),
+                    &session_id,
+                ));
+            }
         }
     }
-    if let Ok(value) = &outcome {
-        log(logger, "decision.result", json!({"response":value}))?;
+    if let Ok(value) = &outcome
+        && let Err(e) = log(logger, "decision.result", json!({"response":value}))
+    {
+        let original = format!("{outcome:?}");
+        outcome = Err(with_session_id(
+            error("log.write", format!("{e}; original outcome: {original}")),
+            &session_id,
+        ));
     }
-    logger.flush().map_err(|e| error("log.flush", e))?;
+    if let Err(e) = logger.flush() {
+        let original = format!("{outcome:?}");
+        outcome = Err(with_session_id(
+            error("log.flush", format!("{e}; original outcome: {original}")),
+            &session_id,
+        ));
+    }
     outcome
 }
 pub fn batch(
