@@ -1,6 +1,6 @@
 # j-2 plan: the Run, on Rust, decidr and the wheel
 
-Base: sprint/j-1 @d81b1892 (gate 2404/2580). Line refs are file:line at that commit. Written by reading the code; the Rust parts were prototyped on this branch (see Budget).
+Base: sprint/j-1 @f8bb024a (gate 2404/2580). Line refs are file:line at that commit. Written by reading the code; the Rust parts were prototyped on this branch (see Budget).
 
 ## Goal
 
@@ -93,8 +93,8 @@ pub struct Run {
 }
 impl Run {
     /// The library way: runs `load` (layered config), applies the overrides (decidr.invalid_workers,
-    /// decidr.invalid_request_timeout), reads the process environment, derives log_root from `tool` (explicit `tool` wins
-    /// even with an injected logger; the logger's service name is the tool only when `tool` is empty), validates the model name once (`candidates`: types.unknown_short_name / types.unknown_provider). `None` logger: owns `default_logger(&args.tool)`.
+    /// decidr.invalid_request_timeout), reads the process environment, derives log_root from `tool` (an injected logger logs where it logs;
+    /// otherwise the default logger logs to the tool's log root), validates the model name once (`candidates`: types.unknown_short_name / types.unknown_provider). `None` logger: owns `default_logger(&args.tool)`.
     pub fn new(args: RunArgs, logger: Option<Arc<Logger>>, cancel: Arc<Cancel>) -> Result<Self, Error>;
     /// Test seam: a fully built Options (injected environment, root, log_root, repo); same defaults for wait/keyring.
     pub fn from_options(options: Options, tool: String, logger: Option<Arc<Logger>>, cancel: Arc<Cancel>) -> Result<Self, Error>;
@@ -116,7 +116,7 @@ struct ConfigEnv(String, Vec<(OsString, OsString)>);   // prefix = tool upper-ca
 ```
 For tool "decidr" behaviour is byte-for-byte what it is now (REQ-SAG-0003, REQ-SAG-0020). Replaces config() hard-coded `"decidr.json"`, `"decidr.local.json"` (lib.rs:262) and `"DECIDR_"` (:201, :209), and `load`/`doctor` copies of "decidr" (:1490). `missing_setting(tool, path)` (:142) and `Settings::project_required` (:170) build their text from `prefix(tool)` and `layers(tool)`; `Settings` gains `#[serde(skip)] pub tool: String`, set by `config`; `setting()` takes `tool`. For "decidr" the messages are byte-identical (existing config tests are the check); a tool "judge-jev" is told `JUDGE_JEV_` and `judge-jev.json`.
 
-Python `tool`: `Run(tool=...)` is required unless `general_log` is given. An explicit `tool` wins: it names the layered config and the default log root; a given `general_log` is used as passed and its service name is only the fallback tool when `tool` is absent (`logger("my-tool")` names the tool). Neither -> `sc_agent_py.invalid_option` "tool is required", stored and returned by every call; it is not logged (no logger exists). No `"decidr"` default exists in the wheel; decidr passes "decidr".
+Python `tool`: `Run(tool=...)` is required unless `general_log` is given. `tool` names the layered config and the default log root; a given `general_log` (the test path) is used as passed and logs where it logs. Neither -> `sc_agent_py.invalid_option` "tool is required", stored and returned by every call; it is not logged (no logger exists). No `"decidr"` default exists in the wheel; decidr passes "decidr".
 
 `Route` (:1038), `Jev`/`OpenAiCompat`/`AnthropicCompat`, `model_with` and every j-1 error id are unchanged; `Run::send` builds the `Route` from `self`.
 
