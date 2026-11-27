@@ -470,6 +470,7 @@ fn system_prompt_override_by_full_id() -> Test {
         opts.settings.models.insert(
             opts.model.clone(),
             sc_agent::ModelEntry {
+                released: None,
                 provider: provider.into(),
                 id: sc_agent::model(&opts.model, Some(provider))?.1,
             },
