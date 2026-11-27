@@ -191,18 +191,18 @@ Paths: default logger `<DECIDR_LOG_ROOT|~/.sc-agent>/logs/decidr.log.jsonl`; ses
 
 | | lines | basis |
 |---|---|---|
-| Restructure: sc-agent `RunArgs`, `Run`, `new`, `from_options`, close, minus send/batch parameter lists incl. the `tool` parameter of config/load/doctor (lib.rs 1315 -> 1432) | +117 | measured on this branch |
+| Restructure: sc-agent `RunArgs`, `Run`, `new`, `from_options`, close, minus send/batch parameter lists incl. the `tool` parameter of config/load/doctor (lib.rs 1315 -> 1433) | +118 | measured on this branch |
 | Restructure: decidr main.rs 144 -> 128, cli.rs 33 -> 31 | -18 | measured (decidr no longer calls load, vars_os, log_root, workers) |
 | Restructure: PyO3 lib.rs 562 -> about 450 (module send/send_batch/Cancel/capsule/options/wait/lookup out, PyRun/PyLogger in) | about -110 | estimate, not yet built |
-| **Restructure net** | **about -12** (target <= 0) | |
+| **Restructure net** | **0 counted** (rule 2: must be <= 0). Measured Rust half is +100 (+118 -18); it nets <= 0 only if the PyO3 port deletes >= 100 lines (estimate -110, unbuilt). If it does not, the dev stops and reports | |
 | New capability: `TYPESAFE` +1, `provider_keys` +5, `PyRun.sends_to` +3, `__enter__`/`__exit__` +6 | about +15 | estimate |
-| **Sprint total** | **about 2,408 / 2,500** (worst case 2,427) | |
+| **Sprint total** | **about 2,419 / 2,500** (2,404 + new capability 15; restructure counted 0) | |
 Python (uncounted by the gate): __init__.py 28 -> about 9, stubs about +30, template net <= +4, integration.py net about 0. Docs uncapped. No per-function counts.
 
 ## Done checks
 
 - Build: `RUSTUP_TOOLCHAIN=1.98.1 cargo build --workspace --locked`; `cargo clippy --workspace --all-targets --all-features -- -D warnings`; `cargo fmt --check --all`.
-- Gate: `RUSTUP_TOOLCHAIN=1.98.1 python3 scripts/gate/rewrite.py` all PASS; Rust source <= 2,404 + new capability (about 2,419); the config tests pass `tool`; fails the sprint above 2,427.
+- Gate: `RUSTUP_TOOLCHAIN=1.98.1 python3 scripts/gate/rewrite.py` all PASS; Rust source <= 2,404 + new capability (about 2,419); the config tests pass `tool`; fails the sprint above 2,419.
 - Greps: `grep -rn 'PyCapsule\|unsafe\|invalid_call\|_new_cancel' crates/sc-agent-py/src` none; `grep -n 'pub fn send(\|pub fn batch(\|provider: Option' crates/sc-agent/src crates/decidr/src` none; `grep -rn 'recv_timeout' crates/decidr/src` none; `grep -rnE 'seed_session|TestSeams|def close|Cancel' crates/sc-agent-py/python/sc_agent/*.pyi` none.
 - Rust tests (ported to `Run`; `support::run(opts, &logger)` helper): sending.rs and records.rs existing names kept; new `run_new_rejects_unknown_model_and_send_resolves_per_call` (REQ-SAG-0101), `run_close_shuts_down_only_an_owned_logger` (ANC-006), `run_timeout_and_workers_apply_to_every_call` (REQ-SAG-0702), `run_with_invalid_timeout_or_workers_is_an_error` (REQ-SAG-0702); wires.rs unchanged; decidr cli.rs: `send_provider_flag_is_a_usage_error`, `local_timeout_default_is_120_seconds`.
 - Python (`python3 -m unittest discover -s tests/contract`, loopback.py, strict pyright, `check_consumer_template.py`): existing wheel tests ported by call shape (names unchanged); new `test_run_sends_through_loopback_and_closes`, `test_run_cancel_from_on_result_cancels_the_rest`, `test_run_invalid_arguments_return_invalid_option`, `test_module_exports_only_the_run_api`, `test_run_model_errors`, `test_provider_keys_typesafe_and_run_sends_to`, `test_native_stub_declares_every_export`; integration: `test_export_uses_current_provider_variables_and_injected_lookup` (rewritten), `test_export_with_only_an_anthropic_key`, `test_export_refuses_before_writing_without_credentials`. All deterministic (stub replies on events, sleep seam, barrier).
