@@ -32,8 +32,22 @@ class IPv6ThreadingHTTPServer(ThreadingHTTPServer):
 def server(replies, respond=None, host="127.0.0.1", handled=None, errors=None):
     received = []
     lock = threading.Lock()
+    handler_lock = threading.Lock()
+    handlers_done = threading.Event()
+    handlers_done.set()
+    handler_errors = errors if errors is not None else []
+    active_handlers = 0
+
+    def handler_finished():
+        nonlocal active_handlers
+        with handler_lock:
+            active_handlers -= 1
+            if active_handlers == 0:
+                handlers_done.set()
 
     class Handler(BaseHTTPRequestHandler):
+        timeout = 5
+
         def log_message(self, *args):
             pass
 
@@ -60,28 +74,69 @@ def server(replies, respond=None, host="127.0.0.1", handled=None, errors=None):
             self.wfile.write(data)
 
     server_class = IPv6ThreadingHTTPServer if ":" in host else ThreadingHTTPServer
-    if handled is not None:
-        class ObservedServer(server_class):
-            def handle_error(self, request, client_address):
-                errors.append(traceback.format_exc())
+    class ObservedServer(server_class):
+        daemon_threads = True
 
-            def shutdown_request(self, request):
-                super().shutdown_request(request)
+        def process_request(self, request, client_address):
+            nonlocal active_handlers
+            with handler_lock:
+                active_handlers += 1
+                handlers_done.clear()
+            try:
+                super().process_request(request, client_address)
+            except BaseException:
+                handler_finished()
+                raise
+
+        def process_request_thread(self, request, client_address):
+            try:
+                super().process_request_thread(request, client_address)
+            finally:
+                handler_finished()
+
+        def handle_error(self, request, client_address):
+            handler_errors.append(traceback.format_exc())
+
+        def shutdown_request(self, request):
+            super().shutdown_request(request)
+            if handled is not None:
                 handled.set()  # The handler thread has recorded any error by now.
 
-        server_class = ObservedServer
-    http = server_class((host, 0), Handler)
-    thread = threading.Thread(target=http.serve_forever)
+    http = ObservedServer((host, 0), Handler)
+    thread = threading.Thread(target=http.serve_forever, daemon=True)
     thread.start()
     try:
         url_host = f"[{host}]" if ":" in host else host
         yield f"http://{url_host}:{http.server_port}/v1", received
     finally:
-        http.shutdown()
-        thread.join(15)
+        shutdown_failures = []
+        shutdown_errors = []
+
+        def shutdown():
+            try:
+                http.shutdown()
+            except BaseException:
+                shutdown_errors.append(traceback.format_exc())
+
+        shutdown_thread = threading.Thread(target=shutdown, daemon=True)
+        shutdown_thread.start()
+        shutdown_thread.join(15)
+        if shutdown_thread.is_alive():
+            shutdown_failures.append("http.shutdown backstop expired")
+        if shutdown_errors:
+            shutdown_failures.append("http.shutdown failed")
+        if not handlers_done.wait(15):
+            shutdown_failures.append("handlers_done.wait(15) backstop expired")
         http.server_close()
+        thread.join(15)
         if thread.is_alive():
-            raise AssertionError("contract server did not finish")
+            shutdown_failures.append("serve thread.join(15) backstop expired")
+        if shutdown_failures:
+            raise AssertionError(f"{'; '.join(shutdown_failures)}; received={received!r}; "
+                                 f"shutdown_thread_alive={shutdown_thread.is_alive()}; "
+                                 f"serve_thread_alive={thread.is_alive()}; "
+                                 f"shutdown_errors={shutdown_errors!r}; active_handlers={active_handlers}; "
+                                 f"handler_errors={handler_errors!r}")
 
 
 class Isolated(unittest.TestCase):
@@ -430,26 +485,39 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             arrived.set()
             if not release.wait(20):
                 expired.set()
+                expired_backstops.append("respond release.wait(20)")
             return 200, {}, ANSWER
         results = []
+        expired_backstops = []
         with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
             with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name,
                               general_log=self.api.logger("decidr")["value"], base_url=url, timeout_secs=60.0) as run:
                 def send():
                     results.append(run.send(json.dumps(REQUEST)))
                 call = threading.Thread(target=send, daemon=True)
+
+                def diagnostics():
+                    sessions = [path.read_text() for path in Path(self.directory.name).rglob("sessions.jsonl")]
+                    return f"received={received!r}; results={results!r}; sessions={sessions!r}"
+
                 try:
                     call.start()
-                    self.assertTrue(arrived.wait(10), f"request did not arrive; received={received!r}, results={results!r}")
+                    self.assertTrue(arrived.wait(10), f"arrived.wait(10) backstop expired; "
+                                    f"{diagnostics()}")
                     run.cancel()
                     call.join(5)
-                    self.assertFalse(call.is_alive(), f"send waited after cancel; received={received!r}, results={results!r}")
+                    self.assertFalse(call.is_alive(), f"call.join(5) backstop expired; "
+                                     f"{diagnostics()}")
                 finally:
                     run.cancel()
                     release.set()
                     if call.is_alive():
                         call.join(10)
-        self.assertFalse(expired.is_set(), f"response backstop expired; received={received!r}, results={results!r}")
+                        self.assertFalse(call.is_alive(),
+                                         f"cleanup call.join(10) backstop expired; {diagnostics()}; "
+                                         f"expired_backstops={expired_backstops!r}")
+        state = f"{diagnostics()}; expired_backstops={expired_backstops!r}"
+        self.assertFalse(expired.is_set(), f"respond release.wait(20) backstop expired; {state}")
         self.assertEqual(len(received), 1)
         self.assertEqual(len(results), 1)
         self.assertEqual(self.error(results[0])["id"], "decision.cancelled")
@@ -757,45 +825,58 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         def send(url, wait):
             with self.api.Run(tool="decidr", project="contract", agent_role="contract", config_dir=self.directory.name, general_log=logger, base_url=url, sleep=wait) as run_9:
                 return run_9.send(json.dumps(REQUEST))
+        def diagnostics():
+            sessions = [path.read_text() for path in Path(self.directory.name).rglob("sessions.jsonl")]
+            return (f"first requests={first_received!r}; second requests={second_received!r}; "
+                    f"waits={waits!r}; results={results!r}; "
+                    f"completed_during_holdoff={completed_during_holdoff!r}; sessions={sessions!r}")
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}), server(
                 [(429, {}, {}), (429, {}, {}), (200, {}, ANSWER)]) as (first, first_received), server(
                 [(200, {}, ANSWER)], host="::1") as (second, second_received):
             worker = threading.Thread(target=lambda: results.append(send(first, sleep)), daemon=True)
             worker.start()
             try:
-                self.assertTrue(entered.wait(10), "busy reply did not reach holdoff")
+                self.assertTrue(entered.wait(10),
+                                f"entered.wait(10) backstop expired; {diagnostics()}")
                 other = send(second, lambda _: None)
-                self.assertTrue(other["ok"], other)
+                self.assertTrue(other.get("ok"), f"second host result failed; {other!r}; {diagnostics()}")
             finally:
                 finished.set()
                 worker.join(15)
-        diagnostics = (f"first requests={first_received!r}; second requests={second_received!r}; "
-                       f"waits={waits!r}; results={results!r}; "
-                       f"completed_during_holdoff={completed_during_holdoff!r}")
-        self.assertFalse(worker.is_alive(), f"worker.join(15) backstop expired; {diagnostics}")
+                self.assertFalse(worker.is_alive(),
+                                 f"worker.join(15) backstop expired; {diagnostics()}")
+        state = diagnostics()
         self.assertEqual(completed_during_holdoff, [True, True],
-                         f"finished.wait(10) backstop expired; {diagnostics}")
+                         f"finished.wait(10) backstop expired; {state}")
         self.assertEqual(waits, [1, 2])
-        self.assertTrue(results[0]["ok"], results)
+        self.assertTrue(results and isinstance(results[0], dict) and results[0].get("ok"),
+                        f"first host result failed; {state}")
 
     def test_session_append_does_not_wait_for_busy_holdoff(self):
         in_flight, holding, persisted = threading.Event(), threading.Event(), threading.Event()
         observed = []
+        expired_backstops = []
         busy_replies = 0
         def respond(body):
             nonlocal busy_replies
             if body["state"] == "finished":
                 in_flight.set()
                 if not holding.wait(10):
+                    expired_backstops.append("holding.wait(10)")
                     return 500, {}, {}
                 return 200, {}, ANSWER
             if not in_flight.wait(10):
+                expired_backstops.append("in_flight.wait(10)")
                 return 500, {}, {}
             busy_replies += 1
             return (429, {}, {}) if busy_replies == 1 else (200, {}, ANSWER)
         def sleep(_):
             holding.set()
-            observed.append(persisted.wait(10))
+            if not persisted.wait(10):
+                expired_backstops.append("persisted.wait(10)")
+                observed.append(False)
+            else:
+                observed.append(True)
         def completed(index, value):
             if index == 0 and value["ok"]:
                 rows = list(Path(self.directory.name).rglob("sessions.jsonl"))
@@ -804,23 +885,32 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}), server([None] * 3, respond) as (url, received):
             with self.api.Run(tool="decidr", workers=2, project="contract", agent_role="contract", config_dir=self.directory.name, base_url=url, sleep=sleep, general_log=self.api.logger("decidr")["value"]) as run_10:
                 got = run_10.send_batch([json.dumps({**REQUEST, "state": state}) for state in ("finished", "busy")], on_result=completed)
-        self.assertTrue(got["ok"], got)
-        self.assertTrue(all(item["result"]["ok"] for item in got["value"]), got)
         sessions = [path.read_text() for path in Path(self.directory.name).rglob("sessions.jsonl")]
-        self.assertEqual(observed, [True], f"persistence backstop expired; got={got!r}; "
-                         f"received={received!r}; sessions={sessions!r}")
+        diagnostics = (f"got={got!r}; received={received!r}; observed={observed!r}; "
+                       f"expired_backstops={expired_backstops!r}; sessions={sessions!r}")
+        self.assertTrue(got.get("ok"), diagnostics)
+        self.assertFalse(expired_backstops,
+                         f"event wait backstop(s) expired: {expired_backstops!r}; {diagnostics}")
+        items = got.get("value")
+        self.assertIsInstance(items, list, diagnostics)
+        self.assertTrue(all(isinstance(item, dict) and item.get("result", {}).get("ok")
+                            for item in items), diagnostics)
+        self.assertEqual(observed, [True], f"persistence backstop expired; {diagnostics}")
 
     def test_batch_indices_and_finish_callbacks(self):
         first_started = threading.Event()
         release_first = threading.Event()
         callbacks = []
+        expired_backstops = []
 
         def respond(body):
             if body["state"] == "0":
                 first_started.set()
                 if not release_first.wait(10):
+                    expired_backstops.append("release_first.wait(10)")
                     return 500, {}, {"error": "first result was never released"}
             elif not first_started.wait(10):
+                expired_backstops.append("first_started.wait(10)")
                 return 500, {}, {"error": "workers did not overlap"}
             return 200, {}, {**ANSWER, "marker": body["state"]}
 
@@ -832,7 +922,16 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         with server([None, None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
             with self.api.Run(tool="decidr", workers=2, project="contract", agent_role="contract", config_dir=self.directory.name, base_url=url, general_log=self.api.logger("decidr")["value"]) as run_11:
                 got = run_11.send_batch([json.dumps({**REQUEST, "state": str(i)}) for i in range(2)], on_result=completed)
-        self.assertTrue(got["ok"], got)
+        sessions = [path.read_text() for path in Path(self.directory.name).rglob("sessions.jsonl")]
+        diagnostics = (f"got={got!r}; received={received!r}; callbacks={callbacks!r}; "
+                       f"expired_backstops={expired_backstops!r}; sessions={sessions!r}")
+        self.assertTrue(got.get("ok"), diagnostics)
+        items = got.get("value")
+        self.assertIsInstance(items, list, diagnostics)
+        self.assertTrue(all(isinstance(item, dict) and item.get("result", {}).get("ok")
+                            for item in items), diagnostics)
+        self.assertFalse(expired_backstops,
+                         f"batch event backstop(s) expired: {expired_backstops!r}; {diagnostics}")
         self.assertEqual([item["index"] for item in got["value"]], [0, 1])
         self.assertEqual([item["result"]["value"]["marker"] for item in got["value"]], ["0", "1"])
         self.assertEqual([index for index, _ in callbacks], [1, 0])
@@ -906,7 +1005,8 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                     got = run_13.send_batch([REQUEST] * 3)
                 finally:
                     release.set()
-        self.assertFalse(expired.is_set(), f"response backstop expired; received={received!r}, got={got!r}")
+        self.assertFalse(expired.is_set(),
+                         f"respond release.wait(20) backstop expired; received={received!r}, got={got!r}")
         self.assertTrue(got["ok"], got)
         self.assertEqual(len(received), 1)
         self.assertEqual([self.error(item["result"])["id"] for item in got["value"]], ["decision.cancelled"] * 3)
@@ -1198,6 +1298,7 @@ class Cli(Isolated):
                     process = subprocess.Popen([str(binary), "--config-dir", folder, "send", "--model", "laya",
                                                  "--agent-role", "contract", "--batch", "--workers", "1"],
                                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=folder, env=env)
+                    stdout = stderr = ""
                     try:
                         try:
                             stdout, stderr = process.communicate("\n".join([json.dumps(REQUEST)] * 3), timeout=20)
@@ -1216,7 +1317,14 @@ class Cli(Isolated):
                         try:
                             if process.poll() is None:
                                 process.kill()
-                                process.wait(timeout=5)
+                                try:
+                                    process.wait(timeout=5)
+                                except subprocess.TimeoutExpired as deadline:
+                                    sessions = [path.read_text() for path in Path(folder).rglob("sessions.jsonl")]
+                                    self.fail(f"{interrupt.name} process.wait(timeout=5) backstop expired; "
+                                              f"sessions={sessions!r}; received={received!r}; "
+                                              f"stdout={deadline.output or stdout!r}; "
+                                              f"stderr={deadline.stderr or stderr!r}")
                         finally:
                             try:
                                 for pipe in (process.stdin, process.stdout, process.stderr):
@@ -1225,10 +1333,12 @@ class Cli(Isolated):
                             finally:
                                 release.set()
                 self.assertTrue(handled.wait(20),
-                                f"{interrupt.name} handler did not finish; "
+                                f"{interrupt.name} handled.wait(20) backstop expired; "
                                 f"received={received!r}; stdout={stdout!r}; stderr={stderr!r}")
+                sessions = [path.read_text() for path in Path(folder).rglob("sessions.jsonl")]
                 self.assertFalse(expired.is_set(),
-                                 f"{interrupt.name} response backstop expired; "
+                                 f"{interrupt.name} respond release.wait(40) backstop expired; "
+                                 f"sessions={sessions!r}; "
                                  f"received={received!r}; stdout={stdout!r}; stderr={stderr!r}")
                 self.assertEqual(server_errors, [])
                 self.assertNotEqual(process.returncode, 0, stdout + stderr)
