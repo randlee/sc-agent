@@ -1,14 +1,5 @@
 # j-1 signatures v2 (spec; items and counts in j-1-signatures.json)
 
-## Numbers (gate: `scripts/gate/rewrite.py`, cap 2,580)
-| | lines |
-|---|---|
-| Restructure (Decision path, shared transport, tables, send/batch, dedup of consumers) | -77, counted 0 (rule 2) |
-| New capability: Llm trait and impls (+53) and units O4/O5 (+62) | grows the total |
-| Measured on sprint/j-1 | Rust source 2,402 / 2,580 |
-
-`llm query` and `--resume` do not exist; they are not in this spec.
-
 ## Deliverables
 1. J1-S02: struct fields append, in this order, after `local`:
 2. J1-S03: const rows append in order: "max_sends", "decidr.luna-system-prompt", "
@@ -50,19 +41,6 @@ Exact code for each: the dev bead agt-j-1.group-dev Signatures and design "Publi
 - The template: j-4.
 - `event()` (split of `log`): j-3, its only user (session sinks).
 - REQ-SAG-0503's catalog comparison: not in phase j.
-
-## Before/after (hardcoded construct -> trait replacement)
-| Construct (file:line @8f68424a) | Lines | Replacement | Lines |
-|---|---|---|---|
-| wire() lib.rs:879-908 and response() 909-937 | 59 | Jev/Decision impls S17-S18 + ask S16 | 9+10+23 = 42 |
-| per-wire body/reply for Llm (was inside wire/response) | (in the 59) | B04 B05 B06 (+B01..B03) | 53 (class B) |
-| send() 957-1229 incl. loop, provider-name header choice, 2 hand-built Failure literals | 273 | send S20 + post S19 | 113 + 114 = 227 |
-| six inline cancel checks (977,1042,1047,1078,1174,1184) | 18 | Cancel::check S21 + 6 call sites | 6 + 6 |
-| cancel-polling recv loop lib.rs:1077-1087 + decidr main.rs:78-93 | 11 + 16 | Cancel::recv S22 | 9 |
-| repo+config copies: doctor 1326-1337, decidr 41-49, py 158-171 | 12+9+14 | load() S24 + doctor S25 | 14 + 4 |
-| provider-name list lib.rs:719 | 1 | Provider.open S07-S09 | 1 + 1 + 7 |
-| CliModelError and dead accessors, docli_from_clap.rs:13-34, 88-114 | 54 | deleted S28 | 0 |
-Config additions required by records (not replacements): Settings +2, KEYS +3, init +2, check +3, imports +5.
 
 ## Behaviour changes the owner should know (none is pinned by a test or record I could find)
 1. attempts is set on every failure after at least one send (and on cancel); before only on http failures and cancel. REQ-SAG-0016 says "when they apply".
@@ -613,7 +591,7 @@ index ff7573a2..aa55fc56 100644
 ```
 
 ## Unresolved owner decisions
-1. The behaviour changes above (1-6). 2. Key name max_sends. 3. Prompt key by typed name, else resolved id. 4. (settled: typed Wire enum, no string dispatch in send()). 5. Whether to keep the docli dead-code deletion (outside sc-agent). 6. Cache hash definition (O3) and Run vs ADR-0001 (O1). 7. ANC-009 CLI half is j-2.
+1. The behaviour changes above (1-6). 2. Key name max_sends. 3. Prompt key by typed name, else the resolved row's short name. 4. Whether to keep the docli dead-code deletion (outside sc-agent). 5. Cache hash definition (O3) and Run vs ADR-0001 (O1). 6. ANC-009 CLI half is j-2.
 
 ## Units O4/O5 (owner rulings 2026-11-24; placement: lead decision)
 Both are new capability, counted separately from the -77 restructure. Code lands on sprint/j-1 @b4be55e6 and is updated in place. Items are in scratchpad/phase-j/j-1-o45-beads.json (one per public-surface item).
@@ -642,8 +620,8 @@ config_and_values.rs: `config_local_endpoints` (decider keys decode into Setting
 Python: tests/contract/test_integration.py `test_export_requires_one_of_typesafe_anthropic_nous` and the updated export test; test_contract.py laya fixtures without "model".
 Gate: `cargo test --workspace --all-features` (1.98.1), `cargo fmt --check`, `cargo clippy ... -D warnings`, `pytest tests/contract`, `python3 scripts/gate/rewrite.py` (Rust source lines N/2580; every push).
 
-### Budget (against 2,580; j-1 at 2342; new capability, restructure unchanged at -77)
-Estimated before building: O4 +19, O5 +35 (+54, 2396). Measured on sprint/j-1 after the build, rewrite.py: Rust source 2402/2580 (+62 for O4+O5 together; the 8 over the estimate is the explicit single-candidate shortcut and the key_missing name list in resolve). scripts/integration.py and the Python tests are not counted by the gate.
+### Budget (against 2,580)
+Measured on sprint/j-1 after the build, rewrite.py: Rust source 2402/2580 (O4+O5 are +62). scripts/integration.py and the Python tests are not counted by the gate.
 
 ## Signatures (closed list)
 
@@ -1040,7 +1018,7 @@ impl Llm for AnthropicCompat<'_> {
 ```
 Replaces: (new) 
 Deletes: nothing
-Body rule: max_tokens is the Messages API's required field, set to the maximum output the row's model documents (a provider limit, not an sc-agent cap; rule 0); system top-level; schema as output_config.format; text at /content/0/text.
+Body rule: max_tokens is the Messages API's required field, set to the one constant ANTHROPIC_MAX_TOKENS (a provider limit, not an sc-agent cap; rule 0); system top-level; schema as output_config.format; text at /content/0/text.
 Test: anthropic_compat_call_returns_the_json_the_model_wrote
 Requirement: ['ANC-013']
 Source: scratchpad/j-1-signatures.md; starting code on sprint/j-1 @b4be55e6.
@@ -1246,7 +1224,7 @@ Source: plan-qa-4 finding applied to scratchpad/j-1-signatures.md; code sprint/j
 Release check: decider requests carry the row's model id (REQ-SAG-0103 MUST); confirm with one live POST to the decider server before release (llama note j1-bead.txt:430-433 says it needs model omitted).
 
 ## Tests (exact code; all deterministic, loopback Stub, no_wait injected, no sleeps)
-tests/support/mod.rs options(): add `max_sends: 5,` and `decidr: Default::default(),` after `laya: None,` (no import).
+tests/support/mod.rs options(): add `max_sends: 5,` and `decidr: Default::default(),` after `local: Default::default(),` (no import).
 A test builds a Route directly with `with_route` (in wires.rs below): model_with resolves (provider, name), then a Route literal over the Stub url, Cancel::default(), &no_wait, &keyring, and a local Cell for sends.
 tests/wires.rs (new file, complete):
 ```rust
