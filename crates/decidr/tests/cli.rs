@@ -3,8 +3,11 @@ mod cli;
 use clap::Parser;
 use std::{
     fs,
+    io::Read,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
+    sync::{Arc, Mutex, mpsc},
+    time::{Duration, Instant},
 };
 
 fn isolated_command(command: &mut Command, root: &Path) {
@@ -101,19 +104,66 @@ fn local_timeout_default_is_120_seconds() -> Result<(), Box<dyn std::error::Erro
             "--nocapture",
         ]);
         isolated_command(&mut command, &root);
-        let output = command
+        let mut child = command
             .env("SC_AGENT_DEFAULT_TIMEOUT_CHILD", "1")
-            .output()?;
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+        let stdout = child.stdout.take().ok_or("missing stdout")?;
+        let stderr = child.stderr.take().ok_or("missing stderr")?;
+        let captured = Arc::new(Mutex::new([Vec::new(), Vec::new()]));
+        let (done, observed) = mpsc::channel();
+        for (index, mut pipe) in [
+            (0, Box::new(stdout) as Box<dyn Read + Send>),
+            (1, Box::new(stderr) as Box<dyn Read + Send>),
+        ] {
+            let captured = captured.clone();
+            let done = done.clone();
+            std::thread::spawn(move || {
+                let result = (|| -> Result<(), String> {
+                    let mut buffer = [0; 4096];
+                    loop {
+                        let count = pipe.read(&mut buffer).map_err(|e| e.to_string())?;
+                        if count == 0 {
+                            return Ok(());
+                        }
+                        captured.lock().map_err(|e| e.to_string())?[index]
+                            .extend_from_slice(&buffer[..count]);
+                    }
+                })();
+                let _ = done.send(result);
+            });
+        }
+        drop(done);
+        // Failure-only hang guard; the default timeout is inspected, never waited out.
+        let deadline = Instant::now() + Duration::from_secs(30);
+        for _ in 0..2 {
+            match observed.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+                Ok(Ok(())) => {}
+                failure => {
+                    let killed = child.kill();
+                    let reaped = child.wait();
+                    let captured = captured.lock().map_err(|e| e.to_string())?;
+                    return Err(format!(
+                        "child output backstop/read failure: {failure:?}; kill={killed:?}; wait={reaped:?}\nstdout:\n{}\nstderr:\n{}",
+                        String::from_utf8_lossy(&captured[0]),
+                        String::from_utf8_lossy(&captured[1]),
+                    ).into());
+                }
+            }
+        }
+        let status = child.wait()?;
+        let captured = captured.lock().map_err(|e| e.to_string())?;
         assert!(
-            output.status.success(),
+            status.success(),
             "child test failed:\n{}\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
+            String::from_utf8_lossy(&captured[0]),
+            String::from_utf8_lossy(&captured[1])
         );
         assert!(
-            String::from_utf8_lossy(&output.stdout).contains("1 passed"),
+            String::from_utf8_lossy(&captured[0]).contains("1 passed"),
             "child did not report one passing test:\n{}",
-            String::from_utf8_lossy(&output.stdout)
+            String::from_utf8_lossy(&captured[0])
         );
         return Ok(());
     }
