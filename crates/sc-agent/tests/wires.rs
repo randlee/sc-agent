@@ -1,7 +1,7 @@
 pub mod support;
 use sc_agent::{
     AnthropicCompat, Cancel, DEFAULT_SYSTEM_PROMPT, Decision, Jev, Llm, LlmRequest, OpenAiCompat,
-    Options, Route, Runner, model_with, result, send,
+    Options, Route, Runner, result,
 };
 use serde_json::{Value, json};
 use std::cell::Cell;
@@ -26,7 +26,7 @@ fn with_route<T>(
     base: &str,
     run: impl Fn(&Route<'_>) -> T,
 ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-    let (provider, model) = model_with(name, Some(provider), &Default::default())?;
+    let (provider, model) = pinned_model(provider, name)?;
     let sends = Cell::new(0);
     let route = Route {
         options,
@@ -36,7 +36,9 @@ fn with_route<T>(
         cancel: &Cancel::default(),
         wait: &no_wait,
         keyring: &keyring,
+        key: None,
         sends: &sends,
+        holdoffs: &sc_agent::Holdoffs::default(),
     };
     Ok(run(&route))
 }
@@ -70,10 +72,7 @@ fn non_decision_llm_selected_by_short_name_returns_the_json_the_model_wrote() ->
     assert_eq!(reply, json!({"a":1}));
     let seen = stub.finish()?;
     assert_eq!(seen.len(), 1);
-    assert_eq!(
-        seen[0].body["model"],
-        model_with("sol", Some("openai"), &Default::default())?.1
-    );
+    assert_eq!(seen[0].body["model"], pinned_model("openai", "sol")?.1);
     assert_eq!(seen[0].path, "/v1/chat/completions");
     assert_eq!(
         seen[0].body["messages"],
@@ -137,16 +136,13 @@ fn luna_and_haiku_send_the_default_then_the_configured_system_prompt() -> Test {
             let mut opts = options(&root, &stub.url);
             opts.model = model.into();
             if let Some(prompt) = configured {
-                opts.settings.decidr.insert(text.into(), prompt.into());
+                opts.settings.values["decidr"][text] = json!(prompt);
             }
-            let value = send(
-                &request(),
-                &opts,
-                &logger,
-                &Cancel::default(),
-                &no_wait,
-                &keyring,
-            )?;
+            let value = {
+                let run = run(opts.clone(), &logger)?;
+
+                run.send(&request())
+            }?;
             assert_eq!(value["answers"], answer()["answers"]);
             let body = &stub.finish()?[0].body;
             let system = if model == "luna" {
@@ -170,14 +166,11 @@ fn decide_over_an_llm_rejects_an_answer_of_the_wrong_type() -> Test {
     let stub = Stub::new(vec![http(200, raw)])?;
     let mut opts = options(&root, &stub.url);
     opts.model = "luna".into();
-    let failure = result(send(
-        &request(),
-        &opts,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    ));
+    let failure = result({
+        let run = run(opts.clone(), &logger)?;
+
+        run.send(&request())
+    });
     assert_eq!(failure["error"]["id"], "decision.schema_mismatch");
     let _ = stub.finish()?;
     logger.shutdown()?;
@@ -191,15 +184,12 @@ fn max_sends_setting_limits_the_sends_of_one_request() -> Test {
     let busy = || http(502, json!({"error":"busy"}));
     let stub = Stub::new(vec![busy(), busy()])?;
     let mut opts = options(&root, &stub.url);
-    opts.settings.max_sends = 2;
-    let failure = result(send(
-        &request(),
-        &opts,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    ));
+    opts.settings.values["max_sends"] = json!(2);
+    let failure = result({
+        let run = run(opts.clone(), &logger)?;
+
+        run.send(&request())
+    });
     assert_eq!(failure["error"]["id"], "http.provider_busy");
     assert_eq!(failure["error"]["attempts"], 2);
     assert_eq!(stub.finish()?.len(), 2);
@@ -245,14 +235,11 @@ fn runner(stub: &Stub) -> Result<Runner, Box<dyn std::error::Error + Send + Sync
 }
 fn sent(root: &Temp, opts: &Options) -> Result<Value, sc_agent::Error> {
     let logger = logger(root).map_err(|e| sc_agent::error("config.logger", e))?;
-    let reply = send(
-        &request(),
-        opts,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    );
+    let reply = {
+        let run = run(opts.clone(), &logger)?;
+
+        run.send(&request())
+    };
     logger
         .shutdown()
         .map_err(|e| sc_agent::error("config.logger", e))?;
@@ -271,7 +258,7 @@ fn local_endpoints() -> Test {
         let mut opts = options(&root, "");
         opts.base_url = None;
         opts.model = model.into();
-        opts.settings.local.insert(name.into(), runner(&stub)?);
+        opts.settings.values[name] = json!(runner(&stub)?);
         sent(&root, &opts)?;
         let seen = stub.finish()?;
         assert_eq!(seen[0].path, "/v1/systemone");
@@ -283,13 +270,10 @@ fn local_endpoints() -> Test {
     let root = Temp::new()?;
     let mut opts = options(&root, "");
     opts.model = "decider-2b-v11".into();
-    opts.settings.local.insert(
-        "decider_4b".into(),
-        Runner {
-            host: "h".into(),
-            port: 1,
-        },
-    );
+    opts.settings.values["decider_4b"] = json!(Runner {
+        host: "h".into(),
+        port: 1,
+    });
     let failure = sent(&root, &opts).err().ok_or("unset runner sent")?;
     let failure = serde_json::to_value(failure)?;
     assert_eq!(failure["id"], "config.missing_setting");
@@ -374,14 +358,12 @@ fn keyless_resolution_names_every_missing_key_and_redacts_the_used_one() -> Test
     opts.model = "haiku".into();
     let logger = logger(&root)?;
     let empty = |_: &str| Ok(String::new());
-    let failure = send(
-        &request(),
-        &opts,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &empty,
-    )
+    let failure = {
+        let mut run = run(opts.clone(), &logger)?;
+
+        run.keyring = Box::new(empty);
+        run.send(&request())
+    }
     .err()
     .ok_or("sent without a key")?;
     let failure = serde_json::to_value(failure)?;
@@ -402,14 +384,12 @@ fn keyless_resolution_names_every_missing_key_and_redacts_the_used_one() -> Test
     let mut opts = single_reply_options(&root, &stub.url);
     opts.environment = vec![("NOUS_API_KEY".into(), "nous-secret".into())];
     opts.model = "luna".into();
-    let failure = send(
-        &request(),
-        &opts,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &empty,
-    )
+    let failure = {
+        let mut run = run(opts.clone(), &logger)?;
+
+        run.keyring = Box::new(empty);
+        run.send(&request())
+    }
     .err()
     .ok_or("401 accepted")?;
     let failure = serde_json::to_value(failure)?;
@@ -483,10 +463,12 @@ fn system_prompt_override_by_full_id() -> Test {
         let stub = Stub::new(vec![http(200, raw)])?;
         let mut opts = options(&root, &stub.url);
         opts.model = model.into();
-        opts.provider = Some(provider.into());
-        opts.settings
-            .decidr
-            .insert(key.into(), "full-id prompt".into());
+        opts.settings.values["models"][opts.model.clone()] = json!(sc_agent::ModelEntry {
+            released: None,
+            provider: provider.into(),
+            id: pinned_model(provider, &opts.model)?.1,
+        });
+        opts.settings.values["decidr"][key] = json!("full-id prompt");
         assert_eq!(sent(&root, &opts)?["answers"], answer()["answers"]);
         let seen = stub.finish()?;
         assert_eq!(seen[0].body.pointer(at), Some(&json!("full-id prompt")));
@@ -499,7 +481,7 @@ fn body_read_failure_is_resent() -> Test {
     let root = Temp::new()?;
     let stub = Stub::new(vec![Reply::Truncated, Reply::Truncated])?;
     let mut opts = options(&root, &stub.url);
-    opts.settings.max_sends = 2;
+    opts.settings.values["max_sends"] = json!(2);
     let failure = result(sent(&root, &opts));
     assert_eq!(failure["error"]["id"], "http.network");
     assert_eq!(failure["error"]["attempts"], 2);
@@ -520,25 +502,28 @@ fn configurable_send_count_does_not_overflow_the_backoff() -> Test {
             .collect(),
     )?;
     let mut opts = options(&root, &stub.url);
-    opts.settings.max_sends = 66;
-    let waits = Mutex::new(Vec::new());
-    let failure = result(send(
-        &request(),
-        &opts,
-        &logger,
-        &Cancel::default(),
-        &|delay| {
+    opts.settings.values["max_sends"] = json!(66);
+    let waits = std::sync::Arc::new(Mutex::new(Vec::new()));
+    let failure = result({
+        let mut run = run(opts.clone(), &logger)?;
+
+        let waits = waits.clone();
+        run.wait = Box::new(move |delay| {
             if let Ok(mut waits) = waits.lock() {
                 waits.push(delay);
             }
             Ok(())
-        },
-        &keyring,
-    ));
+        });
+
+        run.send(&request())
+    });
     assert_eq!(failure["error"]["id"], "http.provider_busy");
     assert_eq!(failure["error"]["attempts"], 66);
     assert_eq!(stub.finish()?.len(), 66);
-    let waits = waits.into_inner().map_err(|_| "waits recorder poisoned")?;
+    let waits = waits
+        .lock()
+        .map(|v| v.clone())
+        .map_err(|_| "waits recorder poisoned")?;
     assert_eq!(waits.len(), 65);
     assert_eq!(waits.last(), Some(&Duration::from_secs(u64::MAX)));
     assert!(waits.windows(2).all(|pair| pair[0] < pair[1]));
@@ -555,7 +540,7 @@ fn redirect_never_forwards_the_api_key_to_another_endpoint() -> Test {
     )])?;
     let source = Stub::new(vec![Reply::Redirect(target.url.clone())])?;
     let mut opts = options(&root, &source.url);
-    opts.settings.max_sends = 1;
+    opts.settings.values["max_sends"] = json!(1);
     let outcome = with_route(&opts, ("anthropic", "haiku"), &source.url, |route| {
         AnthropicCompat(route).call(&llm_request())
     })?;
@@ -602,9 +587,7 @@ fn llm_decision_backends_reject_answers_outside_the_requested_schema() -> Test {
         for (provider, model) in [("openai", "luna"), ("anthropic", "haiku")] {
             let root = Temp::new()?;
             let reply = json!({"answers":{"q":answer}}).to_string();
-            let wire = model_with(model, Some(provider), &Default::default())?
-                .0
-                .wire;
+            let wire = pinned_model(provider, model)?.0.wire;
             let raw = match wire {
                 sc_agent::Wire::Messages => json!({"content":[{"type":"text","text":reply}]}),
                 sc_agent::Wire::Chat => json!({"choices":[{"message":{"content":reply}}]}),
@@ -629,5 +612,34 @@ fn llm_decision_backends_reject_answers_outside_the_requested_schema() -> Test {
 fn stub_shutdown_wakes_a_worker_with_unserved_replies() -> Test {
     let stub = Stub::new(vec![http(200, answer()), http(200, answer())])?;
     assert!(stub.finish()?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn configured_model_prompt_reaches_the_provider() -> Test {
+    for model in ["custom-alias", "custom.full/id"] {
+        let root = Temp::new()?;
+        let raw = json!({"choices":[{"message":{"content":answer().to_string()}}]});
+        let stub = Stub::new(vec![http(200, raw)])?;
+        let mut opts = single_reply_options(&root, &stub.url);
+        std::fs::write(
+            root.0.join("decidr.json"),
+            json!({
+                "project":"phase-b", "max_sends":1,
+                "models":{model:{"provider":"openai","id":"custom-wire-id"}},
+                "decidr":{format!("{model}-system-prompt"):"configured instruction"}
+            })
+            .to_string(),
+        )?;
+        opts.settings = sc_agent::config("decidr", None, Some(&root.0), &[], None, &[])?.config;
+        opts.model = model.into();
+        assert_eq!(sent(&root, &opts)?["answers"], answer()["answers"]);
+        let seen = stub.finish()?;
+        assert_eq!(seen[0].body["model"], "custom-wire-id");
+        assert_eq!(
+            seen[0].body["messages"][0]["content"],
+            "configured instruction"
+        );
+    }
     Ok(())
 }

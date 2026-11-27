@@ -54,3 +54,10 @@ Names come from the Rust provider table. At least one of TYPESAFE_API_KEY, ANTHR
 (haiku and luna need no TypeSafe key); every available key is written to a new mode-0600 file outside the checkout and never printed.
 Existing files are not overwritten. Delete the temporary file after the run;
 never commit it. The exporter does not build wheels, run suites or render reports.
+
+For a candidate exposing the Run API, consumer checks select `haiku` or `luna`
+without `TYPESAFE_API_KEY`. Use `with sc_agent.Run(tool=..., model=..., project=...,
+agent_role=...) as run` and inspect `run.sends_to(sc_agent.TYPESAFE)` for TypeSafe
+consent. Timeout and workers belong to that Run. Credential export accepts any
+keyed provider returned by `decidr models` and exits 2 before writing when none
+are available. Live calls remain owner-attended through the consumer suites above.

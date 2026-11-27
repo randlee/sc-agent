@@ -1,12 +1,12 @@
 use pyo3::{
+    exceptions::{PyKeyboardInterrupt, PyRuntimeError},
     prelude::*,
-    types::{PyCFunction, PyCapsule, PyDict, PyTuple},
+    types::{PyCFunction, PyDict, PyTuple},
 };
 use sc_agent::{Error, error};
 use sc_observability::v2::Logger;
 use serde_json::{Value, json};
 use std::{
-    ffi::CStr,
     path::PathBuf,
     sync::{Arc, Mutex, mpsc},
     time::Duration,
@@ -33,26 +33,30 @@ fn raw(py: Python<'_>, value: Value) -> Py<PyAny> {
         // REQ-SAG-0002: a result Python cannot load comes back as an error value
         // carrying the loader's message and the whole result text, never as None.
         Err(e) => {
-            let failure = sc_agent::error("sc_agent_py.result_load", format!("{e}: {value}"));
+            let failure = sc_agent::result(Err(sc_agent::error(
+                "sc_agent_py.result_load",
+                format!("{e}: {value}"),
+            )));
             let fields = PyDict::new(py);
-            let detail = PyDict::new(py);
-            let Error::Failure {
-                id,
-                message,
-                action,
-                category,
-                ..
-            } = failure;
-            for (key, text) in [
-                ("id", id),
-                ("message", message.as_str()),
-                ("action", action),
-                ("category", category),
-            ] {
-                let _ = detail.set_item(key, text);
+            if let Some(envelope) = failure.as_object() {
+                for (key, value) in envelope {
+                    match value {
+                        Value::Bool(value) => {
+                            let _ = fields.set_item(key, value);
+                        }
+                        Value::Object(values) => {
+                            let detail = PyDict::new(py);
+                            for (key, value) in values {
+                                if let Some(value) = value.as_str() {
+                                    let _ = detail.set_item(key, value);
+                                }
+                            }
+                            let _ = fields.set_item(key, detail);
+                        }
+                        _ => {}
+                    }
+                }
             }
-            let _ = fields.set_item("ok", false);
-            let _ = fields.set_item("error", detail);
             fields.into_any().unbind()
         }
     }
@@ -65,33 +69,30 @@ fn required<'a, 'py>(value: Option<&'a Bound<'py, PyAny>>) -> Result<&'a Bound<'
 fn text(value: Option<&Bound<'_, PyAny>>) -> Result<String, Error> {
     required(value)?.extract().map_err(invalid)
 }
-fn handle<T: Send + Sync + 'static>(
-    value: &Bound<'_, PyAny>,
-    name: &CStr,
-) -> Result<Arc<T>, Error> {
-    let pointer = value
-        .cast::<PyCapsule>()
-        .map_err(invalid)?
-        .pointer_checked(Some(name))
-        .map_err(invalid)?
-        .cast::<Arc<T>>();
-    // The checked capsule is created in this extension with exactly Arc<T>.
-    Ok(unsafe { pointer.as_ref() }.clone())
+#[pyclass(name = "Logger", frozen)]
+struct PyLogger(Arc<Logger>);
+fn logger_of(value: &Bound<'_, PyAny>) -> Result<Arc<Logger>, Error> {
+    value
+        .extract::<PyRef<'_, PyLogger>>()
+        .map(|v| v.0.clone())
+        .map_err(invalid)
 }
-fn capsule<T: Send + Sync + 'static>(
-    py: Python<'_>,
-    value: T,
-    name: &'static CStr,
-) -> Result<Py<PyAny>, Error> {
-    let result = PyDict::new(py);
-    result.set_item("ok", true).map_err(invalid)?;
-    result
-        .set_item(
-            "value",
-            PyCapsule::new_with_value(py, Arc::new(value), name).map_err(invalid)?,
-        )
-        .map_err(invalid)?;
-    Ok(result.into_any().unbind())
+fn logger_for(given: Option<&Bound<'_, PyAny>>, name: &str) -> Result<Arc<Logger>, Error> {
+    match given.filter(|value| !value.is_none()) {
+        Some(value) => logger_of(value),
+        None => sc_agent::default_logger(name).map(Arc::new),
+    }
+}
+fn respond_error(given: Option<&Bound<'_, PyAny>>, name: &str, original: Error) -> Value {
+    match logger_for(given, name) {
+        Ok(logger) => {
+            let value = sc_agent::report(&logger, Err(original));
+            finish(&logger, given.is_none_or(|value| value.is_none()), value)
+        }
+        Err(failure) => {
+            sc_agent::after_failure(sc_agent::result(Err(original)), Err(failure), "log.write")
+        }
+    }
 }
 fn respond(
     py: Python<'_>,
@@ -99,80 +100,79 @@ fn respond(
     name: &str,
     run: impl FnOnce(&Logger) -> Result<Value, Error>,
 ) -> Py<PyAny> {
+    raw(py, respond_value(given, name, run))
+}
+fn respond_value(
+    given: Option<&Bound<'_, PyAny>>,
+    name: &str,
+    run: impl FnOnce(&Logger) -> Result<Value, Error>,
+) -> Value {
     let owned = given.is_none_or(|v| v.is_none());
-    let logger = match given.filter(|v| !v.is_none()) {
-        Some(value) => handle::<Logger>(value, c"sc_agent.Logger"),
-        None => sc_agent::default_logger(name).map(Arc::new),
-    };
+    let logger = logger_for(given, name);
     match logger {
-        Err(error) => raw(py, sc_agent::result(Err(error))),
+        Err(error) => sc_agent::result(Err(error)),
         Ok(logger) => {
             let value = sc_agent::report(&logger, run(&logger));
-            raw(py, finish(&logger, owned, value))
+            finish(&logger, owned, value)
         }
     }
 }
-fn finish(logger: &Logger, owned: bool, value: Value) -> Value {
-    match (
-        logger.flush(),
-        if owned { logger.shutdown() } else { Ok(()) },
-    ) {
-        (Err(e), _) => sc_agent::result(Err(error("log.flush", e))),
-        (Ok(()), shutdown) => sc_agent::after_shutdown(value, shutdown),
+fn finish(logger: &Logger, owned: bool, mut value: Value) -> Value {
+    value = sc_agent::after_failure(value, logger.flush(), "log.flush");
+    if owned {
+        value = sc_agent::after_failure(value, logger.shutdown(), "log.shutdown");
     }
+    value
 }
-fn option<T: for<'a, 'py> FromPyObject<'a, 'py>>(
-    named: &[(&str, Option<&Bound<'_, PyAny>>)],
-    key: &str,
+
+fn arg<T: for<'a, 'py> FromPyObject<'a, 'py>>(
+    value: Option<&Bound<'_, PyAny>>,
+    name: &str,
 ) -> Result<Option<T>, Error> {
-    named
-        .iter()
-        .find(|(name, _)| *name == key)
-        .and_then(|(_, v)| *v)
+    value
         .filter(|v| !v.is_none())
         .map(|v| {
-            v.extract::<T>().map_err(|error| {
-                let error: PyErr = error.into();
-                invalid(format!("invalid {key}: {error}"))
+            v.extract::<T>().map_err(|e| {
+                let e: PyErr = e.into();
+                invalid(format!("invalid {name}: {e}"))
             })
         })
         .transpose()
 }
-fn options(
-    named: &[(&str, Option<&Bound<'_, PyAny>>)],
-    logger: &Logger,
-) -> Result<sc_agent::Options, Error> {
-    let timeout =
-        Duration::try_from_secs_f64(option::<f64>(named, "timeout_secs")?.unwrap_or(120.0))
-            .map_err(|e| error("decidr.invalid_request_timeout", e))?;
-    let workers = option::<i64>(named, "workers")?
-        .map(sc_agent::workers)
-        .transpose()?;
-    let agent_role =
-        option::<String>(named, "agent_role")?.ok_or_else(|| invalid("agent_role is required"))?;
-    let model = option::<String>(named, "model")?.unwrap_or_else(|| "jev".into());
-    let provider = option::<String>(named, "provider")?;
-    let global = option::<String>(named, "config_dir")?.map(PathBuf::from);
-    let project = option::<String>(named, "project")?;
-    let (loaded, root, repo) = sc_agent::load(global.as_deref(), project.as_deref())?;
-    let mut settings = loaded.config;
-    sc_agent::model_with(&model, provider.as_deref(), &settings.models)?;
-    if let Some(workers) = workers {
-        settings.workers = workers;
+fn bind<'py>(
+    args: &Bound<'py, PyTuple>,
+    kwargs: Option<&Bound<'py, PyDict>>,
+    positional: &[&str],
+    keyword_only: &[&str],
+) -> Result<Vec<Option<Bound<'py, PyAny>>>, Error> {
+    if args.len() > positional.len() {
+        return Err(invalid("unexpected positional arguments"));
     }
-    let log_root = sc_agent::log_root(logger.service_name().as_str())?;
-    Ok(sc_agent::Options {
-        environment: std::env::vars_os().collect(),
-        settings,
-        model,
-        provider,
-        agent_role,
-        timeout,
-        base_url: option(named, "base_url")?,
-        root,
-        repo,
-        log_root,
-    })
+    let mut values = Vec::with_capacity(positional.len() + keyword_only.len());
+    for (index, name) in positional.iter().chain(keyword_only).enumerate() {
+        let positional_value = (index < positional.len() && index < args.len())
+            .then(|| args.get_item(index))
+            .transpose()
+            .map_err(invalid)?;
+        let named_value = kwargs
+            .map(|kwargs| kwargs.get_item(name))
+            .transpose()
+            .map_err(invalid)?
+            .flatten();
+        if positional_value.is_some() && named_value.is_some() {
+            return Err(invalid(format!("multiple values for argument '{name}'")));
+        }
+        values.push(positional_value.or(named_value));
+    }
+    if let Some(kwargs) = kwargs {
+        for (key, _) in kwargs.iter() {
+            let name = key.extract::<String>().map_err(invalid)?;
+            if !positional.contains(&name.as_str()) && !keyword_only.contains(&name.as_str()) {
+                return Err(invalid(format!("unexpected argument '{name}'")));
+            }
+        }
+    }
+    Ok(values)
 }
 fn request(value: Option<&Bound<'_, PyAny>>) -> Result<Value, Error> {
     let value = required(value)?;
@@ -189,49 +189,30 @@ fn request(value: Option<&Bound<'_, PyAny>>) -> Result<Value, Error> {
     }
     Ok(parsed)
 }
-fn cancel_flag(value: Option<&Bound<'_, PyAny>>) -> Result<Arc<sc_agent::Cancel>, Error> {
-    value
-        .filter(|v| !v.is_none())
-        .map(|v| {
-            v.getattr("_flag")
-                .map_err(invalid)
-                .and_then(|v| handle::<sc_agent::Cancel>(&v, c"sc_agent.Cancel"))
-        })
-        .transpose()
-        .map(|v| v.unwrap_or_else(|| Arc::new(sc_agent::Cancel::default())))
-}
 fn callback(value: Option<&Bound<'_, PyAny>>) -> Result<Option<Py<PyAny>>, Error> {
-    value
-        .filter(|v| !v.is_none())
-        .map(|v| {
-            if v.is_callable() {
-                Ok(v.clone().unbind())
-            } else {
-                Err(invalid("callback must be callable"))
-            }
-        })
-        .transpose()
-}
-fn wait(
-    delay: Duration,
-    callback: &Option<Py<PyAny>>,
-    cancel: &sc_agent::Cancel,
-) -> Result<(), Error> {
-    if let Some(callback) = callback {
-        Python::attach(|py| match callback.call1(py, (delay.as_secs_f64(),)) {
-            Ok(_) => Ok(()),
-            Err(error) if error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) => {
-                cancel.cancel();
-                Ok(())
-            }
-            Err(error) => {
-                let _ = py.detach(|| cancel.wait(delay));
-                Err(sc_agent::error("sc_agent_py.callback", error))
-            }
-        })
-    } else {
-        cancel.wait(delay)
+    let Some(value) = value.filter(|v| !v.is_none()) else {
+        return Ok(None);
+    };
+    if !value.is_callable() {
+        return Err(invalid("callback must be callable"));
     }
+    Ok(Some(value.clone().unbind()))
+}
+fn call_back<A, T>(callback: &Py<PyAny>, argument: A, cancel: &sc_agent::Cancel) -> Result<T, PyErr>
+where
+    A: for<'py> IntoPyObject<'py> + Send,
+    T: for<'a, 'py> FromPyObject<'a, 'py>,
+{
+    Python::attach(|py| {
+        callback
+            .call1(py, (argument,))
+            .and_then(|v| v.extract::<T>(py).map_err(Into::into))
+            .inspect_err(|e| {
+                if e.is_instance_of::<PyKeyboardInterrupt>(py) {
+                    cancel.cancel();
+                }
+            })
+    })
 }
 fn callback_result(
     callback_error: Mutex<Option<Error>>,
@@ -259,7 +240,7 @@ fn interruptible(
         });
         loop {
             if let Err(error) = py.check_signals()
-                && error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
+                && error.is_instance_of::<PyKeyboardInterrupt>(py)
             {
                 cancel.cancel();
             }
@@ -273,43 +254,27 @@ fn interruptible(
     })
 }
 
-fn lookup(
-    name: &str,
-    callback: &Option<Py<PyAny>>,
-    cancel: &sc_agent::Cancel,
-) -> Result<String, sc_agent::KeyringError> {
-    match callback {
-        None => sc_agent::os_keyring(name),
-        Some(callback) => Python::attach(|py| {
-            callback
-                .call1(py, (name,))
-                .and_then(|v| v.extract::<String>(py))
-                .map_err(|e| {
-                    if e.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) {
-                        cancel.cancel();
-                    }
-                    sc_agent::KeyringError::Read(e.to_string())
-                })
-        }),
-    }
+#[pyfunction(signature=(name=None,*,tool="decidr"))]
+fn logger(py: Python<'_>, name: Option<&Bound<'_, PyAny>>, tool: &str) -> Py<PyAny> {
+    let created = (|| -> Result<Py<PyAny>, Error> {
+        let logger = sc_agent::default_logger(&text(name)?)?;
+        let value = Py::new(py, PyLogger(Arc::new(logger))).map_err(invalid)?;
+        let envelope = PyDict::new(py);
+        envelope.set_item("ok", true).map_err(invalid)?;
+        envelope.set_item("value", value).map_err(invalid)?;
+        Ok(envelope.into_any().unbind())
+    })();
+    created.unwrap_or_else(|e| raw(py, respond_error(None, tool, e)))
 }
-#[pyfunction(signature=(name=None))]
-fn logger(py: Python<'_>, name: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
-    match text(name)
-        .and_then(|name| sc_agent::default_logger(&name))
-        .and_then(|logger| capsule(py, logger, c"sc_agent.Logger"))
-    {
-        Ok(value) => value,
-        Err(error) => respond(py, None, "decidr", |_| Err(error)),
-    }
-}
-#[pyfunction(signature=(logger=None,event=None))]
+
+#[pyfunction(signature=(logger=None,event=None,*,tool="decidr"))]
 fn log(
     py: Python<'_>,
     logger: Option<&Bound<'_, PyAny>>,
     event: Option<&Bound<'_, PyAny>>,
+    tool: &str,
 ) -> Py<PyAny> {
-    respond(py, logger, "decidr", |logger| {
+    respond(py, logger, tool, |logger| {
         let supplied = decode(required(event)?)?;
         let mut event = json!({"version":"v1", "timestamp":sc_observability::Timestamp::now_utc(),
                               "service":logger.service_name(), "identity":sc_observability::ProcessIdentity::default(),
@@ -324,9 +289,9 @@ fn log(
         Ok(Value::Null)
     })
 }
-#[pyfunction(signature=(logger=None))]
-fn flush(py: Python<'_>, logger: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
-    match required(logger).and_then(|v| handle::<Logger>(v, c"sc_agent.Logger")) {
+#[pyfunction(signature=(logger=None,*,tool="decidr"))]
+fn flush(py: Python<'_>, logger: Option<&Bound<'_, PyAny>>, tool: &str) -> Py<PyAny> {
+    match required(logger).and_then(|v| logger_of(v)) {
         Ok(logger) => raw(
             py,
             sc_agent::result(
@@ -336,193 +301,263 @@ fn flush(py: Python<'_>, logger: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
                     .map_err(|e| error("log.flush", e)),
             ),
         ),
-        Err(error) => respond(py, None, "decidr", |_| Err(error)),
+        Err(error) => raw(py, respond_error(None, tool, error)),
     }
 }
-#[pyfunction(signature=(request=None,question=None,*,general_log=None))]
+#[pyfunction(signature=(request=None,question=None,*,general_log=None,tool="decidr"))]
 fn digest(
     py: Python<'_>,
     request: Option<&Bound<'_, PyAny>>,
     question: Option<&Bound<'_, PyAny>>,
     general_log: Option<&Bound<'_, PyAny>>,
+    tool: &str,
 ) -> Py<PyAny> {
-    respond(py, general_log, "decidr", |_| {
+    respond(py, general_log, tool, |_| {
         sc_agent::digest(&decode(required(request)?)?, &text(question)?).map(Value::String)
     })
 }
-#[expect(
-    clippy::too_many_arguments,
-    reason = "PyO3 requires a parameter for each public keyword"
-)]
-#[pyfunction(signature=(request=None,*,model=None,provider=None,project=None,agent_role=None,config_dir=None,general_log=None,timeout_secs=None,cancel=None,base_url=None,sleep=None,keyring_lookup=None))]
-fn send(
-    py: Python<'_>,
-    request: Option<&Bound<'_, PyAny>>,
-    model: Option<&Bound<'_, PyAny>>,
-    provider: Option<&Bound<'_, PyAny>>,
-    project: Option<&Bound<'_, PyAny>>,
-    agent_role: Option<&Bound<'_, PyAny>>,
-    config_dir: Option<&Bound<'_, PyAny>>,
-    general_log: Option<&Bound<'_, PyAny>>,
-    timeout_secs: Option<&Bound<'_, PyAny>>,
-    cancel: Option<&Bound<'_, PyAny>>,
-    base_url: Option<&Bound<'_, PyAny>>,
-    sleep: Option<&Bound<'_, PyAny>>,
-    keyring_lookup: Option<&Bound<'_, PyAny>>,
-) -> Py<PyAny> {
-    respond(py, general_log, "decidr", |logger| {
-        let value = self::request(request)?;
-        let options = options(
-            &[
-                ("model", model),
-                ("provider", provider),
-                ("project", project),
-                ("agent_role", agent_role),
-                ("config_dir", config_dir),
-                ("timeout_secs", timeout_secs),
-                ("base_url", base_url),
-            ],
-            logger,
-        )?;
-        let flag = cancel_flag(cancel)?;
-        let sleep = callback(sleep)?;
-        let keyring = callback(keyring_lookup)?;
-        interruptible(py, &flag, || {
-            sc_agent::send(
-                &value,
-                &options,
-                logger,
-                &flag,
-                &|delay| wait(delay, &sleep, &flag),
-                &|name| lookup(name, &keyring, &flag),
-            )
-        })
-    })
-}
-#[expect(
-    clippy::too_many_arguments,
-    reason = "PyO3 requires a parameter for each public keyword"
-)]
-#[pyfunction(signature=(requests=None,*,model=None,provider=None,project=None,agent_role=None,config_dir=None,general_log=None,timeout_secs=None,workers=None,on_result=None,cancel=None,base_url=None,sleep=None,keyring_lookup=None))]
-fn send_batch(
-    py: Python<'_>,
-    requests: Option<&Bound<'_, PyAny>>,
-    model: Option<&Bound<'_, PyAny>>,
-    provider: Option<&Bound<'_, PyAny>>,
-    project: Option<&Bound<'_, PyAny>>,
-    agent_role: Option<&Bound<'_, PyAny>>,
-    config_dir: Option<&Bound<'_, PyAny>>,
-    general_log: Option<&Bound<'_, PyAny>>,
-    timeout_secs: Option<&Bound<'_, PyAny>>,
-    workers: Option<&Bound<'_, PyAny>>,
-    on_result: Option<&Bound<'_, PyAny>>,
-    cancel: Option<&Bound<'_, PyAny>>,
-    base_url: Option<&Bound<'_, PyAny>>,
-    sleep: Option<&Bound<'_, PyAny>>,
-    keyring_lookup: Option<&Bound<'_, PyAny>>,
-) -> Py<PyAny> {
-    respond(py, general_log, "decidr", |logger| {
-        let requests = required(requests)?
-            .try_iter()
-            .map_err(invalid)?
-            .map(|v| v.map_err(invalid).and_then(|v| request(Some(&v))))
-            .collect::<Result<Vec<_>, _>>()?;
-        let options = options(
-            &[
-                ("model", model),
-                ("provider", provider),
-                ("project", project),
-                ("agent_role", agent_role),
-                ("config_dir", config_dir),
-                ("timeout_secs", timeout_secs),
-                ("base_url", base_url),
-                ("workers", workers),
-            ],
-            logger,
-        )?;
-        let flag = cancel_flag(cancel)?;
-        let sleep = callback(sleep)?;
-        let keyring = callback(keyring_lookup)?;
-        let completed = callback(on_result)?;
-        let callback_error = Mutex::new(None);
-        let on_result = |index, value: &Value| {
-            if let Some(callback) = &completed {
-                Python::attach(|py| {
-                    if let Err(error) = callback.call1(py, (index, raw(py, value.clone()))) {
-                        flag.cancel();
-                        if !error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
-                            && let Ok(mut first) = callback_error.lock()
-                            && first.is_none()
-                        {
-                            *first = Some(sc_agent::error("sc_agent_py.callback", error));
-                        }
-                    }
-                });
-            }
-        };
-        let result = interruptible(py, &flag, || {
-            sc_agent::batch(
-                &requests,
-                &options,
-                logger,
-                &flag,
-                &|delay| wait(delay, &sleep, &flag),
-                &|name| lookup(name, &keyring, &flag),
-                &on_result,
-            )
-        });
-        callback_result(callback_error, result)
-    })
-}
-#[pyfunction]
-fn _new_cancel(py: Python<'_>) -> Py<PyAny> {
-    match capsule(py, sc_agent::Cancel::default(), c"sc_agent.Cancel") {
-        Ok(value) => value,
-        Err(error) => raw(py, sc_agent::result(Err(error))),
+#[pyclass(name = "Run", frozen)]
+struct PyRun(Result<sc_agent::Run, Value>);
+impl PyRun {
+    fn with(
+        &self,
+        py: Python<'_>,
+        f: impl FnOnce(&sc_agent::Run) -> Result<Value, Error>,
+    ) -> Py<PyAny> {
+        raw(
+            py,
+            match &self.0 {
+                Ok(run) => finish(run.logger(), false, sc_agent::report(run.logger(), f(run))),
+                Err(e) => e.clone(),
+            },
+        )
     }
 }
-#[pyfunction(signature=(flag=None))]
-fn _cancel(py: Python<'_>, flag: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
+#[pymethods]
+impl PyRun {
+    #[new]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "PyO3 needs a parameter per public keyword"
+    )]
+    #[pyo3(signature=(*extra, tool=None, model=None, project=None, agent_role=None, config_dir=None, general_log=None, timeout_secs=None, workers=None, base_url=None, sleep=None, keyring_lookup=None, **rest))]
+    fn new(
+        extra: &Bound<'_, PyTuple>,
+        tool: Option<&Bound<'_, PyAny>>,
+        model: Option<&Bound<'_, PyAny>>,
+        project: Option<&Bound<'_, PyAny>>,
+        agent_role: Option<&Bound<'_, PyAny>>,
+        config_dir: Option<&Bound<'_, PyAny>>,
+        general_log: Option<&Bound<'_, PyAny>>,
+        timeout_secs: Option<&Bound<'_, PyAny>>,
+        workers: Option<&Bound<'_, PyAny>>,
+        base_url: Option<&Bound<'_, PyAny>>,
+        sleep: Option<&Bound<'_, PyAny>>,
+        keyring_lookup: Option<&Bound<'_, PyAny>>,
+        rest: Option<&Bound<'_, PyDict>>,
+    ) -> Self {
+        let rejected = |name: Option<&str>, e: Error| {
+            if name.is_none() && general_log.is_none_or(|value| value.is_none()) {
+                return sc_agent::result(Err(e));
+            }
+            respond_error(general_log, name.unwrap_or("decidr"), e)
+        };
+        let tool = match arg::<String>(tool, "tool").and_then(|v| {
+            v.filter(|v| !v.is_empty())
+                .ok_or_else(|| invalid("tool is required"))
+        }) {
+            Ok(tool) => tool,
+            Err(e) => return Self(Err(rejected(None, e))),
+        };
+        let created = (|| {
+            bind(extra, rest, &[], &[])?;
+            let args = sc_agent::RunArgs {
+                tool: tool.clone(),
+                model: arg(model, "model")?,
+                project: arg(project, "project")?,
+                agent_role: arg(agent_role, "agent_role")?
+                    .ok_or_else(|| invalid("agent_role is required"))?,
+                config_dir: arg::<String>(config_dir, "config_dir")?.map(PathBuf::from),
+                timeout_secs: arg(timeout_secs, "timeout_secs")?,
+                workers: arg(workers, "workers")?,
+                base_url: arg(base_url, "base_url")?,
+            };
+            let logger = general_log
+                .filter(|v| !v.is_none())
+                .map(logger_of)
+                .transpose()?;
+            let sleep = callback(sleep)?;
+            let lookup = callback(keyring_lookup)?;
+            let flag = Arc::new(sc_agent::Cancel::default());
+            let mut run = sc_agent::Run::new(args, logger, flag.clone())?;
+            if let Some(callback) = sleep {
+                let flag = flag.clone();
+                run.wait = Box::new(move |delay| {
+                    Python::attach(|py| {
+                        match call_back::<_, Py<PyAny>>(&callback, delay.as_secs_f64(), &flag) {
+                            Ok(_) => Ok(()),
+                            Err(e) if e.is_instance_of::<PyKeyboardInterrupt>(py) => Ok(()),
+                            Err(e) => Err(error("sc_agent_py.callback", e)),
+                        }
+                    })
+                });
+            }
+            if let Some(callback) = lookup {
+                run.keyring = Box::new(move |name| {
+                    call_back(&callback, name.to_owned(), &flag)
+                        .map_err(|e| sc_agent::KeyringError::Read(e.to_string()))
+                });
+            }
+            Ok(run)
+        })();
+        Self(created.map_err(|e| rejected(Some(&tool), e)))
+    }
+    fn __enter__(slf: Py<Self>) -> Py<Self> {
+        slf
+    }
+    fn __exit__(
+        &self,
+        py: Python<'_>,
+        _kind: &Bound<'_, PyAny>,
+        _value: &Bound<'_, PyAny>,
+        _traceback: &Bound<'_, PyAny>,
+    ) -> bool {
+        if let Ok(run) = &self.0 {
+            let result = sc_agent::result(run.close().map(|()| Value::Null));
+            if result.get("ok").and_then(Value::as_bool) == Some(false) {
+                let message = result.to_string();
+                let envelope = raw(py, result);
+                PyErr::new::<PyRuntimeError, _>(format!("sc-agent Run.close failed: {message}"))
+                    .write_unraisable(py, Some(envelope.bind(py)));
+            }
+        }
+        false
+    }
+    #[pyo3(signature=(*args, **kwargs))]
+    fn sends_to(
+        &self,
+        py: Python<'_>,
+        args: &Bound<'_, PyTuple>,
+        kwargs: Option<&Bound<'_, PyDict>>,
+    ) -> Py<PyAny> {
+        self.with(py, |run| {
+            let mut values = bind(args, kwargs, &["provider"], &[])?.into_iter();
+            let provider = arg::<String>(values.next().flatten().as_ref(), "provider")?
+                .ok_or_else(|| invalid("provider is required"))?;
+            run.sends_to(&provider).map(Value::Bool)
+        })
+    }
+    #[pyo3(signature=(*args, **kwargs))]
+    fn send(
+        &self,
+        py: Python<'_>,
+        args: &Bound<'_, PyTuple>,
+        kwargs: Option<&Bound<'_, PyDict>>,
+    ) -> Py<PyAny> {
+        self.with(py, |run| {
+            let mut values = bind(args, kwargs, &["request"], &[])?.into_iter();
+            let value = self::request(values.next().flatten().as_ref())?;
+            interruptible(py, &run.cancel, || run.send(&value))
+        })
+    }
+    #[pyo3(signature=(*args, **kwargs))]
+    fn send_batch(
+        &self,
+        py: Python<'_>,
+        args: &Bound<'_, PyTuple>,
+        kwargs: Option<&Bound<'_, PyDict>>,
+    ) -> Py<PyAny> {
+        self.with(py, |run| {
+            let mut values = bind(args, kwargs, &["requests"], &["on_result"])?.into_iter();
+            let requests = values.next().flatten();
+            let on_result = values.next().flatten();
+            let requests = required(requests.as_ref())?
+                .try_iter()
+                .map_err(invalid)?
+                .map(|v| v.map_err(invalid).and_then(|v| request(Some(&v))))
+                .collect::<Result<Vec<_>, _>>()?;
+            let completed = callback(on_result.as_ref())?;
+            let callback_error = Mutex::new(None);
+            let on_result = |index, value: &Value| {
+                if let Some(callback) = &completed {
+                    Python::attach(|py| {
+                        if let Err(e) = callback.call1(py, (index, raw(py, value.clone()))) {
+                            run.cancel.cancel();
+                            if !e.is_instance_of::<PyKeyboardInterrupt>(py)
+                                && let Ok(mut first) = callback_error.lock()
+                                && first.is_none()
+                            {
+                                *first = Some(error("sc_agent_py.callback", e));
+                            }
+                        }
+                    });
+                }
+            };
+            let result = interruptible(py, &run.cancel, || run.send_batch(&requests, &on_result));
+            callback_result(callback_error, result)
+        })
+    }
+    #[pyo3(signature=(*extra,**rest))]
+    fn cancel(
+        &self,
+        py: Python<'_>,
+        extra: &Bound<'_, PyTuple>,
+        rest: Option<&Bound<'_, PyDict>>,
+    ) -> Py<PyAny> {
+        self.with(py, |run| {
+            bind(extra, rest, &[], &[]).map(|_| {
+                run.cancel.cancel();
+                Value::Null
+            })
+        })
+    }
+}
+#[pyfunction]
+fn provider_keys(py: Python<'_>) -> Py<PyAny> {
+    let keys = sc_agent::PROVIDERS
+        .iter()
+        .map(|p| p.key)
+        .filter(|k| !k.is_empty())
+        .collect::<Vec<_>>();
+    raw(py, sc_agent::result(Ok(json!(keys))))
+}
+#[pyfunction]
+fn models(py: Python<'_>) -> Py<PyAny> {
     raw(
         py,
-        sc_agent::result(
-            required(flag)
-                .and_then(|v| handle::<sc_agent::Cancel>(v, c"sc_agent.Cancel"))
-                .map(|flag| {
-                    flag.cancel();
-                    Value::Null
-                }),
-        ),
+        sc_agent::result(sc_agent::model_catalog("decidr", None, None)),
     )
 }
-#[pyfunction(signature=(*,general_log=None))]
-fn languages(py: Python<'_>, general_log: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
-    respond(py, general_log, "sitr", |logger| {
+#[pyfunction(signature=(*,general_log=None,tool="sitr"))]
+fn languages(py: Python<'_>, general_log: Option<&Bound<'_, PyAny>>, tool: &str) -> Py<PyAny> {
+    respond(py, general_log, tool, |logger| {
         sc_agent::log(logger, "sitr.languages", json!({}))?;
         Ok(sc_treesitter::languages())
     })
 }
-#[pyfunction(signature=(language=None,*,general_log=None))]
+#[pyfunction(signature=(language=None,*,general_log=None,tool="sitr"))]
 fn queries(
     py: Python<'_>,
     language: Option<&Bound<'_, PyAny>>,
     general_log: Option<&Bound<'_, PyAny>>,
+    tool: &str,
 ) -> Py<PyAny> {
-    respond(py, general_log, "sitr", |logger| {
+    respond(py, general_log, tool, |logger| {
         let value = sc_treesitter::queries(&text(language)?)?;
         sc_agent::log(logger, "sitr.queries", json!({}))?;
         Ok(value)
     })
 }
-#[pyfunction(signature=(language=None,source=None,query=None,*,general_log=None))]
+#[pyfunction(signature=(language=None,source=None,query=None,*,general_log=None,tool="sitr"))]
 fn query(
     py: Python<'_>,
     language: Option<&Bound<'_, PyAny>>,
     source: Option<&Bound<'_, PyAny>>,
     query: Option<&Bound<'_, PyAny>>,
     general_log: Option<&Bound<'_, PyAny>>,
+    tool: &str,
 ) -> Py<PyAny> {
-    respond(py, general_log, "sitr", |logger| {
+    respond(py, general_log, tool, |logger| {
         let value = sc_treesitter::query(
             &sc_treesitter::language(&text(language)?)?,
             &text(source)?,
@@ -532,15 +567,16 @@ fn query(
         Ok(value)
     })
 }
-#[pyfunction(signature=(language=None,name=None,source=None,*,general_log=None))]
+#[pyfunction(signature=(language=None,name=None,source=None,*,general_log=None,tool="sitr"))]
 fn run(
     py: Python<'_>,
     language: Option<&Bound<'_, PyAny>>,
     name: Option<&Bound<'_, PyAny>>,
     source: Option<&Bound<'_, PyAny>>,
     general_log: Option<&Bound<'_, PyAny>>,
+    tool: &str,
 ) -> Py<PyAny> {
-    respond(py, general_log, "sitr", |logger| {
+    respond(py, general_log, tool, |logger| {
         let value = sc_treesitter::predefined(&text(language)?, &text(name)?, &text(source)?)?;
         sc_agent::log(logger, "sitr.run", json!({}))?;
         Ok(value)
@@ -560,7 +596,9 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
                         Err(failure) => {
                             let given = kwargs.and_then(|v| v.get_item("general_log").ok().flatten());
                             let name = if matches!(stringify!($function), "languages" | "queries" | "query" | "run") { "sitr" } else { "decidr" };
-                            respond(py, given.as_ref(), name, |_| Err(error("sc_agent_py.invalid_call", failure)))
+                            let tool = kwargs.and_then(|v| v.get_item("tool").ok().flatten())
+                                .and_then(|v| v.extract::<String>().ok());
+                            raw(py, respond_error(given.as_ref(), tool.as_deref().unwrap_or(name), error("sc_agent_py.invalid_option", failure)))
                         },
                     }
                 },
@@ -569,10 +607,12 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     }
     register!(
         logger => c"logger", log => c"log", flush => c"flush", digest => c"digest",
-        send => c"send", send_batch => c"send_batch", _new_cancel => c"_new_cancel",
-        _cancel => c"_cancel", languages => c"languages", queries => c"queries",
+        provider_keys => c"provider_keys", models => c"models", languages => c"languages", queries => c"queries",
         query => c"query", run => c"run",
     );
+    module.add_class::<PyLogger>()?;
+    module.add_class::<PyRun>()?;
+    module.add("TYPESAFE", sc_agent::TYPESAFE)?;
     Ok(())
 }
 
@@ -619,6 +659,27 @@ mod tests {
         config.enable_console_sink = false;
         let logger = Logger::new(config)?;
         logger.shutdown()?;
+        let original = sc_agent::result(Err(error("http.auth", "original error")));
+        let kept = finish(&logger, false, original);
+        assert_eq!(kept["error"]["id"], "http.auth");
+        let message = kept["error"]["message"].as_str().ok_or("message absent")?;
+        assert!(message.contains("original error"));
+        assert!(message.contains("log.flush"));
+        let logger_failure = sc_agent::default_logger("invalid logger name")
+            .err()
+            .ok_or("invalid logger name accepted")?;
+        let logger_detail = logger_failure.to_string();
+        let creation = sc_agent::after_failure(
+            sc_agent::result(Err(error("types.unknown_short_name", "bad model"))),
+            Err(logger_failure),
+            "log.write",
+        );
+        assert_eq!(creation["error"]["id"], "types.unknown_short_name");
+        let message = creation["error"]["message"]
+            .as_str()
+            .ok_or("message absent")?;
+        assert!(message.contains("bad model"));
+        assert!(message.contains(&logger_detail));
         let failure = finish(&logger, false, sc_agent::result(Ok(json!("success"))));
         assert_eq!(failure["error"]["id"], "log.flush");
         assert_eq!(

@@ -8,10 +8,37 @@ Every operation returns a result envelope and does not raise for an operation fa
 
 ### Decision requests
 
-- `send(request, *, model=None, provider=None, project=None, agent_role=None, config_dir=None, general_log=None, timeout_secs=None, cancel=None, base_url=None, sleep=None, keyring_lookup=None)` sends one JSON request. `request` may be a JSON string or object. `model` accepts a provider short name or model id. If `provider` is omitted, the first provider table containing the selector is used; reseller ids can pass through unchanged. `project` and `agent_role` tag the session record. `config_dir` selects configuration files. `timeout_secs` sets the per-call timeout; `cancel` is a `Cancel` shared with the caller. `base_url`, `sleep`, and `keyring_lookup` inject the endpoint and retry/keyring behavior when needed.
-- `send_batch(requests, *, model=None, provider=None, project=None, agent_role=None, config_dir=None, general_log=None, timeout_secs=None, workers=None, on_result=None, cancel=None, base_url=None, sleep=None, keyring_lookup=None)` sends a sequence of requests and returns one indexed result for each input. `workers` sets the fan-out, `on_result(index, result)` receives each completed result, and the other options match `send`.
-- `digest(request, question, *, general_log=None)` returns the digest for one question in a request.
-- `Cancel()` creates a reusable cancellation flag. Call `cancel.cancel()` to stop new requests; completed results remain available and unfinished batch entries return a `decision.cancelled` error.
+Create one Run for a command and use it as a context manager:
+
+```python
+import sc_agent
+
+with sc_agent.Run(tool="my-tool", model="haiku", project="phase", agent_role="my-tool",
+                  timeout_secs=30, workers=2) as run:
+    result = run.send({"questions": {"q": {"type": "noul"}}})
+    batch = run.send_batch([{"questions": {"q": {"type": "noul"}}}],
+                           on_result=lambda index, result: None)
+```
+
+`Run` requires `tool` and `agent_role`; `model` defaults to `jev`. Set `project`,
+`config_dir`, `general_log`, `timeout_secs`, `workers`, `base_url`, `sleep`, and
+`keyring_lookup` when creating the Run. Its `send` and `send_batch` methods take
+no per-call overrides. Requests are JSON objects or strings. A creation error
+is stored and returned by the Run's methods.
+
+`run.cancel()` stops unfinished requests and keeps completed results.
+`run.sends_to(provider)` returns a boolean envelope or the resolution error;
+`sc_agent.TYPESAFE` identifies TypeSafe for a consent check. `provider_keys()`
+returns an envelope whose `value` is the provider table's credential variable names,
+for example `sc_agent.provider_keys()["value"]` on success. `models()` returns the
+same table envelope as `decidr models`. Select a provider through
+`models.<name>.provider` in configuration.
+
+Context exit closes an owned logger and leaves an injected Logger usable.
+`digest(request, question, *, general_log=None)` remains independent. The old
+module-level `send`, `send_batch`, `Cancel`, and `provider=` argument are removed.
+The consumer testing helpers `sc_agent.testing.FakeRun` and `fake_open_run` are
+planned for the following template sprint; they are not exported by this wheel.
 
 ### Logging
 
@@ -19,7 +46,7 @@ Every operation returns a result envelope and does not raise for an operation fa
 - `log(logger, event)` writes an event through that handle.
 - `flush(logger)` flushes queued records before the caller exits.
 
-Pass the returned handle as `general_log` to `send`, `send_batch`, `digest`, and sitr operations. Check each result envelope, including errors returned by `log` or `flush`.
+Pass the returned handle as `general_log` to `Run`, `digest`, and sitr operations. Check each result envelope, including errors returned by `log` or `flush`.
 
 ### Syntax queries
 

@@ -37,7 +37,7 @@ from collections.abc import Callable, Container, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeGuard, cast
 
 if TYPE_CHECKING:
-    from sc_agent import Cancel
+    from sc_agent import Run
 
 SC_DECIDR_VERSION = "{{ sc_decidr_version }}"
 CLIENT_NAME = "{{ client_name }}"
@@ -165,12 +165,12 @@ def load_wheel():
     return sc_agent
 
 
-def _logger(create: Callable[[str], Record], injected: Any) -> Record:
+def _logger(create: Callable[..., Record], injected: Any) -> Record:
     """The caller's Logger, else this client's one Logger, created on first use."""
     global _logger_handle
     with _logger_lock:
         if injected is None and _logger_handle is None:
-            created = create(CLIENT_NAME)
+            created = create(CLIENT_NAME, tool=CLIENT_NAME)
             if not created["ok"]:
                 return created
             _logger_handle = created["value"]
@@ -218,10 +218,10 @@ def _invalid_result(reason: object) -> Record:
                                action="Inspect the invalid sc-decidr result and check the wheel and client versions."))
 
 
-def _abort_if_selected(line: object, abort_on: frozenset[str], cancel: Cancel) -> None:
+def _abort_if_selected(line: object, abort_on: frozenset[str], run: Run) -> None:
     error = cast(Record, line).get("error") if isinstance(line, dict) else None
     if isinstance(error, dict) and cast(Record, error).get("category") in abort_on:
-        cancel.cancel()
+        run.cancel()
 
 
 def _as_text(request: str | Record) -> str:
@@ -246,7 +246,7 @@ def _start(abort_on: frozenset[str], category_codes: Mapping[str, str] | None, r
 
 def call_result(request: str | Record, *, model: str, project: str | None = None,
                 abort_on: frozenset[str] = frozenset(), category_codes: Mapping[str, str] | None = None,
-                cancel: Cancel | None = None, config_dir: str | None = None, general_log: Any = None,
+                config_dir: str | None = None, general_log: Any = None,
                 timeout_secs: float | None = None, repository_root: str = ".",
                 consent_what: str = "The request text") -> Record:
     """Send one decision request and return the consumer result record."""
@@ -256,20 +256,20 @@ def call_result(request: str | Record, *, model: str, project: str | None = None
     logger = _logger(sc_agent.logger, general_log)
     if not logger["ok"]:
         return decode_result(logger, category_codes=category_codes)
-    cancel = cancel or sc_agent.Cancel()
-    try:
-        line: Any = sc_agent.send(_as_text(request), model=model, project=project, agent_role=CLIENT_NAME, cancel=cancel,
-                                  config_dir=config_dir, general_log=logger["value"], timeout_secs=timeout_secs)
-    except KeyboardInterrupt:
-        cancel.cancel()
-        line = _failure("decision.cancelled", "interrupted", "cancelled")
-    _abort_if_selected(line, abort_on, cancel)
+    with sc_agent.Run(tool=CLIENT_NAME, model=model, project=project, agent_role=CLIENT_NAME,
+                      config_dir=config_dir, general_log=logger["value"], timeout_secs=timeout_secs) as run:
+        try:
+            line: Any = run.send(_as_text(request))
+        except KeyboardInterrupt:
+            run.cancel()
+            line = _failure("decision.cancelled", "interrupted", "cancelled")
+        _abort_if_selected(line, abort_on, run)
     return decode_result(line, category_codes=category_codes)
 
 
 def call_batch_results(requests: Sequence[str | Record], *, model: str, project: str | None = None,
                        abort_on: frozenset[str] = frozenset(), category_codes: Mapping[str, str] | None = None,
-                       cancel: Cancel | None = None, config_dir: str | None = None, general_log: Any = None,
+                       config_dir: str | None = None, general_log: Any = None,
                        timeout_secs: float | None = None, repository_root: str = ".",
                        consent_what: str = "The request text", workers: int | None = None,
                        on_result: Callable[[Record], None] | None = None) -> Record:
@@ -280,28 +280,27 @@ def call_batch_results(requests: Sequence[str | Record], *, model: str, project:
     logger = _logger(sc_agent.logger, general_log)
     if not logger["ok"]:
         return decode_result(logger, category_codes=category_codes)
-    cancel = cancel or sc_agent.Cancel()
-    finished: list[Record] = []
+    with sc_agent.Run(tool=CLIENT_NAME, model=model, project=project, agent_role=CLIENT_NAME,
+                      config_dir=config_dir, general_log=logger["value"], timeout_secs=timeout_secs, workers=workers) as run:
+        finished: list[Record] = []
 
-    def handle(index: int, line: Record) -> None:
-        line = dict(line, index=index)
-        finished.append(line)
-        _abort_if_selected(line, abort_on, cancel)
-        if on_result is not None:
-            on_result(decode_result(line, category_codes=category_codes))
+        def handle(index: int, line: Record) -> None:
+            line = dict(line, index=index)
+            finished.append(line)
+            _abort_if_selected(line, abort_on, run)
+            if on_result is not None:
+                on_result(decode_result(line, category_codes=category_codes))
 
-    try:
-        batch = sc_agent.send_batch([_as_text(request) for request in requests], model=model, project=project,
-                                    agent_role=CLIENT_NAME, cancel=cancel, config_dir=config_dir, general_log=logger["value"],
-                                    timeout_secs=timeout_secs, workers=workers, on_result=handle)
-    except KeyboardInterrupt:
-        cancel.cancel()
-        lines = finished
-    else:
-        if not batch["ok"]:
-            _abort_if_selected(batch, abort_on, cancel)
-            return decode_result(batch, category_codes=category_codes)
-        lines = [dict(item["result"], index=item["index"]) for item in batch["value"]]
+        try:
+            batch = run.send_batch([_as_text(request) for request in requests], on_result=handle)
+        except KeyboardInterrupt:
+            run.cancel()
+            lines = finished
+        else:
+            if not batch["ok"]:
+                _abort_if_selected(batch, abort_on, run)
+                return decode_result(batch, category_codes=category_codes)
+            lines = [dict(item["result"], index=item["index"]) for item in batch["value"]]
     return {"ok": True, "value": [decode_result(line, category_codes=category_codes) for line in lines]}
 
 
@@ -664,5 +663,5 @@ def extract(language: str, source: str, query: str, *, general_log: Any = None) 
     logger = _logger(sc_agent.logger, general_log)
     if not logger["ok"]:
         return logger
-    return sc_agent.sitr.query(language, source, query, general_log=logger["value"])
+    return sc_agent.sitr.query(language, source, query, general_log=logger["value"], tool=CLIENT_NAME)
 {% endif %}

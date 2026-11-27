@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 use std::{
     fs,
     io::{BufRead, BufReader, Read, Write},
-    net::{TcpListener, TcpStream},
+    net::{SocketAddr, TcpListener, TcpStream},
     path::PathBuf,
     sync::{
         Arc,
@@ -28,10 +28,10 @@ impl Drop for Temp {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
-pub fn logger(root: &Temp) -> Result<Logger, Box<dyn std::error::Error + Send + Sync>> {
+pub fn logger(root: &Temp) -> Result<Arc<Logger>, Box<dyn std::error::Error + Send + Sync>> {
     let mut config = LoggerConfig::default_for(ServiceName::new("rust-test")?, root.0.clone());
     config.enable_console_sink = false;
-    Ok(Logger::new(config)?)
+    Ok(Arc::new(Logger::new(config)?))
 }
 pub fn options(root: &Temp, url: &str) -> Options {
     Options {
@@ -41,15 +41,10 @@ pub fn options(root: &Temp, url: &str) -> Options {
             ("OPENAI_API_KEY".into(), "test-secret".into()),
         ],
         settings: Settings {
-            project: Some("phase-b".into()),
-            workers: 1,
-            models: Default::default(),
-            local: Default::default(),
-            max_sends: 5,
-            decidr: Default::default(),
+            tool: "decidr".into(),
+            values: json!({"project":"phase-b","workers":1,"models":{},"max_sends":5,"decidr":{}}),
         },
         model: "jev".into(),
-        provider: None,
         agent_role: "rust-developer".into(),
         timeout: Duration::from_secs(5),
         base_url: Some(url.into()),
@@ -62,7 +57,9 @@ pub fn single_reply_options(root: &Temp, url: &str) -> Options {
     let mut options = options(root, url);
     // Failure-only hang guard, not a response-speed assertion; never resend to an exhausted stub.
     options.timeout = Duration::from_secs(600);
-    options.settings.max_sends = 1;
+    if let Some(value) = options.settings.values.get_mut("max_sends") {
+        *value = json!(1);
+    }
     options
 }
 pub fn request() -> Value {
@@ -138,7 +135,13 @@ pub struct Stub {
 }
 impl Stub {
     pub fn new(replies: Vec<Reply>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let listener = TcpListener::bind("127.0.0.1:0")?;
+        Self::at(replies, "127.0.0.1:0".parse()?)
+    }
+    pub fn at(
+        replies: Vec<Reply>,
+        address: SocketAddr,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let listener = TcpListener::bind(address)?;
         let url = format!("http://{}/v1", listener.local_addr()?);
         let owned_listener = listener.try_clone()?;
         let stop = Arc::new(AtomicBool::new(false));
@@ -286,4 +289,41 @@ pub fn rows(root: &Temp) -> Result<Vec<Value>, Box<dyn std::error::Error + Send 
         .lines()
         .map(|line| serde_json::from_str(line).map_err(Into::into))
         .collect()
+}
+
+pub fn run(options: Options, logger: &Arc<Logger>) -> Result<sc_agent::Run, sc_agent::Error> {
+    let mut run = sc_agent::Run::from_options(
+        options,
+        Some(logger.clone()),
+        Arc::new(sc_agent::Cancel::default()),
+    )?;
+    run.wait = Box::new(no_wait);
+    run.keyring = Box::new(keyring);
+    Ok(run)
+}
+
+// A pinned provider/model is fixture data for Route wire tests; product selection uses Run.
+pub fn pinned_model(
+    provider: &str,
+    name: &str,
+) -> Result<(&'static sc_agent::Provider, String), sc_agent::Error> {
+    let provider = sc_agent::PROVIDERS
+        .iter()
+        .find(|p| p.name == provider)
+        .ok_or_else(|| sc_agent::error("types.unknown_provider", provider))?;
+    let id = provider
+        .models
+        .iter()
+        .find(|(alias, id, _)| *alias == name || *id == name)
+        .map(|(_, id, _)| *id)
+        .unwrap_or(name);
+    Ok((provider, id.into()))
+}
+
+// Only tests select the first candidate without credential resolution.
+pub fn model_with(
+    name: &str,
+    configured: &std::collections::BTreeMap<String, sc_agent::ModelEntry>,
+) -> Result<(&'static sc_agent::Provider, String), sc_agent::Error> {
+    Ok(sc_agent::candidates(name, configured)?.remove(0))
 }
