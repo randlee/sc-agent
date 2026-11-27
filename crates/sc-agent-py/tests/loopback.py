@@ -213,8 +213,11 @@ class RenderedWheelLoopback(unittest.TestCase):
     def test_fakerun_conforms_to_real_run(self):
         from sc_agent.testing import FakeRun
         fake = FakeRun({"provider": "laya", "run_id": "test", "envelopes": []})
-        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"PLAN_ANCHOR_LOG_ROOT": temporary}):
-            with sc_agent.Run(tool="plan-anchor", tool_version="test", agent_role="plan-anchor", project="test") as real:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            env = {"PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "PLAN_ANCHOR_LOG_ROOT": temporary}
+            with patch.dict(os.environ, env, clear=True), chdir(root), sc_agent.Run(
+                    tool="plan-anchor", tool_version="test", agent_role="plan-anchor", project="test", config_dir=temporary) as real:
                 fake_cancel = fake.cancel()
                 real_cancel = real.cancel()
                 self.assertEqual(set(fake_cancel), set(real_cancel))
