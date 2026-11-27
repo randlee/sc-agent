@@ -785,9 +785,10 @@ const GPT: &[(&str, &str, &str)] = &[
     ("luna", "gpt-6-luna", "2026-09-22"),
     ("astra", "gpt-6-astra", "2026-09-03"),
 ];
+pub const TYPESAFE: &str = "typesafe";
 pub static PROVIDERS: &[Provider] = &[
     Provider {
-        name: "typesafe",
+        name: TYPESAFE,
         url: "https://api.typesafe.ai/v1",
         key: "TYPESAFE_API_KEY",
         wire: Wire::Jev,
@@ -1508,8 +1509,8 @@ impl Run {
         resolve(self.found.clone(), &self.options, &*self.keyring)
     }
     /// Whether the next send resolves to the named provider (keyless first, then the first held key).
-    pub fn sends_to(&self, provider: &str) -> bool {
-        self.resolve().is_ok_and(|(p, _)| p.name == provider)
+    pub fn sends_to(&self, provider: &str) -> Result<bool, Error> {
+        self.resolve().map(|(p, _)| p.name == provider)
     }
     pub fn logger(&self) -> &Logger {
         &self.logger
@@ -1536,7 +1537,7 @@ impl Run {
                     .collect::<BTreeMap<_, _>>()
             });
         let sends = Cell::new(0);
-        let mut outcome = (|| {
+        let outcome = (|| {
             cancel.check()?;
             let project = options.settings.project_required()?;
             slug(project)?;
@@ -1562,16 +1563,13 @@ impl Run {
                 keyring: &*self.keyring,
                 sends: &sends,
             };
-            let reply = match provider.wire {
-                "messages" => AnthropicCompat(&route).decide(request),
-                "chat/completions" => OpenAiCompat(&route).decide(request),
-                _ => Jev(&route).decide(request),
-            }?;
-            schema(request, &reply).map(|()| reply)
+            match provider.wire {
+                Wire::Messages => AnthropicCompat(&route).decide(request),
+                Wire::Chat => OpenAiCompat(&route).decide(request),
+                Wire::Jev => Jev(&route).decide(request),
+            }
         })();
-        if let Err(e) = cancel.check() {
-            outcome = Err(e);
-        }
+        let mut outcome = after_cancel(outcome, cancel);
         if let Err(Error::Failure {
             session_id: id,
             attempts,

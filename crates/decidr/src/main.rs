@@ -4,7 +4,6 @@ use serde_json::{Value, json};
 use std::{
     io::{Read, Write},
     sync::{Arc, mpsc},
-    time::Duration,
 };
 mod cli;
 fn main() {
