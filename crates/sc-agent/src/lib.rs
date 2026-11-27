@@ -1759,6 +1759,41 @@ pub fn load(
         repo,
     ))
 }
+pub fn model_catalog(
+    tool: &str,
+    config_dir: Option<&Path>,
+    project: Option<&str>,
+) -> Result<Value, Error> {
+    let (configuration, ..) = load(tool, config_dir, project)?;
+    let mut catalog = json!(PROVIDERS);
+    let providers = catalog
+        .as_array_mut()
+        .ok_or_else(|| error("config.models", "provider catalog is not an array"))?;
+    for provider in providers {
+        let Some(name) = provider
+            .get("name")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+        else {
+            continue;
+        };
+        let Some(models) = provider.get_mut("models").and_then(Value::as_array_mut) else {
+            continue;
+        };
+        models.retain(|row| {
+            row.as_array()
+                .and_then(|columns| columns.first())
+                .and_then(Value::as_str)
+                .is_none_or(|alias| !configuration.config.models.contains_key(alias))
+        });
+        for (alias, entry) in &configuration.config.models {
+            if entry.provider == name {
+                models.push(json!([alias, entry.id, entry.released]));
+            }
+        }
+    }
+    Ok(catalog)
+}
 pub fn doctor(
     tool: &str,
     config_dir: Option<&Path>,

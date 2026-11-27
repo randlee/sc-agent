@@ -218,9 +218,20 @@ class Wheel(Isolated):
 
     def test_models_matches_decidr_models(self):
         binary = Path(__file__).resolve().parents[2] / "target/debug/decidr"
-        found = subprocess.run([str(binary), "models"], capture_output=True, text=True, timeout=20, cwd=self.directory.name)
+        model_config = Path(self.directory.name) / "decidr.json"
+        model_config.write_text(json.dumps({"models": {
+            "contract-model": {"provider": "openai", "id": "gpt-contract", "released": "2026-11-20"}
+        }}))
+        found = subprocess.run([str(binary), "--config-dir", self.directory.name, "models"],
+                               capture_output=True, text=True, timeout=20, cwd=self.directory.name)
         self.assertEqual(found.returncode, 0, found.stdout + found.stderr)
-        self.assertEqual(self.api.models(), json.loads(found.stdout))
+        cli_catalog = json.loads(found.stdout)
+        with patch.dict(os.environ, {"SC_AGENT_HOME": self.directory.name}):
+            python_result = self.api.models()
+        self.assertTrue(python_result["ok"], python_result)
+        self.assertEqual(python_result, cli_catalog)
+        openai = next(provider for provider in cli_catalog["value"] if provider["name"] == "openai")
+        self.assertIn(["contract-model", "gpt-contract", "2026-11-20"], openai["models"])
 
     def test_module_exports_only_the_run_api(self):
         self.assertEqual(set(self.api.__all__), {"Logger", "Run", "TYPESAFE", "digest", "flush", "log", "logger", "models", "provider_keys", "sitr"})

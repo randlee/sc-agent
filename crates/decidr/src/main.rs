@@ -1,6 +1,6 @@
 use clap::Parser;
 use cli::{Cli, Command};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::{
     io::{Read, Write},
     sync::{Arc, mpsc},
@@ -34,7 +34,13 @@ fn main() {
             let outcome = (|| -> Result<Value, sc_agent::Error> {
                 let cli = parsed.map_err(|e| sc_agent::error("decidr.usage", e))?;
                 let (model, agent_role, input, batch, workers, timeout_secs) = match cli.command {
-                    Command::Models => return Ok(json!(sc_agent::PROVIDERS)),
+                    Command::Models => {
+                        return sc_agent::model_catalog(
+                            TOOL,
+                            cli.config_dir.as_deref(),
+                            cli.project.as_deref(),
+                        );
+                    }
                     Command::Doctor => {
                         return sc_agent::doctor(
                             TOOL,

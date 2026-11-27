@@ -523,7 +523,10 @@ fn provider_keys(py: Python<'_>) -> Py<PyAny> {
 }
 #[pyfunction]
 fn models(py: Python<'_>) -> Py<PyAny> {
-    raw(py, sc_agent::result(Ok(json!(sc_agent::PROVIDERS))))
+    raw(
+        py,
+        sc_agent::result(sc_agent::model_catalog("decidr", None, None)),
+    )
 }
 #[pyfunction(signature=(*,general_log=None,tool="sitr"))]
 fn languages(py: Python<'_>, general_log: Option<&Bound<'_, PyAny>>, tool: &str) -> Py<PyAny> {
