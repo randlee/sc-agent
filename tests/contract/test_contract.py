@@ -214,21 +214,30 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
         release, arrived = threading.Event(), threading.Event()
         def respond(body):
             arrived.set()
-            release.wait(10)
+            release.wait()
             return 200, {}, ANSWER
         cancel, results = self.api.Cancel(), []
+        call = None
         with server([None], respond) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            call = threading.Thread(target=lambda: results.append(self.api.send(
-                json.dumps(REQUEST), project="contract", agent_role="contract", config_dir=self.directory.name,
-                general_log=self.api.logger("decidr")["value"], base_url=url, timeout_secs=60.0, cancel=cancel)))
-            call.start()
-            self.assertTrue(arrived.wait(10))
-            cancel.cancel()
-            call.join(5)
-            ended = not call.is_alive()
-            release.set()
-            call.join(10)
-        self.assertTrue(ended, "send waited for the reply after cancel")
+            def send():
+                results.append(self.api.send(
+                    json.dumps(REQUEST), project="contract", agent_role="contract", config_dir=self.directory.name,
+                    general_log=self.api.logger("decidr")["value"], base_url=url, timeout_secs=60.0, cancel=cancel))
+
+            call = threading.Thread(target=send)
+            try:
+                call.start()
+                self.assertTrue(arrived.wait(10), f"request did not arrive; received={received!r}, results={results!r}")
+                cancel.cancel()
+                call.join(5)
+                self.assertFalse(call.is_alive(), f"send waited after cancel; received={received!r}, results={results!r}")
+            finally:
+                cancel.cancel()
+                release.set()
+                if call.is_alive():
+                    call.join(10)
+        self.assertEqual(len(received), 1)
+        self.assertEqual(len(results), 1)
         self.assertEqual(self.error(results[0])["id"], "decision.cancelled")
 
     def test_log_returns_an_event_the_logger_refuses(self):
