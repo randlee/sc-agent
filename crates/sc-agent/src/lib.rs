@@ -1,7 +1,4 @@
-use sc_config::{
-    AppName, ConfigError, EnvSource, FileSource, Resolved, Slot, Source, SourceKind,
-    StandardContext, StandardLayers, ValueSource,
-};
+use sc_config::{ConfigError, EnvSource, FileSource, Layers, Resolved, Source, ValueSource};
 use sc_observability::{LoggerConfig, ServiceName, v2::Logger};
 use serde::{
     Deserialize, Serialize,
@@ -12,6 +9,7 @@ use std::{
     cell::Cell,
     collections::BTreeMap,
     ffi::OsString,
+    num::{NonZeroU32, NonZeroUsize},
     path::{Path, PathBuf},
     sync::{
         Arc, Condvar, Mutex, MutexGuard, TryLockError,
@@ -191,6 +189,7 @@ fn deserialize_model_release<'de, D: serde::Deserializer<'de>>(
 type Models = BTreeMap<String, ModelEntry>;
 type Prompts = BTreeMap<String, String>;
 /// A setting's accepted key, default and Rust type, declared together.
+#[derive(Clone)]
 pub struct Setting {
     key: String,
     default: Option<Value>,
@@ -220,14 +219,12 @@ fn layers(tool: &str) -> String {
     )
 }
 fn missing_setting(tool: &str, path: &str) -> Error {
+    let prefix = prefix(tool);
+    let key = path.to_uppercase().replace('.', "__");
+    let files = layers(tool);
     error(
         "config.missing_setting",
-        format!(
-            "Set {path} through {}{}, {}",
-            prefix(tool),
-            path.to_uppercase().replace('.', "__"),
-            layers(tool)
-        ),
+        format!("Set {path} through {prefix}{key}, {files}"),
     )
 }
 fn at<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
@@ -242,12 +239,10 @@ impl Settings {
         self.get::<Option<&str>>("project")?
             .filter(|s| !s.is_empty())
             .ok_or_else(|| {
+                let files = layers(&self.tool);
                 error(
                     "config.missing_project",
-                    format!(
-                        "Set project/phase through --project, SC_PROJECT, {}",
-                        layers(&self.tool)
-                    ),
+                    format!("Set project/phase through --project, SC_PROJECT, {files}"),
                 )
             })
     }
@@ -258,11 +253,7 @@ pub struct Configuration {
     pub files: Vec<Value>,
 }
 fn config_error(failure: ConfigError) -> Error {
-    let id = match failure.code() {
-        "APP.INVALID_NAME" => "config.name",
-        _ => "config.invalid",
-    };
-    error(id, failure)
+    error("config.invalid", failure)
 }
 fn invalid_setting(resolved: &Resolved, path: &str, failure: impl ToString) -> Error {
     let sources = resolved
@@ -290,9 +281,9 @@ pub fn config(
 ) -> Result<Configuration, Error> {
     let mut schema = vec![
         Setting::new::<Option<String>>("project", Some(Value::Null)),
-        Setting::new::<usize>("workers", Some(json!(8))),
+        Setting::new::<NonZeroUsize>("workers", Some(json!(8))),
         Setting::new::<Models>("models", Some(json!({}))),
-        Setting::new::<u32>("max_sends", Some(json!(5))),
+        Setting::new::<NonZeroU32>("max_sends", Some(json!(5))),
         Setting::new::<Prompts>("decidr", Some(json!({}))),
         Setting::new::<String>("model", Some(json!("jev"))),
         Setting::new::<f64>("timeout_secs", Some(json!(120))),
@@ -303,7 +294,7 @@ pub fn config(
             Setting::new::<u16>(format!("{}.port", provider.name), None),
         ]);
     }
-    let schema = schema.iter().chain(extra).collect::<Vec<_>>();
+    schema.extend_from_slice(extra);
     let env_prefix = prefix(tool);
     let variables = environment
         .iter()
@@ -327,44 +318,36 @@ pub fn config(
                 .map(|(_, value)| PathBuf::from(value))
         })
         .map_or_else(home_root, Ok)?;
-    let app = AppName::new("sc-agent").map_err(config_error)?;
-    let mut layers = StandardLayers::new(StandardContext::new(app, vec![], vec![]));
+    let mut layers = Layers::new();
     for Setting { key, default, .. } in &schema {
         if let Some(value) = default {
             let keys = key.rsplit('.');
             let value = keys.fold(value.clone(), |value, key| json!({key:value}));
             let source = ValueSource::new(Source::default("default"), value);
-            layers = layers.insert(Slot::Defaults, source);
+            layers = layers.push(source);
         }
     }
     let mut files = Vec::new();
-    for (slot, folder) in [(Slot::User, Some(global.as_path())), (Slot::Local, local)] {
-        if let Some(folder) = folder {
-            for name in [
-                "sc-agent.json".into(),
-                format!("{tool}.json"),
-                format!("{tool}.local.json"),
-            ] {
-                let path = folder.join(name);
-                files.push(json!({"path":path,"exists":path.exists()}));
-                layers = layers.insert(
-                    slot,
-                    FileSource::new(path)
-                        .optional()
-                        .accepts(schema.iter().map(|d| d.key.split('.').collect::<Vec<_>>())),
-                );
-            }
+    for folder in [Some(global.as_path()), local].into_iter().flatten() {
+        for name in [
+            "sc-agent.json".into(),
+            format!("{tool}.json"),
+            format!("{tool}.local.json"),
+        ] {
+            let path = folder.join(name);
+            files.push(path.clone());
+            layers = layers.push(
+                FileSource::new(path)
+                    .optional()
+                    .accepts(schema.iter().map(|d| d.key.split('.').collect::<Vec<_>>())),
+            );
         }
     }
-    let flags = project
-        .map(|project| json!({"project":project}))
-        .unwrap_or(json!({}));
+    let flags = project.map_or(json!({}), |project| json!({"project":project}));
+    let flags = ValueSource::new(Source::flag("--project"), flags);
     let resolved = layers
-        .insert(
-            Slot::Env,
-            EnvSource::new(env_prefix, variables).alias("SC_PROJECT", ["project"]),
-        )
-        .flags(flags)
+        .push(EnvSource::new(env_prefix, variables).alias("SC_PROJECT", ["project"]))
+        .push(flags)
         .resolve()
         .map_err(config_error)?;
     for declaration in &schema {
@@ -373,6 +356,7 @@ pub fn config(
             (declaration.validate)(value).map_err(|e| invalid_setting(&resolved, path, e))?;
         } else if let Some((parent, _)) = path.rsplit_once('.')
             && at(&resolved.value, parent).is_some()
+            && provider_named(parent).is_ok_and(|p| p.url.is_empty())
         {
             let failure = missing_setting(tool, path);
             return Err(invalid_setting(&resolved, parent, failure));
@@ -382,33 +366,57 @@ pub fn config(
         values: resolved.value.clone(),
         tool: tool.into(),
     };
-    workers(config.get::<usize>("workers")?)
-        .map_err(|_| invalid_setting(&resolved, "workers", "must be positive"))?;
-    if config.get::<u32>("max_sends")? == 0 {
-        return Err(invalid_setting(&resolved, "max_sends", "must be positive"));
-    }
     Duration::try_from_secs_f64(config.get("timeout_secs")?)
         .map_err(|e| invalid_setting(&resolved, "timeout_secs", e))?;
-    for entry in config.get::<Models>("models")?.values() {
+    let models = config.get::<Models>("models")?;
+    for entry in models.values() {
         provider_named(&entry.provider)?;
     }
-    let rows = resolved
-        .rows()
+    let prompt_start = schema.len();
+    let builtin = PROVIDERS.iter().flat_map(|p| p.models);
+    let names = builtin.flat_map(|r| [r.0, r.1]);
+    for model in names.chain(models.keys().map(String::as_str)) {
+        let key = format!("decidr.{model}-system-prompt");
+        schema.push(Setting::new::<String>(key, None));
+    }
+    let mut prompt_sources = vec![resolved.clone()];
+    for path in &files {
+        let input = Layers::new().push(FileSource::new(path).optional());
+        prompt_sources.push(input.resolve().map_err(config_error)?);
+    }
+    for source in prompt_sources {
+        let prompts = at(&source.value, "decidr").and_then(Value::as_object);
+        for (prompt, _) in prompts.into_iter().flatten() {
+            let path = format!("decidr.{prompt}");
+            if !schema.iter().skip(prompt_start).any(|d| d.key == path) {
+                return Err(invalid_setting(&source, &path, "unknown setting"));
+            }
+        }
+    }
+    let mut rows = schema
+        .iter()
+        .filter(|d| at(&resolved.value, &d.key).is_none())
+        .map(|d| (d.key.clone(), (Value::Null, Source::default("default"))))
+        .collect::<BTreeMap<_, _>>();
+    for row in resolved.rows() {
+        rows.insert(row.path.join("."), (row.value, row.source));
+    }
+    let rows = rows
         .into_iter()
-        .map(|row| {
-            let source = match row.source.kind {
-                SourceKind::Flag => "--project".into(),
-                _ => row.source.name,
-            };
-            let value = match row.value {
+        .map(|(path, (value, source))| {
+            let value = match value {
                 Value::Null => "unset".into(),
                 Value::String(text) => text,
                 other => other.to_string(),
             };
-            json!({"path":row.path.join("."),"value":value,"source":source})
+            json!({"path":path,"value":value,"source":source.name})
         })
         .collect();
     files.reverse();
+    let files = files
+        .into_iter()
+        .map(|path| json!({"exists":path.exists(),"path":path}))
+        .collect();
     Ok(Configuration {
         config,
         rows,
@@ -1436,10 +1444,8 @@ impl Route<'_> {
 static SESSION_APPEND: Mutex<()> = Mutex::new(());
 
 pub fn workers(value: impl TryInto<usize>) -> Result<usize, Error> {
-    value
-        .try_into()
-        .ok()
-        .filter(|v| *v > 0)
+    NonZeroUsize::new(value.try_into().unwrap_or(0))
+        .map(NonZeroUsize::get)
         .ok_or_else(|| error("decidr.invalid_workers", "workers must be positive"))
 }
 
@@ -1783,29 +1789,22 @@ pub fn model_catalog(
     project: Option<&str>,
 ) -> Result<Value, Error> {
     let (configuration, ..) = load(tool, config_dir, project)?;
-    let mut catalog = json!(PROVIDERS);
-    let providers = catalog
-        .as_array_mut()
-        .ok_or_else(|| error("config.models", "provider catalog is not an array"))?;
-    for provider in providers {
-        let Some(name) = provider
-            .get("name")
-            .and_then(Value::as_str)
-            .map(str::to_owned)
-        else {
-            continue;
-        };
-        let Some(models) = provider.get_mut("models").and_then(Value::as_array_mut) else {
-            continue;
-        };
-        for (alias, entry) in configuration.config.get::<Models>("models")? {
-            if entry.provider == name {
-                models.push(json!([alias, entry.id, entry.released]));
+    let configured = configuration.config.get::<Models>("models")?;
+    let mut catalog = Vec::new();
+    for provider in PROVIDERS {
+        let mut row = json!(provider);
+        if let Some(models) = row.get_mut("models").and_then(Value::as_array_mut) {
+            for (alias, entry) in &configured {
+                if entry.provider == provider.name {
+                    models.push(json!([alias, entry.id, entry.released]));
+                }
             }
         }
+        catalog.push(row);
     }
-    Ok(catalog)
+    Ok(json!(catalog))
 }
+
 pub fn doctor(
     tool: &str,
     config_dir: Option<&Path>,
