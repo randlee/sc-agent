@@ -32,7 +32,7 @@
 
 ### Context
 
-sc-agent logs through sc-observability. The `decidr` CLI, the `sitr` CLI and the sc-decidr wheel already link the sc-observability crate. Two kinds of log exist: the general log (diagnostics, searched for issues) and session logs (the long-term record of every model query and response, analysed later and loaded into SQLite, ADR-SAG-0002).
+sc-agent logs through sc-observability. The `decidr` CLI, the `sitr` CLI and the sc-decidr wheel already link the sc-observability crate. Two kinds of log exist: the general log (diagnostics, searched for issues) and session logs (the long-term record of every successful model query and its response, analysed later and loaded into SQLite, ADR-SAG-0002).
 
 **Problem Statement:**
 
@@ -87,7 +87,7 @@ A wheel is not an entry point and has no row: it writes to the Logger its caller
 
 ### Rationale
 
-The entry point is the only code that knows the process's lifetime, so it is the only correct owner of the Logger: it obtains the Logger before the first general-log record and flushes after each call. Exposing the crate's own Logger from the wheel keeps one copy and one queue in the process and needs no Python package. Fixed paths keep every log in one known place for audit, and a separate `sessions/` tree lets tools and the later SQLite load read every session with a path glob. The session log is the record of every Jev query from every tool, so it cannot be turned off and is never rotated; it stays small enough because `project` changes over time.
+The entry point is the only code that knows the process's lifetime, so it is the only correct owner of the Logger: it obtains the Logger before the first general-log record and flushes after each call. Exposing the crate's own Logger from the wheel keeps one copy and one queue in the process and needs no Python package. Fixed paths keep every log in one known place for audit, and a separate `sessions/` tree lets tools and the later SQLite load read every session with a path glob. The session log is the record of every successful Jev query from every tool, so it cannot be turned off and is never rotated; it stays small enough because `project` changes over time.
 
 ### Consequences
 

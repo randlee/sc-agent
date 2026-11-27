@@ -14,21 +14,22 @@
 
 ### Requirement Statement
 
-Definitions: JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A query is one decision request sent through `send`, or one request of a `send_batch` call. A query's session log is the JSONL file `sessions.jsonl`, and its run log is the JSONL file `runs.jsonl` in the same directory. A session row is the one line of a session log that records one query sent to a model and its result. A Run is the context object through which every query is sent (ADR-SAG-0019 decision 14). A link record is the one line of a run log that ties a Run to the session row that answered one of its queries.
+Definitions: JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A query is one decision request sent through `send`, or one request of a `send_batch` call. A query's session log is the JSONL file `sessions.jsonl`, and its run log is the JSONL file `runs.jsonl` in the same directory. A session row is the one line of a session log that records one query whose model call succeeded and its result. A failed call is one that ends in an error (auth, busy, quota, network or cancel). A Run is the context object through which every query is sent (ADR-SAG-0019 decision 14). A link record is the one line of a run log that ties a Run to the session row that answered one of its queries.
 
 **MUST statements:**
 
 - Session logs MUST be written as JSONL.
-- For every query sent to a model, sc-agent MUST append a session row to the query's session log.
+- For every query whose model call succeeded, sc-agent MUST append a session row to the query's session log.
 - For every session row that answers a Run's query, sc-agent MUST append one link record to the query's run log.
 
 **MUST NOT statements:**
 
 - sc-agent MUST NOT append more than one session row for one query.
+- sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.
 
 ### Rationale
 
-Every query from every tool lands in the session log, so a tool references a row by `session_id` instead of copying the query or the response. The run log records which Run each row answered, because one row can answer many Runs through cache hits. What a row and a link record hold, and that both logs are never rotated or pruned, is in ADR-SAG-0021 (Session log).
+Every successfully answered query from every tool lands in the session log, while errors go to the general log, so a tool references a row by `session_id` instead of copying the query or the response. The run log records which Run each row answered, because one row can answer many Runs through cache hits. What a row and a link record hold, and that both logs are never rotated or pruned, is in ADR-SAG-0021 (Session log).
 
 ### Success Criteria
 
@@ -39,6 +40,7 @@ Every query from every tool lands in the session log, so a tool references a row
 - [ ] One Python `sc_agent.send` adds one row to a `sessions.jsonl` under `<log_root>/sessions/`.
 - [ ] A `decidr` CLI send with `repo` `github.com/randlee/sc-agent`, `agent_role` `rust-developer` and `project` `phase-b` adds one row to `sessions.jsonl`.
 - [ ] A query sent four times after three busy responses adds one row.
+- [ ] A send that fails with a 401 adds no row to `sessions.jsonl`.
 - [ ] A batch of 3 through a Run adds 3 link records to `runs.jsonl` in the same directory.
 
 ### Dependencies
