@@ -54,4 +54,3 @@ Two consumers each rebuilt the wheel boundary and the copies diverged (ADR-SAG-0
 - ADR-SAG-0019
 - ADR-SAG-0021
 - REQ-SAG-0018
-- REQ-SAG-0022
