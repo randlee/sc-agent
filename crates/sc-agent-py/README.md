@@ -29,7 +29,8 @@ is stored and returned by the Run's methods.
 `run.cancel()` stops unfinished requests and keeps completed results.
 `run.sends_to(provider)` returns a boolean envelope or the resolution error;
 `sc_agent.TYPESAFE` identifies TypeSafe for a consent check. `provider_keys()`
-returns the provider table's credential variable names. `models()` returns the
+returns an envelope whose `value` is the provider table's credential variable names,
+for example `sc_agent.provider_keys()["value"]` on success. `models()` returns the
 same table envelope as `decidr models`. Select a provider through
 `models.<name>.provider` in configuration.
 

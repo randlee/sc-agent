@@ -139,7 +139,9 @@ class Wheel(Isolated):
     def test_provider_keys_typesafe_and_run_sends_to(self):
         catalog = self.api.models()
         self.assertTrue(catalog["ok"], catalog)
-        self.assertEqual(self.api.provider_keys(), [row["key"] for row in catalog["value"] if row["key"]])
+        self.assertEqual(self.api.provider_keys(), {"ok": True, "value": [row["key"] for row in catalog["value"] if row["key"]]})
+        for bad_call in (lambda: self.api.provider_keys(1), lambda: self.api.provider_keys(bogus=1)):
+            self.assertEqual(self.error(bad_call())["id"], "sc_agent_py.invalid_option")
         self.assertEqual(self.api.TYPESAFE, "typesafe")
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY":"contract-secret"}):
             with self.api.Run(tool="decidr", model="haiku", agent_role="contract", config_dir=self.directory.name,
