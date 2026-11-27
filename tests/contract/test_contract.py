@@ -114,7 +114,7 @@ class Wheel(Isolated):
 
     def test_repeated_run_exit_reports_close_failure_to_unraisable_hook(self):
         events = []
-        run = self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract",
+        run = self.api.Run(tool="decidr", project="contract",
                            agent_role="contract", config_dir=self.directory.name)
         with patch.object(sys, "unraisablehook", events.append):
             self.assertFalse(run.__exit__(None, None, None))
@@ -274,7 +274,7 @@ class Wheel(Isolated):
                 self.assertEqual(self.error(function(*args, **kwargs))["id"], "sc_agent_py.invalid_option")
 
     def test_run_methods_explicitly_flush_success_and_error_results(self):
-        run = self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract",
+        run = self.api.Run(tool="decidr", project="contract",
                            agent_role="contract", config_dir=self.directory.name)
         run.__exit__(None, None, None)  # Closed sink: background writes cannot produce this oracle.
         self.assertEqual(self.error(run.cancel())["id"], "log.flush")
@@ -676,7 +676,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             raise ValueError("controlled sleep callback refusal")
         with server([(429, {"Retry-After": "0"}, {"error": "provider busy lower body"})]) as (url, received), \
                 patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            with self.api.Run(tool="decidr", tool_version="test", cache=False, project="contract", agent_role="contract",
+            with self.api.Run(tool="decidr", project="contract", agent_role="contract",
                               config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"],
                               base_url=url, sleep=rejected) as run:
                 result = run.send(REQUEST)
