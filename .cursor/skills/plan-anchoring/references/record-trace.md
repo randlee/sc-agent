@@ -1,0 +1,93 @@
+---
+name: record-trace
+version: 0.16.1
+description: Judge REQ, ADR and NFR records against the locked anchors with Jev to find over-specification and conflicts; jev_judge.py trace writes the matrix, change_report.py --trace renders it.
+---
+
+# Record trace
+
+**Cleaning up records.** Follow `references/record-cleanup.md`; this page defines the trace and its remedies.
+
+## When to use
+
+After anchors are locked, to check REQ, ADR and NFR records against what the owner said: which serve an anchor, which exceed it, which contradict it. Not a gate; it informs record edits. A run with `duplicates_pass: false` is not finished until a re-run shows `true` or remaining items are recorded as owner conflicts.
+
+## Command
+
+```
+python3 scripts/jev_judge.py trace --anchors <plan>/anchors.json --source <repo> [--source <repo> ...] [--raptor <checkout>] [--index <raptor-index.json> ...] [--ids ids.txt] [--no-provenance] [--history <checkout>] [--out-dir DIR] [--no-overlap] [--dry-run | --answers-file F] [--workers N]
+python3 scripts/change_report.py --trace DIR/trace-<UTC>.json [--annotations notes.json] [--out <folder>] [--guidance-url URL]
+```
+
+The report's folder, name, saved sources, index entry and wording follow `references/html-reporting-guidelines.md`.
+
+- Records come only from Raptor. `--source <repo>` runs Raptor's importer (`--raptor <checkout>`) on a repository with a `.raptor/` inventory; `--index` takes a saved Raptor import index as Raptor wrote it. Nothing parses record Markdown, splits headings or finds obligations in text. Errors: missing Raptor `DEPENDENCY.RAPTOR` (with install command), no inventory `RAPTOR.NO_INVENTORY`, importer failure `RAPTOR.IMPORT_FAILED`.
+- Each record: `id`, `kind` (ADR for Raptor's decisions; REQ or NFR from the id), `repository` (Raptor's URN; no per-record file path), the whole served record (`raptor`), its import `diagnostics`, and `obligations`: Raptor's `requirement_statement.statements` verbatim, or, when Raptor serves none, `statements: null` with a note. Never synthesized.
+- `--ids` (one id per line) traces only those; an unserved requested id is listed in `not_served` with Raptor's reason, never read another way.
+- Jev receives the served record (`state.record.raptor`).
+- Only `locked` anchors are traced (`ANCHOR.NONE_LOCKED` if none).
+- One Jev request per record x anchor with four choice questions: `relates`, `serves`, `conflicts`, `exceeds`. Live calls use the batch client and need `allow_remote_judge: true`. `--dry-run` shows cell requests on stdout and writes nothing; `--answers-file` keys are `<record>/<anchor>`, `<anchor>`, `<item>/overlap`, `overlap` or `*`.
+
+## Classification
+
+The script classifies each cell from P(yes); Jev is never asked for counts.
+
+| Class | Rule (defaults; `--conflict-threshold`, `--relation-threshold`, `--exceeds-threshold`) | Colour |
+|---|---|---|
+| conflicts | P(conflicts) >= 0.5 | red |
+| exceeds | P(serves) or P(relates) >= 0.6, and P(exceeds) >= 0.6 | yellow |
+| serves | P(serves) >= 0.6 | green |
+| related | P(relates) >= 0.6 | blue |
+| none | otherwise | grey |
+
+## Overlap
+
+After the cells, `trace` finds records restating each other (off with `--no-overlap`). Candidate pairs: per anchor column, every deduplicated pair of records with non-`none` cells; the lower id is the item. One request per item: `state.item` is the record as text (id and title, statement paragraph or an ADR's context, then each statement), each partner statement a choice question `<partner id, - as _>_s<i>`: does the item already state it (yes, no, unclear)? Statements are Raptor's; an ADR's decision is one block. Requests use the cells' batch path, consent rule and `--answers-file`, in a second batch since pairs depend on cell answers; a dry run shows no overlap requests.
+
+`yes` with confidence >= 0.6 is a duplicate statement, `yes` >= 0.4 possible, otherwise none (`--duplicate-threshold`, `--possible-threshold`). `overlap` lists every answer as `{item, partner, statement_index, statement, choice, confidence, session_id, class}`; `summary.per_record` gives `statements_restated` and `statements_total`; `summary.fully_restated` records whose every statement is duplicated elsewhere. The page opens on the "Anchors × Records" grid tab. "Duplicates" lists duplicated statements by record pair (pair, statement number from 1, statement, confidence, proposals naming it; a row opens a side panel with both records' statements), then "Possible duplicates" likewise, unbadged and not affecting `duplicates_pass`, then deletion candidates, "Fully restated records" (`fully_restated`). `records_with_no_relation` appears on the grid tab as "Not covered by any anchor", likewise unbadged and not affecting it, each judged on its own merits (Interpretation). With a duplicate the tab label carries a red "(!)" badge and the count; with none it reads "Duplicates 0"; with `--no-overlap` it says not run. Trace JSON keeps `cells` and `overlap` apart.
+
+The output pushes the caller to correct, never choosing the correction: every duplicate carries `action: "correct"`; `data.duplicates_to_correct` counts them; `data.duplicates_pass` is `false` while there is one (exit stays 0; `null` with `--no-overlap`); `data.message` and the top of the Duplicates tab say "N duplicate statements must be corrected: keep each obligation in one record and delete the other copy. See Correcting duplicates in references/record-trace.md." Rows link to that section (this installed file, or `--guidance-url`). The trace's `actions` holds this wording and "Fully restated: every statement is in another record; delete this record." Which copy to keep is the caller's judgement, per the rules below.
+
+## Correcting duplicates
+
+Duplication is a defect: each obligation lives in exactly one record. Correct every reported duplicate in the same pass; never keep both copies or resolve one by rewording.
+
+Home order:
+
+1. A rule shared across repositories lives in its owning repository's records; dependents' copies are deleted.
+2. A consumer-visible, testable obligation (wire format, file another tool reads, config key, CLI or public API behaviour) lives in a REQ, or an NFR for a quality attribute. An ADR keeps its decision and reasons and cites the REQ id instead of restating it.
+3. A choice between alternatives, with its reasons, lives in the ADR; a REQ restating the choice deletes it.
+4. Between two REQs, the record whose title and subject it belongs to; failing that, the higher judge-jev score.
+
+The correction is a deletion: remove the duplicate, adding only the keeping record's id, only where the remaining text would not read without it. Don't reword the kept statement in that pass. Delete a record left with no statements or fully restated elsewhere.
+
+These rules alone decide where an obligation lives; statement age does not. Provenance matters only when copies differ in meaning: a conflict, not a duplicate, sent to the owner with both texts quoted, provenance showing which wording is stale.
+
+Outside record cleanup, the deduplicating agent decides; during it, every correction is an owner-approved proposal (`references/record-cleanup.md`, which takes precedence).
+
+Verify: re-run `trace` with overlap; the corrected pair must show no duplicate; run judge-jev once per edited record.
+
+## Outputs
+
+`<out-dir>/trace-<UTC>.json` (schema `plan-anchoring/trace/2`; default out-dir `<plan>/anchor-runs`): model, session ids, question digests, thresholds; per cell the answers, P(yes) and class; the Raptor revision and indexes, `not_served`; per record what Raptor serves; per anchor the whole anchor; `anchors_path` and `index` paths relative to `--repository-root` when inside it; `summary.per_anchor` counts, `records_with_no_relation`, `conflicts`; with overlap on, `overlap`, `summary.per_record` and `summary.fully_restated` (`overlap: null` when off).
+
+**Provenance.** For every record in a red or yellow cell or duplicate (item and partner), `records[].provenance` is one `{statement_index, statement, provenance: {commit, date, summary}}` per statement: the oldest commit whose diff adds the statement's first 60 characters (`git log -S`, argument lists, no shell), in the `--source` repository, or for `--index` the `--history` checkout (default: `--repository-root`'s checkout). No repository or match: `provenance` null, `reason` says why. `--no-provenance` skips it. Mechanical (when text arrived, not who decided it); which side is stale is the reviewer's call.
+
+`change_report.py --trace --annotations` takes `anchor-cleanup-proposer` annotations from record cleanup: `[{record, anchor | duplicate, clauses, what, remedy, jev_disputed, provenance, stale, no_provenance}]`. `record`+`anchor` name a cell; `duplicate` an overlap statement by `<item>/<partner>/<statement_index>` (from 0; the page numbers from 1). `provenance` is copied from the trace, `[{record, statement, commit, date, summary}]`; `stale` is `{record, statement, reason}` or null; `no_provenance` why no history was found. They merge into the report, not the trace (no re-trace), only into exceeds and conflicts cells and duplicate or possible overlap statements, as `author: anchor-cleanup-proposer`, labelled as the proposer's text, not Jev's. Others go to `data.warnings`, unmerged. `data.unannotated_cells` lists each red cell, yellow cell and duplicate lacking an annotation with `provenance` or `no_provenance`.
+
+The page is a records x anchors grid; every panel uses one layout (templates/trace-panel.xhtml.j2): a title and plain-language headed blocks. Row header (record): title, kind, repository, status, version, statements (modal as MUST / MUST NOT), requirement text, decision, rationale, acceptance criteria. Column header (anchor): statement, owner quote, scope, deterministic check. A coloured cell shows "Record × Anchor — class"; yellow and red cells first show what exceeds or conflicts (offending clauses quoted; "Reviewer disputes Jev:" when the reviewer disagrees) and the proposed remedy (marked "reviewer text, not Jev"), then the anchor, record statements and one Jev P(yes) line. Copy JSON keeps every field.
+
+### Field lists (move to Raptor)
+
+Panel fields are declarative lists in `change_report.py`: `RECORD_FIELDS` and `ANCHOR_PANEL_FIELDS`, each `(label, dotted path)` in reading order. `field_blocks(obj, fields, keep)` renders one as headed blocks; `--fields path,...` keeps only some paths. This sole Raptor-to-HTML seam belongs in Raptor long term (a per-kind render method taking a field filter). When Raptor offers that, delete `field_blocks`, the field lists and `_texts`, and call Raptor.
+
+Errors (exit 2): `ANCHOR.NONE_LOCKED`, `DEPENDENCY.RAPTOR`, `RAPTOR.NO_INVENTORY`, `RAPTOR.IMPORT_FAILED`, `INPUT.MALFORMED` / `INPUT.EMPTY` / `VALIDATION.INPUT` for a bad Raptor index or duplicate ids, `FIXTURE.MISSING`, `POLICY.REMOTE_JUDGE_DISABLED`; `change_report.py --trace` reports a non-trace file as `TRACE.INVALID`.
+
+## Interpretation
+
+The cleanup level (`aggressive`, `standard`, `conservative`; `references/record-cleanup.md`, Levels) sets how yellow cells and unanchored records are treated. Deletion is always the default; rewording is rare, with a stated justification.
+
+- Red (conflicts): contradicts the owner. Resolve every conflict at every level, never by automatic cut, stating resolution and source of truth: cut the conflicting text (the anchor is the owner's word), reconcile the wording (justified), or, when the anchor is wrong, ask the owner to change it (a proposed anchor). Then re-trace.
+- Yellow (exceeds): exceeds the anchor; highly suspect. Remedy per level (`references/record-cleanup.md` Levels). At `aggressive`, excess believed necessary goes to the owner as a one-line proposed anchor (record id, statement, why needed), deleted until anchored. A record left empty is deleted.
+- "Not covered by any anchor": treat per level (same Levels). A missing anchor is not a reason to delete, and existing is not a reason to keep.
+- Annotations are the anchor-cleanup-proposer's reading, with the git history it found; `jev_disputed: true` means it disagrees with Jev's class: read the record before acting.

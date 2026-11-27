@@ -1,6 +1,6 @@
 ---
 name: installation-and-troubleshooting
-version: 0.13.0
+version: 0.16.1
 description: Installing plan-anchor into a repository or a parent folder with the plan-anchor-installer skill (install.py), per-repository overrides and per-folder upgrades, the anchor tracker this install is rendered for and how to switch it, the CLIs and credentials plan-anchoring depends on (python3, PyYAML, bd, sc-compose, jq, TypeSafe API key), minimum versions, PATH issues in Claude Code, Codex and Cursor environment policy, validation, and known issues.
 ---
 
@@ -15,6 +15,8 @@ python3 "<skill dir>/scripts/anchor_tracker.py" resolve      # selected tracker,
 which bd && bd --version
 which sc-compose && sc-compose --version
 which jq && jq --version
+# record operations only (jev_judge.py trace):
+test -x "${RAPTOR:-raptor}/.venv/bin/python" && test -f "${RAPTOR:-raptor}/scripts/extract.py" && echo "Raptor ok"
 test -n "$TYPESAFE_API_KEY" && echo "environment key set (preferred)" || echo "environment key absent; check the documented platform credential store"
 ```
 
@@ -52,7 +54,7 @@ The installed `anchor_tracker.py resolve` knows only the tracker this install is
 
 Exit codes follow the plugin convention shared by every script: 0 the command ran (selected); 2 any error, invalid arguments included (`VALIDATION.INPUT`), with the typed error object on stdout. The only exit codes are 0, 2 and 130 (interrupt); a negative answer from a command that ran is exit 0 with the outcome in `data`. Act on the error code (`SETTINGS.*`, `BEADS.*`, `TRACKER.*`, `DEPENDENCY.PYYAML`, `REPO.NOT_FOUND`, `SCRIPT.INTERNAL`), not the exit status. Output is always the JSON envelope `{success, data, error}`; the reported `cli_path` is absolute.
 
-**Settings file.** Synaptic Canvas packages keep settings at `<folder>/.sc/<package>/settings.yaml`: YAML, snake_case keys, committed to git, never secrets. The file in effect is the nearest one at or above the working directory, stopping before the home directory: the repository's own file, else a parent folder's (see Parent-folder installs). `plan_anchor_settings.py set` changes the file in effect (or creates one at the repository root, `git rev-parse --show-toplevel`); `anchor_tracker.py write` records the tracker in the repository's own file. For this package:
+**Settings file.** Packages keep settings at `<folder>/.sc/<package>/settings.yaml`: YAML, snake_case keys, committed to git, never secrets. The file in effect is the nearest one at or above the working directory, stopping before the home directory: the repository's own file, else a parent folder's (see Parent-folder installs). `plan_anchor_settings.py set` changes the file in effect (or creates one at the repository root, `git rev-parse --show-toplevel`); `anchor_tracker.py write` records the tracker in the repository's own file. For this package:
 
 ```yaml
 # .sc/plan-anchor/settings.yaml
@@ -63,7 +65,7 @@ anchor_tracker: bd
 plan_dir: "docs/plans/phase-b"
 ```
 
-`plan_dir` names the current phase folder, `docs/plans/phase-<current>` with the phase id written out: a relative path with forward slashes and no `..` or `<placeholder>` (`SETTINGS.INVALID_PLAN_DIR`). Set it with `plan_anchor_settings.py set plan_dir docs/plans/phase-<id>`; the installer and `anchor_tracker.py write` keep it. The optional `issue_url_template` (unset by default) turns tracker ids in the change report into links: an http(s) URL holding `{id}` once (`SETTINGS.INVALID_ISSUE_URL` otherwise), set with `plan_anchor_settings.py set issue_url_template 'https://tracker.example/issues/{id}'` and kept the same way (`references/change-report.md`). `schema_version` must be `1`. Unknown or duplicate keys are rejected (`SETTINGS.UNKNOWN_KEY`, `SETTINGS.MALFORMED`) so a typo never falls back silently. When the file or its `anchor_tracker` key is absent, the installer detects (rule 2) and the installed `anchor_tracker.py` selects `bd`, checked against disk. `.gitignore` may ignore `.sc/sessions/` and `.sc/*/cache/`, never this file; `write` reports `settings_ignored_by_git` when it is.
+`plan_dir` names the current phase folder, `docs/plans/phase-<current>` with the phase id written out: a relative path with forward slashes and no `..` or `<placeholder>` (`SETTINGS.INVALID_PLAN_DIR`). Set it with `plan_anchor_settings.py set plan_dir docs/plans/phase-<id>`; the installer and `anchor_tracker.py write` keep it. The optional `reports_dir` (default `site/reports/plan-anchor`) is the repository website folder every plan-anchor HTML report and its sources are saved in: a relative path like `plan_dir` (`SETTINGS.INVALID_REPORTS_DIR` otherwise), set with `plan_anchor_settings.py set reports_dir <folder>` and kept by the installer (`references/html-reporting-guidelines.md`). The optional `issue_url_template` (unset by default) turns tracker ids in the change report into links: an http(s) URL holding `{id}` once (`SETTINGS.INVALID_ISSUE_URL` otherwise), set with `plan_anchor_settings.py set issue_url_template 'https://tracker.example/issues/{id}'` and kept the same way (`references/change-report.md`). `schema_version` must be `1`. Unknown or duplicate keys are rejected (`SETTINGS.UNKNOWN_KEY`, `SETTINGS.MALFORMED`) so a typo never falls back silently. When the file or its `anchor_tracker` key is absent, the installer detects (rule 2) and the installed `anchor_tracker.py` selects `bd`, checked against disk. `.gitignore` may ignore `.sc/sessions/` and `.sc/*/cache/`, never this file; `write` reports `settings_ignored_by_git` when it is.
 
 This install is rendered for `bd`; both gates read anchor and question beads with it. The sprint text comes from the caller, from wherever it wrote it (`item_file`).
 
@@ -100,6 +102,19 @@ Settings are your choice: keep `<folder>/.sc/plan-anchor/settings.yaml` to retai
 - bd is supported only where a Dolt-backed `.beads/` already exists (`.beads/metadata.json` has `"backend": "dolt"`). On these systems bd needs an upstream Dolt (DoltHub or a Dolt server); provisioning one is outside this skill, so never run `bd init` for plan anchoring.
 
 - Install: `brew install steveyegge/beads/bd` (or your team's tap), or with Go `go install github.com/steveyegge/beads/cmd/bd@latest` and `$HOME/go/bin` on PATH.
+
+**Raptor** (only for `jev_judge.py trace`, which reads REQ, NFR and ADR records; every other command runs without it)
+
+Raptor is the only reader of records: it imports them from a repository's `.raptor/` inventory into an index of record fields and obligation statements. `trace` runs Raptor's importer as an external program (`<checkout>/.venv/bin/python <checkout>/scripts/extract.py`); it imports no Raptor module and parses no Markdown. Install once per machine (needs a Rust toolchain; same revision as judge-jev):
+
+```bash
+git clone https://github.com/randlee/raptor raptor
+git -C raptor checkout 8ce2be8363318be2f7c2e2b79d1f646399cab2fd
+uv venv raptor/.venv -p 3.11 && uv pip install -p raptor/.venv/bin/python ./raptor markdown
+RAPTOR="$(pwd)/raptor"     # pass --raptor "$RAPTOR" to trace
+```
+
+Each repository whose records are traced needs a `.raptor/` inventory (Raptor's README). Without Raptor, `trace --source` returns `DEPENDENCY.RAPTOR`; a repository with no inventory returns `RAPTOR.NO_INVENTORY`. A saved Raptor index (`extract.py --output`) can be passed with `--index` instead of `--source`.
 
 **sc-compose** (1.8.0 or newer)
 
@@ -170,6 +185,7 @@ Use the full path, or `export PATH="/opt/homebrew/bin:$PATH"` for the session.
 | bd | 1.x, Dolt-backed `.beads/` only | `--parent`, `--labels`, `--silent`, `--body-file`, `show --json`, `children --json`, `comment --file`, `ready --exclude-label` |
 | sc-compose | 1.8.0 | strict render, declared-variable validation, and `--check-render` |
 | jq | any current release | gate agents read question-override beads |
+| Raptor | revision `8ce2be83` | `jev_judge.py trace` only: the import index (`metadata.repository`, `requirements`, `decisions`, `diagnostics.issues`) |
 | Jev | `jev-latest` | pin a version once thresholds are tuned |
 
 ## PATH troubleshooting
@@ -201,7 +217,6 @@ The smoke `judge` runs the full gating path offline: expect `not_addressed` for 
 - `AUTH.CREDENTIALS` with the key set: it contains whitespace or a control character (usually a pasted trailing newline), or TypeSafe rejected it.
 - `QUESTIONS.ROLES`: a question override renamed a question ID. Keep the default IDs.
 - `ANCHOR.NOT_LOCKED`: `--anchor` named a proposed or retired anchor. Lock it, or use `--all`.
-- `JEV.CONTEXT_EXCEEDED`: the item could not be shortened below 2,000 characters and still fit. Shorten the evidence account; at the development gate drop the test section first.
 - `DECIDR.RESPONSE_INVALID` repeatedly: sc-decidr rejected the provider response shape. Check for a proxy between you and `api.typesafe.ai`, and confirm the installed wheel matches the generated client version.
 - `VALIDATION.ANCHORS` from `judge`: run `validate` and fix the listed problems; the usual cause is a hand edit. Use `update`, `retire` and `promote`.
 - `DECIDR.RATE_LIMITED` under parallel gates: reduce concurrency; the shared client reports its observed attempts.
