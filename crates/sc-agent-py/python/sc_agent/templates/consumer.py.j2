@@ -292,9 +292,16 @@ def call_result(run: Any, request: str | Mapping[str, Any], *, cache: bool | Non
 
 
 def call_batch_results(run: Any, requests: Sequence[str | Mapping[str, Any]], *, cache: bool | None = None,
-                       on_each: Callable[[int, Result[Reply, ClientError]], object] | None = None,
                        abort_on: frozenset[str] = frozenset(), category_codes: Mapping[str, str] | None = None,
                        repository_root: str = ".", consent_what: str = "The request text") -> Result[list[Result[Reply, ClientError]], ClientError]:
+    return _call_batch_results(run, requests, cache=cache, abort_on=abort_on, category_codes=category_codes,
+                               repository_root=repository_root, consent_what=consent_what)
+
+
+def _call_batch_results(run: Any, requests: Sequence[str | Mapping[str, Any]], *, cache: bool | None = None,
+                        on_each: Callable[[int, Result[Reply, ClientError]], object] | None = None,
+                        abort_on: frozenset[str] = frozenset(), category_codes: Mapping[str, str] | None = None,
+                        repository_root: str = ".", consent_what: str = "The request text") -> Result[list[Result[Reply, ClientError]], ClientError]:
     start = _start(run, abort_on, category_codes, repository_root, consent_what)
     if isinstance(start, Err):
         return start
@@ -676,9 +683,9 @@ def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings
         if not line.ok:
             failed.append(line)
     if results is None:
-        sent = call_batch_results(run, [job.body for job in jobs], cache=False if settings.repeat > 1 else cache,
-                                  on_each=deliver, abort_on=abort_on, category_codes=category_codes,
-                                  repository_root=repository_root, consent_what=consent_what)
+        sent = _call_batch_results(run, [job.body for job in jobs], cache=False if settings.repeat > 1 else cache,
+                                   on_each=deliver, abort_on=abort_on, category_codes=category_codes,
+                                   repository_root=repository_root, consent_what=consent_what)
         if errors:
             return Err(errors[0] if isinstance(errors[0], ClientError) else ClientError("DECIDR.ERROR", str(errors[0])))
         if isinstance(sent, Err):
