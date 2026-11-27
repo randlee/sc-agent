@@ -22,8 +22,12 @@ ANSWER = {"model": "jev-1.14.0", "answers": {"q": {"type": "choice", "choice": "
 INTERRUPT_CHILD = os.environ.get("SC_INTERRUPT_CHILD") == "1"
 
 
+class IPv6ThreadingHTTPServer(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+
 @contextmanager
-def server(replies, respond=None):
+def server(replies, respond=None, host="127.0.0.1"):
     received = []
     lock = threading.Lock()
 
@@ -49,11 +53,13 @@ def server(replies, respond=None):
             self.end_headers()
             self.wfile.write(data)
 
-    http = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server_class = IPv6ThreadingHTTPServer if ":" in host else ThreadingHTTPServer
+    http = server_class((host, 0), Handler)
     thread = threading.Thread(target=http.serve_forever)
     thread.start()
     try:
-        yield f"http://127.0.0.1:{http.server_port}/v1", received
+        url_host = f"[{host}]" if ":" in host else host
+        yield f"http://{url_host}:{http.server_port}/v1", received
     finally:
         http.shutdown()
         thread.join(15)
@@ -676,12 +682,12 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                 return run_9.send(json.dumps(REQUEST))
         with patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}), server(
                 [(429, {}, {}), (429, {}, {}), (200, {}, ANSWER)]) as (first, _), server(
-                [(200, {}, ANSWER)]) as (second, _):
+                [(200, {}, ANSWER)], host="::1") as (second, _):
             worker = threading.Thread(target=lambda: results.append(send(first, sleep)))
             worker.start()
             try:
                 self.assertTrue(entered.wait(10), "busy reply did not reach holdoff")
-                other = send(second.replace("127.0.0.1", "localhost"), lambda _: None)
+                other = send(second, lambda _: None)
                 self.assertTrue(other["ok"], other)
             finally:
                 finished.set()

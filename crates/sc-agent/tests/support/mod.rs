@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 use std::{
     fs,
     io::{BufRead, BufReader, Read, Write},
-    net::{TcpListener, TcpStream},
+    net::{SocketAddr, TcpListener, TcpStream},
     path::PathBuf,
     sync::{
         Arc,
@@ -138,7 +138,13 @@ pub struct Stub {
 }
 impl Stub {
     pub fn new(replies: Vec<Reply>) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let listener = TcpListener::bind("127.0.0.1:0")?;
+        Self::at(replies, "127.0.0.1:0".parse()?)
+    }
+    pub fn at(
+        replies: Vec<Reply>,
+        address: SocketAddr,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let listener = TcpListener::bind(address)?;
         let url = format!("http://{}/v1", listener.local_addr()?);
         let owned_listener = listener.try_clone()?;
         let stop = Arc::new(AtomicBool::new(false));
