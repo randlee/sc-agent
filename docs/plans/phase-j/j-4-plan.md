@@ -1,6 +1,6 @@
 # j-4 plan: the consumer template on the Run
 
-Base: sprint/j-3 @db860455. `:N` = `crates/sc-agent-py/python/sc_agent/templates/consumer.py.j2` at that commit (668 lines). Wheel API = j-2 and j-3 planned end states (j-2-plan.md, j-3-plan.md); their code on this branch is partial. Written by reading the code; no j-4 code yet.
+Base: sprint/j-3 @0a44e3e0. `:N` = `crates/sc-agent-py/python/sc_agent/templates/consumer.py.j2` at that commit (668 lines). Wheel API = j-2 and j-3 planned end states (j-2-plan.md, j-3-plan.md); their code on this branch is partial. Written by reading the code; no j-4 code yet.
 
 ## Goal
 
@@ -171,7 +171,7 @@ with client.open_run(model=args.model, repeat=settings.repeat, workers=args.work
 ```
 Paths: general log `<PLAN_ANCHOR_LOG_ROOT|~/.sc-agent>/logs/plan-anchor.log.jsonl` (wheel default); sitr calls in the judge-jev render log to `judge-jev.log.jsonl` (via `tool=`). Consent: `.sc/<client>/settings.yaml` `allow_remote_judge`, read only for a TypeSafe Run.
 
-## Deletions (file:line at db860455)
+## Deletions (file:line at 0a44e3e0)
 
 consumer.py.j2: `import hashlib` :28, `import threading` :35, `Container` :36, `TYPE_CHECKING`/`Cancel` :37-40, `_logger_handle`/`_logger_lock` :45-46, `_CLIENT_IDS` :55, `_failure` :150-153, `_failed` :156-157, `_logger` :168-177, per-call Run parameters and interrupt synthesis :247-305, `remote_preflight` :341-343, `BATCH_MAX_WORKERS`, `BATCH_RETRIES` :347-348, BatchSettings `model/timeout/max_workers` :357,:361-362, `StreamedResult.attempts` :380, `_sha256`/`questions_digest` :389-395, `fixture_attempt` :416-440, `/1` line body :511-539, `check_fixture_coverage` :567-579, `encode_result_line(redact=)` :635, `total_attempts`/`streamed_result` :641-655, `_logger` use in `extract` :664-666.
 tests: test_template.py:33 assertions on `fixture_attempt`/`total_attempts`; loopback.py `test_keyboard_interrupt_cancels_the_passed_cancel` :310, `test_wheel_keyboard_interrupt_reaches_each_consumer_cancel_handler` :353, `test_logger_initialization_is_serialized` :172 (no module logger remains).
@@ -187,7 +187,7 @@ tests: test_template.py:33 assertions on `fixture_attempt`/`total_attempts`; loo
 
 ## Budget
 
-Gate count (non-test Rust, scripts/gate/rewrite.py): this branch measures 2,440/2,500 today (j-3 partial). j-4 restructure: 0 Rust. New capability: sitr `tool=` about +6 Rust (rule-7 item 1); without it, 0. Python (not in the gate): consumer.py.j2 roughly 668 -> 700 (about -150 deleted, +~110 new incl. run_batch/ResultLine/redaction, +~70 moved Result block); testing.py about +45 new. Restructure net zero is a Rust rule; the template's Python delta is reported, not capped.
+Gate count (non-test Rust, scripts/gate/rewrite.py): this branch measures 2,503/2,500 today (j-3 partial). j-4 restructure: 0 Rust. New capability: sitr `tool=` about +6 Rust (rule-7 item 1); without it, 0. Python (not in the gate): consumer.py.j2 roughly 668 -> 700 (about -150 deleted, +~110 new incl. run_batch/ResultLine/redaction, +~70 moved Result block); testing.py about +45 new. Restructure net zero is a Rust rule; the template's Python delta is reported, not capped.
 
 ## Plan decisions (rule 0, no question to Rand)
 
