@@ -225,7 +225,7 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
                     json.dumps(REQUEST), project="contract", agent_role="contract", config_dir=self.directory.name,
                     general_log=self.api.logger("decidr")["value"], base_url=url, timeout_secs=60.0, cancel=cancel))
 
-            call = threading.Thread(target=send)
+            call = threading.Thread(target=send, daemon=True)
             try:
                 call.start()
                 self.assertTrue(arrived.wait(10), f"request did not arrive; received={received!r}, results={results!r}")
