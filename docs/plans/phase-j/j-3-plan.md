@@ -131,7 +131,7 @@ CLI: no new flag; `decidr send` writes `tool: "decidr"`, `tool_version` = the CL
 
 - crates/sc-agent/src/lib.rs: `static SESSION_APPEND` :1186; the append block :1366-1394 and `config.session`; the `sends` local :1296 and `Route.sends`; `send_json` :1128 and `body.clone()` :1127; the duplicate sc-sha call :871-876; the `response` field :1398.
 - crates/sc-agent-py (j-2 plan): the "tool is required" check.
-- Tests: `req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once` (sending.rs:599; replaced by `j3_session_write_failure`); `req_sag_0005_one_mib_request_is_recorded_whole` (records.rs:59) is deleted ONLY if rule 7 below is answered "accept the sink's 1 MiB event cap"; otherwise it is kept.
+- Tests: `req_sag_0002_session_append_failure_keeps_provider_outcome_and_logs_once` (sending.rs:599; replaced by `j3_session_write_failure`). `req_sag_0005_one_mib_request_is_recorded_whole` (records.rs:59) is replaced by `j3_largest_request_that_fits_is_recorded_whole` (owner, 2026-11-24, approved): the largest request whose enveloped row fits the sink's 1 MiB event cap is sent and its row read back whole; one byte larger is still sent whole to the model, writes no row and no link, and returns `log.session_write` (logged once).
 - Nothing else: `model_with`, Route fields, wire impls, batch code are untouched.
 
 ## Budget (rewrite.py counting; against the 2,500 phase cap, starting from j-2's planned end about 2,345)
@@ -155,6 +155,8 @@ Over the cap the dev stops at the gate and reports the line; the first cut is th
 - decidr cli.rs: `j3_decidr_row_identity` (row under `<log_root>/sessions/github.com/randlee/sc-agent/rust-developer/phase-b/`, tool `decidr`, tool_version = CLI version).
 - Python (tests/contract/test_session.py new, test_contract.py): `test_run_id_and_links` (26-char ULID = links' run_id; two Runs differ), `test_missing_tool_refuses` (None and "" for tool/tool_version from every call), `test_run_cache_override` (`cache=False` -> 2 stub requests), `test_session_rows_reader` (child process, `<CLIENT>_LOG_ROOT` set, temporary git repo: found ids; missing id `session.not_found`; no log-root parameter), `test_cli_and_wheel_rows_match` (equal except session_id/tool/tool_version), `test_sitr_default_log_root` (REQ-SAG-0003, `SC_AGENT_HOME`), existing `test_session_and_general_log_share_fixed_root` kept; `test_native_stub_declares_every_export` still passes.
 
-## Open point for the owner (rule 7)
+## Owner rulings applied (2026-11-24, j1-bead.txt:352-354)
 
-`JsonlFileSink::write` (sc-observability 1.5.0 sinks.rs:347-366) writes a `LogEvent` envelope and refuses any event over 1 MiB (`MAX_LOG_EVENT_BYTES`, constants.rs:23). Rows through the sink are therefore enveloped and a request near 1 MiB cannot be recorded, which conflicts with ANC-004 ("Input is limited by model context"). This plan uses the sink as ADR-SAG-0021 says; the choice is recorded in the report.
+1. Event-wrapped session row accepted: the sink is used as ADR-SAG-0021 says; the row is the `fields` of the event (see External contracts).
+2. 1 MiB: the largest request that fits is recorded whole; a larger one gives no row and a `log.session_write` error (the request itself is still sent whole, so ANC-004 holds). Covered by `j3_largest_request_that_fits_is_recorded_whole`; the failure path is the `log.session_write` rule in Run::send step 4.
+3. A cache hit writes no new row and returns the `session_id` of the row holding the result with `cached: true`: Run::send step 3 (link only; the value is the older row's `result.value`, whose `session_id` is that row's). Checked against `j3_cache_hit_one_model_call`.
