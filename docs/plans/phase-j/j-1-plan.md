@@ -1066,15 +1066,11 @@ Deletes: provider name "local"; the runner.model override
 New capability: True
 Source: scratchpad/j-1-signatures.md section 'Units O4/O5'; code sprint/j-1 @f8bb024a (rule-3 review PASS).
 
-24. O45-04: KEYS: decider endpoint keys, laya.model removed
+24. O45-04: KEYS: local endpoint keys derived from PROVIDERS; laya.model removed
 
 Public-surface item J1-O45-04 (units O4 decider local row / O5 keyless haiku-luna).
 
-Exact Rust:
-```rust
-const KEYS: &[&str] = &[..., "laya.host", "laya.port", "decider_4b.host", "decider_4b.port", "decider_2b.host", "decider_2b.port", ...]
-```
-Replaces: lib.rs:171-181
+Rule: fixed configuration names remain in `KEYS`; `<provider.name>.host` and `<provider.name>.port` are derived from `PROVIDERS` rows whose URL is empty. Adding a local row therefore needs no duplicate key-list entry.
 Deletes: "laya.model"
 New capability: True
 Source: scratchpad/j-1-signatures.md section 'Units O4/O5'; code sprint/j-1 @f8bb024a (rule-3 review PASS).

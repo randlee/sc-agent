@@ -217,12 +217,6 @@ const KEYS: &[&str] = &[
     "project",
     "workers",
     "models",
-    "laya.host",
-    "laya.port",
-    "decider_4b.host",
-    "decider_4b.port",
-    "decider_2b.host",
-    "decider_2b.port",
     "max_sends",
     "decidr.luna-system-prompt",
     "decidr.haiku-system-prompt",
@@ -283,6 +277,13 @@ pub fn config(
     environment: &[(OsString, OsString)],
     project: Option<&str>,
 ) -> Result<Configuration, Error> {
+    let mut keys = KEYS.iter().map(|key| key.to_string()).collect::<Vec<_>>();
+    keys.extend(
+        PROVIDERS
+            .iter()
+            .filter(|p| p.url.is_empty())
+            .flat_map(|p| ["host", "port"].map(|key| format!("{}.{key}", p.name))),
+    );
     let global = global
         .map(Path::to_path_buf)
         .or_else(|| {
@@ -309,7 +310,7 @@ pub fn config(
                     slot,
                     FileSource::new(path)
                         .optional()
-                        .accepts(KEYS.iter().map(|key| key.split('.').collect::<Vec<_>>())),
+                        .accepts(keys.iter().map(|key| key.split('.').collect::<Vec<_>>())),
                 );
             }
         }
@@ -352,7 +353,7 @@ pub fn config(
         provider_named(&entry.provider)?;
     }
     let provenance = resolved.rows();
-    let rows = KEYS
+    let rows = keys
         .iter()
         .map(|key| {
             let row = provenance.iter().find(|row| row.path.join(".") == *key);
