@@ -6,6 +6,7 @@ use std::{
     sync::{Arc, mpsc},
 };
 mod cli;
+const TOOL: &str = "decidr";
 fn main() {
     let cancelled = Arc::new(sc_agent::Cancel::default());
     let flag = cancelled.clone();
@@ -26,7 +27,7 @@ fn main() {
     let doctor = parsed
         .as_ref()
         .is_ok_and(|cli| matches!(cli.command, Command::Doctor));
-    let value = match signal.and_then(|()| sc_agent::default_logger("decidr")) {
+    let value = match signal.and_then(|()| sc_agent::default_logger(TOOL)) {
         Err(error) => sc_agent::result(Err(error)),
         Ok(logger) => {
             let logger = Arc::new(logger);
@@ -37,7 +38,7 @@ fn main() {
                 }
                 if matches!(cli.command, Command::Doctor) {
                     return sc_agent::doctor(
-                        "decidr",
+                        TOOL,
                         cli.config_dir.as_deref(),
                         cli.project.as_deref(),
                     );
@@ -55,7 +56,7 @@ fn main() {
                 };
                 let run = sc_agent::Run::new(
                     sc_agent::RunArgs {
-                        tool: "decidr".into(),
+                        tool: TOOL.into(),
                         agent_role,
                         model: Some(model),
                         project: cli.project,

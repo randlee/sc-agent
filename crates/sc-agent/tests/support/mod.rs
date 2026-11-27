@@ -299,3 +299,21 @@ pub fn run(options: Options, logger: &Arc<Logger>) -> Result<sc_agent::Run, sc_a
     run.keyring = Box::new(keyring);
     Ok(run)
 }
+
+// A pinned provider/model is fixture data for Route wire tests; product selection uses Run.
+pub fn pinned_model(
+    provider: &str,
+    name: &str,
+) -> Result<(&'static sc_agent::Provider, String), sc_agent::Error> {
+    let provider = sc_agent::PROVIDERS
+        .iter()
+        .find(|p| p.name == provider)
+        .ok_or_else(|| sc_agent::error("types.unknown_provider", provider))?;
+    let id = provider
+        .models
+        .iter()
+        .find(|(alias, id, _)| *alias == name || *id == name)
+        .map(|(_, id, _)| *id)
+        .unwrap_or(name);
+    Ok((provider, id.into()))
+}

@@ -221,6 +221,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                         {
                             "DECIDR_LOG_ROOT": str(root),
                             "CONSUMER_TEST_LOG_ROOT": str(root),
+                    "PLAN_ANCHOR_LOG_ROOT": str(root), "JUDGE_JEV_LOG_ROOT": str(root),
                             "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
                             "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
                         },
@@ -273,6 +274,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                 {
                     "DECIDR_LOG_ROOT": str(root),
                     "CONSUMER_TEST_LOG_ROOT": str(root),
+                    "PLAN_ANCHOR_LOG_ROOT": str(root), "JUDGE_JEV_LOG_ROOT": str(root),
                     "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
                     "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
                 },
@@ -318,6 +320,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                 {
                     "DECIDR_LOG_ROOT": str(root),
                     "CONSUMER_TEST_LOG_ROOT": str(root),
+                    "PLAN_ANCHOR_LOG_ROOT": str(root), "JUDGE_JEV_LOG_ROOT": str(root),
                     "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
                     "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
                 },
@@ -359,6 +362,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                 {
                     "DECIDR_LOG_ROOT": str(root),
                     "CONSUMER_TEST_LOG_ROOT": str(root),
+                    "PLAN_ANCHOR_LOG_ROOT": str(root), "JUDGE_JEV_LOG_ROOT": str(root),
                     "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
                     "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
                 },

@@ -33,7 +33,7 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
             sc_agent::ModelEntry {
                 released: None,
                 provider: provider.into(),
-                id: sc_agent::model(&opts.model, Some(provider))?.1,
+                id: pinned_model(provider, &opts.model)?.1,
             },
         );
         opts.environment.extend([
@@ -62,7 +62,7 @@ fn req_sag_0201_0007_provider_wires_and_responses_preserve_values() -> Test {
         assert_eq!(first.path, path);
         if ["typesafe", "laya"].contains(&provider) {
             let mut expected = request();
-            expected["model"] = json!(sc_agent::model(model, Some(provider))?.1);
+            expected["model"] = json!(pinned_model(provider, model)?.1);
             assert_eq!(first.body, expected);
         } else {
             let schema = if provider == "anthropic" {

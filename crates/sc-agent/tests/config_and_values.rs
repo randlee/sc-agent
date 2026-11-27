@@ -1,5 +1,5 @@
 pub mod support;
-use sc_agent::{Answer, config, digest, error, key, model, result, schema, slug};
+use sc_agent::{Answer, config, digest, error, key, model_with, result, schema, slug};
 use serde_json::json;
 use std::{cell::RefCell, ffi::OsString, fs};
 use support::*;
@@ -278,12 +278,42 @@ fn req_sag_0101_models_use_provider_tables_and_reseller_passthrough() -> Test {
         ("custom/id", Some("nous"), "custom/id"),
         ("future-model", Some("together"), "future-model"),
     ] {
-        assert_eq!(model(name, provider)?.1, id);
+        let configured = provider
+            .map(|provider| {
+                (
+                    name.into(),
+                    sc_agent::ModelEntry {
+                        provider: provider.into(),
+                        id: id.into(),
+                        released: None,
+                    },
+                )
+            })
+            .into_iter()
+            .collect();
+        assert_eq!(model_with(name, &configured)?.1, id);
     }
-    assert_eq!(model("laya", None)?.0.name, "laya");
-    assert_eq!(model("decider", None)?.1, "decider-4b-v2.1");
-    assert!(model("missing", None).is_err());
-    assert!(model("jev", Some("missing")).is_err());
+    assert_eq!(model_with("laya", &Default::default())?.0.name, "laya");
+    assert_eq!(
+        model_with("decider", &Default::default())?.1,
+        "decider-4b-v2.1"
+    );
+    assert!(model_with("missing", &Default::default()).is_err());
+    assert!(
+        model_with(
+            "jev",
+            &[(
+                "jev".into(),
+                sc_agent::ModelEntry {
+                    provider: "missing".into(),
+                    id: "unused".into(),
+                    released: None
+                }
+            )]
+            .into()
+        )
+        .is_err()
+    );
     Ok(())
 }
 
@@ -301,15 +331,15 @@ fn configured_models(
 #[test]
 fn req_sag_0101_configured_models_override_and_extend_the_built_in_table() -> Test {
     let none = configured_models(json!({}))?;
-    let (provider, id) = sc_agent::model_with("jev", None, &none.models)?;
+    let (provider, id) = model_with("jev", &none.models)?;
     assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-latest"));
     let pinned = configured_models(json!({
         "jev": {"provider": "typesafe", "id": "jev-1.14.0"},
         "myjev": {"provider": "typesafe", "id": "jev-next"}
     }))?;
-    let (provider, id) = sc_agent::model_with("jev", None, &pinned.models)?;
+    let (provider, id) = model_with("jev", &pinned.models)?;
     assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-1.14.0"));
-    let (provider, id) = sc_agent::model_with("myjev", None, &pinned.models)?;
+    let (provider, id) = model_with("myjev", &pinned.models)?;
     assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-next"));
     Ok(())
 }
