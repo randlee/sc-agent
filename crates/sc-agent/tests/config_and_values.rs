@@ -774,3 +774,40 @@ fn generated_answer_schema_rejects_invalid_answer_fields() -> Test {
     }
     Ok(())
 }
+
+#[test]
+fn array_shaped_answers_and_boxes_are_schema_mismatches() -> Test {
+    let mut accepted = Vec::new();
+    for (question, answer) in [
+        (json!({"type":"noul"}), json!(["noul", 0.5])),
+        (
+            json!({"type":"choice","criteria":{"a":"A"}}),
+            json!(["choice", "outside", 0.8, {}]),
+        ),
+        (
+            json!({"type":"score","criteria":["low"]}),
+            json!(["score",0.5,0.8,{"0":"low"},{"0":1.0}]),
+        ),
+        (json!({"type":"box"}), json!(["box", null, null])),
+        (
+            json!({"type":"box"}),
+            json!({"type":"box","box":[0.1,0.9,0.2,0.8],"confidence":null}),
+        ),
+    ] {
+        match schema(
+            &json!({"questions":{"q":question}}),
+            &json!({"answers":{"q":answer}}),
+        ) {
+            Ok(()) => accepted.push(answer),
+            Err(failure) => assert_eq!(
+                serde_json::to_value(failure)?["id"],
+                "decision.schema_mismatch"
+            ),
+        }
+    }
+    assert!(
+        accepted.is_empty(),
+        "accepted array-shaped values: {accepted:?}"
+    );
+    Ok(())
+}
