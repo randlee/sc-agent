@@ -363,13 +363,29 @@ impl PyRun {
         keyring_lookup: Option<&Bound<'_, PyAny>>,
         rest: Option<&Bound<'_, PyDict>>,
     ) -> Self {
+        let rejected = |name: Option<&str>, e: Error| {
+            if name.is_none() && general_log.is_none_or(|value| value.is_none()) {
+                return sc_agent::result(Err(e));
+            }
+            let original = json!({"ok":false, "error":e});
+            let called = std::cell::Cell::new(false);
+            let reported = respond_value(general_log, name.unwrap_or("decidr"), |_| {
+                called.set(true);
+                Err(e)
+            });
+            if called.get() {
+                reported
+            } else {
+                finish_error(original, "log.write", reported)
+            }
+        };
         let tool = match arg::<String>(tool, "tool") {
             Ok(tool) => tool.unwrap_or_default(),
-            Err(e) => return Self(Err(sc_agent::result(Err(e)))),
+            Err(e) => return Self(Err(rejected(None, e))),
         };
         let tool_version = match arg::<String>(tool_version, "tool_version") {
             Ok(version) => version.unwrap_or_default(),
-            Err(e) => return Self(Err(sc_agent::result(Err(e)))),
+            Err(e) => return Self(Err(rejected(None, e))),
         };
         if tool.is_empty() || tool_version.is_empty() {
             let args = sc_agent::RunArgs {
@@ -377,9 +393,10 @@ impl PyRun {
                 tool_version,
                 ..Default::default()
             };
-            let result = sc_agent::Run::new(args, None, Arc::new(sc_agent::Cancel::default()))
-                .map(|_| Value::Null);
-            return Self(Err(sc_agent::result(result)));
+            return Self(
+                sc_agent::Run::new(args, None, Arc::new(sc_agent::Cancel::default()))
+                    .map_err(|e| rejected(None, e)),
+            );
         }
         let created = (|| {
             extras(extra, rest)?;
@@ -424,19 +441,7 @@ impl PyRun {
             }
             Ok(run)
         })();
-        Self(created.map_err(|e| {
-            let original = json!({"ok":false, "error":e});
-            let called = std::cell::Cell::new(false);
-            let reported = respond_value(general_log, &tool, |_| {
-                called.set(true);
-                Err(e)
-            });
-            if called.get() {
-                reported
-            } else {
-                finish_error(original, "log.write", reported)
-            }
-        }))
+        Self(created.map_err(|e| rejected(Some(&tool), e)))
     }
     #[getter]
     fn run_id(&self) -> Option<String> {
