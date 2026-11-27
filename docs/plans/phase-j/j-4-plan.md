@@ -4,7 +4,7 @@ Base: sprint/j-3 @db860455. `:N` = `crates/sc-agent-py/python/sc_agent/templates
 
 ## Goal
 
-Rand (ANC-015, ANC-016, rule 0): "judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools"; "derivative tools should defer to the default tool rules and not use injection path for production code (test only)". Measurable: the rendered module opens one `sc_agent.Run(tool=CLIENT_NAME, tool_version=TOOL_VERSION, ...)` per command and sends only through it; it creates no Logger, computes no digest, run id or attempt count, and writes `jev-batch-result/2` lines with exactly the 14 generic fields; every template function returns `Ok`/`Err`; `grep -nE 'hashlib|threading|_logger|Cancel|general_log=logger' consumer.py.j2` finds nothing.
+Rand (ANC-015, ANC-016, rule 0): "judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools"; "derivative tools should defer to the default tool rules and not use injection path for production code (test only)". Measurable: the rendered module opens one `sc_agent.Run(tool=CLIENT_NAME, tool_version=TOOL_VERSION, ...)` per command and sends only through it; it creates no Logger, computes no digest, run id or attempt count, and writes `jev-batch-result/2` lines with exactly the 14 generic fields; every template function returns `Ok`/`Err` (`open_run` included); `grep -nE 'hashlib|threading|_logger|Cancel|general_log=logger' consumer.py.j2` finds nothing.
 
 ## Layout
 
@@ -48,20 +48,13 @@ class Reply:
     session_id: str | None
     cached: bool
 
-class FailedRun:                   # returned by open_run when the wheel cannot be imported
-    provider: None; run_id: None
-    def __init__(self, error: ClientError) -> None    # self.error
-    def __enter__(self) -> FailedRun
-    def __exit__(self, *exc: object) -> bool          # False
-    def cancel(self) -> None                          # no-op
-
 def load_wheel() -> Result[Any, ClientError]          # Err(DEPENDENCY.SC_DECIDR); sc_agent imported only here
 def open_run(*, model: str | None = None, project: str | None = None, cache: bool | None = None,
              repeat: int = 1, config_dir: str | None = None, timeout_secs: float | None = None,
-             workers: int | None = None, seams: Mapping[str, Any] | None = None) -> Any
+             workers: int | None = None, seams: Mapping[str, Any] | None = None) -> Result[Any, ClientError]
     # sc_agent.Run(tool=CLIENT_NAME, tool_version=TOOL_VERSION, agent_role=CLIENT_NAME, model=model,
     #   project=project, cache=False if repeat > 1 else cache, config_dir=..., timeout_secs=..., workers=...,
-    #   **(seams or {}))  | FailedRun.  seams keys: general_log, base_url, sleep, keyring_lookup (tests only)
+    #   **(seams or {}))) ; Err(DEPENDENCY.SC_DECIDR) when the wheel cannot be imported.  seams keys: general_log, base_url, sleep, keyring_lookup (tests only)
 
 def call_result(run: Any, request: str | Mapping[str, Any], *, abort_on: frozenset[str] = frozenset(),
                 category_codes: Mapping[str, str] | None = None, repository_root: str = ".",
@@ -85,16 +78,15 @@ class StreamedResult(NamedTuple): failed: list[ResultLine]
 def batch_settings(args: Any, prefix: str, *, check_threshold: Callable[[Any], Any]) -> Result[BatchSettings, ClientError]
 def fixture_answer(job: BatchJob, fixture: Mapping[str, Any]) -> Result[Reply, ClientError]   # Reply(answers, None, False)
 def result_line(job: BatchJob, settings: BatchSettings, run_id: str | None, project: str | None,
-                result: Result[Reply, ClientError], *,
-                result_fields: Callable[[BatchJob, BatchSettings, Mapping[str, Any] | None], Mapping[str, Any]] | None = None) -> ResultLine
+                result: Result[Reply, ClientError]) -> ResultLine
+    # generic only: min_confidence = min `confidence` over the answers; verdict = "pass" if >= threshold else "fail";
+    # leaning = `choice` of the lowest-confidence answer; all three None on Err or when no answer has a confidence
 def run_batch(run: Any | None, jobs: Sequence[BatchJob], settings: BatchSettings, *,
               on_line: Callable[[ResultLine, Mapping[str, Any] | None], object],
               project: str | None = None, fixture: Mapping[str, Any] | None = None,
               on_request: Callable[[Any], object] | None = None, abort_on: frozenset[str] = frozenset(),
               category_codes: Mapping[str, str] | None = None, repository_root: str = ".",
-              consent_what: str = "The request text",
-              result_fields: Callable[[BatchJob, BatchSettings, Mapping[str, Any] | None], Mapping[str, Any]] | None = None
-              ) -> Result[StreamedResult, ClientError]
+              consent_what: str = "The request text") -> Result[StreamedResult, ClientError]
 def answers_for(lines: Sequence[Mapping[str, Any]]) -> Result[dict[str, dict[str, Any]], ClientError]
     # {request_id: answers}; one sc_agent.session_rows(ids, agent_role=CLIENT_NAME, project=p) per distinct line project
 BEARER_RE: re.Pattern[str]          # r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{16,}"
@@ -103,7 +95,7 @@ def encode_result_line(line: ResultLine) -> str    # _asdict, error -> {code,mes
 {% if sitr %}def extract(language: str, source: str, query: str) -> Result[Any, ClientError]   # sc_agent.sitr.query(..., tool=CLIENT_NAME){% endif %}
 ```
 
-`safe_id`, `validate_request_lines`, `load_answers_fixture` keep their parameters and return `Result[...]` instead of the dict record. Unchanged verbatim: `ClientError`, `from_tool_error`, `CANCELED_EXIT`, `canceled_envelope`, the four answer NamedTuples, `typed_answer`, `wheel_error` (minus the `_CLIENT_IDS` branch), `DECIDR_CATEGORY_CODES`, `_ALLOWED_ABORT_ON`, `BatchJob`, `batch_request_id`, `BATCH_FIXTURE_ERROR`, `BATCH_ID_RE`, `REMOTE_JUDGE_*`, `REPO_ROOT_HELP`, fixture validators, `write_stdout_line`, `json_answers`. No other public name.
+`safe_id`, `validate_request_lines`, `load_answers_fixture` keep their parameters and return `Result[...]` instead of the dict record. Unchanged verbatim: `ClientError`, `from_tool_error`, `CANCELED_EXIT`, `canceled_envelope`, the four answer NamedTuples, `typed_answer`, `wheel_error` (minus the `_CLIENT_IDS` branch), `DECIDR_CATEGORY_CODES`, `_ALLOWED_ABORT_ON`, `BatchJob`, `batch_request_id`, `BATCH_FIXTURE_ERROR`, `BATCH_ID_RE`, `REMOTE_JUDGE_*`, `REPO_ROOT_HELP`, fixture validators, `write_stdout_line`, `json_answers`. No other public name. `ToolError` stays for the tool's own `Result` errors (moved block, used by consumer logic); `ClientError` stays for wheel failures (carries status, retry_after_ms, attempts, data); the moved code already uses both and `from_tool_error` converts.
 
 Rust (new capability, rule-7 item 1): `#[pyfunction] languages|queries|query|run(..., tool: Option<String>)` in crates/sc-agent-py/src/lib.rs :484-527; `respond(py, general_log, tool.as_deref().unwrap_or("sitr"), ..)`.
 
@@ -135,7 +127,7 @@ def fake_open_run(module: types.ModuleType, script: Mapping[str, Any]) -> Iterat
 | `Ok/Err/Result/ToolError/err/utf8_stdio/run_main` | judge-jev result.py.j2:27-126 and plan-anchor's copy (deleted in j-5/j-6); in the template: the `Record` result dicts :44 | `Record` as a result type |
 | `Reply` | success dict in `decode_result` :204-205, :209-210 | keys position, line, digests, usage, model_answered, attempts |
 | `load_wheel` -> Result | `load_wheel` :160-165, `_failure` :150-153, `_failed` :156-157 | `_failure`, `_failed` |
-| `open_run`, `FailedRun` | per-call Run wiring in `call_result` :247-262 and `call_batch_results` :270-296; `_logger` :168-177, `_logger_handle`/`_logger_lock` :45-46 | per-call `model, project, cancel, config_dir, general_log, timeout_secs, workers`; the module Logger; `import threading` |
+| `open_run` -> Result | per-call Run wiring in `call_result` :247-262 and `call_batch_results` :270-296; `_logger` :168-177, `_logger_handle`/`_logger_lock` :45-46 | per-call `model, project, cancel, config_dir, general_log, timeout_secs, workers`; the module Logger; `import threading` |
 | `call_result`, `call_batch_results` on a Run | same, :247-305 | `on_result` callback, `sc_agent.Cancel()`, synthesized cancelled results :263-265, :297-299 |
 | consent gate in `_start` keyed on `run.provider == sc_agent.TYPESAFE` | `_start` :231-244 (consent on every call), `remote_preflight` :341-343 | `remote_preflight` |
 | `remote_judge_consent` -> Result | :315-338 | dict returns |
@@ -185,7 +177,7 @@ tests: test_template.py:33 assertions on `fixture_attempt`/`total_attempts`; loo
 - Build: `maturin develop` (wheel), `python3 scripts/check_consumer_template.py` renders both configurations `--strict`; strict Pyright on both renders and testing.py.
 - Gate: `RUSTUP_TOOLCHAIN=1.98.1 python3 scripts/gate/rewrite.py` all PASS; Rust source <= j-3 end + ~6 and <= 2,500.
 - Greps (empty): `grep -nE 'hashlib|threading|_logger|Cancel|remote_preflight|total_attempts|fixture_attempt|questions_digest' crates/sc-agent-py/python/sc_agent/templates/consumer.py.j2`; `grep -rn 'jev-batch-result/1' crates/sc-agent-py tests/contract`; `grep -n 'sc_agent.testing' <renders>`.
-- tests/contract/test_template.py (FakeRun, deterministic): `test_render_requires_tool_version_and_defines_result_types`, `test_results_are_typed_values`, `test_result_line_fields_in_order_and_error_passthrough` (`ResultLine._fields` = the 14), `test_run_batch_lines_and_answers_for` (3 jobs: run_id, session_ids in index order; answers_for returns scripted answers), `test_open_run_passes_tool_and_no_logger` (open_args has tool, tool_version, agent_role; no general_log unless seams), `test_open_run_repeat_disables_cache`, `test_failed_run_returns_dependency_error_without_send`, `test_fixture_coverage_before_any_line`, `test_fixture_with_run_stamps_run_id_and_sends_nothing`, `test_dry_run_sends_and_writes_nothing`, `test_abort_on_auth_cancels_remaining_jobs`, `test_redact_secrets_table` (bearer rows, provider-key row, 10,000-deep list), `test_category_codes_table`, `test_rendered_module_imports_without_wheel` (`sys.modules["sc_agent"] = None`).
+- tests/contract/test_template.py (FakeRun, deterministic): `test_render_requires_tool_version_and_defines_result_types`, `test_results_are_typed_values`, `test_result_line_fields_in_order_and_error_passthrough` (`ResultLine._fields` = the 14), `test_run_batch_lines_and_answers_for` (3 jobs: run_id, session_ids in index order; answers_for returns scripted answers), `test_open_run_passes_tool_and_no_logger` (open_args has tool, tool_version, agent_role; no general_log unless seams), `test_open_run_repeat_disables_cache`, `test_open_run_without_wheel_is_err`, `test_result_line_generic_verdict_fields`, `test_fixture_coverage_before_any_line`, `test_fixture_with_run_stamps_run_id_and_sends_nothing`, `test_dry_run_sends_and_writes_nothing`, `test_abort_on_auth_cancels_remaining_jobs`, `test_redact_secrets_table` (bearer rows, provider-key row, 10,000-deep list), `test_category_codes_table`, `test_rendered_module_imports_without_wheel` (`sys.modules["sc_agent"] = None`).
 - crates/sc-agent-py/tests/loopback.py (real wheel, loopback stub, `<CLIENT>_LOG_ROOT` set): `test_consent_only_for_typesafe` (haiku: settings module never imported; jev without consent: `POLICY.REMOTE_JUDGE_DISABLED`, 0 stub requests), `test_haiku_runs_without_typesafe_key`, `test_keyboard_interrupt_cancels_the_run` (interrupt from the stub's seam callback; propagates), `test_default_log_path_is_the_wheels` (records in `<CLIENT>_LOG_ROOT/logs/<client>.log.jsonl`; no general_log passed), `test_sitr_extract_logs_under_the_tool` (updated), `test_rendered_modules_only_reference_the_permitted_api` (updated: `Run, session_rows, provider_keys, TYPESAFE, sitr`), `test_fakerun_conforms_to_real_run` (envelope key sets and attributes match), `test_rendered_clients_run_against_the_installed_wheel` (updated).
 - No sleeps, threads or timing in any test (CLAUDE.md flaky-test rule).
 
@@ -193,7 +185,8 @@ tests: test_template.py:33 assertions on `fixture_attempt`/`total_attempts`; loo
 
 Gate count (non-test Rust, scripts/gate/rewrite.py): this branch measures 2,440/2,500 today (j-3 partial). j-4 restructure: 0 Rust. New capability: sitr `tool=` about +6 Rust (rule-7 item 1); without it, 0. Python (not in the gate): consumer.py.j2 roughly 668 -> 700 (about -150 deleted, +~110 new incl. run_batch/ResultLine/redaction, +~70 moved Result block); testing.py about +45 new. Restructure net zero is a Rust rule; the template's Python delta is reported, not capped.
 
-## Rule-7 items
+## Plan decisions (rule 0, no question to Rand)
 
-1. ADR-SAG-0019 d1 l.57 says the client "gives [its Logger] to its Run and every sitr call"; ANC-016 forbids the injection path in production. Check: sitr pyfunctions accept only `general_log` (lib.rs:484-527, default logger named "sitr"). Proposed: add `tool=` to the 4 sitr functions (+~6 Rust, new capability) so sitr logs under the tool's default logger with no injection; otherwise sitr calls go to `sitr.log.jsonl`.
-2. Cache for repeats: j-3 has no per-call cache override (REQ-SAG-0702), so `open_run(repeat=)` sets `cache=False` on the Run when repeat > 1 (plan-anchor REQ-085). No question unless Rand wants repeats as a run_batch argument instead.
+1. sitr `tool=`: tools pass their name and the library picks the default logger (rule 0, ANC-015, ANC-016), so the 4 sitr pyfunctions gain `tool=` (+~6 Rust, new capability) and the template passes no Logger. Conflicting record text to delete on develop: ADR-SAG-0019 d1 l.57 "The generated client gets one Logger from the wheel, named after the client and writing `~/.sc-agent/logs/<client>.log.jsonl`, and gives it to its Run and every sitr call."
+2. Repeats: j-3 has no per-call cache override (REQ-SAG-0702), so `open_run(repeat=)` sets `cache=False` on the Run when repeat > 1 (plan-anchor REQ-085).
+3. /2 is generic only (owner ruling, j1-bead.txt:364-368): no `result_fields` callback; verdict, min_confidence and leaning are computed in `result_line` from answers and threshold.
