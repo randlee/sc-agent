@@ -33,26 +33,23 @@ fn main() {
             let logger = Arc::new(logger);
             let outcome = (|| -> Result<Value, sc_agent::Error> {
                 let cli = parsed.map_err(|e| sc_agent::error("decidr.usage", e))?;
-                if matches!(cli.command, Command::Models) {
-                    return Ok(json!(sc_agent::PROVIDERS));
-                }
-                if matches!(cli.command, Command::Doctor) {
-                    return sc_agent::doctor(
-                        TOOL,
-                        cli.config_dir.as_deref(),
-                        cli.project.as_deref(),
-                    );
-                }
-                let Command::Send {
-                    model,
-                    agent_role,
-                    input,
-                    batch,
-                    workers,
-                    timeout_secs,
-                } = cli.command
-                else {
-                    return Ok(Value::Null);
+                let (model, agent_role, input, batch, workers, timeout_secs) = match cli.command {
+                    Command::Models => return Ok(json!(sc_agent::PROVIDERS)),
+                    Command::Doctor => {
+                        return sc_agent::doctor(
+                            TOOL,
+                            cli.config_dir.as_deref(),
+                            cli.project.as_deref(),
+                        );
+                    }
+                    Command::Send {
+                        model,
+                        agent_role,
+                        input,
+                        batch,
+                        workers,
+                        timeout_secs,
+                    } => (model, agent_role, input, batch, workers, timeout_secs),
                 };
                 let run = sc_agent::Run::new(
                     sc_agent::RunArgs {

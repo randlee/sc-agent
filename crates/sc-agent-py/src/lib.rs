@@ -147,17 +147,6 @@ fn arg<T: for<'a, 'py> FromPyObject<'a, 'py>>(
         })
         .transpose()
 }
-fn extras(extra: &Bound<'_, PyTuple>, rest: Option<&Bound<'_, PyDict>>) -> Result<(), Error> {
-    if !extra.is_empty() {
-        return Err(invalid("unexpected positional arguments"));
-    }
-    if let Some(rest) = rest
-        && !rest.is_empty()
-    {
-        return Err(invalid(format!("unexpected arguments: {rest}")));
-    }
-    Ok(())
-}
 fn bind<'py>(
     args: &Bound<'py, PyTuple>,
     kwargs: Option<&Bound<'py, PyDict>>,
@@ -387,7 +376,7 @@ impl PyRun {
             Err(e) => return Self(Err(rejected(None, e))),
         };
         let created = (|| {
-            extras(extra, rest)?;
+            bind(extra, rest, &[], &[])?;
             let args = sc_agent::RunArgs {
                 tool: tool.clone(),
                 model: arg(model, "model")?,
@@ -522,7 +511,7 @@ impl PyRun {
         rest: Option<&Bound<'_, PyDict>>,
     ) -> Py<PyAny> {
         self.with(py, |run| {
-            extras(extra, rest).map(|()| {
+            bind(extra, rest, &[], &[]).map(|_| {
                 run.cancel.cancel();
                 Value::Null
             })
