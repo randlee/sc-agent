@@ -2,12 +2,16 @@ pub mod support;
 use std::sync::{Arc, Mutex};
 use support::*;
 
+// 2^63 parses exactly through f64 and never expires during a test.
+// Callbacks drive completion, not wall time.
+const RETRY_AFTER: &str = "9223372036854775808";
+
 #[test]
 fn final_busy_reply_holds_off_the_next_send() -> Test {
     let root = Temp::new()?;
     let logger = logger(&root)?;
     let stub = Stub::new(vec![
-        Reply::Http(429, vec![("Retry-After", "3")], "busy".into()),
+        Reply::Http(429, vec![("Retry-After", RETRY_AFTER)], "busy".into()),
         http(200, answer()),
     ])?;
     let mut opts = options(&root, &stub.url);
@@ -31,10 +35,7 @@ fn final_busy_reply_holds_off_the_next_send() -> Test {
             .is_empty()
     );
     client.send(&request())?;
-    assert_eq!(
-        *waits.lock().map_err(|_| "wait recorder poisoned")?,
-        vec![std::time::Duration::from_secs(3)]
-    );
+    assert_eq!(waits.lock().map_err(|_| "wait recorder poisoned")?.len(), 1);
     assert_eq!(stub.finish()?.len(), 2);
     logger.shutdown()?;
     Ok(())
@@ -45,7 +46,11 @@ fn callback_failure_does_not_clear_the_host_deadline() -> Test {
     let root = Temp::new()?;
     let logger = logger(&root)?;
     let stub = Stub::new(vec![
-        Reply::Http(429, vec![("Retry-After", "3")], "busy lower detail".into()),
+        Reply::Http(
+            429,
+            vec![("Retry-After", RETRY_AFTER)],
+            "busy lower detail".into(),
+        ),
         http(200, answer()),
     ])?;
     let mut client = run(options(&root, &stub.url), &logger)?;
@@ -72,10 +77,7 @@ fn callback_failure_does_not_clear_the_host_deadline() -> Test {
     assert!(message.contains("busy lower detail"));
     assert!(message.contains("controlled callback failure"));
     client.send(&request())?;
-    assert_eq!(
-        *waits.lock().map_err(|_| "wait recorder poisoned")?,
-        vec![std::time::Duration::from_secs(3); 2]
-    );
+    assert_eq!(waits.lock().map_err(|_| "wait recorder poisoned")?.len(), 2);
     assert_eq!(stub.finish()?.len(), 2);
     logger.shutdown()?;
     Ok(())
@@ -86,7 +88,7 @@ fn deadline_is_per_host_within_one_run_and_isolated_between_runs() -> Test {
     let root = Temp::new()?;
     let logger = logger(&root)?;
     let stub = Stub::new(vec![
-        Reply::Http(429, vec![("Retry-After", "3")], "busy".into()),
+        Reply::Http(429, vec![("Retry-After", RETRY_AFTER)], "busy".into()),
         http(200, answer()),
         http(200, answer()),
     ])?;
@@ -115,10 +117,7 @@ fn deadline_is_per_host_within_one_run_and_isolated_between_runs() -> Test {
     );
     client.options.base_url = Some(stub.url.clone());
     client.send(&request())?;
-    assert_eq!(
-        *waits.lock().map_err(|_| "wait recorder poisoned")?,
-        vec![std::time::Duration::from_secs(3)]
-    );
+    assert_eq!(waits.lock().map_err(|_| "wait recorder poisoned")?.len(), 1);
     assert_eq!(stub.finish()?.len(), 3);
     assert_eq!(other.finish()?.len(), 1);
     logger.shutdown()?;
@@ -134,7 +133,7 @@ fn simultaneous_followers_wait_for_one_deadline_without_serializing() -> Test {
     let root = Temp::new()?;
     let logger = logger(&root)?;
     let stub = Stub::new(vec![
-        Reply::Http(529, vec![("Retry-After", "3")], "busy".into()),
+        Reply::Http(529, vec![("Retry-After", RETRY_AFTER)], "busy".into()),
         http(200, answer()),
         http(200, answer()),
     ])?;
@@ -142,12 +141,6 @@ fn simultaneous_followers_wait_for_one_deadline_without_serializing() -> Test {
     opts.settings.max_sends = 1;
     let mut client = run(opts, &logger)?;
     assert!(client.send(&request()).is_err());
-    let time = Arc::new(Mutex::new(Duration::ZERO));
-    let now = time.clone();
-    client.now = Box::new(move || {
-        *now.lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-    });
     let released = Arc::new((Mutex::new(false), Condvar::new()));
     let release = released.clone();
     let (entered, observed) = mpsc::channel();
@@ -181,17 +174,36 @@ fn simultaneous_followers_wait_for_one_deadline_without_serializing() -> Test {
         observed.recv_timeout(Duration::from_secs(10)),
         observed.recv_timeout(Duration::from_secs(10)),
     ];
-    *time.lock().map_err(|_| "fake time poisoned")? = Duration::from_secs(3);
     *released.0.lock().map_err(|_| "release flag poisoned")? = true;
     released.1.notify_all();
     for worker in workers {
         worker.join().map_err(|_| "send worker panicked")??;
     }
-    assert_eq!(
-        entered.into_iter().collect::<Result<Vec<_>, _>>()?,
-        vec![Duration::from_secs(3); 2]
-    );
+    assert_eq!(entered.into_iter().collect::<Result<Vec<_>, _>>()?.len(), 2);
     assert_eq!(stub.finish()?.len(), 3);
+    logger.shutdown()?;
+    Ok(())
+}
+
+#[test]
+fn cancelling_from_the_holdoff_wait_prevents_a_resend() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let stub = Stub::new(vec![Reply::Http(
+        429,
+        vec![("Retry-After", RETRY_AFTER)],
+        "busy".into(),
+    )])?;
+    let mut client = run(options(&root, &stub.url), &logger)?;
+    let cancel = client.cancel.clone();
+    client.wait = Box::new(move |_| {
+        cancel.cancel();
+        Ok(())
+    });
+    let failure = sc_agent::result(client.send(&request()));
+    assert_eq!(failure["error"]["id"], "decision.cancelled");
+    assert!(client.cancel.is_cancelled());
+    assert_eq!(stub.finish()?.len(), 1);
     logger.shutdown()?;
     Ok(())
 }

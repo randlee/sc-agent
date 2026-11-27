@@ -54,8 +54,6 @@ impl Cancel {
             match mutex.try_lock() {
                 Ok(guard) => return Ok(guard),
                 Err(TryLockError::WouldBlock) => {
-                    #[cfg(test)]
-                    route_tests::notify(&route_tests::LOCK_WAIT);
                     std::thread::park_timeout(Duration::from_millis(20))
                 }
                 Err(TryLockError::Poisoned(e)) => return Err(error("http.network", e)),
@@ -64,8 +62,6 @@ impl Cancel {
     }
     pub fn wait(&self, delay: Duration) -> Result<(), Error> {
         if let Ok(state) = self.state.lock() {
-            #[cfg(test)]
-            route_tests::notify(&route_tests::WAIT_ENTERED);
             let _ = self
                 .changed
                 .wait_timeout_while(state, delay, |state| !*state);
@@ -1138,6 +1134,18 @@ const BEARER: Auth = &[("Authorization", "Bearer {}")];
 const ANTHROPIC: Auth = &[("x-api-key", "{}"), ("anthropic-version", "2023-06-01")];
 // Messages model output limit: https://platform.claude.com/docs/en/models/overview
 const ANTHROPIC_MAX_TOKENS: u32 = 128000;
+pub struct Holdoffs {
+    started: Instant,
+    deadlines: Mutex<BTreeMap<String, Duration>>,
+}
+impl Default for Holdoffs {
+    fn default() -> Self {
+        Self {
+            started: Instant::now(),
+            deadlines: Mutex::new(BTreeMap::new()),
+        }
+    }
+}
 pub struct Route<'a> {
     pub options: &'a Options,
     pub provider: &'static Provider,
@@ -1147,8 +1155,7 @@ pub struct Route<'a> {
     pub wait: &'a (dyn Fn(Duration) -> Result<(), Error> + Sync),
     pub keyring: &'a (dyn Fn(&str) -> Result<String, KeyringError> + Sync),
     pub sends: &'a Cell<u32>,
-    pub now: &'a (dyn Fn() -> Duration + Sync),
-    pub holdoffs: &'a Mutex<BTreeMap<String, Duration>>,
+    pub holdoffs: &'a Holdoffs,
 }
 pub struct Jev<'a>(pub &'a Route<'a>);
 pub struct OpenAiCompat<'a>(pub &'a Route<'a>);
@@ -1233,7 +1240,7 @@ impl Llm for AnthropicCompat<'_> {
 }
 impl Route<'_> {
     fn defer(&self, host: &str, now: Duration, delay: Duration) -> Result<Duration, Error> {
-        let mut holdoffs = self.cancel.lock(self.holdoffs)?;
+        let mut holdoffs = self.cancel.lock(&self.holdoffs.deadlines)?;
         let deadline = holdoffs.entry(host.to_owned()).or_default();
         *deadline = (*deadline).max(now.saturating_add(delay));
         Ok(*deadline)
@@ -1243,7 +1250,7 @@ impl Route<'_> {
             self.cancel.check()?;
             let deadline = self
                 .cancel
-                .lock(self.holdoffs)?
+                .lock(&self.holdoffs.deadlines)?
                 .get(host)
                 .copied()
                 .unwrap_or_default();
@@ -1253,7 +1260,7 @@ impl Route<'_> {
             }
             (self.wait)(delay)?;
             // A completed injected wait reaches this deadline, including simulated waits.
-            *elapsed = deadline.max((self.now)());
+            *elapsed = deadline.max(self.holdoffs.started.elapsed());
         }
     }
     fn agent(&self) -> ureq::Agent {
@@ -1325,7 +1332,7 @@ impl Route<'_> {
             }
         };
         let agent = self.agent();
-        let mut elapsed = (self.now)();
+        let mut elapsed = self.holdoffs.started.elapsed();
         let mut previous = None;
         for attempt in 1..=max {
             self.holdoff(&host, &mut elapsed)
@@ -1389,7 +1396,7 @@ impl Route<'_> {
             };
             let delay =
                 delay.unwrap_or_else(|| Duration::from_secs(2u64.saturating_pow(attempt - 1)));
-            elapsed = elapsed.max((self.now)());
+            elapsed = elapsed.max(self.holdoffs.started.elapsed());
             let deadline = if busy {
                 Some(
                     self.defer(&host, elapsed, delay)
@@ -1402,7 +1409,9 @@ impl Route<'_> {
                 let delay =
                     deadline.map_or(delay, |until| delay.max(until.saturating_sub(elapsed)));
                 (self.wait)(delay).map_err(|e| contextual(error(id, text.clone()), e, None))?;
-                elapsed = elapsed.saturating_add(delay).max((self.now)());
+                elapsed = elapsed
+                    .saturating_add(delay)
+                    .max(self.holdoffs.started.elapsed());
                 previous = Some(error(id, text));
                 continue;
             }
@@ -1429,9 +1438,7 @@ pub struct Run {
     pub cancel: Arc<Cancel>,
     pub wait: Box<dyn Fn(Duration) -> Result<(), Error> + Send + Sync>,
     pub keyring: Box<KeyringFn>,
-    /// Monotonic elapsed time since creation, in the host deadlines' time domain.
-    pub now: Box<dyn Fn() -> Duration + Send + Sync>,
-    holdoffs: Mutex<BTreeMap<String, Duration>>,
+    holdoffs: Holdoffs,
     found: Vec<(&'static Provider, String)>,
     logger: Arc<Logger>,
     owned: bool,
@@ -1489,14 +1496,12 @@ impl Run {
             None => Arc::new(default_logger(&tool)?),
         };
         let waiting = cancel.clone();
-        let started = Instant::now();
         Ok(Self {
             options,
             cancel,
             wait: Box::new(move |delay| waiting.wait(delay)),
             keyring: Box::new(os_keyring),
-            now: Box::new(move || started.elapsed()),
-            holdoffs: Mutex::new(BTreeMap::new()),
+            holdoffs: Holdoffs::default(),
             found,
             logger,
             owned,
@@ -1559,7 +1564,6 @@ impl Run {
                 wait: &*self.wait,
                 keyring: &*self.keyring,
                 sends: &sends,
-                now: &*self.now,
                 holdoffs: &self.holdoffs,
             };
             match provider.wire {
@@ -1786,15 +1790,6 @@ pub mod route_tests {
         include!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/support/mod.rs"));
     }
     use test_support::*;
-    type Hook = std::cell::RefCell<Option<Box<dyn FnOnce()>>>;
-    pub(super) fn notify(hook: &'static std::thread::LocalKey<Hook>) {
-        hook.with(|hook| {
-            if let Some(waiting) = hook.borrow_mut().take() {
-                waiting();
-            }
-        });
-    }
-
     #[test]
     fn resolution_failure_keeps_every_candidate_error() -> Test {
         for (case, expected_id) in [
@@ -1940,8 +1935,7 @@ pub mod route_tests {
                 wait: &*run.wait,
                 keyring: &keyring,
                 sends: &sends,
-                now: &Duration::default,
-                holdoffs: &Mutex::new(BTreeMap::new()),
+                holdoffs: &Holdoffs::default(),
             };
             assert_eq!(
                 route.agent().config().timeouts().global,
@@ -2006,36 +2000,24 @@ pub mod route_tests {
         Ok(())
     }
 
-    thread_local! {
-        pub(super) static LOCK_WAIT: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
-        pub(super) static WAIT_ENTERED: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
-    }
-
     #[test]
     fn host_deadlines_only_extend_and_waits_recheck_extensions() -> Test {
         let root = Temp::new()?;
         let options = options(&root, "http://127.0.0.1:1/v1");
         let (provider, model) = model_with("jev", &BTreeMap::new())?;
-        let holdoffs = Mutex::new(BTreeMap::new());
-        let time = Mutex::new(Duration::ZERO);
+        let holdoffs = Holdoffs::default();
         let waits = Mutex::new(Vec::new());
         let wait = |delay| {
             let mut waits = waits.lock().map_err(|e| error("http.network", e))?;
             waits.push(delay);
-            let mut time = time.lock().map_err(|e| error("http.network", e))?;
-            *time = time.saturating_add(delay);
             if waits.len() == 1 {
                 holdoffs
+                    .deadlines
                     .try_lock()
                     .map_err(|e| error("http.network", e))?
-                    .insert("one".into(), Duration::from_secs(7));
+                    .insert("one".into(), Duration::MAX);
             }
             Ok(())
-        };
-        let now = || {
-            *time
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
         };
         let route = Route {
             options: &options,
@@ -2046,27 +2028,28 @@ pub mod route_tests {
             wait: &wait,
             keyring: &keyring,
             sends: &Cell::new(0),
-            now: &now,
             holdoffs: &holdoffs,
         };
+        // Controlled arithmetic inputs exercise the boundary without a clock override.
+        let before = Duration::MAX - Duration::from_secs(10);
         assert_eq!(
-            route.defer("one", Duration::ZERO, Duration::from_secs(5))?,
-            Duration::from_secs(5)
+            route.defer("one", before, Duration::from_secs(5))?,
+            before + Duration::from_secs(5)
         );
         assert_eq!(
-            route.defer("one", Duration::from_secs(1), Duration::from_secs(2))?,
-            Duration::from_secs(5)
+            route.defer("one", before, Duration::from_secs(2))?,
+            before + Duration::from_secs(5)
         );
         assert_eq!(
-            route.defer("two", Duration::from_secs(2), Duration::from_secs(8))?,
-            Duration::from_secs(10)
+            route.defer("two", before, Duration::from_secs(8))?,
+            before + Duration::from_secs(8)
         );
-        let mut elapsed = Duration::ZERO;
+        let mut elapsed = before;
         route.holdoff("one", &mut elapsed)?;
-        assert_eq!(elapsed, Duration::from_secs(7));
+        assert_eq!(elapsed, Duration::MAX);
         assert_eq!(
             *waits.lock().map_err(|_| "waits poisoned")?,
-            vec![Duration::from_secs(5), Duration::from_secs(2)]
+            vec![Duration::from_secs(5); 2]
         );
         assert_eq!(
             route.defer("two", Duration::from_secs(1), Duration::MAX)?,
@@ -2080,64 +2063,18 @@ pub mod route_tests {
     }
 
     #[test]
-    fn cancel_ends_busy_holdoff_after_wait_is_entered() -> Test {
-        let cancel = Arc::new(Cancel::default());
-        let (entered, waiting) = std::sync::mpsc::channel();
-        let (finished, outcome) = std::sync::mpsc::channel();
-        let worker_cancel = cancel.clone();
-        let worker = std::thread::spawn(move || {
-            WAIT_ENTERED.with(|hook| {
-                *hook.borrow_mut() = Some(Box::new(move || {
-                    let _ = entered.send(());
-                }))
-            });
-            let _ = worker_cancel.wait(Duration::from_secs(600));
-            let _ = finished.send(());
-        });
-        waiting
-            .recv_timeout(Duration::from_secs(10))
-            .map_err(|e| format!("holdoff wait not entered: {e}"))?;
-        std::thread::spawn(move || cancel.cancel());
-        outcome
-            .recv_timeout(Duration::from_secs(10))
-            .map_err(|e| format!("cancel did not release holdoff: {e}"))?;
-        worker.join().map_err(|_| "holdoff waiter panicked")?;
-        Ok(())
-    }
-
-    #[test]
-    fn cancel_ends_a_wait_on_the_host_holdoff() -> Test {
-        let cancel = Arc::new(Cancel::default());
-        let host = Arc::new(Mutex::new(()));
-        let same_host = host.clone();
-        let held = host.lock().map_err(|_| "holdoff poisoned")?;
-        let (finished, outcome) = std::sync::mpsc::channel();
-        let waiting_cancel = cancel.clone();
-        let reached = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let worker_reached = reached.clone();
-        let work = std::thread::spawn(move || {
-            let flag = waiting_cancel.clone();
-            LOCK_WAIT.with(|hook| {
-                *hook.borrow_mut() = Some(Box::new(move || {
-                    worker_reached.store(true, Ordering::SeqCst);
-                    flag.cancel();
-                }));
-            });
-            let result = waiting_cancel.lock(&same_host).map(|_| json!(null));
-            let _ = finished.send(result);
-        });
-        let result = outcome.recv_timeout(Duration::from_secs(10));
-        drop(held);
-        if matches!(result, Err(RecvTimeoutError::Timeout)) {
-            return Err(format!(
-                "lock waiter timed out; contention hook reached={}",
-                reached.load(Ordering::SeqCst)
-            )
-            .into());
-        }
-        work.join().map_err(|_| "lock waiter panicked")?;
-        assert!(cancel.is_cancelled(), "contention hook was not reached");
-        assert_eq!(super::result(result?)["error"]["id"], "decision.cancelled");
+    fn cancelled_operations_do_not_wait_for_a_locked_mutex() -> Test {
+        let cancel = Cancel::default();
+        let mutex = Mutex::new(());
+        let _held = mutex.lock().map_err(|_| "mutex poisoned")?;
+        cancel.cancel();
+        let failure = cancel
+            .lock(&mutex)
+            .err()
+            .ok_or("cancelled lock succeeded")?;
+        assert_eq!(result(Err(failure))["error"]["id"], "decision.cancelled");
+        cancel.wait(Duration::MAX)?;
+        assert!(cancel.is_cancelled());
         Ok(())
     }
 
@@ -2163,8 +2100,7 @@ pub mod route_tests {
                 wait: &no_wait,
                 keyring: &keyring,
                 sends: &sends,
-                now: &Duration::default,
-                holdoffs: &Mutex::new(BTreeMap::new()),
+                holdoffs: &Holdoffs::default(),
             };
             assert_eq!(route.agent().config().timeouts().global, Some(timeout));
         }

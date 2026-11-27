@@ -301,19 +301,7 @@ pub fn run(options: Options, logger: &Arc<Logger>) -> Result<sc_agent::Run, sc_a
         Some(logger.clone()),
         Arc::new(sc_agent::Cancel::default()),
     )?;
-    let time = Arc::new(std::sync::Mutex::new(Duration::ZERO));
-    let now = time.clone();
-    run.now = Box::new(move || {
-        *now.lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-    });
-    run.wait = Box::new(move |delay| {
-        let mut now = time
-            .lock()
-            .map_err(|e| sc_agent::error("http.network", e))?;
-        *now = now.saturating_add(delay);
-        Ok(())
-    });
+    run.wait = Box::new(no_wait);
     run.keyring = Box::new(keyring);
     Ok(run)
 }
