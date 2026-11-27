@@ -1,20 +1,16 @@
 # j-1 signatures v2 (spec; items and counts in j-1-signatures.json)
 
-Built and measured in a throwaway worktree from origin/plan/phase-j 8f68424a; the full diff is scratchpad/j-1-proto-patches/v2/j1-v2-total.patch. The code below is the verbatim rustfmt output that built. Full gate (venv, so the wheel steps run): all 16 gates pass, Rust source 2342/2580. Baseline 2366.
-
-## Numbers
+## Numbers (gate: `scripts/gate/rewrite.py`, cap 2,580)
 | | lines |
 |---|---|
-| A. Restructure (Decision path, shared transport, tables, send/batch, dedup of consumers) | **-77** |
-| B. New capability (Llm trait, LlmRequest, Llm impls, text extraction) | **+53** |
-| Total vs 2366 | -24 (2342) |
+| Restructure (Decision path, shared transport, tables, send/batch, dedup of consumers) | -77, counted 0 (rule 2) |
+| New capability: Llm trait and impls (+53) and units O4/O5 (+62) | grows the total |
+| Measured on sprint/j-1 | Rust source 2,402 / 2,580 |
 
-Existence check: `llm query` and `--resume` do not exist at 8f68424a (git grep of crates and scripts finds only the unrelated sitr `query`). They are not in this spec; B counts only the Llm trait and its impls.
-
-A is below the target of 0: the trait design replaces wire()/response() and the inline send loop and also absorbs the dedup below. Without the consumer dedup and the docli deletion (S26-S28, -83) A would be +6.
+`llm query` and `--resume` do not exist; they are not in this spec.
 
 ## Deliverables
-1. J1-S02: struct fields append, in this order, after `laya`:
+1. J1-S02: struct fields append, in this order, after `local`:
 2. J1-S03: const rows append in order: "max_sends", "decidr.luna-system-prompt", "
 3. J1-S07: struct field append as last field: pub open: bool,
 4. J1-S10: type aliases pub type DecisionRequest = Value;
@@ -49,7 +45,7 @@ A is below the target of 0: the trait design replaces wire()/response() and the 
 Exact code for each: the dev bead agt-j-1.group-dev Signatures and design "Public surface".
 
 ## Does Not Close
-- PyO3 `Run`/`Logger`, decidr on the Run, deleting `Options.provider` (`Options.model` stays: `Run::new`'s selector), and the `decidr models` output shape: j-2. `Run::send`/`send_batch` return errors unreported; callers `report`.
+- The Rust `Run`, `RunArgs`, `Run::new`/`from_options`/`send`/`send_batch`, PyO3 `Run`/`Logger`, decidr on the Run, and deleting `Options.provider` (`Options.model` stays as the selector): j-2. j-1 keeps the free functions `send` and `batch`; they return errors unreported and callers `report`.
 - Session row v2, `runs.jsonl`, `run_id`, tool identity, cache, and the reply usage pointers: j-3.
 - The template: j-4.
 - `event()` (split of `log`): j-3, its only user (session sinks).
@@ -68,18 +64,6 @@ Exact code for each: the dev bead agt-j-1.group-dev Signatures and design "Publi
 | CliModelError and dead accessors, docli_from_clap.rs:13-34, 88-114 | 54 | deleted S28 | 0 |
 Config additions required by records (not replacements): Settings +2, KEYS +3, init +2, check +3, imports +5.
 
-## Per-item attribution of A (sums to -77)
-S01 +5, S02 +2, S03 +3, S05 +2, S06 +3, S07 +1, S08 +7, S10 +2, S11 +3, S12 +1, S13 +2, S14 +10, S15 +3, S16 +23, S17 +9, S18 +10, S19 +114, S20 -157, S21 +6, S22 +9, S23 +1, S24 +14, S25 -8, S26 -20, S27 -9, S28 -54, S30 -59. B: B01 +5, B02 +3, B03 +1, B04 +19, B05 +10, B06 +15 = +53. S20 -157 includes 3 blank-line lines at span boundaries (measured hunk total +59 for lib.rs).
-
-## Savings found beyond the trait replacement (all counted, tests pass)
-| Item | Where @8f68424a | Saving | Allowed by | Behaviour test |
-|---|---|---|---|---|
-| docli CliModelError + test-only accessors | scripts/docli_from_clap.rs:13-34, 88-114 | 54 | dead code (allow(dead_code) pragma, only its own test used it); no record names it | the file's own test, run by both examples |
-| hand-built Failure literals -> error() | lib.rs:1105-1118, 1141-1165 | in S19/S20 | REQ-SAG-0016/0017 give category by id; action text is not pinned (grep) | sending.rs status/quota/auth tests |
-| repo+config copy x3 -> load() | decidr main.rs:41-49, py lib.rs:158-171, lib.rs:1326-1337 | 20 net | ANC-010 | contract doctor/CLI tests |
-| cancel checks/recv | lib.rs 6 sites + decidr 4 sites | 14 net | ANC-010 | cancel tests |
-Not done (considered): provider-row compaction by #[rustfmt::skip] (saves 66, suppression pragma, not used); py send/send_batch shared prelude (PyO3 signatures force the lists); emit/finish helper for decidr/sitr main (about -6).
-
 ## Behaviour changes the owner should know (none is pinned by a test or record I could find)
 1. attempts is set on every failure after at least one send (and on cancel); before only on http failures and cancel. REQ-SAG-0016 says "when they apply".
 2. decision.api_status and quota actions now use error()'s generic text; api_status category stays 'other'.
@@ -88,27 +72,28 @@ Not done (considered): provider-row compaction by #[rustfmt::skip] (saves 66, su
 5. Each Decision impl runs schema() (ask for the compat impls, the Jev impl for Jev), so Decision::decide returns a schema-checked reply or decision.schema_mismatch (REQ-SAG-0901); send() no longer calls schema().
    10. A cancel after a finished request overrides only a success; a lower-layer error (http.auth, ...) is kept (J-1-05).
    11. A failure reading the reply body is http.network and is resent like a failed send (J-1-14); a sender waiting on the host holdoff ends at once on cancel (J-1-15).
-   12. decidr batch prints every request's result: unfinished requests end decision.cancelled (REQ-SAG-0011; J-1-16).
+   12. decidr has no post-send cancel check: send() and the batch already return decision.cancelled for what a cancel interrupted and keep lower-layer errors (J-1-05); decidr prints every result and exits non-zero when cancelled (status 0 only if the value is ok and the Cancel is not cancelled, REQ-SAG-0011; J-1-16).
 6. Network failures share the busy path but still take no host lock.
 7. The compat Decision path now sends the prompt as a system message plus the bare request JSON as the user message (ANC-014); before it sent one user message "Answer every question in this decision request using its required schema, including probabilities and confidence: <request>" (old wire(), lib.rs:904).
 8. Provider.open appears in decidr's providers JSON (json!(PROVIDERS), decidr main.rs:36).
 9. doctor gains rows for max_sends and the two decidr.*-system-prompt keys (KEYS).
 
 ## Gap closures
-base_url: Route.base = options.base_url.clone().unwrap_or(base) at construction (in send). Key function is key(), not resolve(). Loop form: `for attempt in 1..=max`. Prompt key: format!("{}-system-prompt", options.model) as typed, else the resolved id (a haiku/luna chosen by full id finds its setting). Schema wrapper, user text, response_format name and the Anthropic header table are in the code below. Tests need no BTreeMap import (Default::default()). Route is item S14. Gate change applied (S29).
+base_url: Route.base = options.base_url.clone().unwrap_or(base) at construction (in send). Key function is key(), not resolve(). Loop form: `for attempt in 1..=max`. Prompt key: format!("{}-system-prompt", options.model) as typed, else the resolved row's short name (a haiku/luna chosen by full id finds its setting). Schema wrapper, user text, response_format name and the Anthropic header table are in the code below. Tests need no BTreeMap import (Default::default()). Route is item S14. Gate change applied (S29).
 
 ## Exact code
 ### Signature items (one copy)
-Aliases, LlmRequest, Decision, Llm, DEFAULT_SYSTEM_PROMPT, Auth consts, Route, Jev/OpenAiCompat/AnthropicCompat, the Decision and Llm impls, Cancel::check/recv/lock, load and doctor are specified once, in the closed Signatures list of agt-j-1.group-dev (items J1-S02..S30, B01..B05, O45-01..11, S31). `const ANTHROPIC_MAX_TOKENS: u32 = 64000;` (the Messages API's required max_tokens; the documented maximum output of the claude-haiku-5-5 row, verified at implementation; not an sc-agent cap). This design keeps only the bodies that list does not carry: ask, Route::text, Route::post, send, the consumer diffs.
+Aliases, LlmRequest, Decision, Llm, DEFAULT_SYSTEM_PROMPT, Auth consts, Route, Jev/OpenAiCompat/AnthropicCompat, the Decision and Llm impls, Cancel::check/recv/lock, load and doctor are specified once, in the closed Signatures list of agt-j-1.group-dev (items J1-S02..S30, B01..B05, O45-01..11, S31). `const ANTHROPIC_MAX_TOKENS: u32 = 64000;` (the Messages API's required max_tokens; the smallest documented maximum output among the Messages-wire rows, so no row is sent more than its model allows; lower it if a row documents less; verified at implementation; not an sc-agent cap). This design keeps only the bodies that list does not carry: ask, Route::text, Route::post, send, the consumer diffs.
 
 ### ask (S16)
 ```rust
 fn ask(llm: &impl Llm, route: &Route<'_>, req: &DecisionRequest) -> Result<DecisionResult, Error> {
-    // The override is keyed by the name as typed, else by the resolved id, so a haiku/luna chosen by full id finds its setting.
+    // The override is keyed by the name as typed, else by the resolved row's short name, so a haiku/luna chosen by full id finds its setting (only decidr.haiku-/luna-system-prompt exist).
     let decidr = &route.options.settings.decidr;
+    let short = route.provider.models.iter().find(|row| row.1 == route.model).map_or(route.options.model.as_str(), |row| row.0);
     let prompt = decidr
         .get(&format!("{}-system-prompt", route.options.model))
-        .or_else(|| decidr.get(&format!("{}-system-prompt", route.model)));
+        .or_else(|| decidr.get(&format!("{short}-system-prompt")));
     let questions = req
         .get("questions")
         .and_then(Value::as_object)
@@ -437,11 +422,10 @@ index 29b6d080..063c5c95 100644
 -                if cancelled.is_cancelled() {
 -                    return Err(sc_agent::error("decision.cancelled", "interrupted"));
 -                }
-+                // A batch prints every result (unfinished requests are decision.cancelled in the batch itself, REQ-SAG-0011); only a single send is checked here.
-+                if !batch {
-+                    cancelled.check()?;
-+                }
                  result
+@@ status @@
+-    let status = if value.get("ok") == Some(&Value::Bool(true)) {
++    let status = if value.get("ok") == Some(&Value::Bool(true)) && !cancelled.is_cancelled() {
              })();
 diff --git a/crates/sc-agent-py/src/lib.rs b/crates/sc-agent-py/src/lib.rs
 index 250bbd24..47317039 100644
@@ -631,9 +615,6 @@ index ff7573a2..aa55fc56 100644
 ## Unresolved owner decisions
 1. The behaviour changes above (1-6). 2. Key name max_sends. 3. Prompt key by typed name, else resolved id. 4. (settled: typed Wire enum, no string dispatch in send()). 5. Whether to keep the docli dead-code deletion (outside sc-agent). 6. Cache hash definition (O3) and Run vs ADR-0001 (O1). 7. ANC-009 CLI half is j-2.
 
-## Not independently verified
-All counts and tests are my own runs. The Python contract suite passed only in my venv run of the gate. The final gate run predates the added B06 test (that test and clippy were run alone).
-
 ## Units O4/O5 (owner rulings 2026-11-24; placement: lead decision)
 Both are new capability, counted separately from the -77 restructure. Code lands on sprint/j-1 @b4be55e6 and is updated in place. Items are in scratchpad/phase-j/j-1-o45-beads.json (one per public-surface item).
 
@@ -662,7 +643,7 @@ Python: tests/contract/test_integration.py `test_export_requires_one_of_typesafe
 Gate: `cargo test --workspace --all-features` (1.98.1), `cargo fmt --check`, `cargo clippy ... -D warnings`, `pytest tests/contract`, `python3 scripts/gate/rewrite.py` (Rust source lines N/2580; every push).
 
 ### Budget (against 2,580; j-1 at 2342; new capability, restructure unchanged at -77)
-Estimated before building: O4 +19, O5 +35 (+54, 2396). Measured on sprint/j-1 after the build, rewrite.py: Rust source 2404/2580 (+62 for O4+O5 together; the 8 over the estimate is the explicit single-candidate shortcut and the key_missing name list in resolve). scripts/integration.py and the Python tests are not counted by the gate.
+Estimated before building: O4 +19, O5 +35 (+54, 2396). Measured on sprint/j-1 after the build, rewrite.py: Rust source 2402/2580 (+62 for O4+O5 together; the 8 over the estimate is the explicit single-candidate shortcut and the key_missing name list in resolve). scripts/integration.py and the Python tests are not counted by the gate.
 
 ## Signatures (closed list)
 
