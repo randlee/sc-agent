@@ -175,15 +175,45 @@ fn adr_sag_0021_send_and_report_return_logger_failures() -> Test {
         .ok_or("flush failure message absent")?;
     assert!(message.contains(&original));
     assert!(message.contains("decision.cancelled"));
-    assert!(failure["error"]["session_id"].as_str().is_some());
-    let failure = sc_agent::report(
-        &logger,
-        Err(sc_agent::error("test.failure", "reported error")),
-    );
-    assert_eq!(failure["error"]["id"], "log.write");
+    let session_id = failure["error"]["session_id"]
+        .as_str()
+        .ok_or("missing session id")?
+        .to_owned();
     let original =
         sc_agent::result(sc_agent::log(&logger, "error", json!({})).map(|()| json!(null)));
-    assert_eq!(failure["error"], original["error"]);
+    for session in [None, Some(session_id)] {
+        let failure = sc_agent::report(
+            &logger,
+            Err(sc_agent::Error::Failure {
+                id: "test.failure",
+                message: "reported error".into(),
+                action: "Retry later.",
+                category: "other",
+                attempts: None,
+                session_id: session.clone(),
+            }),
+        );
+        for field in ["id", "action", "category"] {
+            assert_eq!(failure["error"][field], original["error"][field]);
+        }
+        let message = failure["error"]["message"]
+            .as_str()
+            .ok_or("missing log error message")?;
+        assert!(
+            message.contains(
+                original["error"]["message"]
+                    .as_str()
+                    .ok_or("missing original log error")?
+            ),
+            "{message}"
+        );
+        assert!(message.contains("test.failure"), "{message}");
+        assert!(message.contains("reported error"), "{message}");
+        assert_eq!(
+            failure["error"].get("session_id"),
+            session.as_ref().map(|id| json!(id)).as_ref()
+        );
+    }
     Ok(())
 }
 

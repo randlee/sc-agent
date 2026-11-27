@@ -1687,8 +1687,16 @@ pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value,
 
 pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {
     if let Err(error) = &outcome
-        && let Err(failure) = log(logger, "error", json!(error))
+        && let Err(mut failure) = log(logger, "error", json!(error))
     {
+        let Error::Failure { session_id, .. } = error;
+        let Error::Failure {
+            message,
+            session_id: failure_session_id,
+            ..
+        } = &mut failure;
+        message.push_str(&format!("; original error: {error}"));
+        *failure_session_id = session_id.clone();
         return result(Err(failure));
     }
     result(outcome)
