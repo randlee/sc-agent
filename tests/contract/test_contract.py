@@ -115,13 +115,14 @@ class Wheel(Isolated):
     def test_run_invalid_arguments_return_invalid_option(self):
         for options in ({}, {"tool":""}, {"tool":False}):
             run = self.api.Run(**options)
-            failures = [run.send(REQUEST), run.send_batch([]), run.cancel(), run.sends_to("typesafe")]
+            failures = [run.send(REQUEST), run.send_batch([]), run.cancel(), run.sends_to("typesafe"), run.sends_to(1)]
             self.assertTrue(all(self.error(value)["id"] == "sc_agent_py.invalid_option" for value in failures))
             self.assertTrue(all(value == failures[0] for value in failures))
         self.assertFalse((Path(self.directory.name) / "logs").exists())
         with self.api.Run(tool="decidr", agent_role="contract", config_dir=self.directory.name) as run:
             for value in (run.send(REQUEST, "extra"), run.send(REQUEST, workers=2),
-                          run.send_batch([], timeout_secs=1), run.cancel(1)):
+                          run.send_batch([], timeout_secs=1), run.cancel(1), run.sends_to(1),
+                          run.sends_to(), run.sends_to("typesafe", 1), run.sends_to("typesafe", bogus=1)):
                 self.assertEqual(self.error(value)["id"], "sc_agent_py.invalid_option")
         with self.api.Run(tool="decidr", agent_role="contract", config_dir=self.directory.name, provider="openai") as run:
             self.assertIn("provider", self.error(run.send(REQUEST))["message"])
@@ -193,7 +194,6 @@ class Wheel(Isolated):
         self.assertEqual(rows[0]["project"], "from-home")
 
     def test_bad_call_signatures_return_errors(self):
-        run = self.api.Run(tool="decidr", agent_role="contract", config_dir=self.directory.name)
         run = self.api.Run(tool="decidr", agent_role="contract", config_dir=self.directory.name)
         self.addCleanup(run.__exit__, None, None, None)
         functions = [self.api.logger, self.api.log, self.api.flush, self.api.digest,

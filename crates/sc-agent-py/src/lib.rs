@@ -107,6 +107,7 @@ fn finish(logger: &Logger, owned: bool, value: Value) -> Value {
         (Ok(()), shutdown) => sc_agent::after_shutdown(value, shutdown),
     }
 }
+
 fn arg<T: for<'a, 'py> FromPyObject<'a, 'py>>(
     value: Option<&Bound<'_, PyAny>>,
     name: &str,
@@ -217,22 +218,15 @@ fn interruptible(
 
 #[pyfunction(signature=(name=None))]
 fn logger(py: Python<'_>, name: Option<&Bound<'_, PyAny>>) -> Py<PyAny> {
-    match text(name)
-        .and_then(|name| sc_agent::default_logger(&name))
-        .and_then(|logger| Py::new(py, PyLogger(Arc::new(logger))).map_err(invalid))
-    {
-        Ok(value) => {
-            let envelope = PyDict::new(py);
-            let built = envelope
-                .set_item("ok", true)
-                .and_then(|()| envelope.set_item("value", value));
-            match built {
-                Ok(()) => envelope.into_any().unbind(),
-                Err(e) => raw(py, sc_agent::result(Err(invalid(e)))),
-            }
-        }
-        Err(error) => respond(py, None, "decidr", |_| Err(error)),
-    }
+    let created = (|| -> Result<Py<PyAny>, Error> {
+        let logger = sc_agent::default_logger(&text(name)?)?;
+        let value = Py::new(py, PyLogger(Arc::new(logger))).map_err(invalid)?;
+        let envelope = PyDict::new(py);
+        envelope.set_item("ok", true).map_err(invalid)?;
+        envelope.set_item("value", value).map_err(invalid)?;
+        Ok(envelope.into_any().unbind())
+    })();
+    created.unwrap_or_else(|e| respond(py, None, "decidr", |_| Err(e)))
 }
 
 #[pyfunction(signature=(logger=None,event=None))]
@@ -284,6 +278,21 @@ fn digest(
 }
 #[pyclass(name = "Run", frozen)]
 struct PyRun(Result<sc_agent::Run, Value>);
+impl PyRun {
+    fn with(
+        &self,
+        py: Python<'_>,
+        f: impl FnOnce(&sc_agent::Run) -> Result<Value, Error>,
+    ) -> Py<PyAny> {
+        raw(
+            py,
+            match &self.0 {
+                Ok(run) => sc_agent::report(run.logger(), f(run)),
+                Err(e) => e.clone(),
+            },
+        )
+    }
+}
 #[pymethods]
 impl PyRun {
     #[new]
@@ -367,15 +376,20 @@ impl PyRun {
         }
         false
     }
-    fn sends_to(&self, py: Python<'_>, provider: &str) -> Py<PyAny> {
-        let run = match &self.0 {
-            Ok(run) => run,
-            Err(e) => return raw(py, e.clone()),
-        };
-        raw(
-            py,
-            sc_agent::report(run.logger(), run.sends_to(provider).map(Value::Bool)),
-        )
+    #[pyo3(signature=(provider=None,*extra,**rest))]
+    fn sends_to(
+        &self,
+        py: Python<'_>,
+        provider: Option<&Bound<'_, PyAny>>,
+        extra: &Bound<'_, PyTuple>,
+        rest: Option<&Bound<'_, PyDict>>,
+    ) -> Py<PyAny> {
+        self.with(py, |run| {
+            extras(extra, rest)?;
+            let provider = arg::<String>(provider, "provider")?
+                .ok_or_else(|| invalid("provider is required"))?;
+            run.sends_to(&provider).map(Value::Bool)
+        })
     }
     #[pyo3(signature=(request=None,*extra,**rest))]
     fn send(
@@ -385,16 +399,11 @@ impl PyRun {
         extra: &Bound<'_, PyTuple>,
         rest: Option<&Bound<'_, PyDict>>,
     ) -> Py<PyAny> {
-        let run = match &self.0 {
-            Ok(run) => run,
-            Err(e) => return raw(py, e.clone()),
-        };
-        let outcome = (|| {
+        self.with(py, |run| {
             extras(extra, rest)?;
             let value = self::request(request)?;
             interruptible(py, &run.cancel, || run.send(&value))
-        })();
-        raw(py, sc_agent::report(run.logger(), outcome))
+        })
     }
     #[pyo3(signature=(requests=None,*extra,on_result=None,**rest))]
     fn send_batch(
@@ -405,11 +414,7 @@ impl PyRun {
         on_result: Option<&Bound<'_, PyAny>>,
         rest: Option<&Bound<'_, PyDict>>,
     ) -> Py<PyAny> {
-        let run = match &self.0 {
-            Ok(run) => run,
-            Err(e) => return raw(py, e.clone()),
-        };
-        let outcome = (|| {
+        self.with(py, |run| {
             extras(extra, rest)?;
             let requests = required(requests)?
                 .try_iter()
@@ -438,8 +443,7 @@ impl PyRun {
                 Some(e) => Err(e),
                 None => result,
             }
-        })();
-        raw(py, sc_agent::report(run.logger(), outcome))
+        })
     }
     #[pyo3(signature=(*extra,**rest))]
     fn cancel(
@@ -448,15 +452,12 @@ impl PyRun {
         extra: &Bound<'_, PyTuple>,
         rest: Option<&Bound<'_, PyDict>>,
     ) -> Py<PyAny> {
-        let run = match &self.0 {
-            Ok(run) => run,
-            Err(e) => return raw(py, e.clone()),
-        };
-        let outcome = extras(extra, rest).map(|()| {
-            run.cancel.cancel();
-            Value::Null
-        });
-        raw(py, sc_agent::report(run.logger(), outcome))
+        self.with(py, |run| {
+            extras(extra, rest).map(|()| {
+                run.cancel.cancel();
+                Value::Null
+            })
+        })
     }
 }
 #[pyfunction]
