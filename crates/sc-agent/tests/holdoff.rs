@@ -90,7 +90,7 @@ fn deadline_is_per_host_within_one_run_and_isolated_between_runs() -> Test {
         http(200, answer()),
         http(200, answer()),
     ])?;
-    let other = Stub::new(vec![http(200, answer())])?;
+    let other = Stub::at(vec![http(200, answer())], "[::1]:0".parse()?)?;
     let mut opts = options(&root, &stub.url);
     opts.settings.max_sends = 1;
     let mut client = run(opts.clone(), &logger)?;
@@ -105,7 +105,7 @@ fn deadline_is_per_host_within_one_run_and_isolated_between_runs() -> Test {
     });
     assert!(client.send(&request(), Some(false)).is_err());
     run(opts, &logger)?.send(&request(), Some(false))?;
-    client.options.base_url = Some(other.url.replace("127.0.0.1", "localhost"));
+    client.options.base_url = Some(other.url.clone());
     client.send(&request(), Some(false))?;
     assert!(
         waits
