@@ -1434,7 +1434,6 @@ pub struct Run {
     pub cancel: Arc<Cancel>,
     pub wait: Box<dyn Fn(Duration) + Send + Sync>,
     pub keyring: Box<dyn Fn(&str) -> Result<String, KeyringError> + Send + Sync>,
-    provider: &'static Provider,
     found: Vec<(&'static Provider, String)>,
     logger: Arc<Logger>,
     owned: bool,
@@ -1489,7 +1488,6 @@ impl Run {
         cancel: Arc<Cancel>,
     ) -> Result<Self, Error> {
         let found = candidates(&options.model, None, &options.settings.models)?;
-        let provider = found[0].0;
         let owned = logger.is_none();
         let logger = match logger {
             Some(logger) => logger,
@@ -1501,14 +1499,17 @@ impl Run {
             cancel,
             wait: Box::new(move |delay| waiting.wait(delay)),
             keyring: Box::new(os_keyring),
-            provider,
             found,
             logger,
             owned,
         })
     }
-    pub fn provider(&self) -> &'static Provider {
-        self.provider
+    fn resolve(&self) -> Result<(&'static Provider, String), Error> {
+        resolve(self.found.clone(), &self.options, &*self.keyring)
+    }
+    /// Whether the next send resolves to the named provider (keyless first, then the first held key).
+    pub fn sends_to(&self, provider: &str) -> bool {
+        self.resolve().is_ok_and(|(p, _)| p.name == provider)
     }
     pub fn logger(&self) -> &Logger {
         &self.logger
@@ -1540,7 +1541,7 @@ impl Run {
             let project = options.settings.project_required()?;
             slug(project)?;
             slug(&options.agent_role)?;
-            let (provider, model) = resolve(self.found.clone(), options, &*self.keyring)?;
+            let (provider, model) = self.resolve()?;
             let base = match options.settings.local.get(provider.name) {
                 _ if !provider.url.is_empty() => provider.url.into(),
                 Some(runner) => format!("http://{}:{}/v1", runner.host, runner.port),
