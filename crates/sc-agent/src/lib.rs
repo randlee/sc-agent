@@ -887,49 +887,33 @@ fn provider_named(name: &str) -> Result<&'static Provider, Error> {
         .find(|p| p.name == name)
         .ok_or_else(|| error("types.unknown_provider", name))
 }
-/// Resolve a model name using only the built-in tables.
-pub fn model(name: &str, provider: Option<&str>) -> Result<(&'static Provider, String), Error> {
-    model_with(name, provider, &BTreeMap::new())
-}
-/// Resolve a model name to its first candidate; a configured entry for `name`
-/// wins over the built-in tables unless an explicit `provider` names a different one.
+/// Resolve a model name to its first configured or catalog candidate.
 pub fn model_with(
     name: &str,
-    provider: Option<&str>,
     configured: &BTreeMap<String, ModelEntry>,
 ) -> Result<(&'static Provider, String), Error> {
-    Ok(candidates(name, provider, configured)?.remove(0))
+    Ok(candidates(name, configured)?.remove(0))
 }
 /// Every provider row that serves `name`, newest release first, equal dates in table order.
 fn candidates(
     name: &str,
-    provider: Option<&str>,
     configured: &BTreeMap<String, ModelEntry>,
 ) -> Result<Vec<(&'static Provider, String)>, Error> {
     if let Some(entry) = configured.get(name) {
         let p = provider_named(&entry.provider)?;
-        if provider.is_none_or(|requested| requested == entry.provider) {
-            return Ok(vec![(p, entry.id.clone())]);
-        }
+        return Ok(vec![(p, entry.id.clone())]);
     }
-    let chosen = provider.map(provider_named).transpose()?;
     let mut rows = Vec::new();
-    for p in PROVIDERS
-        .iter()
-        .filter(|p| chosen.is_none_or(|c| c.name == p.name))
-    {
+    for p in PROVIDERS {
         for (_, id, date) in p.models.iter().filter(|(s, i, _)| *s == name || *i == name) {
             rows.push((*date, p, (*id).to_owned()));
         }
     }
     rows.sort_by_key(|row| std::cmp::Reverse(row.0));
-    let mut found = rows
+    let found = rows
         .into_iter()
         .map(|(_, p, id)| (p, id))
         .collect::<Vec<_>>();
-    if let Some(p) = chosen.filter(|p| p.open && found.is_empty()) {
-        found.push((p, name.into()));
-    }
     if found.is_empty() {
         return Err(error("types.unknown_short_name", name));
     }
@@ -1431,15 +1415,12 @@ pub fn workers(value: i64) -> Result<usize, Error> {
 fn after_cancel(outcome: Result<Value, Error>, cancel: &Cancel) -> Result<Value, Error> {
     outcome.and_then(|value| cancel.check().map(|()| value))
 }
+type KeyringFn = dyn Fn(&str) -> Result<String, KeyringError> + Send + Sync;
 pub struct Run {
     pub options: Options,
     pub cancel: Arc<Cancel>,
     pub wait: Box<dyn Fn(Duration) + Send + Sync>,
-    #[expect(
-        clippy::type_complexity,
-        reason = "the Run signature owns the injected keyring callback"
-    )]
-    pub keyring: Box<dyn Fn(&str) -> Result<String, KeyringError> + Send + Sync>,
+    pub keyring: Box<KeyringFn>,
     found: Vec<(&'static Provider, String)>,
     logger: Arc<Logger>,
     owned: bool,
@@ -1470,7 +1451,6 @@ impl Run {
         if let Some(count) = args.workers {
             settings.workers = workers(count)?;
         }
-        let name = logger.as_ref().map(|l| l.service_name().as_str());
         let options = Options {
             environment: std::env::vars_os().collect(),
             settings,
@@ -1480,7 +1460,7 @@ impl Run {
                 .map_err(|e| error("decidr.invalid_request_timeout", e))?,
             base_url: args.base_url,
             root,
-            log_root: log_root(name.unwrap_or(&args.tool))?,
+            log_root: log_root(&args.tool)?,
             repo,
         };
         Self::from_options(options, args.tool, logger, cancel)
@@ -1491,7 +1471,7 @@ impl Run {
         logger: Option<Arc<Logger>>,
         cancel: Arc<Cancel>,
     ) -> Result<Self, Error> {
-        let found = candidates(&options.model, None, &options.settings.models)?;
+        let found = candidates(&options.model, &options.settings.models)?;
         let owned = logger.is_none();
         let logger = match logger {
             Some(logger) => logger,
@@ -1519,13 +1499,7 @@ impl Run {
         &self.logger
     }
     pub fn close(&self) -> Result<(), Error> {
-        self.logger.flush().map_err(|e| error("log.flush", e))?;
-        if self.owned {
-            self.logger
-                .shutdown()
-                .map_err(|e| error("log.shutdown", e))?;
-        }
-        Ok(())
+        finish_logger(&self.logger, self.owned)
     }
     pub fn send(&self, request: &Value) -> Result<Value, Error> {
         let (options, logger, cancel) = (&self.options, self.logger(), &*self.cancel);
@@ -1662,6 +1636,15 @@ impl Run {
             )
         }))
     }
+}
+pub fn finish_logger(logger: &Logger, owned: bool) -> Result<(), Error> {
+    let flushed = logger.flush().map_err(|e| error("log.flush", e));
+    let stopped = if owned {
+        logger.shutdown().map_err(|e| error("log.shutdown", e))
+    } else {
+        Ok(())
+    };
+    flushed.and(stopped)
 }
 pub fn repository() -> Result<(PathBuf, String), Error> {
     let cwd = std::env::current_dir().map_err(|e| error("config.repo", e))?;
@@ -1801,7 +1784,7 @@ pub mod route_tests {
                     _ => Ok(String::new()),
                 }
             };
-            let found = candidates("haiku", None, &BTreeMap::new())?;
+            let found = candidates("haiku", &BTreeMap::new())?;
             let causes = found
                 .iter()
                 .map(|(provider, _)| {
@@ -1913,7 +1896,7 @@ pub mod route_tests {
         };
         let run = Run::new(args, Some(logger.clone()), Arc::new(Cancel::default()))?;
         assert_eq!(run.options.settings.workers, 2);
-        let (provider, model) = model("jev", None)?;
+        let (provider, model) = model_with("jev", &BTreeMap::new())?;
         let sends = Cell::new(0);
         for _ in 0..2 {
             let route = Route {
@@ -2068,7 +2051,7 @@ pub mod route_tests {
         ] {
             let mut options = options(&root, "http://127.0.0.1:1/v1");
             options.timeout = timeout;
-            let (provider, model) = model("jev", None)?;
+            let (provider, model) = model_with("jev", &BTreeMap::new())?;
             let route = Route {
                 options: &options,
                 provider,

@@ -1,7 +1,7 @@
 pub mod support;
 use sc_agent::{
     AnthropicCompat, Cancel, DEFAULT_SYSTEM_PROMPT, Decision, Jev, Llm, LlmRequest, OpenAiCompat,
-    Options, Route, Runner, model_with, result,
+    Options, Route, Runner, result,
 };
 use serde_json::{Value, json};
 use std::cell::Cell;
@@ -26,7 +26,7 @@ fn with_route<T>(
     base: &str,
     run: impl Fn(&Route<'_>) -> T,
 ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-    let (provider, model) = model_with(name, Some(provider), &Default::default())?;
+    let (provider, model) = pinned_model(provider, name)?;
     let sends = Cell::new(0);
     let route = Route {
         options,
@@ -70,10 +70,7 @@ fn non_decision_llm_selected_by_short_name_returns_the_json_the_model_wrote() ->
     assert_eq!(reply, json!({"a":1}));
     let seen = stub.finish()?;
     assert_eq!(seen.len(), 1);
-    assert_eq!(
-        seen[0].body["model"],
-        model_with("sol", Some("openai"), &Default::default())?.1
-    );
+    assert_eq!(seen[0].body["model"], pinned_model("openai", "sol")?.1);
     assert_eq!(seen[0].path, "/v1/chat/completions");
     assert_eq!(
         seen[0].body["messages"],
@@ -472,7 +469,7 @@ fn system_prompt_override_by_full_id() -> Test {
             sc_agent::ModelEntry {
                 released: None,
                 provider: provider.into(),
-                id: sc_agent::model(&opts.model, Some(provider))?.1,
+                id: pinned_model(provider, &opts.model)?.1,
             },
         );
         opts.settings
@@ -596,9 +593,7 @@ fn llm_decision_backends_reject_answers_outside_the_requested_schema() -> Test {
         for (provider, model) in [("openai", "luna"), ("anthropic", "haiku")] {
             let root = Temp::new()?;
             let reply = json!({"answers":{"q":answer}}).to_string();
-            let wire = model_with(model, Some(provider), &Default::default())?
-                .0
-                .wire;
+            let wire = pinned_model(provider, model)?.0.wire;
             let raw = match wire {
                 sc_agent::Wire::Messages => json!({"content":[{"type":"text","text":reply}]}),
                 sc_agent::Wire::Chat => json!({"choices":[{"message":{"content":reply}}]}),
