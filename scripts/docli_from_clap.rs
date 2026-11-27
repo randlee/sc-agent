@@ -79,6 +79,10 @@ pub fn write_model(path: &Path, model: &CliModel) -> Result<(), String> {
     std::fs::write(path, bytes).map_err(|error| format!("write {}: {error}", path.display()))
 }
 
+fn text(value: Option<&clap::builder::StyledStr>) -> String {
+    value.map(ToString::to_string).unwrap_or_default()
+}
+
 fn from_clap_path(command: &Command, full_name: &str) -> CliModel {
     let mut options = Vec::new();
     let mut arguments = Vec::new();
@@ -86,11 +90,8 @@ fn from_clap_path(command: &Command, full_name: &str) -> CliModel {
     for arg in command.get_arguments().filter(|arg| !is_auto_injected(arg)) {
         let long = arg.get_long().map(|name| format!("--{name}"));
         let short = arg.get_short().map(|name| format!("-{name}"));
-        let help = arg.get_help().map(ToString::to_string).unwrap_or_default();
-        let long_help = arg
-            .get_long_help()
-            .map(ToString::to_string)
-            .unwrap_or_default();
+        let help = text(arg.get_help());
+        let long_help = text(arg.get_long_help());
         let value_name = arg
             .get_value_names()
             .and_then(|names| names.first().map(ToString::to_string));
@@ -149,18 +150,9 @@ fn from_clap_path(command: &Command, full_name: &str) -> CliModel {
     CliModel {
         name: command.get_name().to_owned(),
         version: command.get_version().map(ToString::to_string),
-        description: command
-            .get_about()
-            .map(ToString::to_string)
-            .unwrap_or_default(),
-        long_description: command
-            .get_long_about()
-            .map(ToString::to_string)
-            .unwrap_or_default(),
-        epilogue: command
-            .get_after_help()
-            .map(ToString::to_string)
-            .unwrap_or_default(),
+        description: text(command.get_about()),
+        long_description: text(command.get_long_about()),
+        epilogue: text(command.get_after_help()),
         usage: command
             .clone()
             .bin_name(full_name)

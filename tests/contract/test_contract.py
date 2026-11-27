@@ -558,11 +558,10 @@ for identity in ("decision.request_parse", "decidr.invalid_request_timeout", "de
             raise ValueError("controlled sleep callback refusal")
         replies = [(429, {"Retry-After": "0"}, {}), (200, {}, ANSWER)]
         with server(replies) as (url, received), patch.dict(os.environ, {"TYPESAFE_API_KEY": "contract-secret"}):
-            result = self.api.send_batch(
-                [REQUEST, REQUEST], workers=1, project="contract", agent_role="contract",
-                config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"],
-                base_url=url, sleep=rejected,
-            )
+            with self.api.Run(tool="decidr", workers=1, project="contract", agent_role="contract",
+                              config_dir=self.directory.name, general_log=self.api.logger("decidr")["value"],
+                              base_url=url, sleep=rejected) as run:
+                result = run.send_batch([REQUEST, REQUEST])
         self.assertTrue(result["ok"], result)
         first, second = [item["result"] for item in result["value"]]
         error = self.error(first)

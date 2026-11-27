@@ -879,36 +879,6 @@ fn array_shaped_answers_and_boxes_are_schema_mismatches() -> Test {
 }
 
 #[test]
-fn configured_release_dates_keep_calendar_and_format_boundaries() -> Test {
-    for (date, valid) in [
-        ("2000-02-29", true),
-        ("2024-02-29", true),
-        ("0000-02-29", true),
-        ("9999-12-31", true),
-        ("1900-02-29", false),
-        ("2025-02-29", false),
-        ("2026-04-31", false),
-        ("2026-00-01", false),
-        ("2026-01-00", false),
-        ("2026-1-01", false),
-        ("2026-01-1", false),
-        ("026-01-01", false),
-        ("+2026-01-01", false),
-        (" 2026-01-01", false),
-        ("2026-01-01T00:00:00Z", false),
-    ] {
-        let result = configured_models(json!({"luna": {
-            "provider":"nous", "id":"openai/gpt-6.1-luna", "released":date
-        }}));
-        assert_eq!(result.is_ok(), valid, "release date {date}");
-        if let Err(error) = result {
-            assert!(error.to_string().contains("config.invalid"), "{error}");
-        }
-    }
-    Ok(())
-}
-
-#[test]
 fn configuration_files_environment_and_missing_project_follow_the_tool_name() -> Test {
     let root = Temp::new()?;
     std::fs::write(

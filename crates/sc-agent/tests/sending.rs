@@ -284,14 +284,7 @@ fn invalid_utf8_provider_error_keeps_status_and_surrounding_text() -> Test {
         })
         .collect();
     let stub = Stub::new(replies)?;
-    let failure = sc_agent::result(send(
-        &request(),
-        &options(&root, &stub.url),
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    ));
+    let failure = sc_agent::result(run(options(&root, &stub.url), &logger)?.send(&request()));
     let requests = stub.finish()?;
     assert_eq!(failure["error"]["id"], "http.auth");
     assert_eq!(failure["error"]["message"], "before?after");
@@ -312,14 +305,7 @@ fn req_sag_0002_provider_error_over_ten_mib_is_preserved() -> Test {
     // Keep the first transport failure rather than retrying an exhausted one-reply stub.
     opts.timeout = Duration::from_secs(600);
     opts.settings.max_sends = 1;
-    let failure = sc_agent::result(send(
-        &request(),
-        &opts,
-        &logger,
-        &Cancel::default(),
-        &no_wait,
-        &keyring,
-    ));
+    let failure = sc_agent::result(run(opts, &logger)?.send(&request()));
     let stub_outcome = stub.finish();
     let error = &failure["error"];
     let message = error["message"].as_str().unwrap_or_default();
