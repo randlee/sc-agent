@@ -128,6 +128,56 @@ def test_warm_cache_routes_without_bd_and_refreshes_once(world):
     assert [c[1] for c in world.commands if c[0] == "bd"] == ["list"]
 
 
+def add_qa_bead(world):
+    qa = "atm-test-1.qa"
+    world.bd.add(qa, labels=["phase-test", "stage:qa"], metadata={"checked_bead": world.dev})
+    world.bd.edge(qa, world.task, "blocks")
+    world.beads[world.dev]["metadata"]["qa_bead"] = qa
+    return qa
+
+
+@pytest.mark.parametrize("marker", [{"nr": True}, {"nr": "true"}, {"outcome": "not_reproducible"}])
+def test_pass_on_a_rejected_fix_also_closes_the_qa_bead(world, marker):
+    qa = add_qa_bead(world)
+    world.values.update(marker)
+    assert world.invoke()["result"] == "handled"
+    reason = f"not reproducible: rejection accepted by sanity at {world.sha}; no QA"
+    assert world.journal() == [(world.task, "close", {"reason": f"PASS at {world.sha}"}, "pending"),
+                               (qa, "close", {"reason": reason}, "pending")]
+    assert not world.bd_writes()
+    assert world.cache().drain()["applied"] == [1, 2]
+    assert (world.beads[qa]["status"], world.beads[qa]["close_reason"]) == ("closed", reason)
+    assert world.invoke()["result"] == "handled"  # a replay journals nothing new
+    assert len(world.journal()) == 2
+
+
+@pytest.mark.parametrize("marker", [{}, {"nr": False}, {"nr": "false"}, {"outcome": "fixed"}])
+def test_pass_on_a_fixed_bead_leaves_the_qa_bead_open(world, marker):
+    qa = add_qa_bead(world)
+    world.values.update(marker)
+    assert world.invoke()["result"] == "handled"
+    assert [row[0] for row in world.journal()] == [world.task]
+    world.cache().drain()
+    assert world.beads[qa]["status"] == "open"
+
+
+def test_fail_on_a_rejected_fix_leaves_the_qa_bead_open(world):
+    qa = add_qa_bead(world)
+    world.values.update(nr=True, verdict="FAIL", findings=[{"deliverable": 1, "issue": "still reproduces"}])
+    assert world.invoke()["result"] == "handled"
+    assert qa not in [row[0] for row in world.journal()]
+    assert world.beads[qa]["status"] == "open"
+
+
+@pytest.mark.parametrize("qa_bead", [None, "atm-test-1.absent"])
+def test_rejected_fix_without_a_readable_qa_bead_refuses_without_writes(world, qa_bead):
+    if qa_bead:
+        world.beads[world.dev]["metadata"]["qa_bead"] = qa_bead
+    world.values["nr"] = True
+    assert world.invoke()["result"] == "refused"
+    assert not world.journal()
+
+
 def test_pass_skips_already_completed_dev_task(world):
     world.histories[world.dev].append({"to_state": "complete"})
     assert len(world.invoke()["atm-action"]) == 1

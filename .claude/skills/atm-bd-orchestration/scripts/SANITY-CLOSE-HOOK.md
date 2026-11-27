@@ -84,7 +84,10 @@ result also supplies verdict, run ID and missing-item numbers/reasons (deliverab
 zero denotes a verification-wide evidence deficiency).
 
 All validation precedes mutations. Bead writes go to the bd-cache journal, not
-to bd: PASS journals the sanity close; FAIL journals its findings in the checked bead notes, then the dev reopen (precondition:
+to bd: PASS journals the sanity close and, when the selected result says the dev
+rejected the finding (`nr` true or `outcome: not_reproducible`), also the close of
+the checked bead's `metadata.qa_bead` (missing or unreadable refuses before any
+write); FAIL journals its findings in the checked bead notes, then the dev reopen (precondition:
 the dev bead's assignee is the dev task's assignee) and the sanity reopen to
 open/unassigned (precondition: its assignee is unchanged). Each entry's
 idempotency key is derived from the close plan and the operation, so a retried
