@@ -270,6 +270,11 @@ fn failed_general_logger_preserves_the_successful_session() -> Test {
             .as_str()
             .is_some_and(|message| message.contains("Ok("))
     );
+    assert!(
+        failure["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("log.write"))
+    );
     assert_eq!(stub.finish()?.len(), 1);
     let sessions = rows(&root)?;
     assert_eq!(sessions.len(), 1);
@@ -319,6 +324,7 @@ fn old_session_file_survives_a_new_decision_unchanged() -> Test {
 struct Captures {
     events: std::sync::Mutex<Vec<sc_observability::LogEvent>>,
     name: sc_observability::SinkName,
+    fail_flush: bool,
 }
 impl sc_observability::v2::LogSink for Captures {
     fn write(
@@ -343,6 +349,66 @@ impl sc_observability::v2::LogSink for Captures {
             last_error: None,
         }
     }
+    fn flush(&self) -> Result<(), sc_observability::v2::LogSinkError> {
+        if self.fail_flush {
+            return Err(sc_observability::v2::LogSinkError::Flush {
+                context: Box::new(sc_observability::ErrorContext::new(
+                    sc_observability::error_codes::LOGGER_SINK_WRITE_FAILED,
+                    "controlled flush failure",
+                    sc_observability::Remediation::not_recoverable("test flush"),
+                )),
+            });
+        }
+        Ok(())
+    }
+}
+#[test]
+fn session_write_failure_survives_later_flush_failure() -> Test {
+    let root = Temp::new()?;
+    std::fs::write(root.0.join("sessions"), "not a directory")?;
+    let io_error = std::fs::create_dir_all(root.0.join("sessions/example"))
+        .err()
+        .ok_or("expected directory error")?
+        .to_string();
+    let sink = std::sync::Arc::new(Captures {
+        events: Default::default(),
+        name: sc_observability::SinkName::new("flush-failure")?,
+        fail_flush: true,
+    });
+    let mut config = sc_observability::LoggerConfig::default_for(
+        sc_observability::ServiceName::new("decidr")?,
+        root.0.clone(),
+    );
+    config.enable_file_sink = false;
+    config.enable_console_sink = false;
+    let mut builder = sc_observability::v2::Logger::builder(config)?;
+    builder.register_sink(sc_observability::SinkRegistration::typed(sink.clone()));
+    let logger = builder.build()?;
+    let stub = Stub::new(vec![http(200, answer())])?;
+    let failure = sc_agent::result(send(
+        &request(),
+        &options(&root, &stub.url),
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    ));
+    assert_eq!(failure["error"]["id"], "log.flush");
+    assert!(failure["error"]["session_id"].as_str().is_some());
+    let message = failure["error"]["message"]
+        .as_str()
+        .ok_or("missing message")?;
+    assert!(message.contains("log.session_write"), "{message}");
+    assert!(message.contains(&io_error), "{message}");
+    assert!(
+        sink.events
+            .lock()
+            .map_err(|e| e.to_string())?
+            .iter()
+            .any(|event| event.fields.get("id") == Some(&json!("log.session_write")))
+    );
+    assert_eq!(stub.finish()?.len(), 1);
+    Ok(())
 }
 #[test]
 fn injected_test_sink_receives_every_general_record_without_default_file() -> Test {
@@ -350,6 +416,7 @@ fn injected_test_sink_receives_every_general_record_without_default_file() -> Te
     let sink = std::sync::Arc::new(Captures {
         events: Default::default(),
         name: sc_observability::SinkName::new("capture")?,
+        fail_flush: false,
     });
     let mut config = sc_observability::LoggerConfig::default_for(
         sc_observability::ServiceName::new("decidr")?,

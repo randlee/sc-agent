@@ -135,24 +135,15 @@ pub fn error(id: &'static str, message: impl ToString) -> Error {
         session_id: None,
     }
 }
-fn with_session_id(error: Error, session_id: &str) -> Error {
-    match error {
-        Error::Failure {
-            id,
-            message,
-            action,
-            category,
-            attempts,
-            ..
-        } => Error::Failure {
-            id,
-            message,
-            action,
-            category,
-            attempts,
-            session_id: Some(session_id.to_owned()),
-        },
-    }
+fn contextual(mut failure: Error, context: impl std::fmt::Display, session: Option<&str>) -> Error {
+    let Error::Failure {
+        message,
+        session_id,
+        ..
+    } = &mut failure;
+    message.push_str(&format!("; {context}"));
+    *session_id = session.map(str::to_owned).or_else(|| session_id.take());
+    failure
 }
 pub fn result(value: Result<Value, Error>) -> Value {
     match value {
@@ -1498,6 +1489,9 @@ pub fn send(
         fields.insert("session_id".into(), json!(session_id));
         fields.insert("question_digests".into(), json!(digests));
     }
+    let mut session_failure = None;
+    let attach = |failure, context| contextual(failure, context, Some(&session_id));
+    let prior = || format!("original outcome: {outcome:?}");
     if let Ok(project) = options.settings.project_required()
         && slug(project).is_ok()
         && slug(&options.agent_role).is_ok()
@@ -1509,19 +1503,9 @@ pub fn send(
             .join(&options.repo)
             .join(&options.agent_role)
             .join(project);
-        let _append = match SESSION_APPEND.lock() {
-            Ok(append) => append,
-            Err(e) => {
-                let original = format!("{outcome:?}");
-                return Err(with_session_id(
-                    error(
-                        "config.session",
-                        format!("{e}; original outcome: {original}"),
-                    ),
-                    &session_id,
-                ));
-            }
-        };
+        let _append = SESSION_APPEND
+            .lock()
+            .map_err(|e| attach(error("config.session", e), prior()))?;
         let written = (|| -> std::io::Result<()> {
             use std::io::Write;
             std::fs::create_dir_all(&path)?;
@@ -1533,41 +1517,28 @@ pub fn send(
                 "{row}"
             )
         })();
-        if let Err(e) = written {
-            let original = format!("{outcome:?}");
-            let failure = with_session_id(
-                error(
-                    "log.session_write",
-                    format!("{e}; original outcome: {original}"),
-                ),
-                &session_id,
-            );
-            if let Err(log_failure) = log(logger, "error", json!(failure)) {
-                outcome = Err(with_session_id(
-                    error(
-                        "log.write",
-                        format!("{log_failure}; original session error: {failure}"),
-                    ),
-                    &session_id,
-                ));
-            }
+        session_failure = written
+            .err()
+            .map(|e| attach(error("log.session_write", e), prior()));
+        if let Some(failure) = &session_failure
+            && let Err(log_failure) = log(logger, "error", json!(failure))
+        {
+            outcome = Err(attach(
+                log_failure,
+                format!("original session error: {failure}"),
+            ));
         }
     }
-    if let Ok(value) = &outcome
-        && let Err(e) = log(logger, "decision.result", json!({"response":value}))
+    let logged = match &outcome {
+        Ok(value) => log(logger, "decision.result", json!({"response":value})),
+        Err(_) => Ok(()),
+    };
+    for failure in [logged, logger.flush().map_err(|e| error("log.flush", e))]
+        .into_iter()
+        .filter_map(Result::err)
     {
-        let original = format!("{outcome:?}");
-        outcome = Err(with_session_id(
-            error("log.write", format!("{e}; original outcome: {original}")),
-            &session_id,
-        ));
-    }
-    if let Err(e) = logger.flush() {
-        let original = format!("{outcome:?}");
-        outcome = Err(with_session_id(
-            error("log.flush", format!("{e}; original outcome: {original}")),
-            &session_id,
-        ));
+        let context = format!("original outcome: {outcome:?}; session error: {session_failure:?}");
+        outcome = Err(attach(failure, context));
     }
     outcome
 }
@@ -1688,17 +1659,14 @@ pub fn doctor(config_dir: Option<&Path>, project: Option<&str>) -> Result<Value,
 
 pub fn report(logger: &Logger, outcome: Result<Value, Error>) -> Value {
     if let Err(error) = &outcome
-        && let Err(mut failure) = log(logger, "error", json!(error))
+        && let Err(failure) = log(logger, "error", json!(error))
     {
         let Error::Failure { session_id, .. } = error;
-        let Error::Failure {
-            message,
-            session_id: failure_session_id,
-            ..
-        } = &mut failure;
-        message.push_str(&format!("; original error: {error}"));
-        *failure_session_id = session_id.clone();
-        return result(Err(failure));
+        return result(Err(contextual(
+            failure,
+            format!("original error: {error}"),
+            session_id.as_deref(),
+        )));
     }
     result(outcome)
 }
