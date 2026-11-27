@@ -1,6 +1,6 @@
 use sc_config::{
-    AppName, ConfigError, EnvSource, FileSource, Layer, LayerSource, Resolved, Slot, SourceKind,
-    StandardContext, StandardLayers,
+    AppName, ConfigError, EnvSource, FileSource, Resolved, Slot, SourceKind, StandardContext,
+    StandardLayers,
 };
 use sc_observability::{LoggerConfig, ServiceName, v2::Logger};
 use serde::{Deserialize, Serialize, de::Error as DeError};
@@ -109,40 +109,37 @@ pub fn after_shutdown(value: Value, shutdown: Result<(), impl std::fmt::Display>
     failure
 }
 pub fn error(id: &'static str, message: impl ToString) -> Error {
-    let category = match id {
-        "secrets.key_missing"
-        | "secrets.key_malformed"
-        | "secrets.keyring_read"
-        | "secrets.keyring_timeout"
-        | "http.auth" => "auth",
-        "http.network" => "network",
-        "decision.api_status" => "other",
-        "http.provider_busy" => "busy",
-        "http.quota_exhausted" => "quota",
-        "decision.cancelled" => "cancelled",
-        "decision.response_parse" | "decision.schema_mismatch" => "response_invalid",
-        s if s.starts_with("log.") => "log",
-        s if s.starts_with("config.") => "config",
-        _ => "validation",
+    let fix_input = "Fix the named input or provider response.";
+    let retry = "Retry later.";
+    let (category, action) = match id {
+        "secrets.keyring_timeout" => (
+            "auth",
+            "Approve keychain access, or set the environment variable or .env key.",
+        ),
+        "secrets.keyring_read" => (
+            "auth",
+            "Restore platform keyring access, or set the key in the environment or repository .env.",
+        ),
+        "secrets.key_missing" => (
+            "auth",
+            "Set the key in the environment, repository .env, or platform keyring.",
+        ),
+        "secrets.key_malformed" | "http.auth" => ("auth", "Check the provider API key."),
+        "http.network" => ("network", retry),
+        "http.provider_busy" => ("busy", retry),
+        "decision.api_status" => ("other", fix_input),
+        "http.quota_exhausted" => ("quota", fix_input),
+        "decision.cancelled" => ("cancelled", fix_input),
+        "decision.response_parse" | "decision.schema_mismatch" => ("response_invalid", fix_input),
+        s if s.starts_with("log.") => ("log", fix_input),
+        s if s.starts_with("config.") => ("config", fix_input),
+        _ => ("validation", fix_input),
     };
     Error::Failure {
         id,
         message: message.to_string(),
         category,
-        action: match category {
-            "auth" if id == "secrets.keyring_timeout" => {
-                "Approve keychain access, or set the environment variable or .env key."
-            }
-            "auth" if id == "secrets.keyring_read" => {
-                "Restore platform keyring access, or set the key in the environment or repository .env."
-            }
-            "auth" if id == "secrets.key_missing" => {
-                "Set the key in the environment, repository .env, or platform keyring."
-            }
-            "auth" => "Check the provider API key.",
-            "busy" | "network" => "Retry later.",
-            _ => "Fix the named input or provider response.",
-        },
+        action,
         attempts: None,
         session_id: None,
     }
@@ -269,29 +266,6 @@ pub struct Configuration {
     pub rows: Vec<Value>,
     pub files: Vec<Value>,
 }
-struct ConfigEnv(String, Vec<(OsString, OsString)>);
-impl LayerSource for ConfigEnv {
-    fn load(&self, base: &Value) -> Result<Option<Layer>, ConfigError> {
-        let prefix = prefix(&self.0);
-        let variables = self
-            .1
-            .iter()
-            .filter(|(name, _)| {
-                let key = name
-                    .to_str()
-                    .and_then(|name| name.strip_prefix(prefix.as_str()))
-                    .and_then(|key| key.split("__").next())
-                    .unwrap_or("")
-                    .to_ascii_lowercase();
-                !matches!(key.as_str(), "log_root" | "project")
-            })
-            .cloned()
-            .collect();
-        EnvSource::new(prefix, variables)
-            .alias("SC_PROJECT", ["project"])
-            .load(base)
-    }
-}
 fn config_error(failure: ConfigError) -> Error {
     let id = match failure.code() {
         "APP.INVALID_NAME" => "config.name",
@@ -322,6 +296,20 @@ pub fn config(
     environment: &[(OsString, OsString)],
     project: Option<&str>,
 ) -> Result<Configuration, Error> {
+    let env_prefix = prefix(tool);
+    let variables = environment
+        .iter()
+        .filter(|(name, _)| {
+            let key = name
+                .to_str()
+                .and_then(|name| name.strip_prefix(env_prefix.as_str()))
+                .and_then(|key| key.split("__").next())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            !matches!(key.as_str(), "log_root" | "project")
+        })
+        .cloned()
+        .collect();
     let mut keys = KEYS.iter().map(|key| key.to_string()).collect::<Vec<_>>();
     keys.extend(
         PROVIDERS
@@ -368,7 +356,10 @@ pub fn config(
         .map(|project| json!({"project":project}))
         .unwrap_or(json!({}));
     let resolved = layers
-        .insert(Slot::Env, ConfigEnv(tool.into(), environment.to_vec()))
+        .insert(
+            Slot::Env,
+            EnvSource::new(env_prefix, variables).alias("SC_PROJECT", ["project"]),
+        )
         .flags(flags)
         .resolve()
         .map_err(config_error)?;
@@ -450,18 +441,15 @@ pub fn slug(value: &str) -> Result<(), Error> {
     Ok(())
 }
 pub fn log_root(name: &str) -> Result<PathBuf, Error> {
-    std::env::var_os(format!(
-        "{}_LOG_ROOT",
-        name.to_uppercase().replace('-', "_")
-    ))
-    .filter(|s| !s.is_empty())
-    .map(PathBuf::from)
-    .map(Ok)
-    .unwrap_or_else(|| {
-        std::env::home_dir()
-            .map(|p| p.join(".sc-agent"))
-            .ok_or_else(|| error("config.home", "Home directory unavailable"))
-    })
+    std::env::var_os(format!("{}LOG_ROOT", prefix(name)))
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .map(Ok)
+        .unwrap_or_else(|| {
+            std::env::home_dir()
+                .map(|p| p.join(".sc-agent"))
+                .ok_or_else(|| error("config.home", "Home directory unavailable"))
+        })
 }
 pub fn default_logger(name: &str) -> Result<Logger, Error> {
     slug(name)?;
@@ -1101,16 +1089,15 @@ fn answer_schema(question: &Value) -> Value {
     let mut fields = json!({"type":{"type":"string","enum":[kind]}});
     if let Some(fields) = fields.as_object_mut() {
         match kind {
-            "choice" => {
-                fields.insert("choice".into(), json!({"type":"string","enum":names}));
+            "choice" | "score" => {
                 fields.insert("confidence".into(), json!({"type":"number"}));
                 fields.insert("probabilities".into(), object("number"));
-            }
-            "score" => {
-                fields.insert("score".into(), json!({"type":"number"}));
-                fields.insert("confidence".into(), json!({"type":"number"}));
-                fields.insert("legend".into(), object("string"));
-                fields.insert("probabilities".into(), object("number"));
+                if kind == "choice" {
+                    fields.insert("choice".into(), json!({"type":"string","enum":names}));
+                } else {
+                    fields.insert("score".into(), json!({"type":"number"}));
+                    fields.insert("legend".into(), object("string"));
+                }
             }
             "box" => {
                 fields.insert("box".into(),json!({
@@ -1408,7 +1395,7 @@ type KeyringFn = dyn Fn(&str) -> Result<String, KeyringError> + Send + Sync;
 pub struct Run {
     pub options: Options,
     pub cancel: Arc<Cancel>,
-    pub wait: Box<dyn Fn(Duration) + Send + Sync>,
+    pub wait: Box<dyn Fn(Duration) -> Result<(), Error> + Send + Sync>,
     pub keyring: Box<KeyringFn>,
     found: Vec<(&'static Provider, String)>,
     logger: Arc<Logger>,
@@ -2081,17 +2068,9 @@ pub mod route_tests {
         let logger = logger(&root)?;
         let body = json!({"error":"controlled remote refusal"});
         let stub = Stub::new(vec![http(401, body.clone())])?;
-        let cancel = Cancel::default();
-        let lower = send(
-            &request(),
-            &options(&root, &stub.url),
-            &logger,
-            &cancel,
-            &no_wait,
-            &keyring,
-        )
-        .err()
-        .ok_or("401 accepted")?;
+        let run = run(options(&root, &stub.url), &logger)?;
+        let cancel = run.cancel.clone();
+        let lower = run.send(&request()).err().ok_or("401 accepted")?;
         assert!(!cancel.is_cancelled());
         assert_eq!(stub.finish()?.len(), 1);
         cancel.cancel();

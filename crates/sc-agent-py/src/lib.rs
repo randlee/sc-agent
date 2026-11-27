@@ -1,4 +1,5 @@
 use pyo3::{
+    exceptions::PyKeyboardInterrupt,
     prelude::*,
     types::{PyCFunction, PyDict, PyTuple},
 };
@@ -149,16 +150,13 @@ fn request(value: Option<&Bound<'_, PyAny>>) -> Result<Value, Error> {
     Ok(parsed)
 }
 fn callback(value: Option<&Bound<'_, PyAny>>) -> Result<Option<Py<PyAny>>, Error> {
-    value
-        .filter(|v| !v.is_none())
-        .map(|v| {
-            if v.is_callable() {
-                Ok(v.clone().unbind())
-            } else {
-                Err(invalid("callback must be callable"))
-            }
-        })
-        .transpose()
+    let Some(value) = value.filter(|v| !v.is_none()) else {
+        return Ok(None);
+    };
+    if !value.is_callable() {
+        return Err(invalid("callback must be callable"));
+    }
+    Ok(Some(value.clone().unbind()))
 }
 fn call_back<A, T>(callback: &Py<PyAny>, argument: A, cancel: &sc_agent::Cancel) -> Result<T, PyErr>
 where
@@ -170,7 +168,7 @@ where
             .call1(py, (argument,))
             .and_then(|v| v.extract::<T>(py).map_err(Into::into))
             .inspect_err(|e| {
-                if e.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) {
+                if e.is_instance_of::<PyKeyboardInterrupt>(py) {
                     cancel.cancel();
                 }
             })
@@ -202,7 +200,7 @@ fn interruptible(
         });
         loop {
             if let Err(error) = py.check_signals()
-                && error.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
+                && error.is_instance_of::<PyKeyboardInterrupt>(py)
             {
                 cancel.cancel();
             }
@@ -347,7 +345,16 @@ impl PyRun {
             if let Some(callback) = sleep {
                 let flag = flag.clone();
                 run.wait = Box::new(move |delay| {
-                    let _ = call_back::<_, Py<PyAny>>(&callback, delay.as_secs_f64(), &flag);
+                    Python::attach(|py| {
+                        match call_back::<_, Py<PyAny>>(&callback, delay.as_secs_f64(), &flag) {
+                            Ok(_) => Ok(()),
+                            Err(e) if e.is_instance_of::<PyKeyboardInterrupt>(py) => Ok(()),
+                            Err(e) => {
+                                py.detach(|| flag.wait(delay))?;
+                                Err(error("sc_agent_py.callback", e))
+                            }
+                        }
+                    })
                 });
             }
             if let Some(callback) = lookup {
@@ -426,7 +433,7 @@ impl PyRun {
                     Python::attach(|py| {
                         if let Err(e) = callback.call1(py, (index, raw(py, value.clone()))) {
                             run.cancel.cancel();
-                            if !e.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py)
+                            if !e.is_instance_of::<PyKeyboardInterrupt>(py)
                                 && let Ok(mut first) = callback_error.lock()
                                 && first.is_none()
                             {
@@ -437,10 +444,7 @@ impl PyRun {
                 }
             };
             let result = interruptible(py, &run.cancel, || run.send_batch(&requests, &on_result));
-            match callback_error.into_inner().map_err(invalid)? {
-                Some(e) => Err(e),
-                None => result,
-            }
+            callback_result(callback_error, result)
         })
     }
     #[pyo3(signature=(*extra,**rest))]
