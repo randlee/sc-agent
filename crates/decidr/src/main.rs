@@ -58,10 +58,10 @@ fn main() {
                     sc_agent::RunArgs {
                         tool: TOOL.into(),
                         agent_role,
-                        model: Some(model),
+                        model,
                         project: cli.project,
                         config_dir: cli.config_dir,
-                        timeout_secs: Some(timeout_secs),
+                        timeout_secs,
                         workers,
                         base_url: None,
                     },
