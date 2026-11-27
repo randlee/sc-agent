@@ -1,12 +1,12 @@
 # j-2 plan: the Run, on Rust, decidr and the wheel
 
-Base: sprint/j-1 @b4be55e6 (gate 2342/2500). Line refs are file:line at that commit. Written by reading the code; the Rust parts were prototyped on this branch (see Budget).
+Base: sprint/j-1 @f8bb024a (gate 2404/2500). Line refs are file:line at that commit. Written by reading the code; the Rust parts were prototyped on this branch (see Budget).
 
 ## Goal
 
-Rand (ANC-008, ANC-010, ANC-011): "Related values are strategically grouped in one struct to remove repeated method parameters"; "any copy/paste was a big red flag"; "I expect the python api may allow more flexibility than cli, NOT less." Measurable: one `Run` struct replaces the send/batch parameter lists in Rust, decidr and the wheel; no PyCapsule, no `unsafe`, no string-keyed option table in crates/sc-agent-py; restructuring adds 0 net lines; phase total <= 2,342 (j-1 end) + new capability, and <= 2,500.
+Rand (ANC-008, ANC-010, ANC-011): "Related values are strategically grouped in one struct to remove repeated method parameters"; "any copy/paste was a big red flag"; "I expect the python api may allow more flexibility than cli, NOT less." Measurable: one `Run` struct replaces the send/batch parameter lists in Rust, decidr and the wheel; no PyCapsule, no `unsafe`, no string-keyed option table in crates/sc-agent-py; restructuring adds 0 net lines; phase total <= 2,404 (j-1 end) + new capability, and <= 2,500.
 
-Premise found in the code: j-1 @b4be55e6 has no `Run`, no `Model`, no J1-13 compat block and no `configured` (j-1's `load` :1379 is that helper). The old j-2 bead names those; they are dropped, not planned.
+Premise found in the code: j-1 @f8bb024a has no `Run`, no `Model`, no J1-13 compat block and no `configured` (j-1's `load` :1474 is that helper). The old j-2 bead names those; they are dropped, not planned.
 
 ## Layout
 
@@ -29,7 +29,7 @@ Library pattern (rule 0): the tool builds one `Run`; the library owns the defaul
 // crates/sc-agent/src/lib.rs
 pub const TYPESAFE: &str = "typesafe";          // new capability; the PROVIDERS row uses it
 
-pub struct Options {                              // :843 minus `provider`
+pub struct Options {                              // :945 minus `provider`
     pub environment: Vec<(OsString, OsString)>,
     pub settings: Settings,
     pub model: String,
@@ -85,11 +85,11 @@ pub fn load(tool: &str, config_dir: Option<&Path>, project: Option<&str>) -> Res
 pub fn doctor(tool: &str, config_dir: Option<&Path>, project: Option<&str>) -> Result<Value, Error>;   // log_root(tool)
 struct ConfigEnv(String, Vec<(OsString, OsString)>);   // prefix = tool upper-cased, '-' -> '_', then '_'
 ```
-For tool "decidr" behaviour is byte-for-byte what it is now (REQ-SAG-0003, REQ-SAG-0020). Replaces config() hard-coded `"decidr.json"`, `"decidr.local.json"` (lib.rs:257) and `"DECIDR_"` (:196, :204), and `load`/`doctor` copies of "decidr" (:1395). `missing_setting(tool, path)` (:143) and `Settings::project_required` (:168) build their text from `prefix(tool)` and `layers(tool)`; `Settings` gains `#[serde(skip)] pub tool: String`, set by `config`; `setting()` takes `tool`. For "decidr" the messages are byte-identical (existing config tests are the check); a tool "judge-jev" is told `JUDGE_JEV_` and `judge-jev.json`.
+For tool "decidr" behaviour is byte-for-byte what it is now (REQ-SAG-0003, REQ-SAG-0020). Replaces config() hard-coded `"decidr.json"`, `"decidr.local.json"` (lib.rs:262) and `"DECIDR_"` (:201, :209), and `load`/`doctor` copies of "decidr" (:1490). `missing_setting(tool, path)` (:142) and `Settings::project_required` (:170) build their text from `prefix(tool)` and `layers(tool)`; `Settings` gains `#[serde(skip)] pub tool: String`, set by `config`; `setting()` takes `tool`. For "decidr" the messages are byte-identical (existing config tests are the check); a tool "judge-jev" is told `JUDGE_JEV_` and `judge-jev.json`.
 
 Python `tool`: `Run(tool=...)` is required unless `general_log` is given; with `general_log` the tool is that logger's service name (`logger("my-tool")` names the tool); neither -> `sc_agent_py.invalid_option` "tool is required" (stored, returned by every call). No `"decidr"` default exists in the wheel; decidr passes "decidr".
 
-`Route` (:936), `Jev`/`OpenAiCompat`/`AnthropicCompat`, `model_with` and every j-1 error id are unchanged; `Run::send` builds the `Route` from `self`.
+`Route` (:1038), `Jev`/`OpenAiCompat`/`AnthropicCompat`, `model_with` and every j-1 error id are unchanged; `Run::send` builds the `Route` from `self`.
 
 ```rust
 // crates/sc-agent-py/src/lib.rs (private Rust names, Python names in quotes)
@@ -136,12 +136,12 @@ Python (names frozen after j-2; `tool` is a Run keyword now because Run::new nee
 
 | item | replaces | deleted with it |
 |---|---|---|
-| `RunArgs`, `Run::new`, `from_options`, `provider`, `logger`, `close` | the repeated `(options, logger, cancel, wait, keyring)` parameters of `send` lib.rs:1170 and `batch` :1283; decidr main.rs:41-49 (`load`), :62-67 (workers), :80-92 (Options literal, `log_root`, `vars_os`); PyO3 `options` :144-179 and its `log_root` call :166 | the 5 parameters in 2 signatures; the 3 hand-built wirings; `Options` literals outside tests |
-| `config`, `load`, `doctor` take `tool`; `Settings.tool` | hard-coded names in `config` lib.rs:196, :204, :257, `doctor` :1395, the texts :147 and :168 | the literals; none of ADR-SAG-0020's names change for decidr |
+| `RunArgs`, `Run::new`, `from_options`, `provider`, `logger`, `close` | the repeated `(options, logger, cancel, wait, keyring)` parameters of `send` lib.rs:1272 and `batch` :1378; decidr main.rs:41-49 (`load`), :62-67 (workers), :80-92 (Options literal, `log_root`, `vars_os`); PyO3 `options` :144-179 and its `log_root` call :166 | the 5 parameters in 2 signatures; the 3 hand-built wirings; `Options` literals outside tests |
+| `config`, `load`, `doctor` take `tool`; `Settings.tool` | hard-coded names in `config` lib.rs:201, :209, :262, `doctor` :1490, the texts :146 and :170 | the literals; none of ADR-SAG-0020's names change for decidr |
 | `PyRun.__enter__`, `__exit__`, `provider` getter | none (ADR-SAG-0019 d14: `with sc_agent.Run(...)`; `run.provider`); new capability | - |
-| `Run::send` | `pub fn send` lib.rs:1170 | free fn |
-| `Run::send_batch` | `pub fn batch` lib.rs:1283 | free fn |
-| `Options` minus `provider` | `Options.provider` :848; `model_with(.., options.provider.as_deref(), ..)` call in send :1190; decidr `--provider` cli.rs:19; PyO3 `provider` keyword. REQ-SAG-0103: no caller names a provider; config `models.<name>.provider` does | the field, flag, keyword |
+| `Run::send` | `pub fn send` lib.rs:1272 | free fn |
+| `Run::send_batch` | `pub fn batch` lib.rs:1378 | free fn |
+| `Options` minus `provider` | `Options.provider` :949; `candidates(&options.model, options.provider.as_deref(), ..)` call in send :1298; decidr `--provider` cli.rs:19; PyO3 `provider` keyword. REQ-SAG-0103: no caller names a provider; config `models.<name>.provider` does | the field, flag, keyword |
 | `PyLogger`, `logger_of` | `handle` :68-80, `capsule` :81-95, c"sc_agent.Logger" capsule | PyCapsule, `unsafe`, `CStr` |
 | `PyRun` + methods | module `send` :338-386, `send_batch` :383-460, `_new_cancel`, `_cancel` :461-481, `cancel_flag` :195-205, Python `Cancel` (__init__.py:7-22) | all of those, the `cancel=` keyword |
 | `arg`, `extras` | `option` :127-143 and the `&[(&str, Option<..>)]` option table | table, `options` helper |
@@ -150,7 +150,7 @@ Python (names frozen after j-2; `tool` is a Run keyword now because Run::new nee
 | `register!` id | `sc_agent_py.invalid_call` :547 -> `sc_agent_py.invalid_option` (one id, `invalid` :15 already uses it) | the id; 4 registrations (send, send_batch, _new_cancel, _cancel) |
 | decidr on `Run` | main.rs: free `send`/`batch` calls :60-110, `provider` binding, local logger clone | `--provider`, per-call param lists |
 | template call sites | consumer.py.j2:249-302 `cancel`/`sc_agent.Cancel()`/`sc_agent.send*`; :221 `_abort_if_selected(.., cancel: Cancel)` -> `Run`; :40 TYPE_CHECKING import | `cancel` params x2, `cancel = cancel or sc_agent.Cancel()` x2, Cancel import |
-| `integration.py` names from `decidr models` | regex over lib.rs :16-18 and hard-coded `("typesafe","anthropic","openai")` :35, "TypeSafe key is required" :38 | both, the error |
+| `integration.py` names from `decidr models` | regex over lib.rs :15 and hard-coded `("typesafe","anthropic","openai")` :35, "TypeSafe key is required" :37 | both, the error |
 | new capability (counted apart): `TYPESAFE`, `provider_keys`, `Run.provider` getter | none; ADR-SAG-0019 d1 lists `provider_keys` and `TYPESAFE` as public, j-4's consent gate keys on `run.provider == TYPESAFE` | - |
 
 ## External contracts (examples)
@@ -178,25 +178,25 @@ Paths: default logger `<DECIDR_LOG_ROOT|~/.sc-agent>/logs/decidr.log.jsonl`; ses
 
 ## Deletions
 
-- crates/sc-agent/src/lib.rs: `pub fn send` :1170, `pub fn batch` :1283 (become methods), `Options.provider` :848.
+- crates/sc-agent/src/lib.rs: `pub fn send` :1272, `pub fn batch` :1378 (become methods), `Options.provider` :949.
 - crates/decidr/src/cli.rs:19-20 `provider`; main.rs `provider` binding and free calls.
 - crates/sc-agent-py/src/lib.rs: `handle` :68, `capsule` :81, `option` :127, `options` :144, `cancel_flag` :195, `wait` :218, `lookup` :257, `send` :338, `send_batch` :387, `_new_cancel` :461, `_cancel` :468, `invalid_call` :547, imports `PyCapsule`, `CStr`.
 - __init__.py: `Cancel` class and `send, send_batch, _new_cancel, _cancel` imports; __init__.pyi `Cancel`, `send`, `send_batch`; _native.pyi `send`, `send_batch`, `_new_cancel`, `_cancel`.
 - consumer.py.j2: `cancel` params, `sc_agent.Cancel()` x2, Cancel import :40.
-- scripts/integration.py :16-18, :35, :38.
+- scripts/integration.py :15, :35, :37.
 - Tests/fixtures of the removed API (ANC-003 style, deleted not skipped): `Cancel` use in test_contract/loopback, `provider=` cases, `opts.provider = Some(..)` in sending.rs:31 (selected by a `settings.models` entry instead).
 - Not deleted (j-1's): `model_with` and its `provider` argument (test seam of the table), Route, Decision/Llm.
 
-## Budget (rewrite.py counting; against 2,500 phase cap, base 2,342)
+## Budget (rewrite.py counting; against 2,500 phase cap, base 2,404)
 
 | | lines | basis |
 |---|---|---|
-| Restructure: sc-agent `RunArgs`, `Run`, `new`, `from_options`, close, provider, minus send/batch parameter lists incl. the `tool` parameter of config/load/doctor (lib.rs 1253 -> 1369) | +116 | measured on this branch |
+| Restructure: sc-agent `RunArgs`, `Run`, `new`, `from_options`, close, provider, minus send/batch parameter lists incl. the `tool` parameter of config/load/doctor (lib.rs 1315 -> 1432) | +117 | measured on this branch |
 | Restructure: decidr main.rs 144 -> 128, cli.rs 33 -> 31 | -18 | measured (decidr no longer calls load, vars_os, log_root, workers) |
 | Restructure: PyO3 lib.rs 562 -> about 450 (module send/send_batch/Cancel/capsule/options/wait/lookup out, PyRun/PyLogger in) | about -110 | estimate, not yet built |
 | **Restructure net** | **about -12** (target <= 0) | |
 | New capability: `TYPESAFE` +1, `provider_keys` +5, `PyRun.provider` getter +3, `__enter__`/`__exit__` +6 | about +15 | estimate |
-| **Sprint total** | **about 2,345 / 2,500** (worst case 2,364) | |
+| **Sprint total** | **about 2,408 / 2,500** (worst case 2,427) | |
 Python (uncounted by the gate): __init__.py 28 -> about 9, stubs about +30, template net <= +4, integration.py net about 0. Docs uncapped. No per-function counts.
 
 ## Done checks
