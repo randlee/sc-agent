@@ -4,7 +4,7 @@ Base: sprint/j-1 @f8bb024a (gate 2404/2580). Line refs are file:line at that com
 
 ## Goal
 
-Rand (ANC-008, ANC-010, ANC-011): "Related values are strategically grouped in one struct to remove repeated method parameters"; "any copy/paste was a big red flag"; "I expect the python api may allow more flexibility than cli, NOT less." Measurable: one `Run` struct replaces the send/batch parameter lists in Rust, decidr and the wheel; no PyCapsule, no `unsafe`, no string-keyed option table in crates/sc-agent-py; restructuring adds 0 net lines; phase total <= 2,404 (j-1 end) + new capability (about +19), and <= 2,580.
+Rand (ANC-008, ANC-010, ANC-011): "Related values are strategically grouped in one struct to remove repeated method parameters"; "any copy/paste was a big red flag"; "I expect the python api may allow more flexibility than cli, NOT less." Measurable: one `Run` struct replaces the send/batch parameter lists in Rust, decidr and the wheel; no PyCapsule, no `unsafe`, no string-keyed option table in crates/sc-agent-py; restructuring adds 0 net lines; the phase total stays <= 2,580 (the only cap; j-2 is expected near 2,421).
 
 Premise found in the code: j-1 @f8bb024a has no `Run`, no `Model`, no J1-13 compat block and no `configured` (j-1's `load` :1474 is that helper). The old j-2 bead names those; they are dropped, not planned.
 
@@ -93,8 +93,8 @@ pub struct Run {
 }
 impl Run {
     /// The library way: runs `load` (layered config), applies the overrides (decidr.invalid_workers,
-    /// decidr.invalid_request_timeout), reads the process environment, derives log_root from the logger's service
-    /// name (or `tool`), validates the model name once (`candidates`: types.unknown_short_name / types.unknown_provider). `None` logger: owns `default_logger(&args.tool)`.
+    /// decidr.invalid_request_timeout), reads the process environment, derives log_root from `tool` (explicit `tool` wins
+    /// even with an injected logger; the logger's service name is the tool only when `tool` is empty), validates the model name once (`candidates`: types.unknown_short_name / types.unknown_provider). `None` logger: owns `default_logger(&args.tool)`.
     pub fn new(args: RunArgs, logger: Option<Arc<Logger>>, cancel: Arc<Cancel>) -> Result<Self, Error>;
     /// Test seam: a fully built Options (injected environment, root, log_root, repo); same defaults for wait/keyring.
     pub fn from_options(options: Options, tool: String, logger: Option<Arc<Logger>>, cancel: Arc<Cancel>) -> Result<Self, Error>;
@@ -158,7 +158,7 @@ fn respond_value(given: Option<&Bound<'_, PyAny>>, name: &str, run: impl FnOnce(
 #[pyfunction] fn models(py: Python<'_>) -> Py<PyAny>;       // new capability (ANC-011): `raw(py, json!({"ok":true,"value":PROVIDERS}))`, the value `decidr models` prints
 // module: add_class Logger, Run; add TYPESAFE; register! keeps logger, log, flush, digest, languages, queries, query, run
 ```
-Python (names frozen after j-2; `tool` is a Run keyword now because Run::new needs it; j-3 adds `run_id`, `session_rows`, and the Run keywords `tool_version`, `cache` together with the code that stores them, so no stub declares a name the native module lacks):
+Python (the names j-2 declares are j-2's contract; `tool` is a Run keyword now because Run::new needs it; j-3 adds `run_id`, `session_rows`, and the Run keywords `tool_version`, `cache` together with the code that stores them, so no stub declares a name the native module lacks):
 - `__init__.py`: `from ._native import Logger, Run, TYPESAFE, digest, flush, log, logger, models, provider_keys`; `__all__ = ["Logger","Run","TYPESAFE","digest","flush","log","logger","models","provider_keys","sitr"]`; `from . import sitr`.
 - `_native.pyi`: `class Run: __init__(self, *, tool: str|None=None, model=None, project=None, agent_role=None, config_dir=None, general_log: Logger|None=None, timeout_secs=None, workers=None, base_url=None, sleep=None, keyring_lookup=None) -> None; __enter__ -> Self; __exit__(...) -> bool; sends_to(provider: str) -> Envelope; cancel() -> Envelope; send(request: Request) -> Envelope; send_batch(requests: Iterable[Request], *, on_result: Callable[[int, Envelope], object]|None=None) -> Envelope`; `class Logger`; `TYPESAFE: str`; `provider_keys() -> list[str]`; `models() -> Envelope`; the unchanged logger/log/flush/digest/sitr stubs. Not declared: module send/send_batch, Cancel, `_new_cancel`, `_cancel`, TestSeams, Run.close, Run.project, Model, seed_session.
 
@@ -228,22 +228,22 @@ Paths: default logger `<DECIDR_LOG_ROOT|~/.sc-agent>/logs/decidr.log.jsonl`; ses
 - The wheel's `Run` takes neither `tool_version` nor `cache` in j-2 (no stub declares a name the native module lacks). j-3 adds both with their storage and, in the same sprint, the template's `TOOL_VERSION`/`tool_version` render variable, the two call sites' `tool_version=TOOL_VERSION`, the wheel README render command and `check_consumer_template.py` vars, so j-3's decision.missing_tool never meets a template that omits it.
 - Old-bead items dropped as not in the code: Model class, J1-13 block, `configured`, `decidr models` `{providers, models}` shape, `tool_version`/`cache` (moved to j-3 with their storage; `tool` is in j-2).
 
-## Budget (rewrite.py counting; against 2,580 phase cap, base 2,404)
+## Budget (rewrite.py counting; against 2,580 phase cap, base 2,402)
 
 | | lines | basis |
 |---|---|---|
 | Restructure: sc-agent `RunArgs`, `Run`, `new`, `from_options`, close, minus send/batch parameter lists incl. the `tool` parameter of config/load/doctor (lib.rs 1315 -> 1433) | +118 | measured on this branch |
 | Restructure: decidr main.rs 144 -> 128, cli.rs 33 -> 31 | -18 | measured (decidr no longer calls load, vars_os, log_root, workers) |
 | Restructure: PyO3 lib.rs 562 -> about 450 (module send/send_batch/Cancel/capsule/options/wait/lookup out, PyRun/PyLogger in) | about -110 | estimate, not yet built |
-| **Restructure net** | **0 counted** (rule 2: must be <= 0). Measured Rust half is +100 (+118 -18); it nets <= 0 only if the PyO3 port deletes >= 100 lines (estimate -110, unbuilt). If it does not, the dev stops and reports | |
+| **Restructure net** | **0 counted** (rule 2: must be <= 0). Measured Rust half is +100 (+118 -18); it nets <= 0 only if the PyO3 port deletes >= 100 lines (estimate -110, unbuilt); the gate reports the total | |
 | New capability: `TYPESAFE` +1, `provider_keys` +5, `PyRun.sends_to` +3, `models` +4, `__enter__`/`__exit__` +6 | about +19 | estimate |
-| **Sprint total** | **about 2,423 / 2,580** (2,404 + new capability 19; restructure counted 0) | |
+| **Sprint total** | **about 2,421 / 2,580** (2,402 + new capability 19; restructure counted 0) | |
 Python (uncounted by the gate): __init__.py 28 -> about 9, stubs about +30, template net <= +4, integration.py net about 0. Docs uncapped. No per-function counts.
 
 ## Done checks
 
 - Build: `RUSTUP_TOOLCHAIN=1.98.1 cargo build --workspace --locked`; `cargo clippy --workspace --all-targets --all-features -- -D warnings`; `cargo fmt --check --all`.
-- Gate: `RUSTUP_TOOLCHAIN=1.98.1 python3 scripts/gate/rewrite.py` all PASS; Rust source <= 2,404 + new capability (about 2,423); the config tests pass `tool`.
+- Gate: `RUSTUP_TOOLCHAIN=1.98.1 python3 scripts/gate/rewrite.py` all PASS; Rust source <= 2,580 (the phase cap; about 2,421 expected); the config tests pass `tool`.
 - Greps: `grep -rn 'PyCapsule\|unsafe\|invalid_call\|_new_cancel' crates/sc-agent-py/src` none; `grep -rn 'recv_timeout' crates/decidr/src` none; `grep -rnE 'seed_session|TestSeams|def close|Cancel' crates/sc-agent-py/python/sc_agent/*.pyi` none.
 - Rust tests (ported to `Run`; `support::run(opts, &logger)` helper): sending.rs and records.rs existing names kept; new `run_new_rejects_unknown_model_and_send_resolves_per_call` (REQ-SAG-0101), `run_close_shuts_down_only_an_owned_logger` (ANC-006), `run_timeout_and_workers_apply_to_every_call` (REQ-SAG-0702), `run_with_invalid_timeout_or_workers_is_an_error` (REQ-SAG-0702); wires.rs unchanged (it builds a Route directly); `run_sends_to_returns_the_resolution_error` (no key held and no keyless candidate: Err secrets.key_missing, not Ok(false)); decidr cli.rs: `send_provider_flag_is_a_usage_error`, `local_timeout_default_is_120_seconds`.
 - Python (`python3 -m unittest discover -s tests/contract`, loopback.py, strict pyright, `check_consumer_template.py`): existing wheel tests ported by call shape (names unchanged); new `test_run_sends_through_loopback_and_closes`, `test_run_cancel_from_on_result_cancels_the_rest`, `test_run_invalid_arguments_return_invalid_option`, `test_module_exports_only_the_run_api`, `test_run_model_errors`, `test_provider_keys_typesafe_and_run_sends_to` (sends_to returns an envelope: value True/False, error envelope when no key is held), `test_models_matches_decidr_models` (ANC-011), `test_native_stub_declares_every_export`; integration: `test_export_uses_current_provider_variables_and_injected_lookup` (rewritten), `test_export_with_only_an_anthropic_key`, `test_export_refuses_before_writing_without_credentials`. All deterministic (stub replies on events, sleep seam, barrier).
