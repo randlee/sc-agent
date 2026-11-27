@@ -66,6 +66,7 @@ pub fn answer() -> Value {
 }
 pub enum Reply {
     Http(u16, Vec<(&'static str, &'static str)>, String),
+    Raw(u16, Vec<(&'static str, &'static str)>, Vec<u8>),
     Disconnect,
     Truncated,
     Redirect(String),
@@ -172,6 +173,14 @@ impl Stub {
                                 stream,
                                 "HTTP/1.1 200 Test\r\nContent-Length: 100\r\nConnection: close\r\n\r\n{{"
                             )?;
+                        }
+                        Reply::Raw(status, headers, body) => {
+                            write!(stream, "HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n", body.len())?;
+                            for (key, value) in headers {
+                                write!(stream, "{key}: {value}\r\n")?;
+                            }
+                            write!(stream, "\r\n")?;
+                            stream.write_all(&body)?;
                         }
                         Reply::Http(status, headers, body) => {
                             write!(

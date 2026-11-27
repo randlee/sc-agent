@@ -1315,7 +1315,7 @@ impl Route<'_> {
                         reply
                             .body_mut()
                             .with_config()
-                            .limit(u64::MAX)
+                            .lossy_utf8(true)
                             .read_to_string(),
                     )
                 }));

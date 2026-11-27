@@ -264,6 +264,37 @@ fn req_sag_0002_0601_auth_quota_are_not_retried_and_remote_text_is_redacted_whol
 }
 
 #[test]
+fn invalid_utf8_provider_error_keeps_status_and_surrounding_text() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let replies = (0..5)
+        .map(|_| {
+            Reply::Raw(
+                401,
+                vec![("Content-Type", "text/plain")],
+                b"before\xffafter".to_vec(),
+            )
+        })
+        .collect();
+    let stub = Stub::new(replies)?;
+    let failure = sc_agent::result(send(
+        &request(),
+        &options(&root, &stub.url),
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    ));
+    let requests = stub.finish()?;
+    assert_eq!(failure["error"]["id"], "http.auth");
+    assert_eq!(failure["error"]["message"], "before?after");
+    assert_eq!(failure["error"]["attempts"], 1);
+    assert_eq!(requests.len(), 1);
+    logger.shutdown()?;
+    Ok(())
+}
+
+#[test]
 fn req_sag_0002_provider_error_over_ten_mib_is_preserved() -> Test {
     let root = Temp::new()?;
     let logger = logger(&root)?;
