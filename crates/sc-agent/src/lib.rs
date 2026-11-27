@@ -1158,6 +1158,7 @@ impl Llm for AnthropicCompat<'_> {
 impl Route<'_> {
     fn agent(&self) -> ureq::Agent {
         ureq::Agent::config_builder()
+            .max_redirects(0)
             .http_status_as_error(false)
             .timeout_global(Some(self.options.timeout))
             .build()

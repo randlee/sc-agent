@@ -67,6 +67,7 @@ pub enum Reply {
     Http(u16, Vec<(&'static str, &'static str)>, String),
     Disconnect,
     Truncated,
+    Redirect(String),
 }
 pub fn http(status: u16, body: Value) -> Reply {
     Reply::Http(status, vec![], body.to_string())
@@ -99,19 +100,23 @@ fn read_request(
         let (key, value) = line.split_once(':').ok_or("missing header separator")?;
         headers.push((key.to_ascii_lowercase(), value.trim().to_owned()));
     }
-    let length: usize = headers
+    let length = headers
         .iter()
         .find(|(key, _)| key == "content-length")
-        .ok_or("missing content length")?
-        .1
-        .parse()?;
+        .map(|(_, value)| value.parse::<usize>())
+        .transpose()?
+        .unwrap_or(0);
     let mut body = vec![0; length];
     reader.read_exact(&mut body)?;
     drop(reader);
     Ok(Request {
         path,
         headers,
-        body: serde_json::from_slice(&body)?,
+        body: if body.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_slice(&body)?
+        },
     })
 }
 pub struct Stub {
@@ -140,6 +145,12 @@ impl Stub {
                 let request = read_request(&mut stream)?;
                 seen.push(request);
                 match reply {
+                    Reply::Redirect(location) => {
+                        write!(
+                            stream,
+                            "HTTP/1.1 302 Test\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        )?;
+                    }
                     Reply::Disconnect => stream.shutdown(std::net::Shutdown::Both)?,
                     Reply::Truncated => {
                         write!(

@@ -530,3 +530,25 @@ fn configurable_send_count_does_not_overflow_the_backoff() -> Test {
     logger.shutdown()?;
     Ok(())
 }
+
+#[test]
+fn redirect_never_forwards_the_api_key_to_another_endpoint() -> Test {
+    let root = Temp::new()?;
+    let target = Stub::new(vec![http(
+        200,
+        json!({"content":[{"type":"text","text":"{}"}]}),
+    )])?;
+    let source = Stub::new(vec![Reply::Redirect(target.url.clone())])?;
+    let mut opts = options(&root, &source.url);
+    opts.settings.max_sends = 1;
+    let outcome = with_route(&opts, ("anthropic", "haiku"), &source.url, |route| {
+        AnthropicCompat(route).call(&llm_request())
+    })?;
+    let original = source.finish()?;
+    let redirected = target.finish()?;
+    assert_eq!(original.len(), 1);
+    assert_eq!(header(&original[0], "x-api-key"), Some("test-secret"));
+    assert!(redirected.is_empty(), "redirect target received a request");
+    assert_eq!(result(outcome)["error"]["id"], "decision.api_status");
+    Ok(())
+}
