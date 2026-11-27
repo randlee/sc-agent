@@ -300,21 +300,33 @@ fn req_sag_0002_provider_error_over_ten_mib_is_preserved() -> Test {
     let logger = logger(&root)?;
     let detail = "x".repeat(10 * 1024 * 1024 + 1);
     let stub = Stub::new(vec![http(401, json!({"error":detail}))])?;
+    let mut opts = options(&root, &stub.url);
+    // Failure-only hang guard, not a throughput target; the response content decides success.
+    // Keep the first transport failure rather than retrying an exhausted one-reply stub.
+    opts.timeout = Duration::from_secs(600);
+    opts.settings.max_sends = 1;
     let failure = sc_agent::result(send(
         &request(),
-        &options(&root, &stub.url),
+        &opts,
         &logger,
         &Cancel::default(),
         &no_wait,
         &keyring,
     ));
-    assert_eq!(failure["error"]["id"], "http.auth");
-    assert!(
-        failure["error"]["message"]
-            .as_str()
-            .is_some_and(|message| message.contains(&detail))
+    let stub_outcome = stub.finish();
+    let error = &failure["error"];
+    let message = error["message"].as_str().unwrap_or_default();
+    let diagnostic = format!(
+        "id={}, attempts={}, message_bytes={}, prefix={:?}, stub={:?}",
+        error["id"],
+        error["attempts"],
+        message.len(),
+        message.chars().take(160).collect::<String>(),
+        stub_outcome,
     );
-    assert_eq!(stub.finish()?.len(), 1);
+    assert_eq!(error["id"], "http.auth", "{diagnostic}");
+    assert!(message.contains(&detail), "{diagnostic}");
+    assert_eq!(stub_outcome?.len(), 1);
     logger.shutdown()?;
     Ok(())
 }
