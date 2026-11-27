@@ -873,11 +873,18 @@ fn resolve(
     for (p, id) in &found {
         match key(p.key, &options.environment, &options.root, keyring) {
             Ok(_) => return Ok((p, id.clone())),
-            Err(Error::Failure {
-                id: "secrets.key_missing",
-                ..
-            }) => {}
-            Err(other) => last = Some(other),
+            Err(mut failure) => {
+                if let Some(mut previous) = last.take() {
+                    // Missing keys add context without replacing an earlier failure.
+                    let Error::Failure { id, .. } = &failure;
+                    if *id == "secrets.key_missing" {
+                        std::mem::swap(&mut previous, &mut failure);
+                    }
+                    let Error::Failure { message, .. } = &mut failure;
+                    message.push_str(&format!("\n{previous}"));
+                }
+                last = Some(failure);
+            }
         }
     }
     let mut names = found.iter().map(|(p, _)| p.key).collect::<Vec<_>>();
@@ -1549,6 +1556,53 @@ pub mod test_support;
 mod route_tests {
     use super::*;
     use test_support::*;
+
+    #[test]
+    fn resolution_failure_keeps_every_candidate_error() -> Test {
+        for (case, expected_id) in [
+            (0, "secrets.key_malformed"),
+            (1, "secrets.keyring_read"),
+            (2, "secrets.key_missing"),
+        ] {
+            let root = Temp::new()?;
+            let mut options = options(&root, "http://127.0.0.1:1/v1");
+            options.environment.clear();
+            let lookup = |variable: &str| {
+                if case == 2 {
+                    return Ok(String::new());
+                }
+                match variable {
+                    "ANTHROPIC_API_KEY" => Err(KeyringError::Timeout),
+                    "OPENROUTER_API_KEY" => Err(KeyringError::Read("controlled refusal".into())),
+                    "NOUS_API_KEY" if case == 0 => Ok("malformed key".into()),
+                    _ => Ok(String::new()),
+                }
+            };
+            let found = candidates("haiku", None, &BTreeMap::new())?;
+            let causes = found
+                .iter()
+                .map(|(provider, _)| {
+                    key(provider.key, &options.environment, &options.root, &lookup)
+                        .err()
+                        .ok_or("candidate unexpectedly has a key")
+                        .map(|failure| failure.to_string())
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let failure = result(resolve(found, &options, &lookup).map(|_| json!(null)));
+            assert_eq!(failure["error"]["id"], expected_id);
+            let message = failure["error"]["message"]
+                .as_str()
+                .ok_or("missing error message")?;
+            let returned = format!(
+                "{}: {message}",
+                failure["error"]["id"].as_str().ok_or("missing error id")?
+            );
+            for cause in causes {
+                assert!(returned.contains(&cause), "lost cause {cause}: {returned}");
+            }
+        }
+        Ok(())
+    }
 
     thread_local! {
         pub(super) static LOCK_WAIT: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
