@@ -38,15 +38,9 @@ fn main() {
                 if matches!(cli.command, Command::Doctor) {
                     return sc_agent::doctor(cli.config_dir.as_deref(), cli.project.as_deref());
                 }
-                let (root, repo) = sc_agent::repository()?;
-                let local = root.join(".sc/sc-agent");
-                let mut settings = sc_agent::config(
-                    root.join(".git").exists().then_some(local.as_path()),
-                    cli.config_dir.as_deref(),
-                    &std::env::vars_os().collect::<Vec<_>>(),
-                    cli.project.as_deref(),
-                )?
-                .config;
+                let (loaded, root, repo) =
+                    sc_agent::load(cli.config_dir.as_deref(), cli.project.as_deref())?;
+                let mut settings = loaded.config;
                 let Command::Send {
                     model,
                     provider,
@@ -62,9 +56,7 @@ fn main() {
                 if let Some(workers) = workers {
                     settings.workers = sc_agent::workers(workers)?;
                 }
-                if cancelled.is_cancelled() {
-                    return Err(sc_agent::error("decision.cancelled", "interrupted"));
-                }
+                cancelled.check()?;
                 let text = match input {
                     Some(path) => std::fs::read_to_string(path)
                         .map_err(|e| sc_agent::error("decidr.input_read", e))?,
@@ -75,19 +67,9 @@ fn main() {
                             let read = std::io::stdin().read_to_string(&mut text).map(|_| text);
                             let _ = sender.send(read);
                         });
-                        loop {
-                            if cancelled.is_cancelled() {
-                                return Err(sc_agent::error("decision.cancelled", "interrupted"));
-                            }
-                            match receiver.recv_timeout(Duration::from_millis(20)) {
-                                Ok(value) => {
-                                    break value
-                                        .map_err(|e| sc_agent::error("decidr.input_read", e))?;
-                                }
-                                Err(mpsc::RecvTimeoutError::Timeout) => {}
-                                Err(e) => return Err(sc_agent::error("decidr.input_read", e)),
-                            }
-                        }
+                        cancelled
+                            .recv(&receiver, "decidr.input_read")?
+                            .map_err(|e| sc_agent::error("decidr.input_read", e))?
                     }
                 };
                 let log_root = sc_agent::log_root("decidr")?;
@@ -138,9 +120,7 @@ fn main() {
                         &sc_agent::os_keyring,
                     )
                 };
-                if cancelled.is_cancelled() {
-                    return Err(sc_agent::error("decision.cancelled", "interrupted"));
-                }
+                cancelled.check()?;
                 result
             })();
             let value = if doctor {

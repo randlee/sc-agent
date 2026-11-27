@@ -155,19 +155,10 @@ fn options(
         option::<String>(named, "agent_role")?.ok_or_else(|| invalid("agent_role is required"))?;
     let model = option::<String>(named, "model")?.unwrap_or_else(|| "jev".into());
     let provider = option::<String>(named, "provider")?;
-    let (root, repo) = sc_agent::repository()?;
     let global = option::<String>(named, "config_dir")?.map(PathBuf::from);
     let project = option::<String>(named, "project")?;
-    let mut settings = sc_agent::config(
-        root.join(".git")
-            .exists()
-            .then_some(root.join(".sc/sc-agent"))
-            .as_deref(),
-        global.as_deref(),
-        &std::env::vars_os().collect::<Vec<_>>(),
-        project.as_deref(),
-    )?
-    .config;
+    let (loaded, root, repo) = sc_agent::load(global.as_deref(), project.as_deref())?;
+    let mut settings = loaded.config;
     sc_agent::model_with(&model, provider.as_deref(), &settings.models)?;
     if let Some(workers) = workers {
         settings.workers = workers;
