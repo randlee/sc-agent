@@ -1651,22 +1651,26 @@ mod route_tests {
         let same_host = host_holdoff("cancel-wait.invalid")?;
         let held = host.lock().map_err(|_| "holdoff poisoned")?;
         let (finished, outcome) = std::sync::mpsc::channel();
-        std::thread::scope(|scope| -> Test {
-            let waiting_cancel = cancel.clone();
-            let work = scope.spawn(move || {
-                let flag = waiting_cancel.clone();
-                LOCK_WAIT.with(|hook| *hook.borrow_mut() = Some(Box::new(move || flag.cancel())));
-                let result = waiting_cancel.lock(&same_host).map(|_| json!(null));
-                let _ = finished.send(result);
-            });
-            let result = outcome.recv_timeout(Duration::from_secs(10));
-            // A broken lock must fail the test instead of hanging its cleanup.
-            drop(held);
-            work.join().map_err(|_| "lock waiter panicked")?;
-            assert!(cancel.is_cancelled(), "contention hook was not reached");
-            assert_eq!(super::result(result?)["error"]["id"], "decision.cancelled");
-            Ok(())
-        })
+        let waiting_cancel = cancel.clone();
+        let work = std::thread::spawn(move || {
+            let flag = waiting_cancel.clone();
+            LOCK_WAIT.with(|hook| *hook.borrow_mut() = Some(Box::new(move || flag.cancel())));
+            let result = waiting_cancel.lock(&same_host).map(|_| json!(null));
+            let _ = finished.send(result);
+        });
+        let result = outcome.recv_timeout(Duration::from_secs(10));
+        drop(held);
+        if matches!(result, Err(RecvTimeoutError::Timeout)) {
+            return Err(format!(
+                "lock waiter timed out; cancel.is_cancelled()={}",
+                cancel.is_cancelled()
+            )
+            .into());
+        }
+        work.join().map_err(|_| "lock waiter panicked")?;
+        assert!(cancel.is_cancelled(), "contention hook was not reached");
+        assert_eq!(super::result(result?)["error"]["id"], "decision.cancelled");
+        Ok(())
     }
 
     #[test]
