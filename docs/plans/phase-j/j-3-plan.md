@@ -1,6 +1,6 @@
 # j-3 plan: session log, run identity, result cache, session-row reader
 
-Base: sprint/j-2 @2ca9e027 (planned end state of docs/plans/phase-j/j-2-plan.md: `Run`, `RunArgs`, `Options` without `provider`, config/load/doctor taking `tool`, PyO3 `PyRun`/`PyLogger`; j-2 end about 2,421/2,580 with restructure counted 0). Line refs are file:line at that commit (Rust `Run` built; PyO3 and tests still to land from j-2, so PyO3 refs are to the j-2 plan). Written by reading the code and the records on origin/plan/phase-j (REQ-SAG-0002/0003/0004/0005/0011/0017/0703, ADR-SAG-0019 decision 14, ADR-SAG-0021 Session log/Paths/Session identity). The bead's old prose is intent only.
+Base: sprint/j-2 @2edf4fad (planned end state of docs/plans/phase-j/j-2-plan.md: `Run`, `RunArgs`, `Options` without `provider`, config/load/doctor taking `tool`, PyO3 `PyRun`/`PyLogger`; j-2 end about 2,421/2,580 with restructure counted 0). Line refs are file:line at that commit (Rust `Run` built; PyO3 and tests still to land from j-2, so PyO3 refs are to the j-2 plan). Written by reading the code and the records on origin/plan/phase-j (REQ-SAG-0002/0003/0004/0005/0011/0017/0703, ADR-SAG-0019 decision 14, ADR-SAG-0021 Session log/Paths/Session identity). The bead's old prose is intent only.
 
 ## Goal
 
