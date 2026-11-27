@@ -134,6 +134,41 @@ fn extras(extra: &Bound<'_, PyTuple>, rest: Option<&Bound<'_, PyDict>>) -> Resul
     }
     Ok(())
 }
+fn bind<'py>(
+    args: &Bound<'py, PyTuple>,
+    kwargs: Option<&Bound<'py, PyDict>>,
+    positional: &[&str],
+    keyword_only: &[&str],
+) -> Result<Vec<Option<Bound<'py, PyAny>>>, Error> {
+    if args.len() > positional.len() {
+        return Err(invalid("unexpected positional arguments"));
+    }
+    let mut values = Vec::with_capacity(positional.len() + keyword_only.len());
+    for (index, name) in positional.iter().chain(keyword_only).enumerate() {
+        let positional_value = (index < positional.len() && index < args.len())
+            .then(|| args.get_item(index))
+            .transpose()
+            .map_err(invalid)?;
+        let named_value = kwargs
+            .map(|kwargs| kwargs.get_item(name))
+            .transpose()
+            .map_err(invalid)?
+            .flatten();
+        if positional_value.is_some() && named_value.is_some() {
+            return Err(invalid(format!("multiple values for argument '{name}'")));
+        }
+        values.push(positional_value.or(named_value));
+    }
+    if let Some(kwargs) = kwargs {
+        for (key, _) in kwargs.iter() {
+            let name = key.extract::<String>().map_err(invalid)?;
+            if !positional.contains(&name.as_str()) && !keyword_only.contains(&name.as_str()) {
+                return Err(invalid(format!("unexpected argument '{name}'")));
+            }
+        }
+    }
+    Ok(values)
+}
 fn request(value: Option<&Bound<'_, PyAny>>) -> Result<Value, Error> {
     let value = required(value)?;
     let parsed = if let Ok(text) = value.extract::<String>() {
@@ -378,52 +413,50 @@ impl PyRun {
         }
         false
     }
-    #[pyo3(signature=(provider=None,*extra,**rest))]
+    #[pyo3(signature=(*args, **kwargs))]
     fn sends_to(
         &self,
         py: Python<'_>,
-        provider: Option<&Bound<'_, PyAny>>,
-        extra: &Bound<'_, PyTuple>,
-        rest: Option<&Bound<'_, PyDict>>,
+        args: &Bound<'_, PyTuple>,
+        kwargs: Option<&Bound<'_, PyDict>>,
     ) -> Py<PyAny> {
         self.with(py, |run| {
-            extras(extra, rest)?;
-            let provider = arg::<String>(provider, "provider")?
+            let mut values = bind(args, kwargs, &["provider"], &[])?.into_iter();
+            let provider = arg::<String>(values.next().flatten().as_ref(), "provider")?
                 .ok_or_else(|| invalid("provider is required"))?;
             run.sends_to(&provider).map(Value::Bool)
         })
     }
-    #[pyo3(signature=(request=None,*extra,**rest))]
+    #[pyo3(signature=(*args, **kwargs))]
     fn send(
         &self,
         py: Python<'_>,
-        request: Option<&Bound<'_, PyAny>>,
-        extra: &Bound<'_, PyTuple>,
-        rest: Option<&Bound<'_, PyDict>>,
+        args: &Bound<'_, PyTuple>,
+        kwargs: Option<&Bound<'_, PyDict>>,
     ) -> Py<PyAny> {
         self.with(py, |run| {
-            extras(extra, rest)?;
-            let value = self::request(request)?;
+            let mut values = bind(args, kwargs, &["request"], &[])?.into_iter();
+            let value = self::request(values.next().flatten().as_ref())?;
             interruptible(py, &run.cancel, || run.send(&value))
         })
     }
-    #[pyo3(signature=(requests=None,*extra,on_result=None,**rest))]
+    #[pyo3(signature=(*args, **kwargs))]
     fn send_batch(
         &self,
         py: Python<'_>,
-        requests: Option<&Bound<'_, PyAny>>,
-        extra: &Bound<'_, PyTuple>,
-        on_result: Option<&Bound<'_, PyAny>>,
-        rest: Option<&Bound<'_, PyDict>>,
+        args: &Bound<'_, PyTuple>,
+        kwargs: Option<&Bound<'_, PyDict>>,
     ) -> Py<PyAny> {
         self.with(py, |run| {
-            extras(extra, rest)?;
-            let requests = required(requests)?
+            let mut values = bind(args, kwargs, &["requests"], &["on_result"])?.into_iter();
+            let requests = values.next().flatten();
+            let on_result = values.next().flatten();
+            let requests = required(requests.as_ref())?
                 .try_iter()
                 .map_err(invalid)?
                 .map(|v| v.map_err(invalid).and_then(|v| request(Some(&v))))
                 .collect::<Result<Vec<_>, _>>()?;
-            let completed = callback(on_result)?;
+            let completed = callback(on_result.as_ref())?;
             let callback_error = Mutex::new(None);
             let on_result = |index, value: &Value| {
                 if let Some(callback) = &completed {
