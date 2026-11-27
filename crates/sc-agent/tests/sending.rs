@@ -264,6 +264,31 @@ fn req_sag_0002_0601_auth_quota_are_not_retried_and_remote_text_is_redacted_whol
 }
 
 #[test]
+fn req_sag_0002_provider_error_over_ten_mib_is_preserved() -> Test {
+    let root = Temp::new()?;
+    let logger = logger(&root)?;
+    let detail = "x".repeat(10 * 1024 * 1024 + 1);
+    let stub = Stub::new(vec![http(401, json!({"error":detail}))])?;
+    let failure = sc_agent::result(send(
+        &request(),
+        &options(&root, &stub.url),
+        &logger,
+        &Cancel::default(),
+        &no_wait,
+        &keyring,
+    ));
+    assert_eq!(failure["error"]["id"], "http.auth");
+    assert!(
+        failure["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains(&detail))
+    );
+    assert_eq!(stub.finish()?.len(), 1);
+    logger.shutdown()?;
+    Ok(())
+}
+
+#[test]
 fn req_sag_0010_0011_cancel_during_retry_keeps_every_batch_position_and_row() -> Test {
     let root = Temp::new()?;
     let logger = logger(&root)?;

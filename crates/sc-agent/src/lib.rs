@@ -1352,7 +1352,11 @@ impl Route<'_> {
                     (
                         reply.status().as_u16(),
                         delay,
-                        reply.body_mut().read_to_string(),
+                        reply
+                            .body_mut()
+                            .with_config()
+                            .limit(u64::MAX)
+                            .read_to_string(),
                     )
                 }));
             });
