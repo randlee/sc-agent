@@ -1,6 +1,6 @@
 # j-4 plan: the consumer template on the Run
 
-Base: sprint/j-3 @0f82d6da. `:N` = `crates/sc-agent-py/python/sc_agent/templates/consumer.py.j2` at that commit (668 lines). Wheel API = j-2 and j-3 planned end states (j-2-plan.md, j-3-plan.md); their code on this branch is partial. Written by reading the code; no j-4 code yet.
+Base: sprint/j-3 @8fd86173. `:N` = `crates/sc-agent-py/python/sc_agent/templates/consumer.py.j2` at that commit (668 lines). Wheel API = j-2 and j-3 planned end states (j-2-plan.md, j-3-plan.md); their code on this branch is partial. Written by reading the code; no j-4 code yet.
 
 ## Goal
 
