@@ -58,6 +58,7 @@ Excluded from (not judged; the cell passes as `excluded`):
 - `agt-m-2`: This sprint relocates sc-agent-config without changing model resolution; agt-m-7 owns the Jev model selection behavior.
 - `agt-m-5`: m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001.
 - `agt-m-6`: m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration.
+- `agt-m-4`: m-4 moves the API-shape implementations and changes no model table, model resolution or jev alias; agt-m-7 carries ANC-001.
 
 Beads: anchor `agt-jzag`, plan questions `agt-jzag.1`, dev questions `agt-jzag.2`
 
@@ -280,8 +281,8 @@ Scope: adds or changes a decidr subcommand or a function in the sc-agent Python 
 Deterministic check to pair with the development gate: for each `decidr` subcommand touched in phase j (models, send, batch), a Python binding exists and has a test
 
 Excluded from (not judged; the cell passes as `excluded`):
-- `agt-m-6`: m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification.
-- `agt-m-7`: m-7 changes provider data behind existing provider_keys without changing offered CLI or Python operations; agt-m-11 carries consumer integration verification.
+- `agt-m-6`: no sprint in phase m carries this anchor; listed for the owner
+- `agt-m-7`: no sprint in phase m carries this anchor; listed for the owner
 
 Beads: anchor `agt-sa4v`, plan questions `agt-sa4v.1`, dev questions `agt-sa4v.2`
 
@@ -550,6 +551,7 @@ Scope: adds or changes the model table, model configuration or local-model handl
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-m-2`: This sprint relocates configuration code without changing local-model resolution; agt-m-7 owns the local-model configuration behavior.
 - `agt-m-5`: m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration.
+- `agt-m-4`: m-4 moves the API-shape implementations and adds no model row, local-model URL or model id; agt-m-7 carries local-model configuration.
 
 Beads: anchor `agt-czru`, plan questions `agt-czru.1`, dev questions `agt-czru.2`
 
@@ -770,6 +772,7 @@ Excluded from (not judged; the cell passes as `excluded`):
 - `agt-m-11`: This integration sprint changes no table or schema definition; agt-m-8 carries session schema work.
 - `agt-m-1`: This sprint moves request/answer types and changes no table definitions or schema versions; sc-agent-py table/schema work belongs to agt-m-8.
 - `agt-m-10`: m-10 defines no SQL table and no schema version and does not touch crates/sc-agent-py; agt-m-8 carries tool schema ownership and versions.
+- `agt-m-3`: m-3 defines no table and no schema version and does not touch crates/sc-agent-py; agt-m-8 carries tool schema ownership and versions.
 
 Beads: anchor `agt-ws1i`, plan questions `agt-ws1i.1`, dev questions `agt-ws1i.2`
 
