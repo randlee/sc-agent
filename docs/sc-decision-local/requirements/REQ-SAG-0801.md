@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: The Jev API is the request and reply format of TypeSafe's Jev decision service (ADR-SAG-0001). A local decision runner is a daemon on the user's machine or network that serves a decision model through the Jev API. sc-agent has two, `laya` and `decider`. A runner's network address is its host and port. A decision model is a model that `sc-agent` can send a decision request to. The 4b decider model is the `decider-4b-v2.1` row. A local model is a model-table row whose model is served by a local decision runner. A paid API is a provider that needs an API key; its key is sent only to the provider's built-in endpoint.
+Definitions: The Jev API is the request and reply format of TypeSafe's Jev decision service (ADR-SAG-0001). A local decision runner is a daemon on the user's machine or network that serves a decision model through the Jev API. sc-agent has two, `laya` and `decider`. A runner's network address is its host and port. A decision model is a model that `sc-agent` can send a decision request to. The 4b decider model is the `decider-4b-v2.1` row. The model table is the list of models built into `sc-agent`, together with the rows configuration adds. A local model is a model-table row whose model is served by a local decision runner. A paid API is a provider that needs an API key; its key is sent only to the provider's built-in endpoint.
 
 **MUST statements:**
 
