@@ -1,0 +1,1484 @@
+{
+  "schema": "plan-anchoring/anchors/1",
+  "plan": "phase-m",
+  "intent_ref": "docs/plans/phase-m/intent.md",
+  "anchors": [
+    {
+      "id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The decidr model name `jev` must select the newest Jev model in sc-agent's model table unless a config file sets another default, so callers get the latest Jev without a code change.",
+      "quote": "I want 'jev' to select latest, config can override default.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "summary": "C01 The decidr model name `jev` must select the newest Jev model",
+      "scope": "adds or changes model resolution, the model table or the jev alias in sc-agent or decidr",
+      "deterministic_check": "unit test: resolve(\"jev\") == first Jev row of the date-sorted table; with config default set, == configured id",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-jzag",
+        "plan_questions": "agt-jzag.1",
+        "dev_questions": "agt-jzag.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T18:51:01+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:55:26+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-jzag",
+            "plan_questions": "agt-jzag.1",
+            "dev_questions": "agt-jzag.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-002",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Until SQLite schema 1.0, sc-agent, judge-jev and plan-anchor must read only the record schema version they write and contain no reader for an older version, so read and write stay in step.",
+      "quote": "We need to read what we are writing, no back compat until SQLite 1.0",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "summary": "C02 Until SQLite schema 1.0, sc-agent, judge-jev and plan-anchor",
+      "scope": "adds or changes code that reads batch result lines, session rows or run records",
+      "deterministic_check": "`rg -n 'jev-batch-result/1\\",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-8y0m",
+        "plan_questions": "agt-8y0m.1",
+        "dev_questions": "agt-8y0m.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T18:51:01+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:55:29+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-8y0m",
+            "plan_questions": "agt-8y0m.1",
+            "dev_questions": "agt-8y0m.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-003",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When a backward-compatible reader is removed, its code and its tests must both be deleted, because backward-compatible reads are baselined later in SQLite.",
+      "quote": "remove code & tests, don't just remove. We will baseline backward compatible reads in SQLite.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "summary": "C03 When phase j removes a backward-compatible reader, its code ",
+      "scope": "removes or changes a reader of an earlier record schema version, or its tests",
+      "deterministic_check": "the sprint diff deletes the reader's tests and fixtures; `rg` finds no skip/xfail/#[ignore] mentioning the removed reader",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-tvqh",
+        "plan_questions": "agt-tvqh.1",
+        "dev_questions": "agt-tvqh.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T18:51:01+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:53:59+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "When phase j removes a backward-compatible reader, its code and its tests must both be deleted, because backward-compatible reads are baselined later in SQLite."
+        },
+        {
+          "at": "2026-11-28T07:55:31+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-tvqh",
+            "plan_questions": "agt-tvqh.1",
+            "dev_questions": "agt-tvqh.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-004",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent must impose no request input size limit of its own beyond the selected model's context, so input limits are not over-specified.",
+      "quote": "These limits are clearly over-specified. Input is limited by model context.",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "summary": "C04 sc-agent must impose no request input size limit of its own ",
+      "scope": "adds or changes a request size check, a record size check or handling of an sc-observability size error",
+      "deterministic_check": "`rg -n '8 \\* 1024 \\* 1024\\",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-bouw",
+        "plan_questions": "agt-bouw.1",
+        "dev_questions": "agt-bouw.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T18:51:01+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:55:33+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-bouw",
+            "plan_questions": "agt-bouw.1",
+            "dev_questions": "agt-bouw.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-005",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "In production runs, every logger sc-agent creates by default, not injected by a caller, must write under the configured log root with a fixed folder and file name, so tools can find the logs.",
+      "quote": "I mandated - that all default loggers created in production have root/folder/file naming conventions specified.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session 2026-11-26; also memory `owner-logger-mandate`",
+      "summary": "C05 In production runs, every logger sc-agent creates by default",
+      "scope": "adds or changes creation of a default sc-observability Logger in sc-agent, decidr or the client template",
+      "deterministic_check": "test: default_logger(name) path == `<log_root>/logs/<name>.log.jsonl`; session sink path == `<log_root>/sessions/<repo-id>/<role>/<project>/sessions.jsonl`",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-2mm1",
+        "plan_questions": "agt-2mm1.1",
+        "dev_questions": "agt-2mm1.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T18:51:01+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:55:35+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-2mm1",
+            "plan_questions": "agt-2mm1.1",
+            "dev_questions": "agt-2mm1.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-006",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent must not change a logger the caller injects, so tests keep control of injected loggers.",
+      "quote": "Injected loggers are not changed (this was specifically set for ease of testing)",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session 2026-11-26; memory `owner-logger-mandate`",
+      "summary": "C06 sc-agent must not change a logger the caller injects, so tes",
+      "scope": "adds or changes code that receives, wraps, flushes or closes an injected sc-observability Logger",
+      "deterministic_check": "test: Run with injected Logger never calls shutdown/rebuild on it, and its root/sinks are unchanged after close; `rg LoggerBuilder` only on the default path",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-o43c",
+        "plan_questions": "agt-o43c.1",
+        "dev_questions": "agt-o43c.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T18:51:01+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:55:37+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-o43c",
+            "plan_questions": "agt-o43c.1",
+            "dev_questions": "agt-o43c.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-007",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Phase m's non-test Rust code, as counted by scripts/gate/rewrite.py, must total at most 2,590 lines at every sprint end, so the phase stays small.",
+      "quote": "2.5k phase cap is what matters",
+      "kind": "structural",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "summary": "C07 Phase j's non-test Rust code, as counted by scripts/gate/rew",
+      "scope": "adds or changes non-test Rust source in the sc-agent repository",
+      "deterministic_check": "`git diff --numstat <phase-j base>..<phase-j tip> -- 'crates/**/*.rs'`, tests excluded, net added ≤ 2580",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-ctuj",
+        "plan_questions": "agt-ctuj.1",
+        "dev_questions": "agt-ctuj.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T18:51:01+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:54:00+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Phase j's non-test Rust code, as counted by scripts/gate/rewrite.py, must total at most 2,580 lines at every sprint end, so the phase stays small."
+        },
+        {
+          "at": "2026-11-28T07:55:39+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-ctuj",
+            "plan_questions": "agt-ctuj.1",
+            "dev_questions": "agt-ctuj.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-008",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "In sc-agent code, related values passed to several methods must be grouped in one struct that replaces those repeated parameters, so encapsulation is efficient and repeated code stays minimal as the architecture scales.",
+      "quote": "Related values are strategically grouped in one struct to remove repeated method parameters, for efficient encapsulation and to minimize repeated code as the architecture scales.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "summary": "C08 In phase-j code, related values passed to several methods mu",
+      "scope": "adds or changes function or method signatures in sc-agent code",
+      "deterministic_check": "review of changed pub fn signatures: no function takes run_id/tool/tool_version/cache/model/provider as separate params",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-jorx",
+        "plan_questions": "agt-jorx.1",
+        "dev_questions": "agt-jorx.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T18:51:01+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:54:09+00:00",
+          "event": "updated",
+          "fields": [
+            "statement",
+            "scope"
+          ],
+          "previous_statement": "In phase-j code, related values passed to several methods must be grouped in one struct that replaces those repeated parameters, so encapsulation is efficient and repeated code stays minimal as the architecture scales."
+        },
+        {
+          "at": "2026-11-28T07:55:41+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-jorx",
+            "plan_questions": "agt-jorx.1",
+            "dev_questions": "agt-jorx.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-009",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.",
+      "quote": "hard-coded rows will get stale quickly and often",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; PRD D15, owner 2026-11-24",
+      "summary": "C10 The sc-agent model table must accept extra model rows from c",
+      "scope": "adds or changes the model table or model configuration in sc-agent",
+      "deterministic_check": "test: a config file with an extra model row makes `decidr models` list it, and a send with that id resolves",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-1quf",
+        "plan_questions": "agt-1quf.1",
+        "dev_questions": "agt-1quf.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T18:51:02+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:55:44+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-1quf",
+            "plan_questions": "agt-1quf.1",
+            "dev_questions": "agt-1quf.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-010",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent, judge-jev and plan-anchor code must not copy and paste logic between files or tools, so the code base does not grow unnecessarily.",
+      "quote": "For years any copy/paste was a big red flag that I was growing the code base unnecessarily.",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; PRD D20, owner 2026-11-24",
+      "summary": "C11 Phase-j code must not copy and paste logic between files or ",
+      "scope": "adds or changes code in judge-jev, plan-anchor or the client template that both tools use",
+      "deterministic_check": "a duplicate-code scan (e.g. jscpd/`rg` of shared helper bodies) across judge-jev and plan-anchor shows no new duplicated block",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-43sg",
+        "plan_questions": "agt-43sg.1",
+        "dev_questions": "agt-43sg.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T18:51:02+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:54:09+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Phase-j code must not copy and paste logic between files or tools, so the code base does not grow unnecessarily."
+        },
+        {
+          "at": "2026-11-28T07:55:46+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-43sg",
+            "plan_questions": "agt-43sg.1",
+            "dev_questions": "agt-43sg.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-011",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every operation the decidr CLI offers must also be callable from the sc-agent Python API, so the Python API is never less flexible than the CLI.",
+      "quote": "I expect the python api may allow more flexibility than cli, NOT less.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; phase-a ANC-006 quote",
+      "summary": "C14 Every operation the decidr CLI offers must also be callable ",
+      "scope": "adds or changes a decidr subcommand or a function in the sc-agent Python bindings",
+      "deterministic_check": "for each `decidr` subcommand touched in phase j (models, send, batch), a Python binding exists and has a test",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-sa4v",
+        "plan_questions": "agt-sa4v.1",
+        "dev_questions": "agt-sa4v.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T18:51:02+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:55:48+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-sa4v",
+            "plan_questions": "agt-sa4v.1",
+            "dev_questions": "agt-sa4v.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-012",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent's decision providers must implement one decision trait, with one implementation per wire format (Jev TypeSafe systemone, OpenAI-compatible chat/completions, Anthropic-compatible Messages), and every provider that speaks a wire format must use that format's implementation, so adding a provider needs no new code or hard-coding.",
+      "quote": "there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "summary": "one decision trait, one implementation per wire format",
+      "scope": "adds or changes decision providers, provider dispatch or the provider table in sc-agent",
+      "deterministic_check": "grep: one decision trait; one impl per wire format; no match on wire strings outside those impls; adding a compatible provider is a config/table row only",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-et87",
+        "plan_questions": "agt-et87.1",
+        "dev_questions": "agt-et87.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T19:52:46+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:55:50+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-et87",
+            "plan_questions": "agt-et87.1",
+            "dev_questions": "agt-et87.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-013",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent must provide an LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider speaking that format, so callers reach any LLM through one interface.",
+      "quote": "we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "summary": "LLM trait, JSON in/out, one impl per wire format",
+      "scope": "adds or changes LLM (non-Jev) calls in sc-agent",
+      "deterministic_check": "grep: one LLM trait with one impl per wire format; decision-over-LLM uses it; test sends JSON and receives schema-valid JSON for each wire format",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-jod5",
+        "plan_questions": "agt-jod5.1",
+        "dev_questions": "agt-jod5.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T19:52:47+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:55:52+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-jod5",
+            "plan_questions": "agt-jod5.1",
+            "dev_questions": "agt-jod5.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-014",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When an LLM answers a decision request in place of Jev, sc-agent must send a built-in default system prompt, and the config settings decidr.luna-system-prompt and decidr.haiku-system-prompt must each override that prompt for their model, so prompts can be tested without code changes.",
+      "quote": "make sure config allows settings for decidr.luna-system-prompt and decidr.haiku-system-prompt as alternatives that can be overridden from config when we do more extensive testing w/out code changes.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "summary": "LLM-as-Jev system prompt; luna/haiku config overrides",
+      "scope": "adds or changes how an LLM is prompted to answer a decision request, or decidr config keys",
+      "deterministic_check": "test: request to luna/haiku carries a system message equal to the default; with decidr.luna-system-prompt / decidr.haiku-system-prompt set in config it equals the configured text",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-pahi",
+        "plan_questions": "agt-pahi.1",
+        "dev_questions": "agt-pahi.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T19:52:47+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:55:54+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-pahi",
+            "plan_questions": "agt-pahi.1",
+            "dev_questions": "agt-pahi.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-015",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A rule that applies to every decidr-based tool (logging, model resolution and the like) must be specified only in sc-agent's records; a derivative tool's records (judge-jev, plan-anchor and others) must not restate it and give only the tool name and the tool's own behaviour, so each rule has one source.",
+      "quote": "judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26; also: 'same thing for REQ-JEV-0009 (this is sc-agent requirement) and applies to all tools'",
+      "summary": "decidr-wide rules live only in sc-agent",
+      "scope": "adds or changes REQ/NFR/ADR records of judge-jev, plan-anchor or another sc-agent-based tool",
+      "deterministic_check": "no derivative-tool record states log placement, model resolution, consent, retries or result-line fields; each points to the sc-agent record",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-fokq",
+        "plan_questions": "agt-fokq.1",
+        "dev_questions": "agt-fokq.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T20:43:06+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:55:56+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-fokq",
+            "plan_questions": "agt-fokq.1",
+            "dev_questions": "agt-fokq.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-016",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent's records must define the logger-injection path, and a derivative tool's production code must not use it, only its tests, so production logs always follow sc-agent's default rules.",
+      "quote": "judge-jev/plan-anchor and other derivative tools should defer to the default tool rules and not use injection path for production code (test only).",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "summary": "logger injection is test-only for derivative tools",
+      "scope": "adds or changes logger construction or injection in sc-agent or a derivative tool",
+      "deterministic_check": "grep derivative tools' non-test code for logger injection: none; one sc-agent record defines the injection path",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-mww2",
+        "plan_questions": "agt-mww2.1",
+        "dev_questions": "agt-mww2.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-26T20:43:06+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:55:58+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-mww2",
+            "plan_questions": "agt-mww2.1",
+            "dev_questions": "agt-mww2.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-017",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent tests must not depend on races, wall-clock timing, sleeps, event-loop ordering or system load; a test found to depend on one must be redesigned to drive its logic with controlled inputs.",
+      "quote": "Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "summary": "no flaky tests",
+      "scope": "adds or changes a test under crates/*/tests, crates/*/src test modules, tests/ or crates/sc-agent-py/tests",
+      "deterministic_check": "review changed tests for sleep, wall-clock assertions, poll-until-timeout and unsynchronized thread ordering; a failure-only backstop that fails with captured output is allowed",
+      "fixtures": {
+        "pass": [
+          "The new holdoff test drives its deadline with an injected clock and an explicit channel handshake."
+        ],
+        "fail": [
+          "The test sleeps 200 ms and then asserts the worker has finished."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-lnby",
+        "plan_questions": "agt-lnby.1",
+        "dev_questions": "agt-lnby.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-27T23:06:46+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-27T23:08:30+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-28T07:56:00+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-lnby",
+            "plan_questions": "agt-lnby.1",
+            "dev_questions": "agt-lnby.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-018",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent's integration tests must be its unit tests run against live agents, triggered manually.",
+      "quote": "I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "summary": "live integration = unit tests run live, manually",
+      "scope": "adds or changes a live-provider test, a test selection for live runs, or a CI workflow under .github/workflows",
+      "deterministic_check": "grep .github/workflows for live-provider test jobs triggered on push, pull_request or schedule; each live test name matches an existing mocked unit test",
+      "fixtures": {
+        "pass": [
+          "The live job reruns the existing unit tests against real providers and is started with workflow_dispatch only."
+        ],
+        "fail": [
+          "A new live_integration suite runs on every pull request."
+        ]
+      },
+      "question_overrides": {},
+      "version": 4,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-y7m6",
+        "plan_questions": "agt-y7m6.1",
+        "dev_questions": "agt-y7m6.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-27T23:06:47+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-27T23:08:05+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "sc-agent's live integration tests must be its existing unit tests run against live providers, and they must be started manually, never by CI on a push, pull request or schedule."
+        },
+        {
+          "at": "2026-11-27T23:08:30+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Every sc-agent live integration test run must be a manually triggered run of sc-agent's unit tests against live agents."
+        },
+        {
+          "at": "2026-11-27T23:08:30+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-28T07:56:02+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-y7m6",
+            "plan_questions": "agt-y7m6.1",
+            "dev_questions": "agt-y7m6.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-019",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent must require Python 3.11 or newer.",
+      "quote": "sc-agent, judge-jev, prompt-anchor all must be 3.11+",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "summary": "Python 3.11+",
+      "scope": "edits pyproject.toml requires-python, Python version checks, CI Python matrices or script interpreter guards",
+      "deterministic_check": "grep requires-python in every sc-agent pyproject.toml reads >=3.11",
+      "fixtures": {
+        "pass": [
+          "pyproject.toml sets requires-python = \">=3.11\"."
+        ],
+        "fail": [
+          "The wheel now supports Python 3.9."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-e0lk",
+        "plan_questions": "agt-e0lk.1",
+        "dev_questions": "agt-e0lk.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-27T23:06:47+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-27T23:08:05+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "sc-agent's Python packages and scripts must require Python 3.11 or newer."
+        },
+        {
+          "at": "2026-11-27T23:08:30+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-28T07:56:04+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-e0lk",
+            "plan_questions": "agt-e0lk.1",
+            "dev_questions": "agt-e0lk.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-020",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When a caller passes its own sc_observability Logger into an sc-agent wheel call, sc-agent must not build a second Logger for that log.",
+      "quote": "we created a oversized set of sprints expressly to normalize config and logging around sc-observability logger (injected).  why do you keep adding more loggers to the design? ... add a new anchor banning python_logger ... lock this",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "summary": "no second logger when one is injected",
+      "scope": "touches crates/sc-agent-py or any code path that accepts an injected logger (general_log=, session_log=)",
+      "deterministic_check": "no LoggerBuilder call in crates/sc-agent-py runs on a path where the caller supplied a logger",
+      "fixtures": {
+        "pass": [
+          "When general_log= is given, the wheel writes to that logger and builds no other."
+        ],
+        "fail": [
+          "The wheel builds its own Logger with LoggerBuilder even when the caller passed session_log=."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-g3pq",
+        "plan_questions": "agt-g3pq.1",
+        "dev_questions": "agt-g3pq.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-27T23:06:47+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-27T23:08:30+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-28T07:56:06+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-g3pq",
+            "plan_questions": "agt-g3pq.1",
+            "dev_questions": "agt-g3pq.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-021",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every phase-m sprint bead names the crate and layer each change lands in, and that layer is the lowest layer whose crates all use the change.",
+      "quote": "You need to be able to push shared methods down and move differences up",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27; layer rule of ADR-SAG-0004 v0.5.0",
+      "summary": "Shared code sits in the lowest layer using it",
+      "scope": "adds or changes code in any crate under crates/",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-s6th",
+        "plan_questions": "agt-s6th.1",
+        "dev_questions": "agt-s6th.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T07:54:55+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:56:09+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-s6th",
+            "plan_questions": "agt-s6th.1",
+            "dev_questions": "agt-s6th.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-022",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent has no hard-coded row for a local model: a local model's URL and model id come only from config.",
+      "quote": "local models come from config. Both ip & model string.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "summary": "Local model URL and id come only from config",
+      "scope": "adds or changes the model table, model configuration or local-model handling",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-czru",
+        "plan_questions": "agt-czru.1",
+        "dev_questions": "agt-czru.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T07:54:55+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:56:11+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-czru",
+            "plan_questions": "agt-czru.1",
+            "dev_questions": "agt-czru.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-023",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent writes each session row to the repository's SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.",
+      "quote": "I want session logs written to SQLite, jsonl was just a quick item for mvp",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "summary": "Session rows go to SQLite, not sessions.jsonl",
+      "scope": "adds or changes code that writes or reads session rows",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-rdga",
+        "plan_questions": "agt-rdga.1",
+        "dev_questions": "agt-rdga.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T07:54:55+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:56:13+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-rdga",
+            "plan_questions": "agt-rdga.1",
+            "dev_questions": "agt-rdga.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-024",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The general log is written through sc-observability under its rotation and deletion policy; sc-agent adds no retention rule of its own.",
+      "quote": "general logs follow sc-obs rotation/deletion guidelines",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "summary": "General log follows sc-observability retention",
+      "scope": "adds or changes general-log writing, rotation or deletion",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-69i3",
+        "plan_questions": "agt-69i3.1",
+        "dev_questions": "agt-69i3.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T07:54:55+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:56:15+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-69i3",
+            "plan_questions": "agt-69i3.1",
+            "dev_questions": "agt-69i3.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-025",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "`sc-agent-schema` contains only struct definitions, literal SQL text and convenience methods on those structs; it has no SQLite dependency and no upgrade code.",
+      "quote": "I consider schema to hold schema (structs and literal sql text) only. Exceptions would be extension convenience methods/transforms and schema versioning/upgrade code.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27; Rand, 2026-11-27 23:44, on this candidate: \"6. Remove upgrade\"",
+      "summary": "sc-agent-schema holds structs and SQL text only",
+      "scope": "adds or changes any file under crates/sc-agent-schema",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-3fwl",
+        "plan_questions": "agt-3fwl.1",
+        "dev_questions": "agt-3fwl.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T07:54:55+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:56:17+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-3fwl",
+            "plan_questions": "agt-3fwl.1",
+            "dev_questions": "agt-3fwl.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-026",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every core table's SQL is defined in `sc-agent-schema` and nowhere else.",
+      "quote": "SQLite schema is in sc-agent-schema.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "summary": "Core table SQL defined only in sc-agent-schema",
+      "scope": "adds or changes SQL table definitions anywhere in the workspace",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-lw7b",
+        "plan_questions": "agt-lw7b.1",
+        "dev_questions": "agt-lw7b.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T07:54:55+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:56:19+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-lw7b",
+            "plan_questions": "agt-lw7b.1",
+            "dev_questions": "agt-lw7b.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-027",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The session schema stores a request once in `messages`, keyed by sha256, and each model reply as a row in `responses` that references it.",
+      "quote": "We likely want message+sha256 and response+model in separate tables as this is one->many",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "summary": "Requests stored once; replies in responses table",
+      "scope": "adds or changes the session tables or code that stores a request or a model reply",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-kkrv",
+        "plan_questions": "agt-kkrv.1",
+        "dev_questions": "agt-kkrv.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T07:54:56+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:56:21+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-kkrv",
+            "plan_questions": "agt-kkrv.1",
+            "dev_questions": "agt-kkrv.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-028",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A cache hit is decided by the request sha256 and the model alone; `run_id` is not part of the cache key.",
+      "quote": "run-id has nothing to do with caching. run is a collection of queries of which some may be cached (if caching enabled)",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "summary": "Cache key is request sha256 and model, not run_id",
+      "scope": "adds or changes the result cache, cache keys or run ids",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-0fau",
+        "plan_questions": "agt-0fau.1",
+        "dev_questions": "agt-0fau.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T07:54:56+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:56:24+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-0fau",
+            "plan_questions": "agt-0fau.1",
+            "dev_questions": "agt-0fau.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-029",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "`--resume` is implemented in `sc-llm`; resuming a decision session continues it as an LLM session.",
+      "quote": "Refers to sc-llm behavior. —resume on decision session would convert it to llm-session",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "summary": "--resume lives in sc-llm",
+      "scope": "adds or changes --resume or session resumption",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-x65j",
+        "plan_questions": "agt-x65j.1",
+        "dev_questions": "agt-x65j.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T07:54:56+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:56:26+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-x65j",
+            "plan_questions": "agt-x65j.1",
+            "dev_questions": "agt-x65j.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-030",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Retry and holdoff code takes its waits, limits and busy and quota rules as parameters from the calling layer, and contains no provider name, host or status-code table.",
+      "quote": "retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "summary": "Retry and holdoff take provider rules as parameters",
+      "scope": "adds or changes retry, resend, backoff or holdoff code",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-2sum",
+        "plan_questions": "agt-2sum.1",
+        "dev_questions": "agt-2sum.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T07:54:56+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:56:28+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-2sum",
+            "plan_questions": "agt-2sum.1",
+            "dev_questions": "agt-2sum.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-031",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "judge-jev, plan-anchor and every other sc-agent-based tool store their results in the repository's SQLite database, not in JSON or JSONL result files.",
+      "quote": "At the end of the day, I want all the 'results' from plan-anchor, judge-jev or any other app to save data to SQLite.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "summary": "Tool results are stored in SQLite",
+      "scope": "adds or changes how judge-jev, plan-anchor or another sc-agent-based tool stores results",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-yz3r",
+        "plan_questions": "agt-yz3r.1",
+        "dev_questions": "agt-yz3r.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T07:54:56+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:56:30+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-yz3r",
+            "plan_questions": "agt-yz3r.1",
+            "dev_questions": "agt-yz3r.2"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ANC-032",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Each tool's tables carry their own schema version, independent of the core schema version; no table definition is in the wheel crate `sc-agent-py`.",
+      "quote": "Also schema is not encoded at individual wheel layer. Schema is versioned for app tables independently.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "summary": "Tool tables versioned apart; none in sc-agent-py",
+      "scope": "adds or changes a tool's table definitions, schema versions, or crates/sc-agent-py",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-ws1i",
+        "plan_questions": "agt-ws1i.1",
+        "dev_questions": "agt-ws1i.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T07:54:56+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T07:56:32+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-ws1i",
+            "plan_questions": "agt-ws1i.1",
+            "dev_questions": "agt-ws1i.2"
+          }
+        }
+      ]
+    }
+  ]
+}
