@@ -145,4 +145,4 @@ Phase plans live only under `docs/plans/phase-<phase>/`.
 
 ## Repository exceptions
 
-None yet.
+A sprint that only moves code is accepted on unchanged tests passing and the boundary check passing.
