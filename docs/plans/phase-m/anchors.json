@@ -347,7 +347,7 @@
       "context": "planning session; session, 2026-11-26",
       "summary": "C07 Phase j's non-test Rust code, as counted by scripts/gate/rew",
       "scope": "adds or changes non-test Rust source in the sc-agent repository",
-      "deterministic_check": "`git diff --numstat <phase-j base>..<phase-j tip> -- 'crates/**/*.rs'`, tests excluded, net added ≤ 2580",
+      "deterministic_check": "python3 scripts/gate/rewrite.py passes at sprint end with LIMIT = 2590 (non-test Rust lines of the PACKAGES list)",
       "fixtures": {
         "pass": [
           "At sprint end scripts/gate/rewrite.py reports 2,540 of 2,590 lines."
@@ -357,7 +357,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 4,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -393,6 +393,13 @@
           "event": "updated",
           "fields": [
             "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-28T08:19:24+00:00",
+          "event": "updated",
+          "fields": [
+            "deterministic_check"
           ]
         }
       ]
@@ -951,6 +958,19 @@
             "plan_questions": "agt-lnby.1",
             "dev_questions": "agt-lnby.2"
           }
+        },
+        {
+          "at": "2026-11-28T08:19:23+00:00",
+          "event": "excluded",
+          "item": "agt-m-0",
+          "reason": "m-0 adds empty crates, boundary records and a CI lint step; it adds or changes no test.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-m-0",
+          "reason": "m-0 adds empty crates, boundary records and a CI lint step; it adds or changes no test."
         }
       ]
     },
@@ -1021,6 +1041,19 @@
             "plan_questions": "agt-y7m6.1",
             "dev_questions": "agt-y7m6.2"
           }
+        },
+        {
+          "at": "2026-11-28T08:19:24+00:00",
+          "event": "excluded",
+          "item": "agt-m-0",
+          "reason": "m-0's only CI change is a static sc-lint boundary job; it adds no live-provider test, live-run selection or workflow_dispatch job.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-m-0",
+          "reason": "m-0's only CI change is a static sc-lint boundary job; it adds no live-provider test, live-run selection or workflow_dispatch job."
         }
       ]
     },
@@ -1461,6 +1494,19 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-28T08:21:10+00:00",
+          "event": "excluded",
+          "item": "agt-m-0",
+          "reason": "m-0 adds no SQL table definition anywhere; sc-agent-schema is an empty crate in this sprint.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-m-0",
+          "reason": "m-0 adds no SQL table definition anywhere; sc-agent-schema is an empty crate in this sprint."
         }
       ]
     },
@@ -1792,6 +1838,19 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-28T08:19:24+00:00",
+          "event": "excluded",
+          "item": "agt-m-0",
+          "reason": "m-0 adds no table definition and no schema version, and does not touch crates/sc-agent-py.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-m-0",
+          "reason": "m-0 adds no table definition and no schema version, and does not touch crates/sc-agent-py."
         }
       ]
     }

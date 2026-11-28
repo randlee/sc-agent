@@ -165,13 +165,13 @@ Anchor: Phase m's non-test Rust code, as counted by scripts/gate/rewrite.py, mus
 
 > 2.5k phase cap is what matters
 
-Said by Rand Lee, planning session; session, 2026-11-26, 2026-11-26. Status: locked. Version 3.
+Said by Rand Lee, planning session; session, 2026-11-26, 2026-11-26. Status: locked. Version 4.
 
 Summary: C07 Phase j's non-test Rust code, as counted by scripts/gate/rew
 
 Scope: adds or changes non-test Rust source in the sc-agent repository
 
-Deterministic check to pair with the development gate: `git diff --numstat <phase-j base>..<phase-j tip> -- 'crates/**/*.rs'`, tests excluded, net added ≤ 2580
+Deterministic check to pair with the development gate: python3 scripts/gate/rewrite.py passes at sprint end with LIMIT = 2590 (non-test Rust lines of the PACKAGES list)
 
 Beads: anchor `agt-ctuj`, plan questions `agt-ctuj.1`, dev questions `agt-ctuj.2`
 
@@ -373,6 +373,9 @@ Scope: adds or changes a test under crates/*/tests, crates/*/src test modules, t
 
 Deterministic check to pair with the development gate: review changed tests for sleep, wall-clock assertions, poll-until-timeout and unsynchronized thread ordering; a failure-only backstop that fails with captured output is allowed
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-0`: m-0 adds empty crates, boundary records and a CI lint step; it adds or changes no test.
+
 Beads: anchor `agt-lnby`, plan questions `agt-lnby.1`, dev questions `agt-lnby.2`
 
 Fixtures:
@@ -392,6 +395,9 @@ Summary: live integration = unit tests run live, manually
 Scope: adds or changes a live-provider test, a test selection for live runs, or a CI workflow under .github/workflows
 
 Deterministic check to pair with the development gate: grep .github/workflows for live-provider test jobs triggered on push, pull_request or schedule; each live test name matches an existing mocked unit test
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-0`: m-0's only CI change is a static sc-lint boundary job; it adds no live-provider test, live-run selection or workflow_dispatch job.
 
 Beads: anchor `agt-y7m6`, plan questions `agt-y7m6.1`, dev questions `agt-y7m6.2`
 
@@ -541,6 +547,9 @@ Summary: Core table SQL defined only in sc-agent-schema
 
 Scope: adds or changes SQL table definitions anywhere in the workspace
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-0`: m-0 adds no SQL table definition anywhere; sc-agent-schema is an empty crate in this sprint.
+
 Beads: anchor `agt-lw7b`, plan questions `agt-lw7b.1`, dev questions `agt-lw7b.2`
 
 Fixtures:
@@ -648,6 +657,9 @@ Said by Rand Lee, phase-m planning session, 2026-11-27, 2026-11-27. Status: lock
 Summary: Tool tables versioned apart; none in sc-agent-py
 
 Scope: adds or changes a tool's table definitions, schema versions, or crates/sc-agent-py
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-0`: m-0 adds no table definition and no schema version, and does not touch crates/sc-agent-py.
 
 Beads: anchor `agt-ws1i`, plan questions `agt-ws1i.1`, dev questions `agt-ws1i.2`
 
