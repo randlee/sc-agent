@@ -1,0 +1,47 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-30">
+  <div class="section-head">
+    <h2>30. Cut the run-log retention statements from REQ-SAG-0003</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="30. Cut the run-log retention statements from REQ-SAG-0003
+Wave 2 · cut excess
+Records: REQ-SAG-0003
+Change:
+- Delete from REQ-SAG-0003: “A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.”
+- Delete from REQ-SAG-0003: “sc-agent MUST NOT remove a run log.”
+Clears:
+- REQ-SAG-0003 × ANC-005 (exceeds)
+- REQ-SAG-0003 × ANC-015 (exceeds)
+- REQ-SAG-0003 × ANC-016 (exceeds)
+Justification: ANC-005 fixes where default loggers write (log root, folder, file name). It says nothing about keeping or removing logs. No anchor covers retention, and each of these statements was written between 2026-11-19 and 2026-11-25, before the anchors of 2026-11-26. REQ-SAG-0005&#x27;s rationale says the never-rotated, never-pruned rule is held in ADR-SAG-0021 (Session log). The path, root-variable and session-folder statements stay. At aggressive, anchored records do not get keep_with_reason. The same cut clears the ANC-015 and ANC-016 cells, because retention is the only text in this record that no anchor covers. Owner ruling 2026-11-27 19:27 (verbatim, relayed by arch-ai): &quot;Session logs not deleted. general logs follow sc-obs rotation/deletion guidelines&quot;. Split from the original five-statement panel 16 (arch-ai) because these answers differ. This panel holds the two run-log statements. The ruling names session logs and general logs, not the run log.
+Source of truth: ANC-005 — Owner said: “I mandated - that all default loggers created in production have root/folder/file naming conventions specified.” — commit 67203e2f
+Expected improvement:
+- REQ-SAG-0003 keeps only placement and log-root obligations, which ANC-005 asks for.
+- Records 49 → 49; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 3 of 28
+Other proposals changing these records: 2, 9, 16, 31">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · cut excess</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0003" data-panel="rec-REQ-SAG-0003">REQ-SAG-0003</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Delete from REQ-SAG-0003: “A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.”</li>
+    <li>Delete from REQ-SAG-0003: “sc-agent MUST NOT remove a run log.”</li>
+  </ul>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0003-ANC-005" data-panel="cell-REQ-SAG-0003-ANC-005">REQ-SAG-0003 × ANC-005 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0003-ANC-015" data-panel="cell-REQ-SAG-0003-ANC-015">REQ-SAG-0003 × ANC-015 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0003-ANC-016" data-panel="cell-REQ-SAG-0003-ANC-016">REQ-SAG-0003 × ANC-016 (exceeds)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>ANC-005 fixes where default loggers write (log root, folder, file name). It says nothing about keeping or removing logs. No anchor covers retention, and each of these statements was written between 2026-11-19 and 2026-11-25, before the anchors of 2026-11-26. REQ-SAG-0005&#x27;s rationale says the never-rotated, never-pruned rule is held in ADR-SAG-0021 (Session log). The path, root-variable and session-folder statements stay. At aggressive, anchored records do not get keep_with_reason. The same cut clears the ANC-015 and ANC-016 cells, because retention is the only text in this record that no anchor covers. Owner ruling 2026-11-27 19:27 (verbatim, relayed by arch-ai): &quot;Session logs not deleted. general logs follow sc-obs rotation/deletion guidelines&quot;. Split from the original five-statement panel 16 (arch-ai) because these answers differ. This panel holds the two run-log statements. The ruling names session logs and general logs, not the run log.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-005 — Owner said: “I mandated - that all default loggers created in production have root/folder/file naming conventions specified.” — commit 67203e2f</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0003 keeps only placement and log-root obligations, which ANC-005 asks for.</p>
+  <p>Records 49 → 49; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 3 of 28</p>
+  <p>Other proposals changing these records: 2, 9, 16, 31</p>
+</section>
