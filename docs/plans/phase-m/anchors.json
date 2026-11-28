@@ -2203,7 +2203,7 @@
       "id": "ANC-027",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "The session schema stores a request once in `messages`, keyed by sha256, and each model reply as a row in `responses` that references it.",
+      "statement": "The session schema must store each request once in `messages`, keyed by sha256, with each model reply as a row in `responses` that references it.",
       "quote": "We likely want message+sha256 and response+model in separate tables as this is one->many",
       "kind": "directive",
       "stated_by": "Rand Lee",
@@ -2221,7 +2221,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -2264,6 +2264,14 @@
           "item": "agt-m-3",
           "reason": "agt-m-3 only extracts the existing JSONL session-row writer unchanged; agt-m-8 owns the messages and responses schema and persistence.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T16:05:01+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "The session schema stores a request once in `messages`, keyed by sha256, and each model reply as a row in `responses` that references it."
         }
       ],
       "exclude": [
@@ -2422,7 +2430,7 @@
       "id": "ANC-030",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "Retry and holdoff code takes its waits, limits and busy and quota rules as parameters from the calling layer, and contains no provider name, host or status-code table.",
+      "statement": "Retry and holdoff code must take its waits, limits and busy and quota rules as parameters from the calling layer and contain no provider name, host or status-code table.",
       "quote": "retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.",
       "kind": "directive",
       "stated_by": "Rand Lee",
@@ -2440,7 +2448,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 4,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -2483,6 +2491,14 @@
           "item": "agt-m-4",
           "reason": "agt-m-4 moves the existing resend and holdoff behavior unchanged; agt-m-9 owns parameterized waits, limits, and busy/quota rules.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T16:05:01+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Retry and holdoff code takes its waits, limits and busy and quota rules as parameters from the calling layer, and contains no provider name, host or status-code table."
         }
       ],
       "exclude": [
@@ -2496,7 +2512,7 @@
       "id": "ANC-031",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "judge-jev, plan-anchor and every other sc-agent-based tool store their results in the repository's SQLite database, not in JSON or JSONL result files.",
+      "statement": "judge-jev, plan-anchor and every other sc-agent-based tool must store their results in the repository's SQLite database, not in JSON or JSONL result files.",
       "quote": "At the end of the day, I want all the 'results' from plan-anchor, judge-jev or any other app to save data to SQLite.",
       "kind": "directive",
       "stated_by": "Rand Lee",
@@ -2514,7 +2530,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -2564,6 +2580,14 @@
           "item": "agt-m-10",
           "reason": "no sprint in phase m carries this anchor; listed for the owner.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T16:05:01+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "judge-jev, plan-anchor and every other sc-agent-based tool store their results in the repository's SQLite database, not in JSON or JSONL result files."
         }
       ],
       "exclude": [
