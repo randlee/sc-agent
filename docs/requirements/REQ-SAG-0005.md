@@ -24,7 +24,7 @@ Definitions: JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-del
 **MUST NOT statements:**
 
 - sc-agent MUST NOT append more than one session row for one query.
-- sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.
+- sc-agent MUST NOT append a session row for a failed call.
 
 ### Rationale
 
