@@ -1,45 +1,53 @@
 <section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-19">
   <div class="section-head">
-    <h2>19. Delete REQ-SAG-0502 and put &quot;launch any LLM&quot; to the owner as an anchor</h2>
+    <h2>19. Cut the configuration loading and error rules (not the paid-API rule) unrelated to model selection from REQ-SAG-0019</h2>
     <div class="section-actions" role="group" aria-label="Copy">
-      <button type="button" class="icon-button" title="Copy Context" data-copy-text="19. Delete REQ-SAG-0502 and put &quot;launch any LLM&quot; to the owner as an anchor
-Wave 2 · propose anchor
-Records: REQ-SAG-0502
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="19. Cut the configuration loading and error rules (not the paid-API rule) unrelated to model selection from REQ-SAG-0019
+Wave 2 · cut excess
+Records: REQ-SAG-0019
 Change:
-- Delete record REQ-SAG-0502 (1 statements).
-- Proposed anchor for the owner: “REQ-SAG-0502: sc-agent can send a request to any LLM a configured provider serves, not only decision models. Needed because decision models are a small part of what sc-agent does.”
-- Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.
+- Delete from REQ-SAG-0019: “When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.”
+- Delete from REQ-SAG-0019: “An unknown key in a configuration file MUST cause a typed load error.”
+- Delete from REQ-SAG-0019: “The `cache` setting MUST default to `true`.”
+- Delete from REQ-SAG-0019: “When a CLI fails to load a configuration file, its error MUST name the failure location.”
+- Delete from REQ-SAG-0019: “A CLI MUST NOT read another CLI&#x27;s `&lt;cli&gt;.json`.”
+- Delete from REQ-SAG-0019: “While it loads configuration, a CLI MUST NOT write to any configuration file.”
 Clears:
-- REQ-SAG-0502 × ANC-009 (exceeds)
-- REQ-SAG-0502 × ANC-013 (exceeds)
-Justification: The only statement, &quot;sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.&quot;, is a capability claim. ANC-013 asks for an LLM trait with one implementation per wire format. ANC-009 asks for config-added rows. Neither says sc-agent can launch any LLM a provider serves. Jev rates it related to both and serving neither (p_serves 0.03 for ANC-013). At aggressive, excess stays deleted until the owner anchors it. The capability is needed: crates/sc-agent/tests/wires.rs has a test, non_decision_llm_selected_by_short_name_returns_the_json_the_model_wrote, that sends to a non-decision LLM by short name. So it goes to the owner as an anchor. The statement dates from c7a40068 (2026-11-09), older than both anchors. Lead: harmonize with the REQ-SAG-0101 and REQ-SAG-0103 proposals, since REQ-SAG-0502 lists both as related.
-Source of truth: ANC-013 — Owner said: “all providers w/ compatible api should use the same impelemntation.” — commit c7a40068
+- REQ-SAG-0019 × ANC-001 (exceeds)
+- REQ-SAG-0019 × ANC-009 (exceeds)
+Justification: ANC-001 asks that config can override the default `jev` model, and ANC-009 asks that config can add model rows. The statements that let config files accept settings and add or override model rows (statements 1, 2, 5 and 6) serve them and stay. These seven are general loading and error rules, the cache default and the paid-API address rule. No anchor asks for them. All date from 2026-11-18 to 2026-11-25, before the anchors of 2026-11-26.
+Source of truth: ANC-001 — Owner said: “I want &#x27;jev&#x27; to select latest, config can override default.” — commit 3afa4f9e
 Expected improvement:
-- REQ-SAG-0502 no longer exceeds ANC-009 or ANC-013. The capability returns only if the owner anchors it.
-- Records 49 → 48; statements 205 → 204; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28">&#x2398;</button>
+- REQ-SAG-0019 no longer specifies loading and error behaviour beyond the model-config anchors.
+- Records 49 → 49; statements 205 → 199; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28
+Other proposals changing these records: 20, 21, 22">&#x2398;</button>
     </div>
   </div>
-  <p class="small">Wave 2 · propose anchor</p>
+  <p class="small">Wave 2 · cut excess</p>
   <h3>Records</h3>
   <ul>
-    <li><a href="#rec-REQ-SAG-0502" data-panel="rec-REQ-SAG-0502">REQ-SAG-0502</a></li>
+    <li><a href="#rec-REQ-SAG-0019" data-panel="rec-REQ-SAG-0019">REQ-SAG-0019</a></li>
   </ul>
   <h3>Change</h3>
   <ul>
-    <li>Delete record REQ-SAG-0502 (1 statements).</li>
-    <li>Proposed anchor for the owner: “REQ-SAG-0502: sc-agent can send a request to any LLM a configured provider serves, not only decision models. Needed because decision models are a small part of what sc-agent does.”</li>
-    <li>Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.</li>
+    <li>Delete from REQ-SAG-0019: “When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.”</li>
+    <li>Delete from REQ-SAG-0019: “An unknown key in a configuration file MUST cause a typed load error.”</li>
+    <li>Delete from REQ-SAG-0019: “The `cache` setting MUST default to `true`.”</li>
+    <li>Delete from REQ-SAG-0019: “When a CLI fails to load a configuration file, its error MUST name the failure location.”</li>
+    <li>Delete from REQ-SAG-0019: “A CLI MUST NOT read another CLI&#x27;s `&lt;cli&gt;.json`.”</li>
+    <li>Delete from REQ-SAG-0019: “While it loads configuration, a CLI MUST NOT write to any configuration file.”</li>
   </ul>
   <h3>Clears</h3>
   <ul>
-    <li><a href="#cell-REQ-SAG-0502-ANC-009" data-panel="cell-REQ-SAG-0502-ANC-009">REQ-SAG-0502 × ANC-009 (exceeds)</a></li>
-    <li><a href="#cell-REQ-SAG-0502-ANC-013" data-panel="cell-REQ-SAG-0502-ANC-013">REQ-SAG-0502 × ANC-013 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0019-ANC-001" data-panel="cell-REQ-SAG-0019-ANC-001">REQ-SAG-0019 × ANC-001 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0019-ANC-009" data-panel="cell-REQ-SAG-0019-ANC-009">REQ-SAG-0019 × ANC-009 (exceeds)</a></li>
   </ul>
   <h3>Justification</h3>
-  <p>The only statement, &quot;sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.&quot;, is a capability claim. ANC-013 asks for an LLM trait with one implementation per wire format. ANC-009 asks for config-added rows. Neither says sc-agent can launch any LLM a provider serves. Jev rates it related to both and serving neither (p_serves 0.03 for ANC-013). At aggressive, excess stays deleted until the owner anchors it. The capability is needed: crates/sc-agent/tests/wires.rs has a test, non_decision_llm_selected_by_short_name_returns_the_json_the_model_wrote, that sends to a non-decision LLM by short name. So it goes to the owner as an anchor. The statement dates from c7a40068 (2026-11-09), older than both anchors. Lead: harmonize with the REQ-SAG-0101 and REQ-SAG-0103 proposals, since REQ-SAG-0502 lists both as related.</p>
+  <p>ANC-001 asks that config can override the default `jev` model, and ANC-009 asks that config can add model rows. The statements that let config files accept settings and add or override model rows (statements 1, 2, 5 and 6) serve them and stay. These seven are general loading and error rules, the cache default and the paid-API address rule. No anchor asks for them. All date from 2026-11-18 to 2026-11-25, before the anchors of 2026-11-26.</p>
   <h3>Source of truth</h3>
-  <p>ANC-013 — Owner said: “all providers w/ compatible api should use the same impelemntation.” — commit c7a40068</p>
+  <p>ANC-001 — Owner said: “I want &#x27;jev&#x27; to select latest, config can override default.” — commit 3afa4f9e</p>
   <h3>Expected improvement</h3>
-  <p>REQ-SAG-0502 no longer exceeds ANC-009 or ANC-013. The capability returns only if the owner anchors it.</p>
-  <p>Records 49 → 48; statements 205 → 204; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28</p>
+  <p>REQ-SAG-0019 no longer specifies loading and error behaviour beyond the model-config anchors.</p>
+  <p>Records 49 → 49; statements 205 → 199; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28</p>
+  <p>Other proposals changing these records: 20, 21, 22</p>
 </section>

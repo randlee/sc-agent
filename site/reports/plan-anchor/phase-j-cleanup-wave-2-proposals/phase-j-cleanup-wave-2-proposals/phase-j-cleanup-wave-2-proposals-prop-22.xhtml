@@ -1,52 +1,45 @@
 <section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-22">
   <div class="section-head">
-    <h2>22. Cut provider-handling statements from REQ-SAG-0901 and put the decider-mode rules to the owner as an anchor</h2>
+    <h2>22. Cut the local-endpoint address and local-folder layer statements from REQ-SAG-0019</h2>
     <div class="section-actions" role="group" aria-label="Copy">
-      <button type="button" class="icon-button" title="Copy Context" data-copy-text="22. Cut provider-handling statements from REQ-SAG-0901 and put the decider-mode rules to the owner as an anchor
-Wave 2 · propose anchor
-Records: REQ-SAG-0901
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="22. Cut the local-endpoint address and local-folder layer statements from REQ-SAG-0019
+Wave 2 · cut excess
+Records: REQ-SAG-0019
 Change:
-- Delete from REQ-SAG-0901: “In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.”
-- Delete from REQ-SAG-0901: “In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.”
-- Delete from REQ-SAG-0901: “Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.”
-- Delete from REQ-SAG-0901: “If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.”
-- Delete from REQ-SAG-0901: “The covered model handling the decision request MUST pass the request&#x27;s inputs to the provider.”
-- Delete from REQ-SAG-0901: “If the provider rejects a request input, the decision backend MUST return the provider&#x27;s error.”
-- Proposed anchor for the owner: “REQ-SAG-0901: in decider mode the covered model (Haiku, Luna) generates the `probabilities` and `confidence` values itself, and a response that fails the required schema returns `decision.schema_mismatch`. Needed because callers compare Jev and LLM answers directly.”
-- Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.
-Clears: REQ-SAG-0901 × ANC-013 (exceeds)
-Justification: &quot;In decider mode, answers from each covered model MUST conform to the required schema.&quot; stays: it serves ANC-013&#x27;s check that each wire format receives schema-valid JSON. The six statements cut here go beyond ANC-013, which asks for an LLM trait and one implementation per wire format. Two of them are provider plumbing and are deleted outright with no anchor: the structured-output request, and passing inputs to the provider and returning its errors. The code documents the structured-output request in crates/sc-agent/src/lib.rs. Neither is an owner rule. Two are believed needed and go to the owner as an anchor: the model generates its own `probabilities` and `confidence`, and a response that fails the schema returns `decision.schema_mismatch`. The code documents the error in crates/sc-agent/src/lib.rs, and the first rule keeps Jev and LLM answers comparable. All statements date from 8f41793e (2026-11-25), before ANC-013 (2026-11-26).
-Source of truth: ANC-013 — Owner said: “all providers w/ compatible api should use the same impelemntation.” — commit 8f41793e
+- Delete from REQ-SAG-0019: “A local endpoint&#x27;s address MUST be settable in configuration.”
+- Delete from REQ-SAG-0019: “When the CLI does not run inside a git work tree, it MUST skip the local-folder layers.”
+Clears:
+- REQ-SAG-0019 × ANC-001 (exceeds)
+- REQ-SAG-0019 × ANC-009 (exceeds)
+Justification: ANC-009 asks for extra model rows from config, not for settable local endpoint addresses or work-tree layer skipping. Both statements date from 2026-11-25, before the anchors, and no anchor asks for them.
+Source of truth: ANC-009 — Owner said: “hard-coded rows will get stale quickly and often” — commit b98b4112
 Expected improvement:
-- REQ-SAG-0901 keeps only the schema-conformance statement ANC-013 supports.
-- Records 49 → 49; statements 205 → 199; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28">&#x2398;</button>
+- REQ-SAG-0019 keeps only the config statements that serve ANC-001 and ANC-009.
+- Records 49 → 49; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28
+Other proposals changing these records: 19, 20, 21">&#x2398;</button>
     </div>
   </div>
-  <p class="small">Wave 2 · propose anchor</p>
+  <p class="small">Wave 2 · cut excess</p>
   <h3>Records</h3>
   <ul>
-    <li><a href="#rec-REQ-SAG-0901" data-panel="rec-REQ-SAG-0901">REQ-SAG-0901</a></li>
+    <li><a href="#rec-REQ-SAG-0019" data-panel="rec-REQ-SAG-0019">REQ-SAG-0019</a></li>
   </ul>
   <h3>Change</h3>
   <ul>
-    <li>Delete from REQ-SAG-0901: “In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.”</li>
-    <li>Delete from REQ-SAG-0901: “In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.”</li>
-    <li>Delete from REQ-SAG-0901: “Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.”</li>
-    <li>Delete from REQ-SAG-0901: “If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.”</li>
-    <li>Delete from REQ-SAG-0901: “The covered model handling the decision request MUST pass the request&#x27;s inputs to the provider.”</li>
-    <li>Delete from REQ-SAG-0901: “If the provider rejects a request input, the decision backend MUST return the provider&#x27;s error.”</li>
-    <li>Proposed anchor for the owner: “REQ-SAG-0901: in decider mode the covered model (Haiku, Luna) generates the `probabilities` and `confidence` values itself, and a response that fails the required schema returns `decision.schema_mismatch`. Needed because callers compare Jev and LLM answers directly.”</li>
-    <li>Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.</li>
+    <li>Delete from REQ-SAG-0019: “A local endpoint&#x27;s address MUST be settable in configuration.”</li>
+    <li>Delete from REQ-SAG-0019: “When the CLI does not run inside a git work tree, it MUST skip the local-folder layers.”</li>
   </ul>
   <h3>Clears</h3>
   <ul>
-    <li><a href="#cell-REQ-SAG-0901-ANC-013" data-panel="cell-REQ-SAG-0901-ANC-013">REQ-SAG-0901 × ANC-013 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0019-ANC-001" data-panel="cell-REQ-SAG-0019-ANC-001">REQ-SAG-0019 × ANC-001 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0019-ANC-009" data-panel="cell-REQ-SAG-0019-ANC-009">REQ-SAG-0019 × ANC-009 (exceeds)</a></li>
   </ul>
   <h3>Justification</h3>
-  <p>&quot;In decider mode, answers from each covered model MUST conform to the required schema.&quot; stays: it serves ANC-013&#x27;s check that each wire format receives schema-valid JSON. The six statements cut here go beyond ANC-013, which asks for an LLM trait and one implementation per wire format. Two of them are provider plumbing and are deleted outright with no anchor: the structured-output request, and passing inputs to the provider and returning its errors. The code documents the structured-output request in crates/sc-agent/src/lib.rs. Neither is an owner rule. Two are believed needed and go to the owner as an anchor: the model generates its own `probabilities` and `confidence`, and a response that fails the schema returns `decision.schema_mismatch`. The code documents the error in crates/sc-agent/src/lib.rs, and the first rule keeps Jev and LLM answers comparable. All statements date from 8f41793e (2026-11-25), before ANC-013 (2026-11-26).</p>
+  <p>ANC-009 asks for extra model rows from config, not for settable local endpoint addresses or work-tree layer skipping. Both statements date from 2026-11-25, before the anchors, and no anchor asks for them.</p>
   <h3>Source of truth</h3>
-  <p>ANC-013 — Owner said: “all providers w/ compatible api should use the same impelemntation.” — commit 8f41793e</p>
+  <p>ANC-009 — Owner said: “hard-coded rows will get stale quickly and often” — commit b98b4112</p>
   <h3>Expected improvement</h3>
-  <p>REQ-SAG-0901 keeps only the schema-conformance statement ANC-013 supports.</p>
-  <p>Records 49 → 49; statements 205 → 199; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28</p>
+  <p>REQ-SAG-0019 keeps only the config statements that serve ANC-001 and ANC-009.</p>
+  <p>Records 49 → 49; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28</p>
+  <p>Other proposals changing these records: 19, 20, 21</p>
 </section>

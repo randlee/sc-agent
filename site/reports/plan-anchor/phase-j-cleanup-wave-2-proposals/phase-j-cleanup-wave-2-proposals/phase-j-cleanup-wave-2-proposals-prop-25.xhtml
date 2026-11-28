@@ -1,0 +1,42 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-25">
+  <div class="section-head">
+    <h2>25. Delete REQ-SAG-0103 and put provider routing to the owner as an anchor</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="25. Delete REQ-SAG-0103 and put provider routing to the owner as an anchor
+Wave 2 · propose anchor
+Records: REQ-SAG-0103
+Change:
+- Delete record REQ-SAG-0103 (10 statements).
+- Proposed anchor for the owner: “REQ-SAG-0103: a model-table row stores its provider apart from its model, and a request carries that row&#x27;s model id. When config names a provider for a model, requests go to it. Otherwise a provider needing no key is preferred, then the first provider whose key is found. The caller never names a provider and a short name never encodes one. Needed because one model can be served by several providers.”
+- Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.
+Clears: REQ-SAG-0103 × ANC-009 (exceeds)
+Justification: All ten statements are provider and routing rules: separate provider field, model id carried, Together, OpenRouter, configured provider, keyless-first, first found key, the `openai` name, no provider in short names, no provider required of the caller. ANC-009 asks only that config can add model rows. The only anchor cells for this record are this yellow one and two `related` ones (ANC-012, ANC-013), and none serves. At aggressive, excess stays deleted until the owner anchors it. The routing rules are needed: crates/sc-agent/src/lib.rs candidates() honours a configured provider, and resolve() prefers a keyless provider and then the first held key. They are proposed as one anchor. The Together, OpenRouter and `openai`-name statements are provider data in the provider table, and ANC-012 says adding a provider needs no hard-coding, so they are deleted without an anchor. The statements date from 67203e2f and 22f4a5bd (2026-11-25), before ANC-009. Lead: REQ-SAG-0102&#x27;s rationale and REQ-SAG-0502&#x27;s related list cite REQ-SAG-0103.
+Source of truth: ANC-009 — Owner said: “hard-coded rows will get stale quickly and often” — commit 67203e2f
+Expected improvement:
+- REQ-SAG-0103 no longer exceeds ANC-009. Provider routing returns only if the owner anchors it.
+- Records 49 → 48; statements 205 → 195; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · propose anchor</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0103" data-panel="rec-REQ-SAG-0103">REQ-SAG-0103</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Delete record REQ-SAG-0103 (10 statements).</li>
+    <li>Proposed anchor for the owner: “REQ-SAG-0103: a model-table row stores its provider apart from its model, and a request carries that row&#x27;s model id. When config names a provider for a model, requests go to it. Otherwise a provider needing no key is preferred, then the first provider whose key is found. The caller never names a provider and a short name never encodes one. Needed because one model can be served by several providers.”</li>
+    <li>Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.</li>
+  </ul>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0103-ANC-009" data-panel="cell-REQ-SAG-0103-ANC-009">REQ-SAG-0103 × ANC-009 (exceeds)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>All ten statements are provider and routing rules: separate provider field, model id carried, Together, OpenRouter, configured provider, keyless-first, first found key, the `openai` name, no provider in short names, no provider required of the caller. ANC-009 asks only that config can add model rows. The only anchor cells for this record are this yellow one and two `related` ones (ANC-012, ANC-013), and none serves. At aggressive, excess stays deleted until the owner anchors it. The routing rules are needed: crates/sc-agent/src/lib.rs candidates() honours a configured provider, and resolve() prefers a keyless provider and then the first held key. They are proposed as one anchor. The Together, OpenRouter and `openai`-name statements are provider data in the provider table, and ANC-012 says adding a provider needs no hard-coding, so they are deleted without an anchor. The statements date from 67203e2f and 22f4a5bd (2026-11-25), before ANC-009. Lead: REQ-SAG-0102&#x27;s rationale and REQ-SAG-0502&#x27;s related list cite REQ-SAG-0103.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-009 — Owner said: “hard-coded rows will get stale quickly and often” — commit 67203e2f</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0103 no longer exceeds ANC-009. Provider routing returns only if the owner anchors it.</p>
+  <p>Records 49 → 48; statements 205 → 195; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28</p>
+</section>

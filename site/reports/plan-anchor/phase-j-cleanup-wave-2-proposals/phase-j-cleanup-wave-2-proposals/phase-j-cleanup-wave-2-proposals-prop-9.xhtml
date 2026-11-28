@@ -1,47 +1,49 @@
 <section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-9">
   <div class="section-head">
-    <h2>9. Delete NFR-SAG-0004 unless the owner anchors one owner per shared fact</h2>
+    <h2>9. Owner ruling: are ADR-SAG-0021&#x27;s path table and Logger-injection text decisions or duplicates?</h2>
     <div class="section-actions" role="group" aria-label="Copy">
-      <button type="button" class="icon-button" title="Copy Context" data-copy-text="9. Delete NFR-SAG-0004 unless the owner anchors one owner per shared fact
-Wave 2 · propose anchor
-Records: NFR-SAG-0004
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="9. Owner ruling: are ADR-SAG-0021&#x27;s path table and Logger-injection text decisions or duplicates?
+Wave 2 · resolve conflict
+Records: ADR-SAG-0021, REQ-SAG-0003, REQ-SAG-0008
 Change:
-- Delete record NFR-SAG-0004 (2 statements).
-- Proposed anchor for the owner: “NFR-SAG-0004, &quot;Every shared fact MUST have a single owner&quot; and &quot;Code that needs a shared fact MUST obtain it by calling its owner&quot;: needed because the first phase-j plan copied the provider-key list into four places, re-implemented the session-log layout in template Python and minted ULIDs in Rust and Python.”
+- Resolution: propose anchor.
+- Proposed anchor for the owner: “ADR-SAG-0021 keeps the per-entry-point log path table and the Logger-injection mechanism as its decision; REQ-SAG-0003 and REQ-SAG-0008 keep the testable obligations.”
 - Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.
 Clears:
-- NFR-SAG-0004 × ANC-009 (exceeds)
-- NFR-SAG-0004 × ANC-010 (exceeds)
-- NFR-SAG-0004 × ANC-015 (exceeds)
-Justification: ANC-010 bans copy-pasted logic in phase-j code across judge-jev, plan-anchor and the client template. ANC-009 and ANC-015 cover the model table and decidr-wide rules. NFR-SAG-0004 requires a single owner for every shared fact in all of sc-agent (provider table, provider-key list, model table, session-log layout, ULID minting), and requires all code to call that owner. No anchor says that. Both statements date from 2026-11-24 and 2026-11-25, before the anchors of 2026-11-26. The record is deleted unless the owner anchors the rule. Both statements are the excess, so the whole record goes.
-Source of truth: ANC-010 — Owner said: “For years any copy/paste was a big red flag that I was growing the code base unnecessarily.” — commit a63c0a59
+- ADR-SAG-0021 restates REQ-SAG-0003 statement 4 (duplicate)
+- ADR-SAG-0021 restates REQ-SAG-0008 statement 1 (duplicate)
+Justification: Jev flags REQ-SAG-0003 statement 3 &#x27;Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).&#x27; and REQ-SAG-0008 statement 0 &#x27;The Rust API MUST accept an injected general Logger.&#x27; as restated in ADR-SAG-0021. The proposer disputes both: the ADR&#x27;s Paths table gives the per-entry-point layout (wider than the REQ&#x27;s root folder, and ADR-only), and &#x27;gives it to each Run it creates ... the Run passes it to every decision call&#x27; describes ownership, which is the decision. Owner decides: record as owner conflicts (no change) or name the cut. Both texts are quoted on the panel; owner rules (record-trace.md, When to use).
+Source of truth: ADR-SAG-0021 — commit f023c0d1
 Expected improvement:
-- No record exceeds ANC-009, ANC-010 or ANC-015 on one-owner-per-fact. If the owner anchors the rule, it can be restored.
-- Records 49 → 48; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 3 of 28">&#x2398;</button>
+- The duplicate flag is settled by the owner rather than left open.
+- Records 49 → 49; statements 205 → 205; duplicates cleared 2 of 8; conflicts resolved 0 of 1; exceeds cleared 0 of 28
+Other proposals changing these records: 2, 3, 4, 5, 6, 7, 16, 17">&#x2398;</button>
     </div>
   </div>
-  <p class="small">Wave 2 · propose anchor</p>
+  <p class="small">Wave 2 · resolve conflict</p>
   <h3>Records</h3>
   <ul>
-    <li><a href="#rec-NFR-SAG-0004" data-panel="rec-NFR-SAG-0004">NFR-SAG-0004</a></li>
+    <li><a href="#rec-ADR-SAG-0021" data-panel="rec-ADR-SAG-0021">ADR-SAG-0021</a></li>
+    <li><a href="#rec-REQ-SAG-0003" data-panel="rec-REQ-SAG-0003">REQ-SAG-0003</a></li>
+    <li><a href="#rec-REQ-SAG-0008" data-panel="rec-REQ-SAG-0008">REQ-SAG-0008</a></li>
   </ul>
   <h3>Change</h3>
   <ul>
-    <li>Delete record NFR-SAG-0004 (2 statements).</li>
-    <li>Proposed anchor for the owner: “NFR-SAG-0004, &quot;Every shared fact MUST have a single owner&quot; and &quot;Code that needs a shared fact MUST obtain it by calling its owner&quot;: needed because the first phase-j plan copied the provider-key list into four places, re-implemented the session-log layout in template Python and minted ULIDs in Rust and Python.”</li>
+    <li>Resolution: propose anchor.</li>
+    <li>Proposed anchor for the owner: “ADR-SAG-0021 keeps the per-entry-point log path table and the Logger-injection mechanism as its decision; REQ-SAG-0003 and REQ-SAG-0008 keep the testable obligations.”</li>
     <li>Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.</li>
   </ul>
   <h3>Clears</h3>
   <ul>
-    <li><a href="#cell-NFR-SAG-0004-ANC-009" data-panel="cell-NFR-SAG-0004-ANC-009">NFR-SAG-0004 × ANC-009 (exceeds)</a></li>
-    <li><a href="#cell-NFR-SAG-0004-ANC-010" data-panel="cell-NFR-SAG-0004-ANC-010">NFR-SAG-0004 × ANC-010 (exceeds)</a></li>
-    <li><a href="#cell-NFR-SAG-0004-ANC-015" data-panel="cell-NFR-SAG-0004-ANC-015">NFR-SAG-0004 × ANC-015 (exceeds)</a></li>
+    <li><a href="#dup-ADR-SAG-0021-REQ-SAG-0003" data-panel="dup-ADR-SAG-0021-REQ-SAG-0003">ADR-SAG-0021 restates REQ-SAG-0003 statement 4 (duplicate)</a></li>
+    <li><a href="#dup-ADR-SAG-0021-REQ-SAG-0008" data-panel="dup-ADR-SAG-0021-REQ-SAG-0008">ADR-SAG-0021 restates REQ-SAG-0008 statement 1 (duplicate)</a></li>
   </ul>
   <h3>Justification</h3>
-  <p>ANC-010 bans copy-pasted logic in phase-j code across judge-jev, plan-anchor and the client template. ANC-009 and ANC-015 cover the model table and decidr-wide rules. NFR-SAG-0004 requires a single owner for every shared fact in all of sc-agent (provider table, provider-key list, model table, session-log layout, ULID minting), and requires all code to call that owner. No anchor says that. Both statements date from 2026-11-24 and 2026-11-25, before the anchors of 2026-11-26. The record is deleted unless the owner anchors the rule. Both statements are the excess, so the whole record goes.</p>
+  <p>Jev flags REQ-SAG-0003 statement 3 &#x27;Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).&#x27; and REQ-SAG-0008 statement 0 &#x27;The Rust API MUST accept an injected general Logger.&#x27; as restated in ADR-SAG-0021. The proposer disputes both: the ADR&#x27;s Paths table gives the per-entry-point layout (wider than the REQ&#x27;s root folder, and ADR-only), and &#x27;gives it to each Run it creates ... the Run passes it to every decision call&#x27; describes ownership, which is the decision. Owner decides: record as owner conflicts (no change) or name the cut. Both texts are quoted on the panel; owner rules (record-trace.md, When to use).</p>
   <h3>Source of truth</h3>
-  <p>ANC-010 — Owner said: “For years any copy/paste was a big red flag that I was growing the code base unnecessarily.” — commit a63c0a59</p>
+  <p>ADR-SAG-0021 — commit f023c0d1</p>
   <h3>Expected improvement</h3>
-  <p>No record exceeds ANC-009, ANC-010 or ANC-015 on one-owner-per-fact. If the owner anchors the rule, it can be restored.</p>
-  <p>Records 49 → 48; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 3 of 28</p>
+  <p>The duplicate flag is settled by the owner rather than left open.</p>
+  <p>Records 49 → 49; statements 205 → 205; duplicates cleared 2 of 8; conflicts resolved 0 of 1; exceeds cleared 0 of 28</p>
+  <p>Other proposals changing these records: 2, 3, 4, 5, 6, 7, 16, 17</p>
 </section>

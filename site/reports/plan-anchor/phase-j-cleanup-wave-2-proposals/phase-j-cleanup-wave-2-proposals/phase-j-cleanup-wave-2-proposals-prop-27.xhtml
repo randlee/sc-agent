@@ -1,0 +1,44 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-27">
+  <div class="section-head">
+    <h2>27. Resolve REQ-SAG-0801 against ANC-001: cut the pinned model-id statements</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="27. Resolve REQ-SAG-0801 against ANC-001: cut the pinned model-id statements
+Wave 2 · resolve conflict
+Records: REQ-SAG-0801
+Change:
+- Resolution: cut.
+- Delete from REQ-SAG-0801: “Each local decision runner&#x27;s model MUST have a fixed model id in the model table.”
+- Delete from REQ-SAG-0801: “A selection of `decider` MUST resolve to the 4b decider model.”
+Clears: REQ-SAG-0801 × ANC-001 (conflicts)
+Justification: Jev finds a conflict (p_conflicts 0.82). The anchor ANC-001 says &quot;I want &#x27;jev&#x27; to select latest, config can override default.&quot; The record pins models instead: &quot;Each local decision runner&#x27;s model MUST have a fixed model id in the model table.&quot; and &quot;A selection of `decider` MUST resolve to the 4b decider model.&quot; Neither statement leaves room for a newest-row rule or a config override. Source of truth: ANC-001, the owner&#x27;s word, locked 2026-11-26. The statements are older (aa1190ba, 2026-11-24, the fixed-model-id ruling; 67203e2f, 2026-11-25). I read the conflict as arguable, since ANC-001 names `jev` and these statements name local runners, so the cell is marked disputed. Cutting is still right: no anchor asks for either pin. In crates/sc-agent/src/lib.rs the `decider` name is served by two provider rows with the same date (decider-4b-v2.1 and decider-2b-v11), so the 4b pin is a table-order accident. Reword and propose_anchor are not proposed, since the anchor is not wrong and there is nothing to reconcile.
+Source of truth: ANC-001 — Owner said: “I want &#x27;jev&#x27; to select latest, config can override default.” — commit aa1190ba
+Expected improvement:
+- REQ-SAG-0801 no longer pins model ids against ANC-001.
+- Records 49 → 49; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 1 of 1; exceeds cleared 0 of 28
+Other proposals changing these records: 28">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · resolve conflict</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0801" data-panel="rec-REQ-SAG-0801">REQ-SAG-0801</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Resolution: cut.</li>
+    <li>Delete from REQ-SAG-0801: “Each local decision runner&#x27;s model MUST have a fixed model id in the model table.”</li>
+    <li>Delete from REQ-SAG-0801: “A selection of `decider` MUST resolve to the 4b decider model.”</li>
+  </ul>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0801-ANC-001" data-panel="cell-REQ-SAG-0801-ANC-001">REQ-SAG-0801 × ANC-001 (conflicts)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>Jev finds a conflict (p_conflicts 0.82). The anchor ANC-001 says &quot;I want &#x27;jev&#x27; to select latest, config can override default.&quot; The record pins models instead: &quot;Each local decision runner&#x27;s model MUST have a fixed model id in the model table.&quot; and &quot;A selection of `decider` MUST resolve to the 4b decider model.&quot; Neither statement leaves room for a newest-row rule or a config override. Source of truth: ANC-001, the owner&#x27;s word, locked 2026-11-26. The statements are older (aa1190ba, 2026-11-24, the fixed-model-id ruling; 67203e2f, 2026-11-25). I read the conflict as arguable, since ANC-001 names `jev` and these statements name local runners, so the cell is marked disputed. Cutting is still right: no anchor asks for either pin. In crates/sc-agent/src/lib.rs the `decider` name is served by two provider rows with the same date (decider-4b-v2.1 and decider-2b-v11), so the 4b pin is a table-order accident. Reword and propose_anchor are not proposed, since the anchor is not wrong and there is nothing to reconcile.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-001 — Owner said: “I want &#x27;jev&#x27; to select latest, config can override default.” — commit aa1190ba</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0801 no longer pins model ids against ANC-001.</p>
+  <p>Records 49 → 49; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 1 of 1; exceeds cleared 0 of 28</p>
+  <p>Other proposals changing these records: 28</p>
+</section>

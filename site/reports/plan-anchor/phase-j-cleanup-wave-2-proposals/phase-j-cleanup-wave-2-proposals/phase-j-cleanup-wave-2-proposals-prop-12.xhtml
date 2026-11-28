@@ -1,46 +1,35 @@
 <section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-12">
   <div class="section-head">
-    <h2>12. Propose an anchor for the shared consumer module&#x27;s common rules in REQ-SAG-0018, and delete three statements until it is approved</h2>
+    <h2>12. Cut row fields, server sync and project length from ADR-SAG-0002</h2>
     <div class="section-actions" role="group" aria-label="Copy">
-      <button type="button" class="icon-button" title="Copy Context" data-copy-text="12. Propose an anchor for the shared consumer module&#x27;s common rules in REQ-SAG-0018, and delete three statements until it is approved
-Wave 2 · propose anchor
-Records: REQ-SAG-0018
-Change:
-- Delete from REQ-SAG-0018: “The consumer module MUST pass the model selector through unchanged.”
-- Delete from REQ-SAG-0018: “The consumer module MUST cancel its running Run on `KeyboardInterrupt`.”
-- Delete from REQ-SAG-0018: “The consent gate MUST ask for consent only when the Run&#x27;s provider is TypeSafe.”
-- Proposed anchor for the owner: “REQ-SAG-0018: the shared consumer module carries the rules every decidr-based tool follows (it passes the model selector through unchanged, cancels its running Run on KeyboardInterrupt, and asks for consent only when the Run&#x27;s provider is TypeSafe), so judge-jev and plan-anchor supply only a tool name.”
-- Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.
-Clears: REQ-SAG-0018 × ANC-010 (exceeds)
-Justification: ANC-010 bans copy-paste logic. It supports one shared template (statements 0, 2 and 5, which stay) but says nothing about selector pass-through, Ctrl-C cancellation or the consent rule. These statements are exactly the shared rules ANC-015&#x27;s quote describes: &#x27;judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools&#x27;. So they are proposed as an anchor, and deleted until the owner approves it. The selector rule dates from 2026-11-14 and the other two from 2026-11-25, before the anchors.
-Source of truth: ANC-015 — Owner said: “judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools” — commit e234112e
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="12. Cut row fields, server sync and project length from ADR-SAG-0002
+Wave 2 · cut excess
+Records: ADR-SAG-0002
+Change: Cut ADR-SAG-0002: “For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.” → “For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database. All sessions of one repo, agent role and project are appended to one file in that directory.”
+Clears: ADR-SAG-0002 × ANC-005 (exceeds)
+Justification: ANC-005 fixes where default logs and the session sink are written. It does not ask for the server sync, the list of fields on every row, or how long a project lasts. Cut clauses: &quot;that syncs to a server for long-term storage&quot;, &quot;Every row carries its own `session_id`, `repo`, `project` and `agent_role`.&quot; and &quot;; a project lasts under a day to several days&quot;. Each is a deletion of words, with no rewording. The statement dates from 2026-11-18, before the anchor of 2026-11-26.
+Source of truth: ANC-005 — Owner said: “I mandated - that all default loggers created in production have root/folder/file naming conventions specified.” — commit 998015d2
 Expected improvement:
-- REQ-SAG-0018 keeps only the obligations ANC-010 supports. The owner decides whether the shared behaviours become anchored.
-- Records 49 → 49; statements 205 → 202; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28">&#x2398;</button>
+- ADR-SAG-0002 keeps the session-log location and the one-file rule that ANC-005 covers.
+- Records 49 → 49; statements 205 → 205; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28">&#x2398;</button>
     </div>
   </div>
-  <p class="small">Wave 2 · propose anchor</p>
+  <p class="small">Wave 2 · cut excess</p>
   <h3>Records</h3>
   <ul>
-    <li><a href="#rec-REQ-SAG-0018" data-panel="rec-REQ-SAG-0018">REQ-SAG-0018</a></li>
+    <li><a href="#rec-ADR-SAG-0002" data-panel="rec-ADR-SAG-0002">ADR-SAG-0002</a></li>
   </ul>
   <h3>Change</h3>
-  <ul>
-    <li>Delete from REQ-SAG-0018: “The consumer module MUST pass the model selector through unchanged.”</li>
-    <li>Delete from REQ-SAG-0018: “The consumer module MUST cancel its running Run on `KeyboardInterrupt`.”</li>
-    <li>Delete from REQ-SAG-0018: “The consent gate MUST ask for consent only when the Run&#x27;s provider is TypeSafe.”</li>
-    <li>Proposed anchor for the owner: “REQ-SAG-0018: the shared consumer module carries the rules every decidr-based tool follows (it passes the model selector through unchanged, cancels its running Run on KeyboardInterrupt, and asks for consent only when the Run&#x27;s provider is TypeSafe), so judge-jev and plan-anchor supply only a tool name.”</li>
-    <li>Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.</li>
-  </ul>
+  <p>Cut ADR-SAG-0002: “For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.” → “For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database. All sessions of one repo, agent role and project are appended to one file in that directory.”</p>
   <h3>Clears</h3>
   <ul>
-    <li><a href="#cell-REQ-SAG-0018-ANC-010" data-panel="cell-REQ-SAG-0018-ANC-010">REQ-SAG-0018 × ANC-010 (exceeds)</a></li>
+    <li><a href="#cell-ADR-SAG-0002-ANC-005" data-panel="cell-ADR-SAG-0002-ANC-005">ADR-SAG-0002 × ANC-005 (exceeds)</a></li>
   </ul>
   <h3>Justification</h3>
-  <p>ANC-010 bans copy-paste logic. It supports one shared template (statements 0, 2 and 5, which stay) but says nothing about selector pass-through, Ctrl-C cancellation or the consent rule. These statements are exactly the shared rules ANC-015&#x27;s quote describes: &#x27;judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools&#x27;. So they are proposed as an anchor, and deleted until the owner approves it. The selector rule dates from 2026-11-14 and the other two from 2026-11-25, before the anchors.</p>
+  <p>ANC-005 fixes where default logs and the session sink are written. It does not ask for the server sync, the list of fields on every row, or how long a project lasts. Cut clauses: &quot;that syncs to a server for long-term storage&quot;, &quot;Every row carries its own `session_id`, `repo`, `project` and `agent_role`.&quot; and &quot;; a project lasts under a day to several days&quot;. Each is a deletion of words, with no rewording. The statement dates from 2026-11-18, before the anchor of 2026-11-26.</p>
   <h3>Source of truth</h3>
-  <p>ANC-015 — Owner said: “judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools” — commit e234112e</p>
+  <p>ANC-005 — Owner said: “I mandated - that all default loggers created in production have root/folder/file naming conventions specified.” — commit 998015d2</p>
   <h3>Expected improvement</h3>
-  <p>REQ-SAG-0018 keeps only the obligations ANC-010 supports. The owner decides whether the shared behaviours become anchored.</p>
-  <p>Records 49 → 49; statements 205 → 202; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28</p>
+  <p>ADR-SAG-0002 keeps the session-log location and the one-file rule that ANC-005 covers.</p>
+  <p>Records 49 → 49; statements 205 → 205; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28</p>
 </section>

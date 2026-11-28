@@ -1,45 +1,47 @@
 <section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-15">
   <div class="section-head">
-    <h2>15. Cut the local-endpoint address and local-folder layer statements from REQ-SAG-0019</h2>
+    <h2>15. Delete NFR-SAG-0004 unless the owner anchors one owner per shared fact</h2>
     <div class="section-actions" role="group" aria-label="Copy">
-      <button type="button" class="icon-button" title="Copy Context" data-copy-text="15. Cut the local-endpoint address and local-folder layer statements from REQ-SAG-0019
-Wave 2 · cut excess
-Records: REQ-SAG-0019
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="15. Delete NFR-SAG-0004 unless the owner anchors one owner per shared fact
+Wave 2 · propose anchor
+Records: NFR-SAG-0004
 Change:
-- Delete from REQ-SAG-0019: “A local endpoint&#x27;s address MUST be settable in configuration.”
-- Delete from REQ-SAG-0019: “When the CLI does not run inside a git work tree, it MUST skip the local-folder layers.”
+- Delete record NFR-SAG-0004 (2 statements).
+- Proposed anchor for the owner: “NFR-SAG-0004, &quot;Every shared fact MUST have a single owner&quot; and &quot;Code that needs a shared fact MUST obtain it by calling its owner&quot;: needed because the first phase-j plan copied the provider-key list into four places, re-implemented the session-log layout in template Python and minted ULIDs in Rust and Python.”
+- Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.
 Clears:
-- REQ-SAG-0019 × ANC-001 (exceeds)
-- REQ-SAG-0019 × ANC-009 (exceeds)
-Justification: ANC-009 asks for extra model rows from config, not for settable local endpoint addresses or work-tree layer skipping. Both statements date from 2026-11-25, before the anchors, and no anchor asks for them.
-Source of truth: ANC-009 — Owner said: “hard-coded rows will get stale quickly and often” — commit b98b4112
+- NFR-SAG-0004 × ANC-009 (exceeds)
+- NFR-SAG-0004 × ANC-010 (exceeds)
+- NFR-SAG-0004 × ANC-015 (exceeds)
+Justification: ANC-010 bans copy-pasted logic in phase-j code across judge-jev, plan-anchor and the client template. ANC-009 and ANC-015 cover the model table and decidr-wide rules. NFR-SAG-0004 requires a single owner for every shared fact in all of sc-agent (provider table, provider-key list, model table, session-log layout, ULID minting), and requires all code to call that owner. No anchor says that. Both statements date from 2026-11-24 and 2026-11-25, before the anchors of 2026-11-26. The record is deleted unless the owner anchors the rule. Both statements are the excess, so the whole record goes.
+Source of truth: ANC-010 — Owner said: “For years any copy/paste was a big red flag that I was growing the code base unnecessarily.” — commit a63c0a59
 Expected improvement:
-- REQ-SAG-0019 keeps only the config statements that serve ANC-001 and ANC-009.
-- Records 49 → 49; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28
-Other proposals changing these records: 13, 14">&#x2398;</button>
+- No record exceeds ANC-009, ANC-010 or ANC-015 on one-owner-per-fact. If the owner anchors the rule, it can be restored.
+- Records 49 → 48; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 3 of 28">&#x2398;</button>
     </div>
   </div>
-  <p class="small">Wave 2 · cut excess</p>
+  <p class="small">Wave 2 · propose anchor</p>
   <h3>Records</h3>
   <ul>
-    <li><a href="#rec-REQ-SAG-0019" data-panel="rec-REQ-SAG-0019">REQ-SAG-0019</a></li>
+    <li><a href="#rec-NFR-SAG-0004" data-panel="rec-NFR-SAG-0004">NFR-SAG-0004</a></li>
   </ul>
   <h3>Change</h3>
   <ul>
-    <li>Delete from REQ-SAG-0019: “A local endpoint&#x27;s address MUST be settable in configuration.”</li>
-    <li>Delete from REQ-SAG-0019: “When the CLI does not run inside a git work tree, it MUST skip the local-folder layers.”</li>
+    <li>Delete record NFR-SAG-0004 (2 statements).</li>
+    <li>Proposed anchor for the owner: “NFR-SAG-0004, &quot;Every shared fact MUST have a single owner&quot; and &quot;Code that needs a shared fact MUST obtain it by calling its owner&quot;: needed because the first phase-j plan copied the provider-key list into four places, re-implemented the session-log layout in template Python and minted ULIDs in Rust and Python.”</li>
+    <li>Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.</li>
   </ul>
   <h3>Clears</h3>
   <ul>
-    <li><a href="#cell-REQ-SAG-0019-ANC-001" data-panel="cell-REQ-SAG-0019-ANC-001">REQ-SAG-0019 × ANC-001 (exceeds)</a></li>
-    <li><a href="#cell-REQ-SAG-0019-ANC-009" data-panel="cell-REQ-SAG-0019-ANC-009">REQ-SAG-0019 × ANC-009 (exceeds)</a></li>
+    <li><a href="#cell-NFR-SAG-0004-ANC-009" data-panel="cell-NFR-SAG-0004-ANC-009">NFR-SAG-0004 × ANC-009 (exceeds)</a></li>
+    <li><a href="#cell-NFR-SAG-0004-ANC-010" data-panel="cell-NFR-SAG-0004-ANC-010">NFR-SAG-0004 × ANC-010 (exceeds)</a></li>
+    <li><a href="#cell-NFR-SAG-0004-ANC-015" data-panel="cell-NFR-SAG-0004-ANC-015">NFR-SAG-0004 × ANC-015 (exceeds)</a></li>
   </ul>
   <h3>Justification</h3>
-  <p>ANC-009 asks for extra model rows from config, not for settable local endpoint addresses or work-tree layer skipping. Both statements date from 2026-11-25, before the anchors, and no anchor asks for them.</p>
+  <p>ANC-010 bans copy-pasted logic in phase-j code across judge-jev, plan-anchor and the client template. ANC-009 and ANC-015 cover the model table and decidr-wide rules. NFR-SAG-0004 requires a single owner for every shared fact in all of sc-agent (provider table, provider-key list, model table, session-log layout, ULID minting), and requires all code to call that owner. No anchor says that. Both statements date from 2026-11-24 and 2026-11-25, before the anchors of 2026-11-26. The record is deleted unless the owner anchors the rule. Both statements are the excess, so the whole record goes.</p>
   <h3>Source of truth</h3>
-  <p>ANC-009 — Owner said: “hard-coded rows will get stale quickly and often” — commit b98b4112</p>
+  <p>ANC-010 — Owner said: “For years any copy/paste was a big red flag that I was growing the code base unnecessarily.” — commit a63c0a59</p>
   <h3>Expected improvement</h3>
-  <p>REQ-SAG-0019 keeps only the config statements that serve ANC-001 and ANC-009.</p>
-  <p>Records 49 → 49; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28</p>
-  <p>Other proposals changing these records: 13, 14</p>
+  <p>No record exceeds ANC-009, ANC-010 or ANC-015 on one-owner-per-fact. If the owner anchors the rule, it can be restored.</p>
+  <p>Records 49 → 48; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 3 of 28</p>
 </section>
