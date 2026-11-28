@@ -1,0 +1,65 @@
+[
+  {
+    "item": "agt-m-9",
+    "anchor_id": "ANC-008",
+    "sentence": "It is given its limits and the rules for \"busy\" and \"out of quota\" as data by whoever calls it",
+    "action": "add",
+    "replacement": "The planned Limits, Replies and Transport structs group related values passed through the send path rather than repeating parameters.",
+    "why": "plan-20261128T094449Z-agt-m-9 addressed=no 0.97, specific=no 0.94; diagnostic plan-20261128T094636Z-agt-m-9 diagnose_specific=no 0.98; the composed item omits the struct design.",
+    "authority": "ANC-008; bead design contains Limits, Replies and Transport signatures."
+  },
+  {
+    "item": "agt-m-9",
+    "anchor_id": "ANC-017",
+    "sentence": "a test gives one provider a different busy list and sees it honoured",
+    "action": "add",
+    "replacement": "The test drives the retry and holdoff logic with controlled inputs, not races, wall-clock timing, sleeps, event-loop ordering or system load.",
+    "why": "plan-20261128T094449Z-agt-m-9 relevance 0.53; test requirement applies to this test.",
+    "authority": "ANC-017 locked before run."
+  },
+  {
+    "item": "agt-m-10",
+    "anchor_id": "ANC-013",
+    "sentence": "JSON in, JSON out, through the same shapes",
+    "action": "add",
+    "replacement": "sc-llm uses the LLM trait and the shared OpenAI-compatible and Anthropic-compatible wire-format implementations supplied by agt-m-4.",
+    "why": "plan-20261128T094344Z-agt-m-10 addressed=no 0.89, specific=no 0.98; diagnostic plan-20261128T094636Z-agt-m-10 diagnose_specific=no 0.86.",
+    "authority": "ANC-013 and agt-m-4 description require the shared traits and shape implementations."
+  },
+  {
+    "item": "agt-m-11",
+    "anchor_id": "ANC-018",
+    "sentence": "The phase is proven against its two real consumers before it reaches develop.",
+    "action": "add",
+    "replacement": "The manually triggered live-agent integration run uses sc-agent unit tests against live agents.",
+    "why": "plan-20261128T094412Z-agt-m-11 contradicted=yes 0.83; diagnostic plan-20261128T094636Z-agt-m-11 diagnose_specific=no 0.92.",
+    "authority": "ANC-018 and agt-m-11 design explicitly require manual live-agent run."
+  },
+  {
+    "item": "agt-m-11",
+    "anchor_id": "ANC-017",
+    "sentence": "The manually triggered live-agent integration run uses sc-agent unit tests against live agents.",
+    "action": "add",
+    "replacement": "Tests must be deterministic and must not rely on races, timing, sleeps, event-loop ordering or system load.",
+    "why": "run plan-20261128T095450Z-agt-m-11 addressed=no 0.85; diagnostic m11_determinism=no 0.86 identifies the missing deterministic-test rule.",
+    "authority": "ANC-017 and the repository agent instructions predate the gate."
+  },
+  {
+    "item": "agt-m-11",
+    "anchor_id": "ANC-018",
+    "sentence": "M11-1 consumer and live-agent integration: apply the corresponding verbatim inventory/change section in design.",
+    "action": "replace",
+    "replacement": "M11-1: Install judge-jev and plan-anchor against the phase-m wheel and run their own suites. Run sc-agent's tests against live agents, triggered manually.",
+    "why": "run plan-20261128T095813Z-agt-m-11 contradicted=yes 0.35 despite addressed=yes 0.88; the composed item omits the actual design inventory.",
+    "authority": "ANC-018 and the m-11 design inventory, both predating the run."
+  },
+  {
+    "item": "agt-m-11",
+    "anchor_id": "ANC-017",
+    "sentence": "Tests must be deterministic and must not rely on races, timing, sleeps, event-loop ordering or system load.",
+    "action": "add",
+    "replacement": "A test found to depend on one of these must be redesigned to drive its logic with controlled inputs.",
+    "why": "run plan-20261128T100120Z-agt-m-11 contradicted=yes 0.25; the stated deterministic rule did not carry ANC-017\u2019s explicit remedy for a test found to rely on those conditions.",
+    "authority": "ANC-017 and repository instructions predate the run."
+  }
+]

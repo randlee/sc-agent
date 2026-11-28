@@ -54,6 +54,11 @@ Scope: adds or changes model resolution, the model table or the jev alias in sc-
 
 Deterministic check to pair with the development gate: unit test: resolve("jev") == first Jev row of the date-sorted table; with config default set, == configured id
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-2`: This sprint relocates sc-agent-config without changing model resolution; agt-m-7 owns the Jev model selection behavior.
+- `agt-m-5`: m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001.
+- `agt-m-6`: m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration.
+
 Beads: anchor `agt-jzag`, plan questions `agt-jzag.1`, dev questions `agt-jzag.2`
 
 Fixtures:
@@ -114,6 +119,9 @@ Scope: adds or changes a request size check, a record size check or handling of 
 
 Deterministic check to pair with the development gate: `rg -n '8 \* 1024 \* 1024\
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-11`: This integration sprint does not change request input-size limits.
+
 Beads: anchor `agt-bouw`, plan questions `agt-bouw.1`, dev questions `agt-bouw.2`
 
 Fixtures:
@@ -133,6 +141,9 @@ Summary: C05 In production runs, every logger sc-agent creates by default
 Scope: adds or changes creation of a default sc-observability Logger in sc-agent, decidr or the client template
 
 Deterministic check to pair with the development gate: test: default_logger(name) path == `<log_root>/logs/<name>.log.jsonl`; session sink path == `<log_root>/sessions/<repo-id>/<role>/<project>/sessions.jsonl`
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-8`: m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths.
 
 Beads: anchor `agt-2mm1`, plan questions `agt-2mm1.1`, dev questions `agt-2mm1.2`
 
@@ -194,6 +205,11 @@ Scope: adds or changes function or method signatures in sc-agent code
 
 Deterministic check to pair with the development gate: review of changed pub fn signatures: no function takes run_id/tool/tool_version/cache/model/provider as separate params
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-5`: m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9.
+- `agt-m-1`: M-1 preserves existing parameter lists while moving code; signature grouping applies to the Settings API changes owned by agt-m-7.
+- `agt-m-10`: m-10 has no related parameters repeated across several methods in its stated LlmRun signatures; RunArgs groups run setup.
+
 Beads: anchor `agt-jorx`, plan questions `agt-jorx.1`, dev questions `agt-jorx.2`
 
 Fixtures:
@@ -213,6 +229,9 @@ Summary: C10 The sc-agent model table must accept extra model rows from c
 Scope: adds or changes the model table or model configuration in sc-agent
 
 Deterministic check to pair with the development gate: test: a config file with an extra model row makes `decidr models` list it, and a send with that id resolves
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-2`: This sprint relocates the existing model table unchanged; configuration-supplied model rows are added by agt-m-7.
 
 Beads: anchor `agt-1quf`, plan questions `agt-1quf.1`, dev questions `agt-1quf.2`
 
@@ -234,6 +253,12 @@ Scope: adds or changes code in judge-jev, plan-anchor or the client template tha
 
 Deterministic check to pair with the development gate: a duplicate-code scan (e.g. jscpd/`rg` of shared helper bodies) across judge-jev and plan-anchor shows no new duplicated block
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-2`: This sprint changes sc-agent configuration code only and does not change judge-jev, plan-anchor, or their shared client template.
+- `agt-m-7`: m-7 changes Rust configuration rows and Settings, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint.
+- `agt-m-8`: m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint.
+- `agt-m-11`: no sprint in phase m carries this anchor; listed for the owner.
+
 Beads: anchor `agt-43sg`, plan questions `agt-43sg.1`, dev questions `agt-43sg.2`
 
 Fixtures:
@@ -253,6 +278,10 @@ Summary: C14 Every operation the decidr CLI offers must also be callable
 Scope: adds or changes a decidr subcommand or a function in the sc-agent Python bindings
 
 Deterministic check to pair with the development gate: for each `decidr` subcommand touched in phase j (models, send, batch), a Python binding exists and has a test
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-6`: m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification.
+- `agt-m-7`: m-7 changes provider data behind existing provider_keys without changing offered CLI or Python operations; agt-m-11 carries consumer integration verification.
 
 Beads: anchor `agt-sa4v`, plan questions `agt-sa4v.1`, dev questions `agt-sa4v.2`
 
@@ -274,6 +303,11 @@ Scope: adds or changes decision providers, provider dispatch or the provider tab
 
 Deterministic check to pair with the development gate: grep: one decision trait; one impl per wire format; no match on wire strings outside those impls; adding a compatible provider is a config/table row only
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-5`: m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4.
+- `agt-m-7`: m-7 changes provider and model configuration rows, not the wire-format Decision implementations; agt-m-4 carries the single implementation per API shape.
+- `agt-m-9`: This HTTP transport sprint does not implement decision provider traits; agt-m-4 carries the decision wire-format implementations.
+
 Beads: anchor `agt-et87`, plan questions `agt-et87.1`, dev questions `agt-et87.2`
 
 Fixtures:
@@ -294,6 +328,12 @@ Scope: adds or changes LLM (non-Jev) calls in sc-agent
 
 Deterministic check to pair with the development gate: grep: one LLM trait with one impl per wire format; decision-over-LLM uses it; test sends JSON and receives schema-valid JSON for each wire format
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-5`: m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API.
+- `agt-m-1`: This item moves the shared Llm trait and JSON-schema helper but changes no non-Jev LLM call; m-4 owns the wire-format implementations and call behavior.
+- `agt-m-11`: This integration sprint does not change the LLM trait or provider wire formats; agt-m-4 carries the shared implementations.
+- `agt-m-9`: m-9 changes retry and holdoff parameters in sc-agent-http; it adds or changes no LLM interface. agt-m-10 carries the shared Llm API.
+
 Beads: anchor `agt-jod5`, plan questions `agt-jod5.1`, dev questions `agt-jod5.2`
 
 Fixtures:
@@ -313,6 +353,9 @@ Summary: LLM-as-Jev system prompt; luna/haiku config overrides
 Scope: adds or changes how an LLM is prompted to answer a decision request, or decidr config keys
 
 Deterministic check to pair with the development gate: test: request to luna/haiku carries a system message equal to the default; with decidr.luna-system-prompt / decidr.haiku-system-prompt set in config it equals the configured text
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-5`: m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7.
 
 Beads: anchor `agt-pahi`, plan questions `agt-pahi.1`, dev questions `agt-pahi.2`
 
@@ -336,6 +379,17 @@ Deterministic check to pair with the development gate: no derivative-tool record
 
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-m-0`: m-0 adds or changes no REQ, NFR or ADR record of sc-agent, judge-jev, plan-anchor or any other tool; it only cites existing records.
+- `agt-m-2`: This sprint moves configuration code and adds or changes no REQ, NFR, or ADR records for derivative tools.
+- `agt-m-5`: m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.
+- `agt-m-6`: m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.
+- `agt-m-7`: m-7 changes configuration code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change.
+- `agt-m-8`: m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change.
+- `agt-m-1`: This sprint changes crate code and a CLI test import, not requirement, NFR, or ADR records for derivative tools.
+- `agt-m-9`: This transport sprint changes no cross-tool requirements or derivative-tool records.
+- `agt-m-10`: This LLM runtime sprint changes no cross-tool requirements or derivative-tool records.
+- `agt-m-11`: This integration sprint changes no cross-tool requirements or derivative-tool records.
+- `agt-m-3`: agt-m-3 moves only sc-agent logging and digest code and changes no REQ, NFR, or ADR records for derivative tools; derivative-record edits are not assigned to agt-m-3.
+- `agt-m-4`: agt-m-4 moves sc-agent transport, types, and provider implementations but changes no REQ, NFR, or ADR records for derivative tools; derivative-record edits are not assigned to agt-m-4.
 
 Beads: anchor `agt-fokq`, plan questions `agt-fokq.1`, dev questions `agt-fokq.2`
 
@@ -379,6 +433,8 @@ Deterministic check to pair with the development gate: review changed tests for 
 
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-m-0`: m-0 adds empty crates, boundary records and a CI lint step; it adds or changes no test.
+- `agt-m-2`: This sprint relocates the existing tests unchanged; deterministic test changes for the model configuration work are owned by agt-m-7.
+- `agt-m-11`: m-11 adds or changes no test; it runs the existing tests against live agents, which ANC-018 covers.
 
 Beads: anchor `agt-lnby`, plan questions `agt-lnby.1`, dev questions `agt-lnby.2`
 
@@ -402,6 +458,7 @@ Deterministic check to pair with the development gate: grep .github/workflows fo
 
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-m-0`: m-0's only CI change is a static sc-lint boundary job; it adds no live-provider test, live-run selection or workflow_dispatch job.
+- `agt-m-10`: m-10 adds LLM and resume tests but changes no live-agent integration run; agt-m-11 carries that run.
 
 Beads: anchor `agt-y7m6`, plan questions `agt-y7m6.1`, dev questions `agt-y7m6.2`
 
@@ -425,6 +482,7 @@ Deterministic check to pair with the development gate: grep requires-python in e
 
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-m-0`: m-0 does not edit requires-python, Python version checks, CI Python matrices or interpreter guards; its python3 commands only run the sc-lint bootstrap and the gate script.
+- `agt-m-11`: requires-python is already >=3.11 (crates/sc-agent-py/pyproject.toml:11); m-11 changes no Python version, check or matrix.
 
 Beads: anchor `agt-e0lk`, plan questions `agt-e0lk.1`, dev questions `agt-e0lk.2`
 
@@ -446,6 +504,10 @@ Scope: touches crates/sc-agent-py or any code path that accepts an injected logg
 
 Deterministic check to pair with the development gate: no LoggerBuilder call in crates/sc-agent-py runs on a path where the caller supplied a logger
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-8`: m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring.
+- `agt-m-11`: m-11 adds or changes no code in any crate and no injected-logger path; agt-m-6 carries the wheel logger wiring.
+
 Beads: anchor `agt-g3pq`, plan questions `agt-g3pq.1`, dev questions `agt-g3pq.2`
 
 Fixtures:
@@ -463,6 +525,9 @@ Said by Rand Lee, phase-m planning session, 2026-11-27; layer rule of ADR-SAG-00
 Summary: Shared code sits in the lowest layer using it
 
 Scope: adds or changes code in any crate under crates/
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-11`: m-11 adds or changes no code in any crate under crates/; it runs integration tests, lands the phase and moves the size limits to sc-lint.
 
 Beads: anchor `agt-s6th`, plan questions `agt-s6th.1`, dev questions `agt-s6th.2`
 
@@ -482,6 +547,10 @@ Summary: Local model URL and id come only from config
 
 Scope: adds or changes the model table, model configuration or local-model handling
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-2`: This sprint relocates configuration code without changing local-model resolution; agt-m-7 owns the local-model configuration behavior.
+- `agt-m-5`: m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration.
+
 Beads: anchor `agt-czru`, plan questions `agt-czru.1`, dev questions `agt-czru.2`
 
 Fixtures:
@@ -500,6 +569,10 @@ Summary: Session rows go to SQLite, not sessions.jsonl
 
 Scope: adds or changes code that writes or reads session rows
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-10`: This sprint consumes sessions and does not change session persistence; agt-m-8 carries SQLite session writes.
+- `agt-m-3`: agt-m-3 only extracts the existing JSONL session-row writer unchanged; agt-m-8 owns replacing that writer with SQLite persistence and removing sessions.jsonl.
+
 Beads: anchor `agt-rdga`, plan questions `agt-rdga.1`, dev questions `agt-rdga.2`
 
 Fixtures:
@@ -517,6 +590,10 @@ Said by Rand Lee, phase-m planning session, 2026-11-27, 2026-11-27. Status: lock
 Summary: General log follows sc-observability retention
 
 Scope: adds or changes general-log writing, rotation or deletion
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-8`: m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability.
+- `agt-m-10`: m-10 changes no general log rotation or deletion policy; the existing sc-observability policy remains in force.
 
 Beads: anchor `agt-69i3`, plan questions `agt-69i3.1`, dev questions `agt-69i3.2`
 
@@ -556,6 +633,10 @@ Scope: adds or changes SQL table definitions anywhere in the workspace
 
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-m-0`: m-0 adds no SQL table definition anywhere; sc-agent-schema is an empty crate in this sprint.
+- `agt-m-2`: This sprint adds or changes no SQL table definitions; the table-definition work is owned by agt-m-8.
+- `agt-m-7`: m-7 defines provider and model configuration rows, not SQL tables; agt-m-8 carries core SQL ownership in sc-agent-schema.
+- `agt-m-1`: This sprint moves request/answer types and defines no SQL table; table SQL is owned by agt-m-8.
+- `agt-m-3`: agt-m-3 moves logging and digest code but adds or changes no table SQL; agt-m-8 owns the schema definitions.
 
 Beads: anchor `agt-lw7b`, plan questions `agt-lw7b.1`, dev questions `agt-lw7b.2`
 
@@ -575,6 +656,10 @@ Summary: Requests stored once; replies in responses table
 
 Scope: adds or changes the session tables or code that stores a request or a model reply
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-10`: This sprint consumes sessions and does not define their tables; agt-m-8 carries the message and response schema.
+- `agt-m-3`: agt-m-3 only extracts the existing JSONL session-row writer unchanged; agt-m-8 owns the messages and responses schema and persistence.
+
 Beads: anchor `agt-kkrv`, plan questions `agt-kkrv.1`, dev questions `agt-kkrv.2`
 
 Fixtures:
@@ -592,6 +677,10 @@ Said by Rand Lee, phase-m planning session, 2026-11-27, 2026-11-27. Status: lock
 Summary: Cache key is request sha256 and model, not run_id
 
 Scope: adds or changes the result cache, cache keys or run ids
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-10`: This sprint does not change cache-key definition; agt-m-8 carries the session cache.
+- `agt-m-3`: agt-m-3 extracts the existing session-row writer and does not change cache behavior; agt-m-8 owns the cache key and lookup.
 
 Beads: anchor `agt-0fau`, plan questions `agt-0fau.1`, dev questions `agt-0fau.2`
 
@@ -629,6 +718,9 @@ Summary: Retry and holdoff take provider rules as parameters
 
 Scope: adds or changes retry, resend, backoff or holdoff code
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-4`: agt-m-4 moves the existing resend and holdoff behavior unchanged; agt-m-9 owns parameterized waits, limits, and busy/quota rules.
+
 Beads: anchor `agt-2sum`, plan questions `agt-2sum.1`, dev questions `agt-2sum.2`
 
 Fixtures:
@@ -646,6 +738,11 @@ Said by Rand Lee, phase-m planning session, 2026-11-27, 2026-11-27. Status: lock
 Summary: Tool results are stored in SQLite
 
 Scope: adds or changes how judge-jev, plan-anchor or another sc-agent-based tool stores results
+
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-8`: m-8 moves only sc-agent's own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool's storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner).
+- `agt-m-3`: agt-m-3 only extracts the existing session JSONL writer; no sprint in phase m carries ANC-031 derivative-tool result storage, so this anchor remains listed for the owner.
+- `agt-m-10`: no sprint in phase m carries this anchor; listed for the owner.
 
 Beads: anchor `agt-yz3r`, plan questions `agt-yz3r.1`, dev questions `agt-yz3r.2`
 
@@ -667,6 +764,12 @@ Scope: adds or changes a tool's table definitions, schema versions, or crates/sc
 
 Excluded from (not judged; the cell passes as `excluded`):
 - `agt-m-0`: m-0 adds no table definition and no schema version, and does not touch crates/sc-agent-py.
+- `agt-m-2`: This sprint adds or changes no table definitions, schema versions, or wheel code; those changes are owned by agt-m-8.
+- `agt-m-6`: m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.
+- `agt-m-7`: m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.
+- `agt-m-11`: This integration sprint changes no table or schema definition; agt-m-8 carries session schema work.
+- `agt-m-1`: This sprint moves request/answer types and changes no table definitions or schema versions; sc-agent-py table/schema work belongs to agt-m-8.
+- `agt-m-10`: m-10 defines no SQL table and no schema version and does not touch crates/sc-agent-py; agt-m-8 carries tool schema ownership and versions.
 
 Beads: anchor `agt-ws1i`, plan questions `agt-ws1i.1`, dev questions `agt-ws1i.2`
 

@@ -1,0 +1,204 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261128T094636Z-agt-m-9",
+  "gate": "plan",
+  "created_at": "2026-11-28T09:46:36+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "agt-m-9",
+    "title": "",
+    "source": "scratchpad/agt-m-9.item.txt",
+    "chars": 1287
+  },
+  "model_requested": "jev",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [
+    {
+      "path": "scratchpad/agt-m-9.triage.jsonl",
+      "sha256": "1b642493550b55dbc8fcc9c022332ccd0bde0e40498242b5b262c4b5c014f400",
+      "ids": [
+        "diagnose_specific"
+      ]
+    },
+    {
+      "path": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/.sc/plan-anchor/triage/plan-questions.jsonl",
+      "sha256": "68180fbd2de8a3dee2421351672f9a321506af1f4bb19531c2c26d7d21c2c521",
+      "ids": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "anchor_id": "ANC-008",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "In sc-agent code, related values passed to several methods must be grouped in one struct that replaces those repeated parameters, so encapsulation is efficient and repeated code stays minimal as the architecture scales.",
+      "quote": "Related values are strategically grouped in one struct to remove repeated method parameters, for efficient encapsulation and to minimize repeated code as the architecture scales.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 3,
+      "deterministic_check": "review of changed pub fn signatures: no function takes run_id/tool/tool_version/cache/model/provider as separate params",
+      "kind": "directive",
+      "leaning": "not_addressed",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "4bae91da752d7dbb6d72891d53e9177393ca8074ac4029fa5450c200c5037b5c",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.16,
+          "probabilities": {
+            "no": 0.44,
+            "unclear": 0.15,
+            "yes": 0.41
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.52,
+          "probabilities": {
+            "no": 0.68,
+            "unclear": 0.05,
+            "yes": 0.27
+          }
+        },
+        "diagnose_specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.01,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.82,
+          "probabilities": {
+            "no": 0.12,
+            "unclear": 0.0,
+            "yes": 0.88
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.33,
+          "probabilities": {
+            "no": 0.55,
+            "unclear": 0.04,
+            "yes": 0.41
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.62,
+          "probabilities": {
+            "no": 0.75,
+            "unclear": 0.06,
+            "yes": 0.19
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.8,
+          "probabilities": {
+            "no": 0.13,
+            "unclear": 0.0,
+            "yes": 0.87
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.01,
+            "yes": 0.02
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.88,
+          "probabilities": {
+            "no": 0.92,
+            "unclear": 0.0,
+            "yes": 0.08
+          }
+        }
+      },
+      "min_confidence": 0.16,
+      "explanation": "Jev was not confident (min confidence 0.16); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1421,
+        "output_tokens": 156
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "no",
+          "confidence": 0.16
+        },
+        {
+          "ask": "first",
+          "role": "conflict",
+          "question_id": "contradicted",
+          "choice": "no",
+          "confidence": 0.52
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 1287
+    }
+  ],
+  "summary": {
+    "counts": {
+      "underspecified": 1
+    },
+    "failing": [
+      "ANC-008"
+    ],
+    "leaning_counts": {
+      "not_addressed": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "excluded": [],
+    "pass": false
+  }
+}

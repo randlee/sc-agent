@@ -532,12 +532,34 @@
           "item": "agt-m-5",
           "reason": "m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T09:56:27+00:00",
+          "event": "excluded",
+          "item": "agt-m-1",
+          "reason": "M-1 preserves existing parameter lists while moving code; signature grouping applies to the Settings API changes owned by agt-m-7.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-28T09:57:50+00:00",
+          "event": "excluded",
+          "item": "agt-m-10",
+          "reason": "m-10 has no related parameters repeated across several methods in its stated LlmRun signatures; RunArgs groups run setup.",
+          "replaced": false
         }
       ],
       "exclude": [
         {
           "item": "agt-m-5",
           "reason": "m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9."
+        },
+        {
+          "item": "agt-m-1",
+          "reason": "M-1 preserves existing parameter lists while moving code; signature grouping applies to the Settings API changes owned by agt-m-7."
+        },
+        {
+          "item": "agt-m-10",
+          "reason": "m-10 has no related parameters repeated across several methods in its stated LlmRun signatures; RunArgs groups run setup."
         }
       ]
     },
@@ -700,6 +722,13 @@
           "item": "agt-m-8",
           "reason": "m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T10:13:47+00:00",
+          "event": "excluded",
+          "item": "agt-m-11",
+          "reason": "no sprint in phase m carries this anchor; listed for the owner.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -714,6 +743,10 @@
         {
           "item": "agt-m-8",
           "reason": "m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
+        },
+        {
+          "item": "agt-m-11",
+          "reason": "no sprint in phase m carries this anchor; listed for the owner."
         }
       ]
     },
@@ -956,6 +989,13 @@
           "item": "agt-m-11",
           "reason": "This integration sprint does not change the LLM trait or provider wire formats; agt-m-4 carries the shared implementations.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T09:56:48+00:00",
+          "event": "excluded",
+          "item": "agt-m-9",
+          "reason": "m-9 changes retry and holdoff parameters in sc-agent-http; it adds or changes no LLM interface. agt-m-10 carries the shared Llm API.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -970,6 +1010,10 @@
         {
           "item": "agt-m-11",
           "reason": "This integration sprint does not change the LLM trait or provider wire formats; agt-m-4 carries the shared implementations."
+        },
+        {
+          "item": "agt-m-9",
+          "reason": "m-9 changes retry and holdoff parameters in sc-agent-http; it adds or changes no LLM interface. agt-m-10 carries the shared Llm API."
         }
       ]
     },
@@ -1173,6 +1217,20 @@
           "item": "agt-m-11",
           "reason": "This integration sprint changes no cross-tool requirements or derivative-tool records.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T10:13:28+00:00",
+          "event": "excluded",
+          "item": "agt-m-3",
+          "reason": "agt-m-3 moves only sc-agent logging and digest code and changes no REQ, NFR, or ADR records for derivative tools; derivative-record edits are not assigned to agt-m-3.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-28T10:13:28+00:00",
+          "event": "excluded",
+          "item": "agt-m-4",
+          "reason": "agt-m-4 moves sc-agent transport, types, and provider implementations but changes no REQ, NFR, or ADR records for derivative tools; derivative-record edits are not assigned to agt-m-4.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -1215,6 +1273,14 @@
         {
           "item": "agt-m-11",
           "reason": "This integration sprint changes no cross-tool requirements or derivative-tool records."
+        },
+        {
+          "item": "agt-m-3",
+          "reason": "agt-m-3 moves only sc-agent logging and digest code and changes no REQ, NFR, or ADR records for derivative tools; derivative-record edits are not assigned to agt-m-3."
+        },
+        {
+          "item": "agt-m-4",
+          "reason": "agt-m-4 moves sc-agent transport, types, and provider implementations but changes no REQ, NFR, or ADR records for derivative tools; derivative-record edits are not assigned to agt-m-4."
         }
       ]
     },
@@ -1337,6 +1403,13 @@
           "item": "agt-m-2",
           "reason": "This sprint relocates the existing tests unchanged; deterministic test changes for the model configuration work are owned by agt-m-7.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T10:13:47+00:00",
+          "event": "excluded",
+          "item": "agt-m-11",
+          "reason": "m-11 adds or changes no test; it runs the existing tests against live agents, which ANC-018 covers.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -1347,6 +1420,10 @@
         {
           "item": "agt-m-2",
           "reason": "This sprint relocates the existing tests unchanged; deterministic test changes for the model configuration work are owned by agt-m-7."
+        },
+        {
+          "item": "agt-m-11",
+          "reason": "m-11 adds or changes no test; it runs the existing tests against live agents, which ANC-018 covers."
         }
       ]
     },
@@ -1424,12 +1501,23 @@
           "item": "agt-m-0",
           "reason": "m-0's only CI change is a static sc-lint boundary job; it adds no live-provider test, live-run selection or workflow_dispatch job.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T09:57:50+00:00",
+          "event": "excluded",
+          "item": "agt-m-10",
+          "reason": "m-10 adds LLM and resume tests but changes no live-agent integration run; agt-m-11 carries that run.",
+          "replaced": false
         }
       ],
       "exclude": [
         {
           "item": "agt-m-0",
           "reason": "m-0's only CI change is a static sc-lint boundary job; it adds no live-provider test, live-run selection or workflow_dispatch job."
+        },
+        {
+          "item": "agt-m-10",
+          "reason": "m-10 adds LLM and resume tests but changes no live-agent integration run; agt-m-11 carries that run."
         }
       ]
     },
@@ -1577,12 +1665,23 @@
           "item": "agt-m-8",
           "reason": "m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T10:15:14+00:00",
+          "event": "excluded",
+          "item": "agt-m-11",
+          "reason": "m-11 adds or changes no code in any crate and no injected-logger path; agt-m-6 carries the wheel logger wiring.",
+          "replaced": false
         }
       ],
       "exclude": [
         {
           "item": "agt-m-8",
           "reason": "m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring."
+        },
+        {
+          "item": "agt-m-11",
+          "reason": "m-11 adds or changes no code in any crate and no injected-logger path; agt-m-6 carries the wheel logger wiring."
         }
       ]
     },
@@ -1637,6 +1736,19 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-28T10:13:47+00:00",
+          "event": "excluded",
+          "item": "agt-m-11",
+          "reason": "m-11 adds or changes no code in any crate under crates/; it runs integration tests, lands the phase and moves the size limits to sc-lint.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-m-11",
+          "reason": "m-11 adds or changes no code in any crate under crates/; it runs integration tests, lands the phase and moves the size limits to sc-lint."
         }
       ]
     },
@@ -1776,12 +1888,23 @@
           "item": "agt-m-10",
           "reason": "This sprint consumes sessions and does not change session persistence; agt-m-8 carries SQLite session writes.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T10:13:28+00:00",
+          "event": "excluded",
+          "item": "agt-m-3",
+          "reason": "agt-m-3 only extracts the existing JSONL session-row writer unchanged; agt-m-8 owns replacing that writer with SQLite persistence and removing sessions.jsonl.",
+          "replaced": false
         }
       ],
       "exclude": [
         {
           "item": "agt-m-10",
           "reason": "This sprint consumes sessions and does not change session persistence; agt-m-8 carries SQLite session writes."
+        },
+        {
+          "item": "agt-m-3",
+          "reason": "agt-m-3 only extracts the existing JSONL session-row writer unchanged; agt-m-8 owns replacing that writer with SQLite persistence and removing sessions.jsonl."
         }
       ]
     },
@@ -1843,12 +1966,23 @@
           "item": "agt-m-8",
           "reason": "m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T09:57:50+00:00",
+          "event": "excluded",
+          "item": "agt-m-10",
+          "reason": "m-10 changes no general log rotation or deletion policy; the existing sc-observability policy remains in force.",
+          "replaced": false
         }
       ],
       "exclude": [
         {
           "item": "agt-m-8",
           "reason": "m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability."
+        },
+        {
+          "item": "agt-m-10",
+          "reason": "m-10 changes no general log rotation or deletion policy; the existing sc-observability policy remains in force."
         }
       ]
     },
@@ -1997,6 +2131,13 @@
           "item": "agt-m-1",
           "reason": "This sprint moves request/answer types and defines no SQL table; table SQL is owned by agt-m-8.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T10:13:28+00:00",
+          "event": "excluded",
+          "item": "agt-m-3",
+          "reason": "agt-m-3 moves logging and digest code but adds or changes no table SQL; agt-m-8 owns the schema definitions.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -2015,6 +2156,10 @@
         {
           "item": "agt-m-1",
           "reason": "This sprint moves request/answer types and defines no SQL table; table SQL is owned by agt-m-8."
+        },
+        {
+          "item": "agt-m-3",
+          "reason": "agt-m-3 moves logging and digest code but adds or changes no table SQL; agt-m-8 owns the schema definitions."
         }
       ]
     },
@@ -2076,12 +2221,23 @@
           "item": "agt-m-10",
           "reason": "This sprint consumes sessions and does not define their tables; agt-m-8 carries the message and response schema.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T10:13:28+00:00",
+          "event": "excluded",
+          "item": "agt-m-3",
+          "reason": "agt-m-3 only extracts the existing JSONL session-row writer unchanged; agt-m-8 owns the messages and responses schema and persistence.",
+          "replaced": false
         }
       ],
       "exclude": [
         {
           "item": "agt-m-10",
           "reason": "This sprint consumes sessions and does not define their tables; agt-m-8 carries the message and response schema."
+        },
+        {
+          "item": "agt-m-3",
+          "reason": "agt-m-3 only extracts the existing JSONL session-row writer unchanged; agt-m-8 owns the messages and responses schema and persistence."
         }
       ]
     },
@@ -2143,12 +2299,23 @@
           "item": "agt-m-10",
           "reason": "This sprint does not change cache-key definition; agt-m-8 carries the session cache.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T10:13:28+00:00",
+          "event": "excluded",
+          "item": "agt-m-3",
+          "reason": "agt-m-3 extracts the existing session-row writer and does not change cache behavior; agt-m-8 owns the cache key and lookup.",
+          "replaced": false
         }
       ],
       "exclude": [
         {
           "item": "agt-m-10",
           "reason": "This sprint does not change cache-key definition; agt-m-8 carries the session cache."
+        },
+        {
+          "item": "agt-m-3",
+          "reason": "agt-m-3 extracts the existing session-row writer and does not change cache behavior; agt-m-8 owns the cache key and lookup."
         }
       ]
     },
@@ -2273,6 +2440,19 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-28T10:13:28+00:00",
+          "event": "excluded",
+          "item": "agt-m-4",
+          "reason": "agt-m-4 moves the existing resend and holdoff behavior unchanged; agt-m-9 owns parameterized waits, limits, and busy/quota rules.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-m-4",
+          "reason": "agt-m-4 moves the existing resend and holdoff behavior unchanged; agt-m-9 owns parameterized waits, limits, and busy/quota rules."
         }
       ]
     },
@@ -2334,12 +2514,34 @@
           "item": "agt-m-8",
           "reason": "m-8 moves only sc-agent's own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool's storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner).",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T10:13:28+00:00",
+          "event": "excluded",
+          "item": "agt-m-3",
+          "reason": "agt-m-3 only extracts the existing session JSONL writer; no sprint in phase m carries ANC-031 derivative-tool result storage, so this anchor remains listed for the owner.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-28T10:13:47+00:00",
+          "event": "excluded",
+          "item": "agt-m-10",
+          "reason": "no sprint in phase m carries this anchor; listed for the owner.",
+          "replaced": false
         }
       ],
       "exclude": [
         {
           "item": "agt-m-8",
           "reason": "m-8 moves only sc-agent's own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool's storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner)."
+        },
+        {
+          "item": "agt-m-3",
+          "reason": "agt-m-3 only extracts the existing session JSONL writer; no sprint in phase m carries ANC-031 derivative-tool result storage, so this anchor remains listed for the owner."
+        },
+        {
+          "item": "agt-m-10",
+          "reason": "no sprint in phase m carries this anchor; listed for the owner."
         }
       ]
     },
@@ -2441,6 +2643,20 @@
           "item": "agt-m-11",
           "reason": "This integration sprint changes no table or schema definition; agt-m-8 carries session schema work.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T09:58:55+00:00",
+          "event": "excluded",
+          "item": "agt-m-1",
+          "reason": "This sprint moves request/answer types and changes no table definitions or schema versions; sc-agent-py table/schema work belongs to agt-m-8.",
+          "replaced": false
+        },
+        {
+          "at": "2026-11-28T10:13:47+00:00",
+          "event": "excluded",
+          "item": "agt-m-10",
+          "reason": "m-10 defines no SQL table and no schema version and does not touch crates/sc-agent-py; agt-m-8 carries tool schema ownership and versions.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -2463,6 +2679,14 @@
         {
           "item": "agt-m-11",
           "reason": "This integration sprint changes no table or schema definition; agt-m-8 carries session schema work."
+        },
+        {
+          "item": "agt-m-1",
+          "reason": "This sprint moves request/answer types and changes no table definitions or schema versions; sc-agent-py table/schema work belongs to agt-m-8."
+        },
+        {
+          "item": "agt-m-10",
+          "reason": "m-10 defines no SQL table and no schema version and does not touch crates/sc-agent-py; agt-m-8 carries tool schema ownership and versions."
         }
       ]
     },
