@@ -1116,6 +1116,19 @@
             "plan_questions": "agt-e0lk.1",
             "dev_questions": "agt-e0lk.2"
           }
+        },
+        {
+          "at": "2026-11-28T08:46:06+00:00",
+          "event": "excluded",
+          "item": "agt-m-0",
+          "reason": "m-0 does not edit requires-python, Python version checks, CI Python matrices or interpreter guards; its python3 commands only run the sc-lint bootstrap and the gate script.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-m-0",
+          "reason": "m-0 does not edit requires-python, Python version checks, CI Python matrices or interpreter guards; its python3 commands only run the sc-lint bootstrap and the gate script."
         }
       ]
     },

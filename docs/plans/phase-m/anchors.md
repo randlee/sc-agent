@@ -420,6 +420,9 @@ Scope: edits pyproject.toml requires-python, Python version checks, CI Python ma
 
 Deterministic check to pair with the development gate: grep requires-python in every sc-agent pyproject.toml reads >=3.11
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-0`: m-0 does not edit requires-python, Python version checks, CI Python matrices or interpreter guards; its python3 commands only run the sc-lint bootstrap and the gate script.
+
 Beads: anchor `agt-e0lk`, plan questions `agt-e0lk.1`, dev questions `agt-e0lk.2`
 
 Fixtures:
