@@ -1,0 +1,128 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0401">
+  <div class="section-head">
+    <h2>REQ-SAG-0401 Credential resolution order and keyring defaults</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0401&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;`sc-agent` MUST resolve a key from the sources in the resolution order.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;`sc-agent` MUST use the credential from the first source in the resolution order in which the credential is present.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The keyring service MUST be that provider&#x27;s credential-variable name.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The keyring account MUST be the current OS account.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0401&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Credential handling stays in one place, so redaction and key lookup cannot disagree about which variables hold secrets.\n\nOwner ruling (2026-11-20), Rand Lee: \&quot;Keyring is super basic.\&quot;\n\nOwner ruling (2026-11-20), Rand Lee: \&quot;Isn&#x27;t ENV &gt; .env &gt; keyring (or win/linux equivalent) standard order?\&quot; A variable already set in the environment wins over `.env`, which is also dotenvy&#x27;s default.\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;Keyring is super basic.\&quot;\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;`sc-agent` MUST resolve a key from the sources in the resolution order.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;`sc-agent` MUST use the credential from the first source in the resolution order in which the credential is present.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The keyring service MUST be that provider&#x27;s credential-variable name.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The keyring account MUST be the current OS account.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: A *provider* is an endpoint that serves a model; a provider that names a credential-variable name has a key that `sc-agent` resolves, and a keyless provider (a local model) has none. A *credential* is the API key for one provider. A *credential-variable name* is the name of the environment variable that holds a provider&#x27;s credential. The *keyring service* and the *keyring account* are the two components that identify a provider&#x27;s entry in the platform keyring. The *resolution order* is the process environment, then the repository-root `.env` file, then the platform keyring (the OS credential store: Keychain on macOS, Credential Manager on Windows, Secret Service on Linux). A credential is *present* in a source when the source holds a value under the provider&#x27;s credential-variable name; a blank platform-keyring value counts as absent. The *current OS account* is the user name of the operating-system user running the process.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;With a valid key in the environment, a different valid key in the repository-root `.env` and another in the keyring, the environment key is used; with none in the environment, the `.env` key is used; with neither, the keyring key is used.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Credential resolution order and keyring defaults&quot;,
+    &quot;version&quot;: &quot;0.6.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.6.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>`sc-agent` MUST resolve a key from the sources in the resolution order.</li>
+    <li>`sc-agent` MUST use the credential from the first source in the resolution order in which the credential is present.</li>
+    <li>The keyring service MUST be that provider&#x27;s credential-variable name.</li>
+    <li>The keyring account MUST be the current OS account.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: A *provider* is an endpoint that serves a model; a provider that names a credential-variable name has a key that `sc-agent` resolves, and a keyless provider (a local model) has none. A *credential* is the API key for one provider. A *credential-variable name* is the name of the environment variable that holds a provider&#x27;s credential. The *keyring service* and the *keyring account* are the two components that identify a provider&#x27;s entry in the platform keyring. The *resolution order* is the process environment, then the repository-root `.env` file, then the platform keyring (the OS credential store: Keychain on macOS, Credential Manager on Windows, Secret Service on Linux). A credential is *present* in a source when the source holds a value under the provider&#x27;s credential-variable name; a blank platform-keyring value counts as absent. The *current OS account* is the user name of the operating-system user running the process.</p>
+  <h3>Rationale</h3>
+  <p>Credential handling stays in one place, so redaction and key lookup cannot disagree about which variables hold secrets.
+
+Owner ruling (2026-11-20), Rand Lee: &quot;Keyring is super basic.&quot;
+
+Owner ruling (2026-11-20), Rand Lee: &quot;Isn&#x27;t ENV &gt; .env &gt; keyring (or win/linux equivalent) standard order?&quot; A variable already set in the environment wins over `.env`, which is also dotenvy&#x27;s default.
+
+Owner ruling (2026-11-21), Rand Lee: &quot;Keyring is super basic.&quot;
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <p>With a valid key in the environment, a different valid key in the repository-root `.env` and another in the keyring, the environment key is used; with none in the environment, the `.env` key is used; with neither, the keyring key is used.</p>
+</section>

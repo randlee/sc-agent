@@ -1,0 +1,111 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-ADR-SAG-0021-ANC-016">
+  <div class="section-head">
+    <h2>ADR-SAG-0021 × ANC-016 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-016&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [],
+    &quot;jev_disputed&quot;: false,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;f023c0d1&quot;,
+        &quot;date&quot;: &quot;2026-11-19&quot;,
+        &quot;record&quot;: &quot;ADR-SAG-0021&quot;,
+        &quot;statement&quot;: &quot;**One Logger per process, owned by the entry point.** The entry point is the CLI&#x27;s `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate&#x27;s Logger.** The sc-decidr wheel returns the sc-observability crate&#x27;s `Logger` to Python, named by the caller. Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue. The wheel has no dependency on the `sc-observability` Python package.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged, so with nothing configured every log lands under `~/.sc-agent/` for a full audit. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller&#x27;s responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI&#x27;s log root: its `&lt;CLI&gt;_LOG_ROOT` environment override when set and non-empty (used by tests), else `~/.sc-agent`. The CLIs and the wheel call that function; nothing else computes a log path. The wheel&#x27;s `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n- Session logs are `~/.sc-agent/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/sessions.jsonl`, and each one&#x27;s run log is `runs.jsonl` in the same directory.\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/&lt;repo&gt;/plan-anchor/&lt;project&gt;/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/&lt;repo&gt;/judge-jev/&lt;project&gt;/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client&#x27;s name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \&quot;project/phase\&quot;.\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger&#x27;s failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.&quot;,
+        &quot;summary&quot;: &quot;Records: one sc-observability Logger per process, one wheel, fixed log paths&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;Proposed in wave 2 after re-trace on wave 1&#x27;s result.&quot;,
+    &quot;stale&quot;: null,
+    &quot;what&quot;: &quot;exceeds cell deferred to wave 2; not yet reviewed by a proposer. Provenance below is every dated statement of ADR-SAG-0021, copied from the trace.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.76,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.84,
+        &quot;unclear&quot;: 0.05,
+        &quot;yes&quot;: 0.11
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.5,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.32,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.67
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.76,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.15,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.84
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.31,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.42,
+        &quot;unclear&quot;: 0.04,
+        &quot;yes&quot;: 0.54
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.11,
+    &quot;exceeds&quot;: 0.67,
+    &quot;relates&quot;: 0.84,
+    &quot;serves&quot;: 0.54
+  },
+  &quot;record&quot;: &quot;ADR-SAG-0021&quot;,
+  &quot;request_id&quot;: &quot;trace/ADR-SAG-0021/ANC-016/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8FMB7BAPPRWAEH3XYWW0YFX&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="ADR-SAG-0021 × ANC-016 — exceeds
+What exceeds
+exceeds cell deferred to wave 2; not yet reviewed by a proposer. Provenance below is every dated statement of ADR-SAG-0021, copied from the trace.
+Proposed remedy
+Proposed in wave 2 after re-trace on wave 1&#x27;s result.
+Anchor
+sc-agent&#x27;s records must define the logger-injection path, and a derivative tool&#x27;s production code must not use it, only its tests, so production logs always follow sc-agent&#x27;s default rules.
+Owner said: “judge-jev/plan-anchor and other derivative tools should defer to the default tool rules and not use injection path for production code (test only).”
+Scope: adds or changes logger construction or injection in sc-agent or a derivative tool
+Record statements
+No obligation statements.
+History (git)
+ADR-SAG-0021 statement 1: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths
+Jev P(yes): relates 0.84 · serves 0.54 · exceeds 0.67 · conflicts 0.11">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <ul>
+  </ul>
+  <p>exceeds cell deferred to wave 2; not yet reviewed by a proposer. Provenance below is every dated statement of ADR-SAG-0021, copied from the trace.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>Proposed in wave 2 after re-trace on wave 1&#x27;s result.</p>
+  <h3>Anchor</h3>
+  <p>sc-agent&#x27;s records must define the logger-injection path, and a derivative tool&#x27;s production code must not use it, only its tests, so production logs always follow sc-agent&#x27;s default rules.</p>
+  <p>Owner said: “judge-jev/plan-anchor and other derivative tools should defer to the default tool rules and not use injection path for production code (test only).”</p>
+  <p>Scope: adds or changes logger construction or injection in sc-agent or a derivative tool</p>
+  <h3>Record statements</h3>
+  <p>No obligation statements.</p>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>ADR-SAG-0021 statement 1: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.84 · serves 0.54 · exceeds 0.67 · conflicts 0.11</p>
+</section>

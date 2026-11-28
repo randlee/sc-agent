@@ -40,4 +40,3 @@ Recording the digest with the response lets a response be retrieved from the exa
 **Related:**
 
 - REQ-SAG-0004
-- REQ-SAG-0703

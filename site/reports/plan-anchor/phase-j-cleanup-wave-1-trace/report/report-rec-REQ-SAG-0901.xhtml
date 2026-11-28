@@ -1,0 +1,235 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0901">
+  <div class="section-head">
+    <h2>REQ-SAG-0901 LLM decision backends return the Jev schema</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0901&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;In decider mode, answers from each covered model MUST conform to the required schema.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The covered model handling the decision request MUST pass the request&#x27;s inputs to the provider.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;If the provider rejects a request input, the decision backend MUST return the provider&#x27;s error.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      &quot;statement&quot;: &quot;In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      &quot;statement&quot;: &quot;In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      &quot;statement&quot;: &quot;In decider mode, answers from each covered model MUST conform to the required schema.&quot;,
+      &quot;statement_index&quot;: 2
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      &quot;statement&quot;: &quot;Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.&quot;,
+      &quot;statement_index&quot;: 3
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      &quot;statement&quot;: &quot;If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.&quot;,
+      &quot;statement_index&quot;: 4
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      &quot;statement&quot;: &quot;The covered model handling the decision request MUST pass the request&#x27;s inputs to the provider.&quot;,
+      &quot;statement_index&quot;: 5
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      &quot;statement&quot;: &quot;If the provider rejects a request input, the decision backend MUST return the provider&#x27;s error.&quot;,
+      &quot;statement_index&quot;: 6
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0201&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0901&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-21&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Callers compare Jev and LLM answers directly, so every backend must return the same answer shape.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;In decider mode, answers from each covered model MUST conform to the required schema.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The covered model handling the decision request MUST pass the request&#x27;s inputs to the provider.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;If the provider rejects a request input, the decision backend MUST return the provider&#x27;s error.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: Decider mode uses a large language model, such as Haiku or Luna, to answer a decision request in place of a decision model. The covered models are Haiku and Luna. The provider is the service to which the decision request is sent. The required schema is the Jev decision API&#x27;s answer schema for the requested question type, including `probabilities` and `confidence` where Jev returns them. The provider&#x27;s structured-output feature lets a request specify the schema the provider&#x27;s answer must follow. A `decision.schema_mismatch` error identifies what in the provider response failed to match the required schema.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Haiku or Luna answer to a choice, score, noul and box question parses as the Jev answer type for that question.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A test provider that returns a response missing `probabilities` yields `decision.schema_mismatch`.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;LLM decision backends return the Jev schema&quot;,
+    &quot;version&quot;: &quot;0.2.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.2.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.</li>
+    <li>In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.</li>
+    <li>In decider mode, answers from each covered model MUST conform to the required schema.</li>
+    <li>Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.</li>
+    <li>If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.</li>
+    <li>The covered model handling the decision request MUST pass the request&#x27;s inputs to the provider.</li>
+    <li>If the provider rejects a request input, the decision backend MUST return the provider&#x27;s error.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: Decider mode uses a large language model, such as Haiku or Luna, to answer a decision request in place of a decision model. The covered models are Haiku and Luna. The provider is the service to which the decision request is sent. The required schema is the Jev decision API&#x27;s answer schema for the requested question type, including `probabilities` and `confidence` where Jev returns them. The provider&#x27;s structured-output feature lets a request specify the schema the provider&#x27;s answer must follow. A `decision.schema_mismatch` error identifies what in the provider response failed to match the required schema.</p>
+  <h3>Rationale</h3>
+  <p>Callers compare Jev and LLM answers directly, so every backend must return the same answer shape.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A Haiku or Luna answer to a choice, score, noul and box question parses as the Jev answer type for that question.</li>
+    <li>A test provider that returns a response missing `probabilities` yields `decision.schema_mismatch`.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>ADR-SAG-0001</li>
+    <li>REQ-SAG-0201</li>
+  </ul>
+</section>

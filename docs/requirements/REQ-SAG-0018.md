@@ -58,7 +58,6 @@ The owner requires every Python consumer to integrate identically, for errors, A
 - REQ-SAG-0016
 - REQ-SAG-0017
 - REQ-SAG-0702
-- REQ-SAG-0703
 - NFR-SAG-0003
 - NFR-SAG-0004
 - REQ-SAG-0005

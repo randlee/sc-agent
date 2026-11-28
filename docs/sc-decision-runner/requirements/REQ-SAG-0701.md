@@ -23,7 +23,6 @@ Definitions: A batch is the decision requests a caller passes in one call: one J
 - When `workers` is not set, the number of workers MUST be 8.
 - Each result MUST carry the session ULID of the request it answers.
 - Each result MUST carry the input position of the request it answers.
-- On a cache hit (REQ-SAG-0703), a result MUST carry the `session_id` of the existing session row that holds its result.
 - A failed request MUST be returned as that request's error result.
 - When one request fails, the other requests of the batch MUST still run.
 - Cancelling the batch MUST stop every request that has not finished.
@@ -54,4 +53,3 @@ Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
 - ADR-SAG-0001
 - REQ-SAG-0601
 - NFR-SAG-0001
-- REQ-SAG-0703

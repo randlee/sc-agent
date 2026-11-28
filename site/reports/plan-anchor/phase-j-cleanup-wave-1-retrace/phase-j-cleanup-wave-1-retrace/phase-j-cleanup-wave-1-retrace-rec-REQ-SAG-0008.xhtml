@@ -1,0 +1,171 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0008">
+  <div class="section-head">
+    <h2>REQ-SAG-0008 Logger injection into the Rust API and the wheel</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0008&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/retrace2/trace-20261128T011234Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The Rust API MUST accept an injected general Logger.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;The wheel MUST NOT depend on the `sc-observability` Python package.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;The Rust API MUST accept an injected general Logger.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1a9af55a&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+      },
+      &quot;statement&quot;: &quot;When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;f023c0d1&quot;,
+        &quot;date&quot;: &quot;2026-11-19&quot;,
+        &quot;summary&quot;: &quot;Records: one sc-observability Logger per process, one wheel, fixed log paths&quot;
+      },
+      &quot;statement&quot;: &quot;The wheel MUST NOT depend on the `sc-observability` Python package.&quot;,
+      &quot;statement_index&quot;: 2
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0003&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0021&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0008&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;The wheel already links the sc-observability crate, so it hands that crate&#x27;s Logger to Python and receives the same object back: one Logger, one queue, no bridge.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The Rust API MUST accept an injected general Logger.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;The wheel MUST NOT depend on the `sc-observability` Python package.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: A Logger is an sc-observability crate `Logger`. The linked crate is the sc-observability Rust crate compiled into the wheel. The general logger writes the general log. Injecting a Logger means the caller passes in the Logger sc-agent uses. The wheel is the sc-decidr Python package, which holds the decidr and sitr Python APIs (ADR-SAG-0021).&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: a Rust caller injects a general Logger with a test sink and finds every general-log record of the call in that sink.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Python test: a program obtains a Logger named `t` from the wheel, writes one record, and finds its record in `~/.sc-agent/logs/t.log.jsonl`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Install check: in a fresh virtual environment, `pip install sc-decidr` installs no `sc-observability` package.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Logger injection into the Rust API and the wheel&quot;,
+    &quot;version&quot;: &quot;0.6.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.6.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>The Rust API MUST accept an injected general Logger.</li>
+    <li>When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.</li>
+    <li>The wheel MUST NOT depend on the `sc-observability` Python package.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: A Logger is an sc-observability crate `Logger`. The linked crate is the sc-observability Rust crate compiled into the wheel. The general logger writes the general log. Injecting a Logger means the caller passes in the Logger sc-agent uses. The wheel is the sc-decidr Python package, which holds the decidr and sitr Python APIs (ADR-SAG-0021).</p>
+  <h3>Rationale</h3>
+  <p>The wheel already links the sc-observability crate, so it hands that crate&#x27;s Logger to Python and receives the same object back: one Logger, one queue, no bridge.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>Unit test: a Rust caller injects a general Logger with a test sink and finds every general-log record of the call in that sink.</li>
+    <li>Python test: a program obtains a Logger named `t` from the wheel, writes one record, and finds its record in `~/.sc-agent/logs/t.log.jsonl`.</li>
+    <li>Install check: in a fresh virtual environment, `pip install sc-decidr` installs no `sc-observability` package.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>REQ-SAG-0003</li>
+    <li>ADR-SAG-0019</li>
+    <li>ADR-SAG-0021</li>
+  </ul>
+</section>

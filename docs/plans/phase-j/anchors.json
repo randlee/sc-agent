@@ -546,6 +546,210 @@
           "status": "locked"
         }
       ]
+    },
+    {
+      "id": "ANC-017",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent tests must not depend on races, wall-clock timing, sleeps, event-loop ordering or system load; a test found to depend on one must be redesigned to drive its logic with controlled inputs.",
+      "quote": "Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "summary": "no flaky tests",
+      "scope": "adds or changes a test under crates/*/tests, crates/*/src test modules, tests/ or crates/sc-agent-py/tests",
+      "deterministic_check": "review changed tests for sleep, wall-clock assertions, poll-until-timeout and unsynchronized thread ordering; a failure-only backstop that fails with captured output is allowed",
+      "fixtures": {
+        "pass": [
+          "The new holdoff test drives its deadline with an injected clock and an explicit channel handshake."
+        ],
+        "fail": [
+          "The test sleeps 200 ms and then asserts the worker has finished."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-27T23:06:46+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-27T23:08:30+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-018",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent's integration tests must be its unit tests run against live agents, triggered manually.",
+      "quote": "I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "summary": "live integration = unit tests run live, manually",
+      "scope": "adds or changes a live-provider test, a test selection for live runs, or a CI workflow under .github/workflows",
+      "deterministic_check": "grep .github/workflows for live-provider test jobs triggered on push, pull_request or schedule; each live test name matches an existing mocked unit test",
+      "fixtures": {
+        "pass": [
+          "The live job reruns the existing unit tests against real providers and is started with workflow_dispatch only."
+        ],
+        "fail": [
+          "A new live_integration suite runs on every pull request."
+        ]
+      },
+      "question_overrides": {},
+      "version": 4,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-27T23:06:47+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-27T23:08:05+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "sc-agent's live integration tests must be its existing unit tests run against live providers, and they must be started manually, never by CI on a push, pull request or schedule."
+        },
+        {
+          "at": "2026-11-27T23:08:30+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "Every sc-agent live integration test run must be a manually triggered run of sc-agent's unit tests against live agents."
+        },
+        {
+          "at": "2026-11-27T23:08:30+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-019",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent must require Python 3.11 or newer.",
+      "quote": "sc-agent, judge-jev, prompt-anchor all must be 3.11+",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "summary": "Python 3.11+",
+      "scope": "edits pyproject.toml requires-python, Python version checks, CI Python matrices or script interpreter guards",
+      "deterministic_check": "grep requires-python in every sc-agent pyproject.toml reads >=3.11",
+      "fixtures": {
+        "pass": [
+          "pyproject.toml sets requires-python = \">=3.11\"."
+        ],
+        "fail": [
+          "The wheel now supports Python 3.9."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-27T23:06:47+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-27T23:08:05+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "sc-agent's Python packages and scripts must require Python 3.11 or newer."
+        },
+        {
+          "at": "2026-11-27T23:08:30+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-020",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When a caller passes its own sc_observability Logger into an sc-agent wheel call, sc-agent must not build a second Logger for that log.",
+      "quote": "we created a oversized set of sprints expressly to normalize config and logging around sc-observability logger (injected).  why do you keep adding more loggers to the design? ... add a new anchor banning python_logger ... lock this",
+      "kind": "prohibition",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "summary": "no second logger when one is injected",
+      "scope": "touches crates/sc-agent-py or any code path that accepts an injected logger (general_log=, session_log=)",
+      "deterministic_check": "no LoggerBuilder call in crates/sc-agent-py runs on a path where the caller supplied a logger",
+      "fixtures": {
+        "pass": [
+          "When general_log= is given, the wheel writes to that logger and builds no other."
+        ],
+        "fail": [
+          "The wheel builds its own Logger with LoggerBuilder even when the caller passed session_log=."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-11-27T23:06:47+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-27T23:08:30+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
     }
   ]
 }

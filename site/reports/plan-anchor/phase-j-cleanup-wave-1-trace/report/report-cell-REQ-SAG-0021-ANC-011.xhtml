@@ -1,0 +1,88 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-related" id="cell-REQ-SAG-0021-ANC-011">
+  <div class="section-head">
+    <h2>REQ-SAG-0021 × ANC-011 — related</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-011&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.79,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.86,
+        &quot;unclear&quot;: 0.04,
+        &quot;yes&quot;: 0.1
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.6,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.73,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.26
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.5,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.32,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.67
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.7,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.8,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.19
+      }
+    }
+  },
+  &quot;class&quot;: &quot;related&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.1,
+    &quot;exceeds&quot;: 0.26,
+    &quot;relates&quot;: 0.67,
+    &quot;serves&quot;: 0.19
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0021&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0021/ANC-011/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8FMANXTSGAFM1R3TKB7893F&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0021 × ANC-011 — related
+Anchor
+Every operation the decidr CLI offers must also be callable from the sc-agent Python API, so the Python API is never less flexible than the CLI.
+Owner said: “I expect the python api may allow more flexibility than cli, NOT less.”
+Scope: adds or changes a decidr subcommand or a function in the sc-agent Python bindings
+Record statements
+The `project` setting MUST be resolved through every project layer.
+The PyO3 bindings MUST take `project` from the first project layer that sets it.
+In the PyO3 bindings, a `project` argument MUST take the place of the `--project` flag layer.
+A session with no project/phase MUST be refused with an error.
+When no project layer sets `project`, a session write MUST NOT send a session.
+When no project layer sets `project`, a session write MUST NOT write a session.
+`project` MUST NOT have a built-in default.
+Jev P(yes): relates 0.67 · serves 0.19 · exceeds 0.26 · conflicts 0.10">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>Anchor</h3>
+  <p>Every operation the decidr CLI offers must also be callable from the sc-agent Python API, so the Python API is never less flexible than the CLI.</p>
+  <p>Owner said: “I expect the python api may allow more flexibility than cli, NOT less.”</p>
+  <p>Scope: adds or changes a decidr subcommand or a function in the sc-agent Python bindings</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>The `project` setting MUST be resolved through every project layer.</li>
+    <li>The PyO3 bindings MUST take `project` from the first project layer that sets it.</li>
+    <li>In the PyO3 bindings, a `project` argument MUST take the place of the `--project` flag layer.</li>
+    <li>A session with no project/phase MUST be refused with an error.</li>
+    <li>When no project layer sets `project`, a session write MUST NOT send a session.</li>
+    <li>When no project layer sets `project`, a session write MUST NOT write a session.</li>
+    <li>`project` MUST NOT have a built-in default.</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.67 · serves 0.19 · exceeds 0.26 · conflicts 0.10</p>
+</section>

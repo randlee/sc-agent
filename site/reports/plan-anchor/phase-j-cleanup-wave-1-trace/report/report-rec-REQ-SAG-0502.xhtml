@@ -1,0 +1,116 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0502">
+  <div class="section-head">
+    <h2>REQ-SAG-0502 sc-agent can launch any LLM</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0502&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;c7a40068&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;summary&quot;: &quot;Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema&quot;
+      },
+      &quot;statement&quot;: &quot;sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.&quot;,
+      &quot;statement_index&quot;: 0
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0101&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0103&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0502&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Decision models are a small part of what sc-agent does.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: LLM means large language model. A provider is the service a request is sent to, such as OpenRouter, Nous, Together, OpenAI or Anthropic. A decision model is a model used for decision requests, such as Jev. sc-agent is the product provided by this repository.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test verifies that sc-agent sends a request to a non-decision LLM selected by short name and returns its response.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;sc-agent can launch any LLM&quot;,
+    &quot;version&quot;: &quot;0.1.1&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.1.1</p>
+  <h3>Statements</h3>
+  <p>sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.</p>
+  <h3>Requirement</h3>
+  <p>Definitions: LLM means large language model. A provider is the service a request is sent to, such as OpenRouter, Nous, Together, OpenAI or Anthropic. A decision model is a model used for decision requests, such as Jev. sc-agent is the product provided by this repository.</p>
+  <h3>Rationale</h3>
+  <p>Decision models are a small part of what sc-agent does.</p>
+  <h3>Acceptance criteria</h3>
+  <p>A unit test verifies that sc-agent sends a request to a non-decision LLM selected by short name and returns its response.</p>
+  <h3>Related</h3>
+  <ul>
+    <li>REQ-SAG-0101</li>
+    <li>REQ-SAG-0103</li>
+  </ul>
+</section>

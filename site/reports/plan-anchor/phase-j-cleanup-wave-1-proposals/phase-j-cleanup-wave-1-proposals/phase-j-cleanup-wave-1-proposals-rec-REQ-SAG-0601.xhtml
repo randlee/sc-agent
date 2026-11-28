@@ -1,0 +1,221 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0601">
+  <div class="section-head">
+    <h2>REQ-SAG-0601 Busy resend and holdoff</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0601&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A request that receives a busy response MUST be resent unchanged.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A request whose send has a network failure MUST be resent unchanged, counting toward the same maximum number of sends.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The maximum number of sends per request MUST be a configurable maximum, 5 by default.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When an `HttpClient` receives a busy reply from a host, the `HttpClient` MUST set a not-before time shared by every send through that client to that host.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Every later send to the provider endpoint MUST wait until the endpoint&#x27;s not-before time.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When the provider gives a `Retry-After`, it MUST set the holdoff.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When the provider gives no `Retry-After`, the holdoffs MUST back off exponentially; this requirement does not fix their values.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A held-off request MUST wait in the queue until its holdoff ends, and the wait MUST end at once when the request is cancelled.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When sends run out on busy replies, the error MUST say busy, with the send count.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;Authentication (401) and quota MUST NOT be resent; they MUST be returned with the remote error id and message.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0602&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0601&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-21&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Providers signal overload with busy responses and expect clients to back off. Holding off in the queue keeps workers free and lets cancellation take effect immediately.\n\nA busy provider is busy for every worker; one worker&#x27;s holdoff that the others ignore only multiplies the busy replies.\n\nOwner ruling (2026-11-20), Rand Lee: \&quot;I did ask for exponential backoff / retry when busy (i.e. 1,2,4,8,..). Nothing precise or fancy.\&quot; \&quot;1,2,4,8 is an example of exp backoff not something to hard code.\&quot;\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;Use time structs for time.\&quot;\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A request that receives a busy response MUST be resent unchanged.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A request whose send has a network failure MUST be resent unchanged, counting toward the same maximum number of sends.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The maximum number of sends per request MUST be a configurable maximum, 5 by default.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When an `HttpClient` receives a busy reply from a host, the `HttpClient` MUST set a not-before time shared by every send through that client to that host.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Every later send to the provider endpoint MUST wait until the endpoint&#x27;s not-before time.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When the provider gives a `Retry-After`, it MUST set the holdoff.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When the provider gives no `Retry-After`, the holdoffs MUST back off exponentially; this requirement does not fix their values.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A held-off request MUST wait in the queue until its holdoff ends, and the wait MUST end at once when the request is cancelled.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When sends run out on busy replies, the error MUST say busy, with the send count.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;Authentication (401) and quota MUST NOT be resent; they MUST be returned with the remote error id and message.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: A busy response is a non-quota HTTP 429, 502 or 529. A send is one transmission of a request; all sends of one request belong to one session. The holdoff is the time a busy request waits before it is resent. `Retry-After` is the HTTP response header that gives that time in seconds. A provider endpoint is one host reached through one `HttpClient`. The not-before time is the earliest moment a send to that endpoint may start.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A request answered busy every time is sent 5 times and ends with a busy error carrying a send count of 5.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A busy response with `Retry-After: 3` holds the request off 3 seconds; with no `Retry-After`, each holdoff is longer than the one before.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Cancelling a held-off request ends its wait at once and returns a cancelled result.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A send that times out is resent unchanged and counts toward the maximum number of sends, and a request whose last attempt timed out ends with the timeout error.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A 402 response is returned after one send with the remote error id and message.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;After one worker receives a busy reply, a send from another worker to the same host through the same `HttpClient` does not start before the not-before time.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A send to a different host through the same `HttpClient` is not delayed by that not-before time.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Busy resend and holdoff&quot;,
+    &quot;version&quot;: &quot;0.4.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.4.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>A request that receives a busy response MUST be resent unchanged.</li>
+    <li>A request whose send has a network failure MUST be resent unchanged, counting toward the same maximum number of sends.</li>
+    <li>The maximum number of sends per request MUST be a configurable maximum, 5 by default.</li>
+    <li>When an `HttpClient` receives a busy reply from a host, the `HttpClient` MUST set a not-before time shared by every send through that client to that host.</li>
+    <li>Every later send to the provider endpoint MUST wait until the endpoint&#x27;s not-before time.</li>
+    <li>When the provider gives a `Retry-After`, it MUST set the holdoff.</li>
+    <li>When the provider gives no `Retry-After`, the holdoffs MUST back off exponentially; this requirement does not fix their values.</li>
+    <li>A held-off request MUST wait in the queue until its holdoff ends, and the wait MUST end at once when the request is cancelled.</li>
+    <li>When sends run out on busy replies, the error MUST say busy, with the send count.</li>
+    <li>Authentication (401) and quota MUST NOT be resent; they MUST be returned with the remote error id and message.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: A busy response is a non-quota HTTP 429, 502 or 529. A send is one transmission of a request; all sends of one request belong to one session. The holdoff is the time a busy request waits before it is resent. `Retry-After` is the HTTP response header that gives that time in seconds. A provider endpoint is one host reached through one `HttpClient`. The not-before time is the earliest moment a send to that endpoint may start.</p>
+  <h3>Rationale</h3>
+  <p>Providers signal overload with busy responses and expect clients to back off. Holding off in the queue keeps workers free and lets cancellation take effect immediately.
+
+A busy provider is busy for every worker; one worker&#x27;s holdoff that the others ignore only multiplies the busy replies.
+
+Owner ruling (2026-11-20), Rand Lee: &quot;I did ask for exponential backoff / retry when busy (i.e. 1,2,4,8,..). Nothing precise or fancy.&quot; &quot;1,2,4,8 is an example of exp backoff not something to hard code.&quot;
+
+Owner ruling (2026-11-21), Rand Lee: &quot;Use time structs for time.&quot;
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A request answered busy every time is sent 5 times and ends with a busy error carrying a send count of 5.</li>
+    <li>A busy response with `Retry-After: 3` holds the request off 3 seconds; with no `Retry-After`, each holdoff is longer than the one before.</li>
+    <li>Cancelling a held-off request ends its wait at once and returns a cancelled result.</li>
+    <li>A send that times out is resent unchanged and counts toward the maximum number of sends, and a request whose last attempt timed out ends with the timeout error.</li>
+    <li>A 402 response is returned after one send with the remote error id and message.</li>
+    <li>After one worker receives a busy reply, a send from another worker to the same host through the same `HttpClient` does not start before the not-before time.</li>
+    <li>A send to a different host through the same `HttpClient` is not delayed by that not-before time.</li>
+  </ul>
+  <h3>Related</h3>
+  <p>REQ-SAG-0602</p>
+</section>

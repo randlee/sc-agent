@@ -20,7 +20,6 @@ Definitions: JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-del
 
 - Session logs MUST be written as JSONL.
 - For every query whose model call succeeded, sc-agent MUST append a session row to the query's session log.
-- For every session row that answers a Run's query, sc-agent MUST append one link record to the query's run log.
 
 **MUST NOT statements:**
 
@@ -51,7 +50,6 @@ Every successfully answered query from every tool lands in the session log, whil
 - REQ-SAG-0004
 - REQ-SAG-0102
 - REQ-SAG-0601
-- REQ-SAG-0703
 - ADR-SAG-0002
 - ADR-SAG-0019
 - ADR-SAG-0021
