@@ -56,3 +56,8 @@
 
 Count per anchor: ANC-015 10, ANC-032 5, ANC-008 4, ANC-010 4, ANC-026 4, ANC-001 3, ANC-013 3, ANC-011 2, ANC-018 2, ANC-020 2, ANC-022 2, ANC-024 2, ANC-004 1, ANC-005 1, ANC-012 1, ANC-014 1, ANC-017 1, ANC-019 1, ANC-021 1, ANC-023 1, ANC-028 1, ANC-031 1
 Cells: 53. Decided at t=0.5: 20 of 53 (not_applicable 19, not_addressed 1). Threshold not changed.
+## Owner ruling on the threshold
+
+Rand, 2026-11-28 09:19 PST, verbatim: "Keep threshold at 0.6 for tuning.  We can consider allowing pass at 0.5 items that passed tuning at 0.6."
+
+Nothing changes: tuning and the gate stay at 0.6. A 0.5 gate pass is not approved; it is a later option the owner may consider, only for anchors whose questions passed tuning at 0.6 (relayed by arch-ai, 2026-11-28).

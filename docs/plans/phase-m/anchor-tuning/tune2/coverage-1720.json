@@ -1,0 +1,655 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "items": [
+      "agt-m-0",
+      "agt-m-1",
+      "agt-m-10",
+      "agt-m-11",
+      "agt-m-2",
+      "agt-m-3",
+      "agt-m-4",
+      "agt-m-5",
+      "agt-m-6",
+      "agt-m-7",
+      "agt-m-8",
+      "agt-m-9"
+    ],
+    "anchors": [
+      "ANC-001",
+      "ANC-002",
+      "ANC-003",
+      "ANC-004",
+      "ANC-005",
+      "ANC-006",
+      "ANC-007",
+      "ANC-008",
+      "ANC-009",
+      "ANC-010",
+      "ANC-011",
+      "ANC-012",
+      "ANC-013",
+      "ANC-014",
+      "ANC-015",
+      "ANC-016",
+      "ANC-017",
+      "ANC-018",
+      "ANC-019",
+      "ANC-020",
+      "ANC-021",
+      "ANC-022",
+      "ANC-023",
+      "ANC-024",
+      "ANC-025",
+      "ANC-026",
+      "ANC-027",
+      "ANC-028",
+      "ANC-029",
+      "ANC-030",
+      "ANC-031",
+      "ANC-032",
+      "ANC-033"
+    ],
+    "matrix": {
+      "ANC-010": {
+        "agt-m-0": "satisfied",
+        "agt-m-1": "satisfied",
+        "agt-m-2": "satisfied",
+        "agt-m-8": "satisfied",
+        "agt-m-9": "satisfied",
+        "agt-m-10": "satisfied",
+        "agt-m-6": "satisfied",
+        "agt-m-3": "satisfied",
+        "agt-m-7": "satisfied",
+        "agt-m-4": "satisfied",
+        "agt-m-5": "satisfied",
+        "agt-m-11": "excluded"
+      },
+      "ANC-021": {
+        "agt-m-0": "satisfied",
+        "agt-m-1": "satisfied",
+        "agt-m-2": "satisfied",
+        "agt-m-8": "satisfied",
+        "agt-m-9": "satisfied",
+        "agt-m-10": "satisfied",
+        "agt-m-6": "satisfied",
+        "agt-m-3": "satisfied",
+        "agt-m-7": "satisfied",
+        "agt-m-4": "satisfied",
+        "agt-m-5": "satisfied",
+        "agt-m-11": "excluded"
+      },
+      "ANC-025": {
+        "agt-m-0": "satisfied",
+        "agt-m-1": "satisfied",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "satisfied",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-001": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "excluded",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "excluded",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "satisfied",
+        "agt-m-4": "excluded",
+        "agt-m-5": "excluded",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-002": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "satisfied",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "satisfied",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-003": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-004": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "excluded"
+      },
+      "ANC-005": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "excluded",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "satisfied",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-006": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "satisfied",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-008": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "excluded",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "satisfied",
+        "agt-m-10": "excluded",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "satisfied",
+        "agt-m-7": "underspecified",
+        "agt-m-4": "satisfied",
+        "agt-m-5": "excluded",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-009": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "excluded",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "satisfied",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-011": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "excluded",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "excluded",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-012": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "excluded",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "excluded",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "excluded",
+        "agt-m-4": "satisfied",
+        "agt-m-5": "excluded",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-013": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "excluded",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "excluded",
+        "agt-m-10": "satisfied",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "satisfied",
+        "agt-m-5": "excluded",
+        "agt-m-11": "excluded"
+      },
+      "ANC-014": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "satisfied",
+        "agt-m-5": "satisfied",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-016": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "satisfied",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-020": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "excluded",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "satisfied",
+        "agt-m-3": "satisfied",
+        "agt-m-7": "satisfied",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "excluded"
+      },
+      "ANC-022": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "excluded",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "not_addressed",
+        "agt-m-4": "excluded",
+        "agt-m-5": "excluded",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-023": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "satisfied",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "excluded",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "excluded",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-024": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "excluded",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "excluded",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "satisfied",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-027": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "satisfied",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "excluded",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "excluded",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-028": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "satisfied",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "excluded",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "excluded",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-029": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "satisfied",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-030": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "satisfied",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "excluded",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-031": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "excluded",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "excluded",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "excluded",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-033": {
+        "agt-m-0": "not_applicable",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "satisfied",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-007": {
+        "agt-m-0": "deterministic_only",
+        "agt-m-1": "deterministic_only",
+        "agt-m-2": "deterministic_only",
+        "agt-m-8": "deterministic_only",
+        "agt-m-9": "deterministic_only",
+        "agt-m-10": "deterministic_only",
+        "agt-m-6": "deterministic_only",
+        "agt-m-3": "deterministic_only",
+        "agt-m-7": "deterministic_only",
+        "agt-m-4": "deterministic_only",
+        "agt-m-5": "deterministic_only",
+        "agt-m-11": "deterministic_only"
+      },
+      "ANC-015": {
+        "agt-m-8": "excluded",
+        "agt-m-6": "excluded",
+        "agt-m-3": "excluded",
+        "agt-m-7": "excluded",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "excluded",
+        "agt-m-11": "excluded"
+      },
+      "ANC-017": {
+        "agt-m-0": "excluded",
+        "agt-m-1": "satisfied",
+        "agt-m-2": "excluded",
+        "agt-m-8": "satisfied",
+        "agt-m-9": "satisfied",
+        "agt-m-10": "satisfied",
+        "agt-m-6": "satisfied",
+        "agt-m-3": "satisfied",
+        "agt-m-7": "satisfied",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "satisfied",
+        "agt-m-11": "excluded"
+      },
+      "ANC-018": {
+        "agt-m-0": "excluded",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "excluded",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "underspecified"
+      },
+      "ANC-019": {
+        "agt-m-0": "excluded",
+        "agt-m-1": "not_applicable",
+        "agt-m-2": "not_applicable",
+        "agt-m-8": "not_applicable",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "not_applicable",
+        "agt-m-7": "not_applicable",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "excluded"
+      },
+      "ANC-026": {
+        "agt-m-1": "excluded",
+        "agt-m-2": "excluded",
+        "agt-m-8": "satisfied",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "not_applicable",
+        "agt-m-6": "not_applicable",
+        "agt-m-3": "excluded",
+        "agt-m-7": "excluded",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "not_applicable"
+      },
+      "ANC-032": {
+        "agt-m-1": "excluded",
+        "agt-m-2": "excluded",
+        "agt-m-8": "satisfied",
+        "agt-m-9": "not_applicable",
+        "agt-m-10": "excluded",
+        "agt-m-6": "excluded",
+        "agt-m-3": "excluded",
+        "agt-m-7": "excluded",
+        "agt-m-4": "not_applicable",
+        "agt-m-5": "not_applicable",
+        "agt-m-11": "excluded"
+      }
+    },
+    "uncovered_anchors": [
+      "ANC-003",
+      "ANC-004",
+      "ANC-007",
+      "ANC-011",
+      "ANC-015",
+      "ANC-018",
+      "ANC-019",
+      "ANC-022",
+      "ANC-031"
+    ],
+    "contradicted": {},
+    "excluded": {
+      "ANC-017": {
+        "agt-m-0": "m-0 adds empty crates, boundary records and a CI lint step; it adds or changes no test.",
+        "agt-m-2": "This sprint relocates the existing tests unchanged; deterministic test changes for the model configuration work are owned by agt-m-7.",
+        "agt-m-11": "m-11 adds or changes no test; it runs the existing tests against live agents, which ANC-018 covers."
+      },
+      "ANC-018": {
+        "agt-m-0": "m-0's only CI change is a static sc-lint boundary job; it adds no live-provider test, live-run selection or workflow_dispatch job.",
+        "agt-m-10": "m-10 adds LLM and resume tests but changes no live-agent integration run; agt-m-11 carries that run."
+      },
+      "ANC-019": {
+        "agt-m-0": "m-0 does not edit requires-python, Python version checks, CI Python matrices or interpreter guards; its python3 commands only run the sc-lint bootstrap and the gate script.",
+        "agt-m-11": "requires-python is already >=3.11 (crates/sc-agent-py/pyproject.toml:11); m-11 changes no Python version, check or matrix."
+      },
+      "ANC-012": {
+        "agt-m-1": "agt-m-1 moves the Decision and Llm trait definitions only; agt-m-4 carries the one implementation per wire format.",
+        "agt-m-9": "This HTTP transport sprint does not implement decision provider traits; agt-m-4 carries the decision wire-format implementations.",
+        "agt-m-7": "m-7 changes provider and model configuration rows, not the wire-format Decision implementations; agt-m-4 carries the single implementation per API shape.",
+        "agt-m-5": "m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4."
+      },
+      "ANC-008": {
+        "agt-m-1": "M-1 preserves existing parameter lists while moving code; signature grouping applies to the Settings API changes owned by agt-m-7.",
+        "agt-m-10": "m-10 has no related parameters repeated across several methods in its stated LlmRun signatures; RunArgs groups run setup.",
+        "agt-m-5": "m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9."
+      },
+      "ANC-013": {
+        "agt-m-1": "This item moves the shared Llm trait and JSON-schema helper but changes no non-Jev LLM call; m-4 owns the wire-format implementations and call behavior.",
+        "agt-m-9": "m-9 changes retry and holdoff parameters in sc-agent-http; it adds or changes no LLM interface. agt-m-10 carries the shared Llm API.",
+        "agt-m-5": "m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API.",
+        "agt-m-11": "This integration sprint does not change the LLM trait or provider wire formats; agt-m-4 carries the shared implementations."
+      },
+      "ANC-026": {
+        "agt-m-1": "This sprint moves request/answer types and defines no SQL table; table SQL is owned by agt-m-8.",
+        "agt-m-2": "This sprint adds or changes no SQL table definitions; the table-definition work is owned by agt-m-8.",
+        "agt-m-3": "agt-m-3 moves logging and digest code but adds or changes no table SQL; agt-m-8 owns the schema definitions.",
+        "agt-m-7": "m-7 defines provider and model configuration rows, not SQL tables; agt-m-8 carries core SQL ownership in sc-agent-schema."
+      },
+      "ANC-032": {
+        "agt-m-1": "This sprint moves request/answer types and changes no table definitions or schema versions; sc-agent-py table/schema work belongs to agt-m-8.",
+        "agt-m-2": "This sprint adds or changes no table definitions, schema versions, or wheel code; those changes are owned by agt-m-8.",
+        "agt-m-10": "m-10 defines no SQL table and no schema version and does not touch crates/sc-agent-py; agt-m-8 carries tool schema ownership and versions.",
+        "agt-m-6": "m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.",
+        "agt-m-3": "m-3 defines no table and no schema version and does not touch crates/sc-agent-py; agt-m-8 carries tool schema ownership and versions.",
+        "agt-m-7": "m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.",
+        "agt-m-11": "This integration sprint changes no table or schema definition; agt-m-8 carries session schema work."
+      },
+      "ANC-001": {
+        "agt-m-2": "This sprint relocates sc-agent-config without changing model resolution; agt-m-7 owns the Jev model selection behavior.",
+        "agt-m-6": "m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration.",
+        "agt-m-4": "m-4 moves the API-shape implementations and changes no model table, model resolution or jev alias; agt-m-7 carries ANC-001.",
+        "agt-m-5": "m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001."
+      },
+      "ANC-009": {
+        "agt-m-2": "This sprint relocates the existing model table unchanged; configuration-supplied model rows are added by agt-m-7."
+      },
+      "ANC-022": {
+        "agt-m-2": "This sprint relocates configuration code without changing local-model resolution; agt-m-7 owns the local-model configuration behavior.",
+        "agt-m-4": "m-4 moves the API-shape implementations and adds no model row, local-model URL or model id; agt-m-7 carries local-model configuration.",
+        "agt-m-5": "m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration."
+      },
+      "ANC-005": {
+        "agt-m-8": "m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths."
+      },
+      "ANC-015": {
+        "agt-m-8": "m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change.",
+        "agt-m-6": "m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.",
+        "agt-m-3": "agt-m-3 moves only sc-agent logging and digest code and changes no REQ, NFR, or ADR records for derivative tools; derivative-record edits are not assigned to agt-m-3.",
+        "agt-m-7": "m-7 changes configuration code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change.",
+        "agt-m-5": "m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.",
+        "agt-m-11": "This integration sprint changes no cross-tool requirements or derivative-tool records."
+      },
+      "ANC-020": {
+        "agt-m-8": "m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring.",
+        "agt-m-11": "m-11 adds or changes no code in any crate and no injected-logger path; agt-m-6 carries the wheel logger wiring."
+      },
+      "ANC-024": {
+        "agt-m-8": "m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability.",
+        "agt-m-10": "m-10 changes no general log rotation or deletion policy; the existing sc-observability policy remains in force."
+      },
+      "ANC-031": {
+        "agt-m-8": "m-8 moves only sc-agent's own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool's storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner).",
+        "agt-m-10": "no sprint in phase m carries this anchor; listed for the owner.",
+        "agt-m-3": "agt-m-3 only extracts the existing session JSONL writer; no sprint in phase m carries ANC-031 derivative-tool result storage, so this anchor remains listed for the owner."
+      },
+      "ANC-023": {
+        "agt-m-10": "This sprint consumes sessions and does not change session persistence; agt-m-8 carries SQLite session writes.",
+        "agt-m-3": "agt-m-3 only extracts the existing JSONL session-row writer unchanged; agt-m-8 owns replacing that writer with SQLite persistence and removing sessions.jsonl."
+      },
+      "ANC-027": {
+        "agt-m-10": "This sprint consumes sessions and does not define their tables; agt-m-8 carries the message and response schema.",
+        "agt-m-3": "agt-m-3 only extracts the existing JSONL session-row writer unchanged; agt-m-8 owns the messages and responses schema and persistence."
+      },
+      "ANC-028": {
+        "agt-m-10": "This sprint does not change cache-key definition; agt-m-8 carries the session cache.",
+        "agt-m-3": "agt-m-3 extracts the existing session-row writer and does not change cache behavior; agt-m-8 owns the cache key and lookup."
+      },
+      "ANC-011": {
+        "agt-m-6": "no sprint in phase m carries this anchor; listed for the owner",
+        "agt-m-7": "no sprint in phase m carries this anchor; listed for the owner"
+      },
+      "ANC-030": {
+        "agt-m-4": "agt-m-4 moves the existing resend and holdoff behavior unchanged; agt-m-9 owns parameterized waits, limits, and busy/quota rules."
+      },
+      "ANC-004": {
+        "agt-m-11": "This integration sprint does not change request input-size limits."
+      },
+      "ANC-010": {
+        "agt-m-11": "no sprint in phase m carries this anchor; listed for the owner."
+      },
+      "ANC-021": {
+        "agt-m-11": "m-11 adds or changes no code in any crate under crates/; it runs integration tests, lands the phase and moves the size limits to sc-lint."
+      }
+    },
+    "runs_considered": 12,
+    "carried_from_earlier_run": {},
+    "exclusion_removed_rejudge": {
+      "ANC-015": [
+        "agt-m-0",
+        "agt-m-1",
+        "agt-m-2",
+        "agt-m-9",
+        "agt-m-10"
+      ],
+      "ANC-026": [
+        "agt-m-0"
+      ],
+      "ANC-032": [
+        "agt-m-0"
+      ]
+    }
+  },
+  "error": null
+}

@@ -936,6 +936,13 @@
           "item": "agt-m-9",
           "reason": "This HTTP transport sprint does not implement decision provider traits; agt-m-4 carries the decision wire-format implementations.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T17:01:00+00:00",
+          "event": "excluded",
+          "item": "agt-m-1",
+          "reason": "agt-m-1 moves the Decision and Llm trait definitions only; agt-m-4 carries the one implementation per wire format.",
+          "replaced": false
         }
       ],
       "exclude": [
@@ -950,6 +957,10 @@
         {
           "item": "agt-m-9",
           "reason": "This HTTP transport sprint does not implement decision provider traits; agt-m-4 carries the decision wire-format implementations."
+        },
+        {
+          "item": "agt-m-1",
+          "reason": "agt-m-1 moves the Decision and Llm trait definitions only; agt-m-4 carries the one implementation per wire format."
         }
       ]
     },
@@ -1111,12 +1122,11 @@
           "item": "agt-m-5",
           "reason": "m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7.",
           "replaced": false
-        }
-      ],
-      "exclude": [
+        },
         {
-          "item": "agt-m-5",
-          "reason": "m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7."
+          "at": "2026-11-28T17:14:50+00:00",
+          "event": "exclusion_removed",
+          "item": "agt-m-5"
         }
       ]
     },
