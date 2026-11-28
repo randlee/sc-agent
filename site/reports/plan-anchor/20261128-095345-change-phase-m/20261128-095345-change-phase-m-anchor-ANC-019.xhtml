@@ -1,0 +1,91 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-anchor" id="anchor-ANC-019">
+  <div class="section-head">
+    <h2>ANC-019 <span class="status status-locked">locked</span> <span class="small">bead agt-e0lk</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy anchor data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;bead&quot;: &quot;agt-e0lk&quot;,
+  &quot;bead_url&quot;: &quot;&quot;,
+  &quot;changes&quot;: [],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: false,
+      &quot;item&quot;: &quot;agt-m-0&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;m-0 does not edit requires-python, Python version checks, CI Python matrices or interpreter guards; its python3 commands only run the sc-lint bootstrap and the gate script.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;item&quot;: &quot;agt-m-11&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;requires-python is already &gt;=3.11 (crates/sc-agent-py/pyproject.toml:11); m-11 changes no Python version, check or matrix.&quot;
+    }
+  ],
+  &quot;fixtures_after&quot;: &quot;-&quot;,
+  &quot;fixtures_before&quot;: &quot;-&quot;,
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-28T09:52:38+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-m-11; reason: requires-python is already &gt;=3.11 (crates/sc-agent-py/pyproject.toml:11); m-11 changes no Python version, check or matrix.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-019&quot;,
+  &quot;questions_default&quot;: &quot;-&quot;,
+  &quot;questions_tuned&quot;: &quot;-&quot;,
+  &quot;quote&quot;: &quot;sc-agent, judge-jev, prompt-anchor all must be 3.11+&quot;,
+  &quot;removed_exclusions&quot;: [],
+  &quot;statement&quot;: &quot;sc-agent must require Python 3.11 or newer.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;status_before&quot;: &quot;locked&quot;,
+  &quot;tuning&quot;: [],
+  &quot;version_before&quot;: &quot;3&quot;,
+  &quot;version_now&quot;: &quot;3&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Anchor ANC-019 (locked v3 -&gt; locked v3)
+Statement: sc-agent must require Python 3.11 or newer.
+Quote: sc-agent, judge-jev, prompt-anchor all must be 3.11+
+Fixture checks: - -&gt; -.
+Questions: default - -&gt; tuned - oracle cases.
+Excluded for agt-m-0: m-0 does not edit requires-python, Python version checks, CI Python matrices or interpreter guards; its python3 commands only run the sc-lint bootstrap and the gate script.
+Excluded for agt-m-11: requires-python is already &gt;=3.11 (crates/sc-agent-py/pyproject.toml:11); m-11 changes no Python version, check or matrix.
+2026-11-28T09:52:38+00:00 excluded: item: agt-m-11; reason: requires-python is already &gt;=3.11 (crates/sc-agent-py/pyproject.toml:11); m-11 changes no Python version, check or matrix.; replaced: false">&#x2398;</button>
+    </div>
+  </div>
+  <p class="statement">sc-agent must require Python 3.11 or newer.</p>
+  <p class="quote">&#x201C;sc-agent, judge-jev, prompt-anchor all must be 3.11+&#x201D;</p>
+
+  <table class="scores">
+    <thead><tr><th scope="col"></th><th scope="col">Before</th><th scope="col">Now</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Status</th><td>locked</td><td>locked</td></tr>
+      <tr><th scope="row">Version</th><td>3</td><td>3</td></tr>
+      <tr><th scope="row">Fixture checks (expected verdicts)</th><td>-</td><td>-</td></tr>
+      <tr><th scope="row">Questions: oracle cases matched (default, tuned)</th><td>-</td><td>-</td></tr>
+    </tbody>
+  </table>
+
+
+  <h3>Record changes</h3>
+  <p class="small">Text unchanged.</p>
+
+  <details>
+    <summary>History since the baseline (1)</summary>
+    <table>
+      <thead><tr><th scope="col">At</th><th scope="col">Event</th><th scope="col">Detail</th></tr></thead>
+      <tbody>
+        <tr><td>2026-11-28T09:52:38+00:00</td><td>excluded</td><td>item: agt-m-11; reason: requires-python is already &gt;=3.11 (crates/sc-agent-py/pyproject.toml:11); m-11 changes no Python version, check or matrix.; replaced: false</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <details open="open">
+    <summary>Exclusions (2)</summary>
+    <table>
+      <thead><tr><th scope="col">Item</th><th scope="col">Reason</th><th scope="col">Change</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">agt-m-0</th><td>m-0 does not edit requires-python, Python version checks, CI Python matrices or interpreter guards; its python3 commands only run the sc-lint bootstrap and the gate script.</td><td>kept</td></tr>
+        <tr><th scope="row">agt-m-11</th><td>requires-python is already &gt;=3.11 (crates/sc-agent-py/pyproject.toml:11); m-11 changes no Python version, check or matrix.</td><td>added</td></tr>
+      </tbody>
+    </table>
+  </details>
+</section>

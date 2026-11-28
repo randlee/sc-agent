@@ -1,0 +1,128 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "item": "agt-m-8",
+    "prev": "plan-20261128T094542Z-agt-m-8",
+    "next": "plan-20261128T095144Z-agt-m-8",
+    "changed": [
+      {
+        "anchor_id": "ANC-005",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-010",
+        "from": "not_applicable",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-015",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-020",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-024",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-025",
+        "from": "not_addressed",
+        "to": "satisfied",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-026",
+        "from": "underspecified",
+        "to": "satisfied",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-027",
+        "from": "underspecified",
+        "to": "satisfied",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-028",
+        "from": "not_addressed",
+        "to": "satisfied",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-031",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-032",
+        "from": "underspecified",
+        "to": "satisfied",
+        "improved": true
+      }
+    ],
+    "added": [],
+    "removed": [],
+    "regressions": [],
+    "pass_to_fail": [],
+    "fail_to_pass": [
+      "ANC-005",
+      "ANC-015",
+      "ANC-020",
+      "ANC-024",
+      "ANC-025",
+      "ANC-026",
+      "ANC-027",
+      "ANC-028",
+      "ANC-031",
+      "ANC-032"
+    ],
+    "item_size": {
+      "before_chars": 1926,
+      "after_chars": 2453,
+      "delta_chars": 527,
+      "grew": true
+    },
+    "excluded": [
+      {
+        "anchor_id": "ANC-005",
+        "reason": "m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths."
+      },
+      {
+        "anchor_id": "ANC-010",
+        "reason": "m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
+      },
+      {
+        "anchor_id": "ANC-015",
+        "reason": "m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
+      },
+      {
+        "anchor_id": "ANC-020",
+        "reason": "m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring."
+      },
+      {
+        "anchor_id": "ANC-024",
+        "reason": "m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability."
+      },
+      {
+        "anchor_id": "ANC-031",
+        "reason": "m-8 moves only sc-agent's own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool's storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner)."
+      }
+    ],
+    "pass_before": false,
+    "pass_after": true
+  },
+  "error": null
+}

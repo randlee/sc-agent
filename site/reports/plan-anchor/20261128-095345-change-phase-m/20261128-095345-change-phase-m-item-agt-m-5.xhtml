@@ -1,0 +1,226 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-item" id="item-agt-m-5">
+  <div class="section-head">
+    <h2>agt-m-5 <span class="unit-title">m-5: `sc-decision-runner`</span> <span class="status status-pass">PASS</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy item data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;changes&quot;: [
+    {
+      &quot;after_chars&quot;: 911,
+      &quot;before_chars&quot;: 713,
+      &quot;field&quot;: &quot;description&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+      &quot;reason&quot;: &quot;m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-008&quot;,
+      &quot;reason&quot;: &quot;m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-012&quot;,
+      &quot;reason&quot;: &quot;m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-013&quot;,
+      &quot;reason&quot;: &quot;m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-014&quot;,
+      &quot;reason&quot;: &quot;m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-015&quot;,
+      &quot;reason&quot;: &quot;m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-022&quot;,
+      &quot;reason&quot;: &quot;m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration.&quot;
+    }
+  ],
+  &quot;first&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-28T09:43:36+00:00&quot;,
+    &quot;excluded&quot;: [],
+    &quot;failing&quot;: [
+      &quot;ANC-001&quot;,
+      &quot;ANC-008&quot;,
+      &quot;ANC-012&quot;,
+      &quot;ANC-013&quot;,
+      &quot;ANC-014&quot;,
+      &quot;ANC-015&quot;,
+      &quot;ANC-021&quot;,
+      &quot;ANC-022&quot;
+    ],
+    &quot;pass&quot;: false,
+    &quot;run_id&quot;: &quot;plan-20261128T094336Z-agt-m-5&quot;,
+    &quot;score&quot;: &quot;1/10&quot;,
+    &quot;status&quot;: &quot;fail&quot;
+  },
+  &quot;id&quot;: &quot;agt-m-5&quot;,
+  &quot;last&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-28T09:49:26+00:00&quot;,
+    &quot;excluded&quot;: [
+      {
+        &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+        &quot;reason&quot;: &quot;m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-008&quot;,
+        &quot;reason&quot;: &quot;m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-012&quot;,
+        &quot;reason&quot;: &quot;m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-013&quot;,
+        &quot;reason&quot;: &quot;m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-014&quot;,
+        &quot;reason&quot;: &quot;m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-015&quot;,
+        &quot;reason&quot;: &quot;m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-022&quot;,
+        &quot;reason&quot;: &quot;m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration.&quot;
+      }
+    ],
+    &quot;failing&quot;: [],
+    &quot;pass&quot;: true,
+    &quot;run_id&quot;: &quot;plan-20261128T094926Z-agt-m-5&quot;,
+    &quot;score&quot;: &quot;2/3&quot;,
+    &quot;status&quot;: &quot;pass&quot;
+  },
+  &quot;runs&quot;: 2,
+  &quot;status&quot;: &quot;pass&quot;,
+  &quot;text_note&quot;: &quot;&quot;,
+  &quot;text_source&quot;: &quot;bd&quot;,
+  &quot;title&quot;: &quot;m-5: `sc-decision-runner`&quot;,
+  &quot;trail&quot;: [
+    {
+      &quot;created_at&quot;: &quot;2026-11-28T09:43:36+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-001&quot;,
+        &quot;ANC-008&quot;,
+        &quot;ANC-012&quot;,
+        &quot;ANC-013&quot;,
+        &quot;ANC-014&quot;,
+        &quot;ANC-015&quot;,
+        &quot;ANC-021&quot;,
+        &quot;ANC-022&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261128T094336Z-agt-m-5&quot;,
+      &quot;score&quot;: &quot;1/10&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-28T09:49:26+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-008&quot;,
+          &quot;reason&quot;: &quot;m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-012&quot;,
+          &quot;reason&quot;: &quot;m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-013&quot;,
+          &quot;reason&quot;: &quot;m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-014&quot;,
+          &quot;reason&quot;: &quot;m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-015&quot;,
+          &quot;reason&quot;: &quot;m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-022&quot;,
+          &quot;reason&quot;: &quot;m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261128T094926Z-agt-m-5&quot;,
+      &quot;score&quot;: &quot;2/3&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    }
+  ],
+  &quot;url&quot;: &quot;&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Plan item agt-m-5: m-5: `sc-decision-runner`
+Gate FAIL 1/10 -&gt; PASS 2/3 over 2 runs.
+Failing at first run: ANC-001, ANC-008, ANC-012, ANC-013, ANC-014, ANC-015, ANC-021, ANC-022.
+Failing now: none.
+Excluded ANC-001: m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001.
+Excluded ANC-008: m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9.
+Excluded ANC-012: m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4.
+Excluded ANC-013: m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API.
+Excluded ANC-014: m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7.
+Excluded ANC-015: m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.
+Excluded ANC-022: m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration.
+Changed fields: description.">&#x2398;</button>
+    </div>
+  </div>
+
+  <table class="gate">
+    <thead><tr><th scope="col">Planning gate</th><th scope="col">Result</th><th scope="col">Satisfied / applicable</th><th scope="col">Failing anchors</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">First run</th><td><span class="status status-fail">FAIL</span></td><td>1/10</td><td>ANC-001, ANC-008, ANC-012, ANC-013, ANC-014, ANC-015, ANC-021, ANC-022</td></tr>
+      <tr><th scope="row">Last run</th><td><span class="status status-pass">PASS</span></td><td>2/3</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <details class="trail">
+    <summary>All 2 runs</summary>
+    <table>
+      <thead><tr><th scope="col">Run</th><th scope="col">Created</th><th scope="col">Result</th><th scope="col">Score</th><th scope="col">Failing</th></tr></thead>
+      <tbody>
+        <tr><td><code>plan-20261128T094336Z-agt-m-5</code></td><td>2026-11-28T09:43:36+00:00</td><td><span class="status status-fail">FAIL</span></td><td>1/10</td><td>ANC-001, ANC-008, ANC-012, ANC-013, ANC-014, ANC-015, ANC-021, ANC-022</td></tr>
+        <tr><td><code>plan-20261128T094926Z-agt-m-5</code></td><td>2026-11-28T09:49:26+00:00</td><td><span class="status status-pass">PASS</span></td><td>2/3</td><td></td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Excluded anchors (not judged)</h3>
+  <table class="exclusions">
+    <thead><tr><th scope="col">Anchor</th><th scope="col">Reason</th><th scope="col">Since</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><a href="#anchor-ANC-001">ANC-001</a></th><td>m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-008">ANC-008</a></th><td>m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-012">ANC-012</a></th><td>m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-013">ANC-013</a></th><td>m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-014">ANC-014</a></th><td>m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-015">ANC-015</a></th><td>m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-022">ANC-022</a></th><td>m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration.</td><td>this round</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Text: first judged to now</h3>
+  <p class="small">Source: bd</p>
+  <details open="open">
+    <summary>description</summary>
+    <div class="diff"><div class="eq">The decider&#x27;s API: create a run, send one request or a batch, cancel, close. It chooses the provider from the model table and hands the request to whichever shape implements `Decision`; it contains no provider-specific line itself. Tools reach every provider through this one type. Nothing is written new; the prompt lookup from m-4 lands here.</div><div class="eq"></div><div class="eq">## Deliverables</div><div class="eq">1. M5-1 sc-decision-runner: apply the corresponding verbatim inventory/change section in design.</div><div class="eq">2. M5-2 Update crates/decidr/tests/cli.rs to call Run from sc-decision-runner after its move, keeping the CLI assertions (REQ-SAG-0501, REQ-SAG-0701).</div><div class="eq"></div><div class="ch">Architecture <del>placement:</del><ins>placement</ins> <del>`sc-decision-runner`</del><ins>(ANC-021;</ins> <del>is</del><ins>ADR-SAG-0004</ins> <del>a</del><ins>v0.5.0):</ins> <del>layer-3</del><ins>the</ins> <del>crate</del><ins>changes land in `sc-decision-runner`, layer 3, the lowest shared layer for the decision run/send/batch/cancel API because all decision tools reach providers through this runner</ins> above the <del>layer-1</del><ins>API-shape crates</ins> and <del>layer-2</del><ins>below</ins> <del>crates.</del><ins>their thin public surfaces.</ins></div></div>
+  </details>
+</section>

@@ -1,0 +1,2027 @@
+{
+  "anchors": [
+    {
+      "bead": "agt-jzag",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-2",
+          "item_url": "",
+          "reason": "This sprint relocates sc-agent-config without changing model resolution; agt-m-7 owns the Jev model selection behavior."
+        },
+        {
+          "added": true,
+          "item": "agt-m-5",
+          "item_url": "",
+          "reason": "m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001."
+        },
+        {
+          "added": true,
+          "item": "agt-m-6",
+          "item_url": "",
+          "reason": "m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:22:19+00:00",
+          "detail": "item: agt-m-2; reason: This sprint relocates sc-agent-config without changing model resolution; agt-m-7 owns the Jev model selection behavior.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-5; reason: m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-6; reason: m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-001",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "I want 'jev' to select latest, config can override default.",
+      "removed_exclusions": [],
+      "statement": "The decidr model name `jev` must select the newest Jev model in sc-agent's model table unless a config file sets another default, so callers get the latest Jev without a code change.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-8y0m",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [],
+      "id": "ANC-002",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "We need to read what we are writing, no back compat until SQLite 1.0",
+      "removed_exclusions": [],
+      "statement": "Until SQLite schema 1.0, sc-agent, judge-jev and plan-anchor must read only the record schema version they write and contain no reader for an older version, so read and write stay in step.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-tvqh",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [],
+      "id": "ANC-003",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "remove code & tests, don't just remove. We will baseline backward compatible reads in SQLite.",
+      "removed_exclusions": [],
+      "statement": "When a backward-compatible reader is removed, its code and its tests must both be deleted, because backward-compatible reads are baselined later in SQLite.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "3",
+      "version_now": "3"
+    },
+    {
+      "bead": "agt-bouw",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-11",
+          "item_url": "",
+          "reason": "This integration sprint does not change request input-size limits."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:52:38+00:00",
+          "detail": "item: agt-m-11; reason: This integration sprint does not change request input-size limits.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-004",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "These limits are clearly over-specified. Input is limited by model context.",
+      "removed_exclusions": [],
+      "statement": "sc-agent must impose no request input size limit of its own beyond the selected model's context, so input limits are not over-specified.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-2mm1",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-8",
+          "item_url": "",
+          "reason": "m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-8; reason: m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-005",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "I mandated - that all default loggers created in production have root/folder/file naming conventions specified.",
+      "removed_exclusions": [],
+      "statement": "In production runs, every logger sc-agent creates by default, not injected by a caller, must write under the configured log root with a fixed folder and file name, so tools can find the logs.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-o43c",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [],
+      "id": "ANC-006",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "Injected loggers are not changed (this was specifically set for ease of testing)",
+      "removed_exclusions": [],
+      "statement": "sc-agent must not change a logger the caller injects, so tests keep control of injected loggers.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-ctuj",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [],
+      "id": "ANC-007",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "2.5k phase cap is what matters",
+      "removed_exclusions": [],
+      "statement": "Phase m's non-test Rust code, as counted by scripts/gate/rewrite.py, must total at most 2,590 lines at every sprint end, so the phase stays small.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "4",
+      "version_now": "4"
+    },
+    {
+      "bead": "agt-jorx",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-5",
+          "item_url": "",
+          "reason": "m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-5; reason: m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-008",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "Related values are strategically grouped in one struct to remove repeated method parameters, for efficient encapsulation and to minimize repeated code as the architecture scales.",
+      "removed_exclusions": [],
+      "statement": "In sc-agent code, related values passed to several methods must be grouped in one struct that replaces those repeated parameters, so encapsulation is efficient and repeated code stays minimal as the architecture scales.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "3",
+      "version_now": "3"
+    },
+    {
+      "bead": "agt-1quf",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-2",
+          "item_url": "",
+          "reason": "This sprint relocates the existing model table unchanged; configuration-supplied model rows are added by agt-m-7."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:08:56+00:00",
+          "detail": "item: agt-m-2; reason: This sprint relocates the existing model table unchanged; additional model rows from configuration are introduced in m-7.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:22:19+00:00",
+          "detail": "item: agt-m-2",
+          "event": "exclusion_removed"
+        },
+        {
+          "at": "2026-11-28T09:22:19+00:00",
+          "detail": "item: agt-m-2; reason: This sprint relocates the existing model table unchanged; configuration-supplied model rows are added by agt-m-7.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-009",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "hard-coded rows will get stale quickly and often",
+      "removed_exclusions": [],
+      "statement": "The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-43sg",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-2",
+          "item_url": "",
+          "reason": "This sprint changes sc-agent configuration code only and does not change judge-jev, plan-anchor, or their shared client template."
+        },
+        {
+          "added": true,
+          "item": "agt-m-7",
+          "item_url": "",
+          "reason": "m-7 changes Rust configuration rows and Settings, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
+        },
+        {
+          "added": true,
+          "item": "agt-m-8",
+          "item_url": "",
+          "reason": "m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:22:19+00:00",
+          "detail": "item: agt-m-2; reason: This sprint changes sc-agent configuration code only and does not change judge-jev, plan-anchor, or their shared client template.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:51:07+00:00",
+          "detail": "item: agt-m-7; reason: m-7 changes Rust configuration rows and Settings, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:51:08+00:00",
+          "detail": "item: agt-m-8; reason: m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-010",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "For years any copy/paste was a big red flag that I was growing the code base unnecessarily.",
+      "removed_exclusions": [],
+      "statement": "sc-agent, judge-jev and plan-anchor code must not copy and paste logic between files or tools, so the code base does not grow unnecessarily.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "3",
+      "version_now": "3"
+    },
+    {
+      "bead": "agt-sa4v",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-6",
+          "item_url": "",
+          "reason": "m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification."
+        },
+        {
+          "added": true,
+          "item": "agt-m-7",
+          "item_url": "",
+          "reason": "m-7 changes provider data behind existing provider_keys without changing offered CLI or Python operations; agt-m-11 carries consumer integration verification."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-6; reason: m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-7; reason: m-7 changes provider data behind existing provider_keys without changing offered CLI or Python operations; agt-m-11 carries consumer integration verification.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-011",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "I expect the python api may allow more flexibility than cli, NOT less.",
+      "removed_exclusions": [],
+      "statement": "Every operation the decidr CLI offers must also be callable from the sc-agent Python API, so the Python API is never less flexible than the CLI.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-et87",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-5",
+          "item_url": "",
+          "reason": "m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4."
+        },
+        {
+          "added": true,
+          "item": "agt-m-7",
+          "item_url": "",
+          "reason": "m-7 changes provider and model configuration rows, not the wire-format Decision implementations; agt-m-4 carries the single implementation per API shape."
+        },
+        {
+          "added": true,
+          "item": "agt-m-9",
+          "item_url": "",
+          "reason": "This HTTP transport sprint does not implement decision provider traits; agt-m-4 carries the decision wire-format implementations."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-5; reason: m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-7; reason: m-7 changes provider and model configuration rows, not the wire-format Decision implementations; agt-m-4 carries the single implementation per API shape.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:52:38+00:00",
+          "detail": "item: agt-m-9; reason: This HTTP transport sprint does not implement decision provider traits; agt-m-4 carries the decision wire-format implementations.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-012",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.",
+      "removed_exclusions": [],
+      "statement": "sc-agent's decision providers must implement one decision trait, with one implementation per wire format (Jev TypeSafe systemone, OpenAI-compatible chat/completions, Anthropic-compatible Messages), and every provider that speaks a wire format must use that format's implementation, so adding a provider needs no new code or hard-coding.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-jod5",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-1",
+          "item_url": "",
+          "reason": "This item moves the shared Llm trait and JSON-schema helper but changes no non-Jev LLM call; m-4 owns the wire-format implementations and call behavior."
+        },
+        {
+          "added": true,
+          "item": "agt-m-5",
+          "item_url": "",
+          "reason": "m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API."
+        },
+        {
+          "added": true,
+          "item": "agt-m-11",
+          "item_url": "",
+          "reason": "This integration sprint does not change the LLM trait or provider wire formats; agt-m-4 carries the shared implementations."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-5; reason: m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:51:42+00:00",
+          "detail": "item: agt-m-1; reason: This item moves the shared Llm trait and JSON-schema helper but changes no non-Jev LLM call; m-4 owns the wire-format implementations and call behavior.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:52:38+00:00",
+          "detail": "item: agt-m-11; reason: This integration sprint does not change the LLM trait or provider wire formats; agt-m-4 carries the shared implementations.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-013",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.",
+      "removed_exclusions": [],
+      "statement": "sc-agent must provide an LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider speaking that format, so callers reach any LLM through one interface.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-pahi",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-5",
+          "item_url": "",
+          "reason": "m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-5; reason: m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-014",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "make sure config allows settings for decidr.luna-system-prompt and decidr.haiku-system-prompt as alternatives that can be overridden from config when we do more extensive testing w/out code changes.",
+      "removed_exclusions": [],
+      "statement": "When an LLM answers a decision request in place of Jev, sc-agent must send a built-in default system prompt, and the config settings decidr.luna-system-prompt and decidr.haiku-system-prompt must each override that prompt for their model, so prompts can be tested without code changes.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-fokq",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": false,
+          "item": "agt-m-0",
+          "item_url": "",
+          "reason": "m-0 adds or changes no REQ, NFR or ADR record of sc-agent, judge-jev, plan-anchor or any other tool; it only cites existing records."
+        },
+        {
+          "added": true,
+          "item": "agt-m-1",
+          "item_url": "",
+          "reason": "This sprint changes crate code and a CLI test import, not requirement, NFR, or ADR records for derivative tools."
+        },
+        {
+          "added": true,
+          "item": "agt-m-2",
+          "item_url": "",
+          "reason": "This sprint moves configuration code and adds or changes no REQ, NFR, or ADR records for derivative tools."
+        },
+        {
+          "added": true,
+          "item": "agt-m-5",
+          "item_url": "",
+          "reason": "m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move."
+        },
+        {
+          "added": true,
+          "item": "agt-m-6",
+          "item_url": "",
+          "reason": "m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move."
+        },
+        {
+          "added": true,
+          "item": "agt-m-7",
+          "item_url": "",
+          "reason": "m-7 changes configuration code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
+        },
+        {
+          "added": true,
+          "item": "agt-m-8",
+          "item_url": "",
+          "reason": "m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
+        },
+        {
+          "added": true,
+          "item": "agt-m-9",
+          "item_url": "",
+          "reason": "This transport sprint changes no cross-tool requirements or derivative-tool records."
+        },
+        {
+          "added": true,
+          "item": "agt-m-10",
+          "item_url": "",
+          "reason": "This LLM runtime sprint changes no cross-tool requirements or derivative-tool records."
+        },
+        {
+          "added": true,
+          "item": "agt-m-11",
+          "item_url": "",
+          "reason": "This integration sprint changes no cross-tool requirements or derivative-tool records."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:08:56+00:00",
+          "detail": "item: agt-m-2; reason: This sprint moves code only and does not add or change records for derivative tools.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:22:19+00:00",
+          "detail": "item: agt-m-2",
+          "event": "exclusion_removed"
+        },
+        {
+          "at": "2026-11-28T09:22:19+00:00",
+          "detail": "item: agt-m-2; reason: This sprint moves configuration code and adds or changes no REQ, NFR, or ADR records for derivative tools.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-5; reason: m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-6; reason: m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-7; reason: m-7 changes configuration code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-8; reason: m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:51:42+00:00",
+          "detail": "item: agt-m-1; reason: This sprint changes crate code and a CLI test import, not requirement, NFR, or ADR records for derivative tools.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:52:38+00:00",
+          "detail": "item: agt-m-9; reason: This transport sprint changes no cross-tool requirements or derivative-tool records.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:52:38+00:00",
+          "detail": "item: agt-m-10; reason: This LLM runtime sprint changes no cross-tool requirements or derivative-tool records.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:52:38+00:00",
+          "detail": "item: agt-m-11; reason: This integration sprint changes no cross-tool requirements or derivative-tool records.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-015",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools",
+      "removed_exclusions": [],
+      "statement": "A rule that applies to every decidr-based tool (logging, model resolution and the like) must be specified only in sc-agent's records; a derivative tool's records (judge-jev, plan-anchor and others) must not restate it and give only the tool name and the tool's own behaviour, so each rule has one source.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-mww2",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [],
+      "id": "ANC-016",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "judge-jev/plan-anchor and other derivative tools should defer to the default tool rules and not use injection path for production code (test only).",
+      "removed_exclusions": [],
+      "statement": "sc-agent's records must define the logger-injection path, and a derivative tool's production code must not use it, only its tests, so production logs always follow sc-agent's default rules.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-lnby",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": false,
+          "item": "agt-m-0",
+          "item_url": "",
+          "reason": "m-0 adds empty crates, boundary records and a CI lint step; it adds or changes no test."
+        },
+        {
+          "added": true,
+          "item": "agt-m-2",
+          "item_url": "",
+          "reason": "This sprint relocates the existing tests unchanged; deterministic test changes for the model configuration work are owned by agt-m-7."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:22:19+00:00",
+          "detail": "item: agt-m-2; reason: This sprint relocates the existing tests unchanged; deterministic test changes for the model configuration work are owned by agt-m-7.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-017",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.",
+      "removed_exclusions": [],
+      "statement": "sc-agent tests must not depend on races, wall-clock timing, sleeps, event-loop ordering or system load; a test found to depend on one must be redesigned to drive its logic with controlled inputs.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-y7m6",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": false,
+          "item": "agt-m-0",
+          "item_url": "",
+          "reason": "m-0's only CI change is a static sc-lint boundary job; it adds no live-provider test, live-run selection or workflow_dispatch job."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [],
+      "id": "ANC-018",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.",
+      "removed_exclusions": [],
+      "statement": "sc-agent's integration tests must be its unit tests run against live agents, triggered manually.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "4",
+      "version_now": "4"
+    },
+    {
+      "bead": "agt-e0lk",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": false,
+          "item": "agt-m-0",
+          "item_url": "",
+          "reason": "m-0 does not edit requires-python, Python version checks, CI Python matrices or interpreter guards; its python3 commands only run the sc-lint bootstrap and the gate script."
+        },
+        {
+          "added": true,
+          "item": "agt-m-11",
+          "item_url": "",
+          "reason": "requires-python is already >=3.11 (crates/sc-agent-py/pyproject.toml:11); m-11 changes no Python version, check or matrix."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:52:38+00:00",
+          "detail": "item: agt-m-11; reason: requires-python is already >=3.11 (crates/sc-agent-py/pyproject.toml:11); m-11 changes no Python version, check or matrix.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-019",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "sc-agent, judge-jev, prompt-anchor all must be 3.11+",
+      "removed_exclusions": [],
+      "statement": "sc-agent must require Python 3.11 or newer.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "3",
+      "version_now": "3"
+    },
+    {
+      "bead": "agt-g3pq",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-8",
+          "item_url": "",
+          "reason": "m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-8; reason: m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-020",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "we created a oversized set of sprints expressly to normalize config and logging around sc-observability logger (injected).  why do you keep adding more loggers to the design? ... add a new anchor banning python_logger ... lock this",
+      "removed_exclusions": [],
+      "statement": "When a caller passes its own sc_observability Logger into an sc-agent wheel call, sc-agent must not build a second Logger for that log.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-s6th",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [],
+      "id": "ANC-021",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "You need to be able to push shared methods down and move differences up",
+      "removed_exclusions": [],
+      "statement": "Every phase-m sprint bead names the crate and layer each change lands in, and that layer is the lowest layer whose crates all use the change.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-czru",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-2",
+          "item_url": "",
+          "reason": "This sprint relocates configuration code without changing local-model resolution; agt-m-7 owns the local-model configuration behavior."
+        },
+        {
+          "added": true,
+          "item": "agt-m-5",
+          "item_url": "",
+          "reason": "m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:22:19+00:00",
+          "detail": "item: agt-m-2; reason: This sprint relocates configuration code without changing local-model resolution; agt-m-7 owns the local-model configuration behavior.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-5; reason: m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-022",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "local models come from config. Both ip & model string.",
+      "removed_exclusions": [],
+      "statement": "sc-agent has no hard-coded row for a local model: a local model's URL and model id come only from config.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-rdga",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-10",
+          "item_url": "",
+          "reason": "This sprint consumes sessions and does not change session persistence; agt-m-8 carries SQLite session writes."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:52:38+00:00",
+          "detail": "item: agt-m-10; reason: This sprint consumes sessions and does not change session persistence; agt-m-8 carries SQLite session writes.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-023",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "I want session logs written to SQLite, jsonl was just a quick item for mvp",
+      "removed_exclusions": [],
+      "statement": "sc-agent writes each session row to the repository's SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-69i3",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-8",
+          "item_url": "",
+          "reason": "m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-8; reason: m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-024",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "general logs follow sc-obs rotation/deletion guidelines",
+      "removed_exclusions": [],
+      "statement": "The general log is written through sc-observability under its rotation and deletion policy; sc-agent adds no retention rule of its own.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-3fwl",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [],
+      "id": "ANC-025",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "I consider schema to hold schema (structs and literal sql text) only. Exceptions would be extension convenience methods/transforms and schema versioning/upgrade code.",
+      "removed_exclusions": [],
+      "statement": "`sc-agent-schema` contains only struct definitions, literal SQL text and convenience methods on those structs; it has no SQLite dependency and no upgrade code.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-lw7b",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": false,
+          "item": "agt-m-0",
+          "item_url": "",
+          "reason": "m-0 adds no SQL table definition anywhere; sc-agent-schema is an empty crate in this sprint."
+        },
+        {
+          "added": true,
+          "item": "agt-m-1",
+          "item_url": "",
+          "reason": "This sprint moves request/answer types and defines no SQL table; table SQL is owned by agt-m-8."
+        },
+        {
+          "added": true,
+          "item": "agt-m-2",
+          "item_url": "",
+          "reason": "This sprint adds or changes no SQL table definitions; the table-definition work is owned by agt-m-8."
+        },
+        {
+          "added": true,
+          "item": "agt-m-7",
+          "item_url": "",
+          "reason": "m-7 defines provider and model configuration rows, not SQL tables; agt-m-8 carries core SQL ownership in sc-agent-schema."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:08:56+00:00",
+          "detail": "item: agt-m-2; reason: This sprint moves configuration code and does not add or change SQL table definitions.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:22:19+00:00",
+          "detail": "item: agt-m-2",
+          "event": "exclusion_removed"
+        },
+        {
+          "at": "2026-11-28T09:22:19+00:00",
+          "detail": "item: agt-m-2; reason: This sprint adds or changes no SQL table definitions; the table-definition work is owned by agt-m-8.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-7; reason: m-7 defines provider and model configuration rows, not SQL tables; agt-m-8 carries core SQL ownership in sc-agent-schema.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:51:42+00:00",
+          "detail": "item: agt-m-1; reason: This sprint moves request/answer types and defines no SQL table; table SQL is owned by agt-m-8.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-026",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "SQLite schema is in sc-agent-schema.",
+      "removed_exclusions": [],
+      "statement": "Every core table's SQL is defined in `sc-agent-schema` and nowhere else.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-kkrv",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-10",
+          "item_url": "",
+          "reason": "This sprint consumes sessions and does not define their tables; agt-m-8 carries the message and response schema."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:52:38+00:00",
+          "detail": "item: agt-m-10; reason: This sprint consumes sessions and does not define their tables; agt-m-8 carries the message and response schema.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-027",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "We likely want message+sha256 and response+model in separate tables as this is one->many",
+      "removed_exclusions": [],
+      "statement": "The session schema stores a request once in `messages`, keyed by sha256, and each model reply as a row in `responses` that references it.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-0fau",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-10",
+          "item_url": "",
+          "reason": "This sprint does not change cache-key definition; agt-m-8 carries the session cache."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:52:38+00:00",
+          "detail": "item: agt-m-10; reason: This sprint does not change cache-key definition; agt-m-8 carries the session cache.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-028",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "run-id has nothing to do with caching. run is a collection of queries of which some may be cached (if caching enabled)",
+      "removed_exclusions": [],
+      "statement": "A cache hit is decided by the request sha256 and the model alone; `run_id` is not part of the cache key.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-x65j",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [],
+      "id": "ANC-029",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "Refers to sc-llm behavior. —resume on decision session would convert it to llm-session",
+      "removed_exclusions": [],
+      "statement": "`--resume` is implemented in `sc-llm`.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "3",
+      "version_now": "3"
+    },
+    {
+      "bead": "agt-2sum",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [],
+      "id": "ANC-030",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.",
+      "removed_exclusions": [],
+      "statement": "Retry and holdoff code takes its waits, limits and busy and quota rules as parameters from the calling layer, and contains no provider name, host or status-code table.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "3",
+      "version_now": "3"
+    },
+    {
+      "bead": "agt-yz3r",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": true,
+          "item": "agt-m-8",
+          "item_url": "",
+          "reason": "m-8 moves only sc-agent's own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool's storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner)."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-8; reason: m-8 moves only sc-agent's own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool's storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner).; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-031",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "At the end of the day, I want all the 'results' from plan-anchor, judge-jev or any other app to save data to SQLite.",
+      "removed_exclusions": [],
+      "statement": "judge-jev, plan-anchor and every other sc-agent-based tool store their results in the repository's SQLite database, not in JSON or JSONL result files.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-ws1i",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [
+        {
+          "added": false,
+          "item": "agt-m-0",
+          "item_url": "",
+          "reason": "m-0 adds no table definition and no schema version, and does not touch crates/sc-agent-py."
+        },
+        {
+          "added": true,
+          "item": "agt-m-2",
+          "item_url": "",
+          "reason": "This sprint adds or changes no table definitions, schema versions, or wheel code; those changes are owned by agt-m-8."
+        },
+        {
+          "added": true,
+          "item": "agt-m-6",
+          "item_url": "",
+          "reason": "m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions."
+        },
+        {
+          "added": true,
+          "item": "agt-m-7",
+          "item_url": "",
+          "reason": "m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions."
+        },
+        {
+          "added": true,
+          "item": "agt-m-11",
+          "item_url": "",
+          "reason": "This integration sprint changes no table or schema definition; agt-m-8 carries session schema work."
+        }
+      ],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [
+        {
+          "at": "2026-11-28T09:08:56+00:00",
+          "detail": "item: agt-m-2; reason: This sprint moves configuration code and does not change tool table definitions, schema versions, or the wheel crate.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:22:19+00:00",
+          "detail": "item: agt-m-2",
+          "event": "exclusion_removed"
+        },
+        {
+          "at": "2026-11-28T09:22:19+00:00",
+          "detail": "item: agt-m-2; reason: This sprint adds or changes no table definitions, schema versions, or wheel code; those changes are owned by agt-m-8.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-6; reason: m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:47:54+00:00",
+          "detail": "item: agt-m-7; reason: m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.; replaced: false",
+          "event": "excluded"
+        },
+        {
+          "at": "2026-11-28T09:52:38+00:00",
+          "detail": "item: agt-m-11; reason: This integration sprint changes no table or schema definition; agt-m-8 carries session schema work.; replaced: false",
+          "event": "excluded"
+        }
+      ],
+      "id": "ANC-032",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "Also schema is not encoded at individual wheel layer. Schema is versioned for app tables independently.",
+      "removed_exclusions": [],
+      "statement": "Each tool's tables carry their own schema version, independent of the core schema version; no table definition is in the wheel crate `sc-agent-py`.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    },
+    {
+      "bead": "agt-kkxs",
+      "bead_url": "",
+      "changes": [],
+      "exclusions": [],
+      "fixtures_after": "-",
+      "fixtures_before": "-",
+      "history": [],
+      "id": "ANC-033",
+      "questions_default": "-",
+      "questions_tuned": "-",
+      "quote": "—resume on decision session would convert it to llm-session",
+      "removed_exclusions": [],
+      "statement": "Resuming a decision session with `--resume` continues that session as an LLM session.",
+      "status": "locked",
+      "status_before": "locked",
+      "tuning": [],
+      "version_before": "2",
+      "version_now": "2"
+    }
+  ],
+  "baseline_rev": "5817c67d134e52737a3f3ea83bb281e0fe9a74d0",
+  "commit": "5817c67d",
+  "drift_review": {
+    "acceptable_choices": [
+      {
+        "location": "agt-m-5..agt-m-8 descriptions",
+        "note": "All growth names locked ANC IDs predating the failed runs. Layer rationale comes from each existing Summary and ADR-SAG-0004 v0.5.0. m-7 explicitly states existing locked model/configuration/test constraints; m-8 explains existing schema/Db signatures without changing them."
+      },
+      {
+        "location": "exclusions",
+        "note": "Carry-forward reasons name their carrying sprints. Untouched derivative-record/consumer-code scopes name no invented carrier; ANC-031 explicitly has no carrier. Low-relevance exclusion counts: m5=6, m6=3, m7=4, m8=4."
+      }
+    ],
+    "compared": "agt-m-5..agt-m-8 initial and final live beads; all 33 anchor statements, scopes, quotes, fixtures and versions against pre-run snapshot; inventory/design text before and after",
+    "confirmations": [
+      {
+        "area": "source preservation",
+        "note": "Each full design is byte-identical before/after this gate work; no inventory, signature, requirement or ADR text changed."
+      },
+      {
+        "area": "anchor integrity",
+        "note": "All 33 statements, scopes, quotes, fixtures, versions and question definitions unchanged; only per-item exclusions added."
+      },
+      {
+        "area": "outcomes",
+        "note": "m-5, m-6 and m-8 pass. m-7 FAIL remains visible; no self-certification or scope exclusion hides ANC-008."
+      },
+      {
+        "area": "invalid runs",
+        "note": "Three invalid setup attempts are outside anchor-runs under scratchpad/invalid-runs: 094117Z-m5, 094139Z-m6, 094229Z-m7. Excluded from coverage and stopping count."
+      }
+    ],
+    "findings": [
+      {
+        "authority": {
+          "quote": "Related values are strategically grouped in one struct to remove repeated method parameters, for efficient encapsulation and to minimize repeated code as the architecture scales.",
+          "ref": "ANC-008"
+        },
+        "fix_note": "Lead message 01M8GS4MXBFG3DY1A7AV6MQ5ZS directs preserving FAIL and referring to arch-ai; exact disputed note appended to agt-m-7.",
+        "id": "M7-DISPUTED",
+        "location": "agt-m-7 ANC-008",
+        "severity": "material",
+        "status": "owner_decision",
+        "suggested_fix": "Leave the failing cell intact for arch-ai and independent tuner adjudication; add no further prose.",
+        "what_changed": "One Settings grouping clarification was added, but valid run plan-20261128T095135Z-agt-m-7 remains underspecified: relevant no 0.30; addressed yes 0.80; diagnostic yes_struct_change 1.0. No exclusion or question change is justified."
+      },
+      {
+        "authority": {
+          "quote": "At the end of the day, I want all the 'results' from plan-anchor, judge-jev or any other app to save data to SQLite.",
+          "ref": "ANC-031"
+        },
+        "fix_note": "Exact exclusion reason authorized by lead 01M8GRT316R9TMY03RJP8XE4CK; lead noted it on m-8 and sent it to arch-ai.",
+        "id": "M8-COVERAGE",
+        "location": "ANC-031 phase coverage",
+        "severity": "material",
+        "status": "owner_decision",
+        "suggested_fix": "Keep the gap explicit pending the owner; do not claim core session logging satisfies derivative-tool storage.",
+        "what_changed": "m-8 exclusion records that core session persistence does not migrate derivative-tool result storage, and no phase-m sprint carries that migration."
+      }
+    ],
+    "not_reviewed": "No production implementation or deterministic line-count gate execution; this is planning only. Other agents own m-0..m-4 and m-9..m-11.",
+    "reviewed_at": "2026-11-28T09:53:45.229469+00:00",
+    "schema": "plan-anchoring/drift-review/1"
+  },
+  "gate": "plan",
+  "generated_at": "2026-11-28 09:53 UTC",
+  "items": [
+    {
+      "changes": [
+        {
+          "after": "The decider's API: create a run, send one request or a batch, cancel, close. It chooses the provider from the model table and hands the request to whichever shape implements `Decision`; it contains no provider-specific line itself. Tools reach every provider through this one type. Nothing is written new; the prompt lookup from m-4 lands here.\n\n## Deliverables\n1. M5-1 sc-decision-runner: apply the corresponding verbatim inventory/change section in design.\n2. M5-2 Update crates/decidr/tests/cli.rs to call Run from sc-decision-runner after its move, keeping the CLI assertions (REQ-SAG-0501, REQ-SAG-0701).\n\nArchitecture placement (ANC-021; ADR-SAG-0004 v0.5.0): the changes land in `sc-decision-runner`, layer 3, the lowest shared layer for the decision run/send/batch/cancel API because all decision tools reach providers through this runner above the API-shape crates and below their thin public surfaces.",
+          "before": "The decider's API: create a run, send one request or a batch, cancel, close. It chooses the provider from the model table and hands the request to whichever shape implements `Decision`; it contains no provider-specific line itself. Tools reach every provider through this one type. Nothing is written new; the prompt lookup from m-4 lands here.\n\n## Deliverables\n1. M5-1 sc-decision-runner: apply the corresponding verbatim inventory/change section in design.\n2. M5-2 Update crates/decidr/tests/cli.rs to call Run from sc-decision-runner after its move, keeping the CLI assertions (REQ-SAG-0501, REQ-SAG-0701).\n\nArchitecture placement: `sc-decision-runner` is a layer-3 crate above the layer-1 and layer-2 crates.\n",
+          "field": "description"
+        }
+      ],
+      "exclusions": [
+        {
+          "added": true,
+          "anchor_id": "ANC-001",
+          "reason": "m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-008",
+          "reason": "m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-012",
+          "reason": "m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-013",
+          "reason": "m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-014",
+          "reason": "m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-015",
+          "reason": "m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-022",
+          "reason": "m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration."
+        }
+      ],
+      "first": {
+        "created_at": "2026-11-28T09:43:36+00:00",
+        "excluded": [],
+        "failing": [
+          "ANC-001",
+          "ANC-008",
+          "ANC-012",
+          "ANC-013",
+          "ANC-014",
+          "ANC-015",
+          "ANC-021",
+          "ANC-022"
+        ],
+        "pass": false,
+        "run_id": "plan-20261128T094336Z-agt-m-5",
+        "score": "1/10",
+        "status": "fail"
+      },
+      "id": "agt-m-5",
+      "last": {
+        "created_at": "2026-11-28T09:49:26+00:00",
+        "excluded": [
+          {
+            "anchor_id": "ANC-001",
+            "reason": "m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001."
+          },
+          {
+            "anchor_id": "ANC-008",
+            "reason": "m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9."
+          },
+          {
+            "anchor_id": "ANC-012",
+            "reason": "m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4."
+          },
+          {
+            "anchor_id": "ANC-013",
+            "reason": "m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API."
+          },
+          {
+            "anchor_id": "ANC-014",
+            "reason": "m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7."
+          },
+          {
+            "anchor_id": "ANC-015",
+            "reason": "m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move."
+          },
+          {
+            "anchor_id": "ANC-022",
+            "reason": "m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration."
+          }
+        ],
+        "failing": [],
+        "pass": true,
+        "run_id": "plan-20261128T094926Z-agt-m-5",
+        "score": "2/3",
+        "status": "pass"
+      },
+      "runs": 2,
+      "status": "pass",
+      "text_note": "",
+      "text_source": "bd",
+      "title": "m-5: `sc-decision-runner`",
+      "trail": [
+        {
+          "created_at": "2026-11-28T09:43:36+00:00",
+          "excluded": [],
+          "failing": [
+            "ANC-001",
+            "ANC-008",
+            "ANC-012",
+            "ANC-013",
+            "ANC-014",
+            "ANC-015",
+            "ANC-021",
+            "ANC-022"
+          ],
+          "pass": false,
+          "run_id": "plan-20261128T094336Z-agt-m-5",
+          "score": "1/10",
+          "status": "fail"
+        },
+        {
+          "created_at": "2026-11-28T09:49:26+00:00",
+          "excluded": [
+            {
+              "anchor_id": "ANC-001",
+              "reason": "m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001."
+            },
+            {
+              "anchor_id": "ANC-008",
+              "reason": "m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9."
+            },
+            {
+              "anchor_id": "ANC-012",
+              "reason": "m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4."
+            },
+            {
+              "anchor_id": "ANC-013",
+              "reason": "m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API."
+            },
+            {
+              "anchor_id": "ANC-014",
+              "reason": "m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7."
+            },
+            {
+              "anchor_id": "ANC-015",
+              "reason": "m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move."
+            },
+            {
+              "anchor_id": "ANC-022",
+              "reason": "m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration."
+            }
+          ],
+          "failing": [],
+          "pass": true,
+          "run_id": "plan-20261128T094926Z-agt-m-5",
+          "score": "2/3",
+          "status": "pass"
+        }
+      ],
+      "url": ""
+    },
+    {
+      "changes": [
+        {
+          "after": "The shell that kept every sprint green is removed. The CLI and the wheel are what they should be: argument parsing and Python binding glue over the runner's API, with no business logic to duplicate. Nothing is written.\n\n## Deliverables\n1. M6-1 old sc-agent crate deletion: apply the corresponding verbatim inventory/change section in design.\n2. M6-2 decidr imports: apply the corresponding verbatim inventory/change section in design.\n3. M6-3 sitr imports: apply the corresponding verbatim inventory/change section in design.\n4. M6-4 sc-agent-py imports: apply the corresponding verbatim inventory/change section in design.\n5. M6-5 Update tests/contract/test_version_sync.py::VersionSync.test_checked_in_cli_versions_match_workspace to check the replacement workspace crate version entries instead of the removed sc-agent dependency; retain the remaining version checks (REQ-SAG-0018, ADR-SAG-0017).\n6. M6-6 Remove the deleted sc-agent manifest from release/sc-publish-consumer-input.json and regenerate release/publish-artifacts.toml through the pinned release installer, preserving the remaining release entries (ADR-SAG-0017, ADR-SAG-0018).\n\nArchitecture placement (ANC-021; ADR-SAG-0004 v0.5.0): the import glue lands in `decidr` and `sc-agent-py`, layer 4, and in `sitr` on its separate `sc-treesitter` stack, the lowest layers that need CLI argument parsing and Python binding glue because the shared business logic already lives in the runner and core crates, while the former `sc-agent` shell is deleted.",
+          "before": "The shell that kept every sprint green is removed. The CLI and the wheel are what they should be: argument parsing and Python binding glue over the runner's API, with no business logic to duplicate. Nothing is written.\n\n## Deliverables\n1. M6-1 old sc-agent crate deletion: apply the corresponding verbatim inventory/change section in design.\n2. M6-2 decidr imports: apply the corresponding verbatim inventory/change section in design.\n3. M6-3 sitr imports: apply the corresponding verbatim inventory/change section in design.\n4. M6-4 sc-agent-py imports: apply the corresponding verbatim inventory/change section in design.\n5. M6-5 Update tests/contract/test_version_sync.py::VersionSync.test_checked_in_cli_versions_match_workspace to check the replacement workspace crate version entries instead of the removed sc-agent dependency; retain the remaining version checks (REQ-SAG-0018, ADR-SAG-0017).\n6. M6-6 Remove the deleted sc-agent manifest from release/sc-publish-consumer-input.json and regenerate release/publish-artifacts.toml through the pinned release installer, preserving the remaining release entries (ADR-SAG-0017, ADR-SAG-0018).\n\nArchitecture placement: `decidr`, `sitr`, and `sc-agent-py` are layer-4 consumers; this sprint removes the former `sc-agent` shell and updates those consumer crates.\n",
+          "field": "description"
+        }
+      ],
+      "exclusions": [
+        {
+          "added": true,
+          "anchor_id": "ANC-001",
+          "reason": "m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-011",
+          "reason": "m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-015",
+          "reason": "m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-032",
+          "reason": "m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions."
+        }
+      ],
+      "first": {
+        "created_at": "2026-11-28T09:43:46+00:00",
+        "excluded": [],
+        "failing": [
+          "ANC-021",
+          "ANC-032",
+          "ANC-001",
+          "ANC-011",
+          "ANC-015"
+        ],
+        "pass": false,
+        "run_id": "plan-20261128T094346Z-agt-m-6",
+        "score": "2/8",
+        "status": "fail"
+      },
+      "id": "agt-m-6",
+      "last": {
+        "created_at": "2026-11-28T09:49:33+00:00",
+        "excluded": [
+          {
+            "anchor_id": "ANC-001",
+            "reason": "m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration."
+          },
+          {
+            "anchor_id": "ANC-011",
+            "reason": "m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification."
+          },
+          {
+            "anchor_id": "ANC-015",
+            "reason": "m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move."
+          },
+          {
+            "anchor_id": "ANC-032",
+            "reason": "m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions."
+          }
+        ],
+        "failing": [],
+        "pass": true,
+        "run_id": "plan-20261128T094933Z-agt-m-6",
+        "score": "3/4",
+        "status": "pass"
+      },
+      "runs": 2,
+      "status": "pass",
+      "text_note": "",
+      "text_source": "bd",
+      "title": "m-6: old `sc-agent` crate deleted; CLI and wheel on the new crates",
+      "trail": [
+        {
+          "created_at": "2026-11-28T09:43:46+00:00",
+          "excluded": [],
+          "failing": [
+            "ANC-021",
+            "ANC-032",
+            "ANC-001",
+            "ANC-011",
+            "ANC-015"
+          ],
+          "pass": false,
+          "run_id": "plan-20261128T094346Z-agt-m-6",
+          "score": "2/8",
+          "status": "fail"
+        },
+        {
+          "created_at": "2026-11-28T09:49:33+00:00",
+          "excluded": [
+            {
+              "anchor_id": "ANC-001",
+              "reason": "m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration."
+            },
+            {
+              "anchor_id": "ANC-011",
+              "reason": "m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification."
+            },
+            {
+              "anchor_id": "ANC-015",
+              "reason": "m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move."
+            },
+            {
+              "anchor_id": "ANC-032",
+              "reason": "m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions."
+            }
+          ],
+          "failing": [],
+          "pass": true,
+          "run_id": "plan-20261128T094933Z-agt-m-6",
+          "score": "3/4",
+          "status": "pass"
+        }
+      ],
+      "url": ""
+    },
+    {
+      "changes": [
+        {
+          "after": "After this sprint, adding a provider or a model is a line of configuration and no Rust change. The compiled-in table becomes the default configuration value, so today's behaviour is the default and every row can be overridden or added to. Settings become one typed struct, so adding a setting is adding a field, and serde does the validation that 150 lines do by hand today. The sprint deletes more than it adds.\n\n## Deliverables\n1. M7-1 sc-agent-config typed settings and provider/model rows: apply the corresponding verbatim inventory/change section in design.\n2. M7-2 Update sc-agent-py provider_keys to read the configured provider entries in place of the deleted PROVIDERS table, preserving the Python result shape (REQ-SAG-0401, REQ-SAG-0503, ADR-SAG-0005).\n\nArchitecture placement (ANC-021; ADR-SAG-0004 v0.5.0): configuration changes land in `sc-agent-config`, layer 1, the lowest shared layer for typed settings and provider/model rows because every launcher needs the same configuration rather than its own Rust provider table.\n\nThe `jev` default selects the newest Jev model unless configuration sets another default (ANC-001); defaults contain no hard-coded local-model row, and local-model URL and model id come only from configuration (ANC-022). Related configuration values flow together as the same typed `Settings` struct rather than repeated method parameters (ANC-008). Any tests changed here drive their logic with controlled inputs and do not depend on races, wall-clock timing, sleeps, event-loop ordering or system load (ANC-017).",
+          "before": "After this sprint, adding a provider or a model is a line of configuration and no Rust change. The compiled-in table becomes the default configuration value, so today's behaviour is the default and every row can be overridden or added to. Settings become one typed struct, so adding a setting is adding a field, and serde does the validation that 150 lines do by hand today. The sprint deletes more than it adds.\n\n## Deliverables\n1. M7-1 sc-agent-config typed settings and provider/model rows: apply the corresponding verbatim inventory/change section in design.\n2. M7-2 Update sc-agent-py provider_keys to read the configured provider entries in place of the deleted PROVIDERS table, preserving the Python result shape (REQ-SAG-0401, REQ-SAG-0503, ADR-SAG-0005).\n\nArchitecture placement: `sc-agent-config` is a layer-1 crate.\n",
+          "field": "description"
+        }
+      ],
+      "exclusions": [
+        {
+          "added": true,
+          "anchor_id": "ANC-010",
+          "reason": "m-7 changes Rust configuration rows and Settings, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-011",
+          "reason": "m-7 changes provider data behind existing provider_keys without changing offered CLI or Python operations; agt-m-11 carries consumer integration verification."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-012",
+          "reason": "m-7 changes provider and model configuration rows, not the wire-format Decision implementations; agt-m-4 carries the single implementation per API shape."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-015",
+          "reason": "m-7 changes configuration code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-026",
+          "reason": "m-7 defines provider and model configuration rows, not SQL tables; agt-m-8 carries core SQL ownership in sc-agent-schema."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-032",
+          "reason": "m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions."
+        }
+      ],
+      "first": {
+        "created_at": "2026-11-28T09:43:56+00:00",
+        "excluded": [],
+        "failing": [
+          "ANC-012",
+          "ANC-021",
+          "ANC-032",
+          "ANC-001",
+          "ANC-008",
+          "ANC-011",
+          "ANC-015",
+          "ANC-017",
+          "ANC-022",
+          "ANC-026"
+        ],
+        "pass": false,
+        "run_id": "plan-20261128T094356Z-agt-m-7",
+        "score": "2/13",
+        "status": "fail"
+      },
+      "id": "agt-m-7",
+      "last": {
+        "created_at": "2026-11-28T09:51:35+00:00",
+        "excluded": [
+          {
+            "anchor_id": "ANC-010",
+            "reason": "m-7 changes Rust configuration rows and Settings, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
+          },
+          {
+            "anchor_id": "ANC-011",
+            "reason": "m-7 changes provider data behind existing provider_keys without changing offered CLI or Python operations; agt-m-11 carries consumer integration verification."
+          },
+          {
+            "anchor_id": "ANC-012",
+            "reason": "m-7 changes provider and model configuration rows, not the wire-format Decision implementations; agt-m-4 carries the single implementation per API shape."
+          },
+          {
+            "anchor_id": "ANC-015",
+            "reason": "m-7 changes configuration code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
+          },
+          {
+            "anchor_id": "ANC-026",
+            "reason": "m-7 defines provider and model configuration rows, not SQL tables; agt-m-8 carries core SQL ownership in sc-agent-schema."
+          },
+          {
+            "anchor_id": "ANC-032",
+            "reason": "m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions."
+          }
+        ],
+        "failing": [
+          "ANC-008"
+        ],
+        "pass": false,
+        "run_id": "plan-20261128T095135Z-agt-m-7",
+        "score": "6/8",
+        "status": "fail"
+      },
+      "runs": 3,
+      "status": "fail",
+      "text_note": "",
+      "text_source": "bd",
+      "title": "m-7: providers and models from configuration (change)",
+      "trail": [
+        {
+          "created_at": "2026-11-28T09:43:56+00:00",
+          "excluded": [],
+          "failing": [
+            "ANC-012",
+            "ANC-021",
+            "ANC-032",
+            "ANC-001",
+            "ANC-008",
+            "ANC-011",
+            "ANC-015",
+            "ANC-017",
+            "ANC-022",
+            "ANC-026"
+          ],
+          "pass": false,
+          "run_id": "plan-20261128T094356Z-agt-m-7",
+          "score": "2/13",
+          "status": "fail"
+        },
+        {
+          "created_at": "2026-11-28T09:49:44+00:00",
+          "excluded": [
+            {
+              "anchor_id": "ANC-011",
+              "reason": "m-7 changes provider data behind existing provider_keys without changing offered CLI or Python operations; agt-m-11 carries consumer integration verification."
+            },
+            {
+              "anchor_id": "ANC-012",
+              "reason": "m-7 changes provider and model configuration rows, not the wire-format Decision implementations; agt-m-4 carries the single implementation per API shape."
+            },
+            {
+              "anchor_id": "ANC-015",
+              "reason": "m-7 changes configuration code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
+            },
+            {
+              "anchor_id": "ANC-026",
+              "reason": "m-7 defines provider and model configuration rows, not SQL tables; agt-m-8 carries core SQL ownership in sc-agent-schema."
+            },
+            {
+              "anchor_id": "ANC-032",
+              "reason": "m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions."
+            }
+          ],
+          "failing": [
+            "ANC-008",
+            "ANC-010"
+          ],
+          "pass": false,
+          "run_id": "plan-20261128T094944Z-agt-m-7",
+          "score": "6/9",
+          "status": "fail"
+        },
+        {
+          "created_at": "2026-11-28T09:51:35+00:00",
+          "excluded": [
+            {
+              "anchor_id": "ANC-010",
+              "reason": "m-7 changes Rust configuration rows and Settings, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
+            },
+            {
+              "anchor_id": "ANC-011",
+              "reason": "m-7 changes provider data behind existing provider_keys without changing offered CLI or Python operations; agt-m-11 carries consumer integration verification."
+            },
+            {
+              "anchor_id": "ANC-012",
+              "reason": "m-7 changes provider and model configuration rows, not the wire-format Decision implementations; agt-m-4 carries the single implementation per API shape."
+            },
+            {
+              "anchor_id": "ANC-015",
+              "reason": "m-7 changes configuration code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
+            },
+            {
+              "anchor_id": "ANC-026",
+              "reason": "m-7 defines provider and model configuration rows, not SQL tables; agt-m-8 carries core SQL ownership in sc-agent-schema."
+            },
+            {
+              "anchor_id": "ANC-032",
+              "reason": "m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions."
+            }
+          ],
+          "failing": [
+            "ANC-008"
+          ],
+          "pass": false,
+          "run_id": "plan-20261128T095135Z-agt-m-7",
+          "score": "6/8",
+          "status": "fail"
+        }
+      ],
+      "url": ""
+    },
+    {
+      "changes": [
+        {
+          "after": "Sessions go to one SQLite database per repository, written through one crate. A request is stored once and each model's reply is a row that points to it, so the same request sent to five models is one message and five responses, and the cache is one indexed read. Any tool adds its own tables by handing its SQL to the same `open` call; the core schema does not change when a tool is added. The JSONL writer and its global lock are deleted.\n\n## Deliverables\n1. M8-1 sc-agent-schema session records and SQL: apply the corresponding verbatim inventory/change section in design.\n2. M8-2 sc-agent-sqlite persistence and cache: apply the corresponding verbatim inventory/change section in design.\n3. M8-3 sc-agent-log writer replacement: apply the corresponding verbatim inventory/change section in design.\n4. M8-4 Update tests/contract/ and crates/sc-agent-py/tests/loopback.py session assertions to read the SQLite sessions and run links instead of sessions.jsonl/runs.jsonl, preserving their existing behavior checks (REQ-SAG-0004, REQ-SAG-0005, REQ-SAG-0701, ADR-SAG-0019).\n\nArchitecture placement (ANC-021; ADR-SAG-0004 v0.5.0): these changes land in `sc-agent-schema`, `sc-agent-sqlite` and `sc-agent-log`, layer 1, the lowest shared layer for session records, SQL, persistence and writing because all tools store sessions through the same core crates rather than duplicating storage in their APIs.\n\n\n`sc-agent-schema` holds only record structs, literal SQL and their convenience methods, with no SQLite dependency or upgrade code, and defines all core table SQL exclusively (ANC-025, ANC-026). `messages` stores each request once by sha256 and `responses` references that request; cache lookup uses request sha256 and model alone, never run_id (ANC-027, ANC-028). Each tool supplies its own `Schema.owner`, `major` and `migrations` independently of the core version, and no table definition lives in `sc-agent-py` (ANC-032).",
+          "before": "Sessions go to one SQLite database per repository, written through one crate. A request is stored once and each model's reply is a row that points to it, so the same request sent to five models is one message and five responses, and the cache is one indexed read. Any tool adds its own tables by handing its SQL to the same `open` call; the core schema does not change when a tool is added. The JSONL writer and its global lock are deleted.\n\n## Deliverables\n1. M8-1 sc-agent-schema session records and SQL: apply the corresponding verbatim inventory/change section in design.\n2. M8-2 sc-agent-sqlite persistence and cache: apply the corresponding verbatim inventory/change section in design.\n3. M8-3 sc-agent-log writer replacement: apply the corresponding verbatim inventory/change section in design.\n4. M8-4 Update tests/contract/ and crates/sc-agent-py/tests/loopback.py session assertions to read the SQLite sessions and run links instead of sessions.jsonl/runs.jsonl, preserving their existing behavior checks (REQ-SAG-0004, REQ-SAG-0005, REQ-SAG-0701, ADR-SAG-0019).\n\nArchitecture placement (ANC-021; ADR-SAG-0004 v0.5.0): these changes land in `sc-agent-schema`, `sc-agent-sqlite` and `sc-agent-log`, layer 1, the lowest shared layer for session records, SQL, persistence and writing because all tools store sessions through the same core crates rather than duplicating storage in their APIs.\n",
+          "field": "description"
+        }
+      ],
+      "exclusions": [
+        {
+          "added": true,
+          "anchor_id": "ANC-005",
+          "reason": "m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-010",
+          "reason": "m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-015",
+          "reason": "m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-020",
+          "reason": "m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-024",
+          "reason": "m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability."
+        },
+        {
+          "added": true,
+          "anchor_id": "ANC-031",
+          "reason": "m-8 moves only sc-agent's own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool's storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner)."
+        }
+      ],
+      "first": {
+        "created_at": "2026-11-28T09:45:42+00:00",
+        "excluded": [],
+        "failing": [
+          "ANC-025",
+          "ANC-028",
+          "ANC-005",
+          "ANC-015",
+          "ANC-020",
+          "ANC-024",
+          "ANC-026",
+          "ANC-027",
+          "ANC-031",
+          "ANC-032"
+        ],
+        "pass": false,
+        "run_id": "plan-20261128T094542Z-agt-m-8",
+        "score": "4/15",
+        "status": "fail"
+      },
+      "id": "agt-m-8",
+      "last": {
+        "created_at": "2026-11-28T09:51:44+00:00",
+        "excluded": [
+          {
+            "anchor_id": "ANC-005",
+            "reason": "m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths."
+          },
+          {
+            "anchor_id": "ANC-010",
+            "reason": "m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
+          },
+          {
+            "anchor_id": "ANC-015",
+            "reason": "m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
+          },
+          {
+            "anchor_id": "ANC-020",
+            "reason": "m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring."
+          },
+          {
+            "anchor_id": "ANC-024",
+            "reason": "m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability."
+          },
+          {
+            "anchor_id": "ANC-031",
+            "reason": "m-8 moves only sc-agent's own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool's storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner)."
+          }
+        ],
+        "failing": [],
+        "pass": true,
+        "run_id": "plan-20261128T095144Z-agt-m-8",
+        "score": "9/10",
+        "status": "pass"
+      },
+      "runs": 3,
+      "status": "pass",
+      "text_note": "",
+      "text_source": "bd",
+      "title": "m-8: session log to SQLite (change)",
+      "trail": [
+        {
+          "created_at": "2026-11-28T09:45:42+00:00",
+          "excluded": [],
+          "failing": [
+            "ANC-025",
+            "ANC-028",
+            "ANC-005",
+            "ANC-015",
+            "ANC-020",
+            "ANC-024",
+            "ANC-026",
+            "ANC-027",
+            "ANC-031",
+            "ANC-032"
+          ],
+          "pass": false,
+          "run_id": "plan-20261128T094542Z-agt-m-8",
+          "score": "4/15",
+          "status": "fail"
+        },
+        {
+          "created_at": "2026-11-28T09:50:13+00:00",
+          "excluded": [
+            {
+              "anchor_id": "ANC-005",
+              "reason": "m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths."
+            },
+            {
+              "anchor_id": "ANC-015",
+              "reason": "m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
+            },
+            {
+              "anchor_id": "ANC-020",
+              "reason": "m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring."
+            },
+            {
+              "anchor_id": "ANC-024",
+              "reason": "m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability."
+            },
+            {
+              "anchor_id": "ANC-031",
+              "reason": "m-8 moves only sc-agent's own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool's storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner)."
+            }
+          ],
+          "failing": [
+            "ANC-010"
+          ],
+          "pass": false,
+          "run_id": "plan-20261128T095013Z-agt-m-8",
+          "score": "9/11",
+          "status": "fail"
+        },
+        {
+          "created_at": "2026-11-28T09:51:44+00:00",
+          "excluded": [
+            {
+              "anchor_id": "ANC-005",
+              "reason": "m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths."
+            },
+            {
+              "anchor_id": "ANC-010",
+              "reason": "m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
+            },
+            {
+              "anchor_id": "ANC-015",
+              "reason": "m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
+            },
+            {
+              "anchor_id": "ANC-020",
+              "reason": "m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring."
+            },
+            {
+              "anchor_id": "ANC-024",
+              "reason": "m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability."
+            },
+            {
+              "anchor_id": "ANC-031",
+              "reason": "m-8 moves only sc-agent's own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool's storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner)."
+            }
+          ],
+          "failing": [],
+          "pass": true,
+          "run_id": "plan-20261128T095144Z-agt-m-8",
+          "score": "9/10",
+          "status": "pass"
+        }
+      ],
+      "url": ""
+    }
+  ],
+  "plan": "phase-m",
+  "schema": "plan-anchoring/change-report/1",
+  "status": "FAIL",
+  "tracker": "bd",
+  "warnings": []
+}

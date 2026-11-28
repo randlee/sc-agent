@@ -1,0 +1,112 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "item": "agt-m-5",
+    "prev": "plan-20261128T094336Z-agt-m-5",
+    "next": "plan-20261128T094926Z-agt-m-5",
+    "changed": [
+      {
+        "anchor_id": "ANC-001",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-008",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-012",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-013",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-014",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-015",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-021",
+        "from": "underspecified",
+        "to": "satisfied",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-022",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      }
+    ],
+    "added": [],
+    "removed": [],
+    "regressions": [],
+    "pass_to_fail": [],
+    "fail_to_pass": [
+      "ANC-001",
+      "ANC-008",
+      "ANC-012",
+      "ANC-013",
+      "ANC-014",
+      "ANC-015",
+      "ANC-021",
+      "ANC-022"
+    ],
+    "item_size": {
+      "before_chars": 1084,
+      "after_chars": 1283,
+      "delta_chars": 199,
+      "grew": true
+    },
+    "excluded": [
+      {
+        "anchor_id": "ANC-001",
+        "reason": "m-5 moves the runner unchanged and consumes the existing model table; it changes no jev default or model-resolution rule; agt-m-7 carries ANC-001."
+      },
+      {
+        "anchor_id": "ANC-008",
+        "reason": "m-5 moves existing Run/RunArgs and their signatures unchanged rather than introducing repeated parameters; typed settings and parameter restructuring are carried by agt-m-7 and agt-m-9."
+      },
+      {
+        "anchor_id": "ANC-012",
+        "reason": "m-5 moves the runner unchanged and delegates to existing Decision implementations; the wire-format implementation inventory is carried by agt-m-4."
+      },
+      {
+        "anchor_id": "ANC-013",
+        "reason": "m-5 is the decision runner and adds no non-Jev LLM interface; agt-m-10 carries the shared Llm API."
+      },
+      {
+        "anchor_id": "ANC-014",
+        "reason": "m-5 moves the existing prompt lookup unchanged; prompt defaults and overrides remain in the API-shape move agt-m-4 and configured settings agt-m-7."
+      },
+      {
+        "anchor_id": "ANC-015",
+        "reason": "m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move."
+      },
+      {
+        "anchor_id": "ANC-022",
+        "reason": "m-5 consumes model resolution unchanged and defines no local-model row, URL or id; agt-m-7 carries local-model configuration."
+      }
+    ],
+    "pass_before": false,
+    "pass_after": true
+  },
+  "error": null
+}

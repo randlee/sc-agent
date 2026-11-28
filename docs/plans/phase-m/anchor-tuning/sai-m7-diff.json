@@ -1,0 +1,121 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "item": "agt-m-7",
+    "prev": "plan-20261128T094356Z-agt-m-7",
+    "next": "plan-20261128T095135Z-agt-m-7",
+    "changed": [
+      {
+        "anchor_id": "ANC-001",
+        "from": "underspecified",
+        "to": "satisfied",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-010",
+        "from": "not_applicable",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-011",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-012",
+        "from": "not_addressed",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-015",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-017",
+        "from": "underspecified",
+        "to": "satisfied",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-021",
+        "from": "not_addressed",
+        "to": "satisfied",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-022",
+        "from": "underspecified",
+        "to": "satisfied",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-026",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-032",
+        "from": "not_addressed",
+        "to": "excluded",
+        "improved": true
+      }
+    ],
+    "added": [],
+    "removed": [],
+    "regressions": [],
+    "pass_to_fail": [],
+    "fail_to_pass": [
+      "ANC-001",
+      "ANC-011",
+      "ANC-012",
+      "ANC-015",
+      "ANC-017",
+      "ANC-021",
+      "ANC-022",
+      "ANC-026",
+      "ANC-032"
+    ],
+    "item_size": {
+      "before_chars": 1390,
+      "after_chars": 2117,
+      "delta_chars": 727,
+      "grew": true
+    },
+    "excluded": [
+      {
+        "anchor_id": "ANC-010",
+        "reason": "m-7 changes Rust configuration rows and Settings, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
+      },
+      {
+        "anchor_id": "ANC-011",
+        "reason": "m-7 changes provider data behind existing provider_keys without changing offered CLI or Python operations; agt-m-11 carries consumer integration verification."
+      },
+      {
+        "anchor_id": "ANC-012",
+        "reason": "m-7 changes provider and model configuration rows, not the wire-format Decision implementations; agt-m-4 carries the single implementation per API shape."
+      },
+      {
+        "anchor_id": "ANC-015",
+        "reason": "m-7 changes configuration code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
+      },
+      {
+        "anchor_id": "ANC-026",
+        "reason": "m-7 defines provider and model configuration rows, not SQL tables; agt-m-8 carries core SQL ownership in sc-agent-schema."
+      },
+      {
+        "anchor_id": "ANC-032",
+        "reason": "m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions."
+      }
+    ],
+    "pass_before": false,
+    "pass_after": false
+  },
+  "error": null
+}

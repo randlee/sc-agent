@@ -1,0 +1,79 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "item": "agt-m-6",
+    "prev": "plan-20261128T094346Z-agt-m-6",
+    "next": "plan-20261128T094933Z-agt-m-6",
+    "changed": [
+      {
+        "anchor_id": "ANC-001",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-011",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-015",
+        "from": "underspecified",
+        "to": "excluded",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-021",
+        "from": "not_addressed",
+        "to": "satisfied",
+        "improved": true
+      },
+      {
+        "anchor_id": "ANC-032",
+        "from": "not_addressed",
+        "to": "excluded",
+        "improved": true
+      }
+    ],
+    "added": [],
+    "removed": [],
+    "regressions": [],
+    "pass_to_fail": [],
+    "fail_to_pass": [
+      "ANC-001",
+      "ANC-011",
+      "ANC-015",
+      "ANC-021",
+      "ANC-032"
+    ],
+    "item_size": {
+      "before_chars": 1880,
+      "after_chars": 2082,
+      "delta_chars": 202,
+      "grew": true
+    },
+    "excluded": [
+      {
+        "anchor_id": "ANC-001",
+        "reason": "m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration."
+      },
+      {
+        "anchor_id": "ANC-011",
+        "reason": "m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification."
+      },
+      {
+        "anchor_id": "ANC-015",
+        "reason": "m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move."
+      },
+      {
+        "anchor_id": "ANC-032",
+        "reason": "m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions."
+      }
+    ],
+    "pass_before": false,
+    "pass_after": true
+  },
+  "error": null
+}

@@ -1,0 +1,248 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-item" id="item-agt-m-8">
+  <div class="section-head">
+    <h2>agt-m-8 <span class="unit-title">m-8: session log to SQLite (change)</span> <span class="status status-pass">PASS</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy item data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;changes&quot;: [
+    {
+      &quot;after_chars&quot;: 1926,
+      &quot;before_chars&quot;: 1400,
+      &quot;field&quot;: &quot;description&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-005&quot;,
+      &quot;reason&quot;: &quot;m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-010&quot;,
+      &quot;reason&quot;: &quot;m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-015&quot;,
+      &quot;reason&quot;: &quot;m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-020&quot;,
+      &quot;reason&quot;: &quot;m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-024&quot;,
+      &quot;reason&quot;: &quot;m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-031&quot;,
+      &quot;reason&quot;: &quot;m-8 moves only sc-agent&#x27;s own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool&#x27;s storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner).&quot;
+    }
+  ],
+  &quot;first&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-28T09:45:42+00:00&quot;,
+    &quot;excluded&quot;: [],
+    &quot;failing&quot;: [
+      &quot;ANC-025&quot;,
+      &quot;ANC-028&quot;,
+      &quot;ANC-005&quot;,
+      &quot;ANC-015&quot;,
+      &quot;ANC-020&quot;,
+      &quot;ANC-024&quot;,
+      &quot;ANC-026&quot;,
+      &quot;ANC-027&quot;,
+      &quot;ANC-031&quot;,
+      &quot;ANC-032&quot;
+    ],
+    &quot;pass&quot;: false,
+    &quot;run_id&quot;: &quot;plan-20261128T094542Z-agt-m-8&quot;,
+    &quot;score&quot;: &quot;4/15&quot;,
+    &quot;status&quot;: &quot;fail&quot;
+  },
+  &quot;id&quot;: &quot;agt-m-8&quot;,
+  &quot;last&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-28T09:51:44+00:00&quot;,
+    &quot;excluded&quot;: [
+      {
+        &quot;anchor_id&quot;: &quot;ANC-005&quot;,
+        &quot;reason&quot;: &quot;m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-010&quot;,
+        &quot;reason&quot;: &quot;m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-015&quot;,
+        &quot;reason&quot;: &quot;m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-020&quot;,
+        &quot;reason&quot;: &quot;m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-024&quot;,
+        &quot;reason&quot;: &quot;m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-031&quot;,
+        &quot;reason&quot;: &quot;m-8 moves only sc-agent&#x27;s own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool&#x27;s storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner).&quot;
+      }
+    ],
+    &quot;failing&quot;: [],
+    &quot;pass&quot;: true,
+    &quot;run_id&quot;: &quot;plan-20261128T095144Z-agt-m-8&quot;,
+    &quot;score&quot;: &quot;9/10&quot;,
+    &quot;status&quot;: &quot;pass&quot;
+  },
+  &quot;runs&quot;: 3,
+  &quot;status&quot;: &quot;pass&quot;,
+  &quot;text_note&quot;: &quot;&quot;,
+  &quot;text_source&quot;: &quot;bd&quot;,
+  &quot;title&quot;: &quot;m-8: session log to SQLite (change)&quot;,
+  &quot;trail&quot;: [
+    {
+      &quot;created_at&quot;: &quot;2026-11-28T09:45:42+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-025&quot;,
+        &quot;ANC-028&quot;,
+        &quot;ANC-005&quot;,
+        &quot;ANC-015&quot;,
+        &quot;ANC-020&quot;,
+        &quot;ANC-024&quot;,
+        &quot;ANC-026&quot;,
+        &quot;ANC-027&quot;,
+        &quot;ANC-031&quot;,
+        &quot;ANC-032&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261128T094542Z-agt-m-8&quot;,
+      &quot;score&quot;: &quot;4/15&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-28T09:50:13+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-005&quot;,
+          &quot;reason&quot;: &quot;m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-015&quot;,
+          &quot;reason&quot;: &quot;m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-020&quot;,
+          &quot;reason&quot;: &quot;m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-024&quot;,
+          &quot;reason&quot;: &quot;m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-031&quot;,
+          &quot;reason&quot;: &quot;m-8 moves only sc-agent&#x27;s own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool&#x27;s storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner).&quot;
+        }
+      ],
+      &quot;failing&quot;: [
+        &quot;ANC-010&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261128T095013Z-agt-m-8&quot;,
+      &quot;score&quot;: &quot;9/11&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-28T09:51:44+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-005&quot;,
+          &quot;reason&quot;: &quot;m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-010&quot;,
+          &quot;reason&quot;: &quot;m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-015&quot;,
+          &quot;reason&quot;: &quot;m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-020&quot;,
+          &quot;reason&quot;: &quot;m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-024&quot;,
+          &quot;reason&quot;: &quot;m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-031&quot;,
+          &quot;reason&quot;: &quot;m-8 moves only sc-agent&#x27;s own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool&#x27;s storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner).&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261128T095144Z-agt-m-8&quot;,
+      &quot;score&quot;: &quot;9/10&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    }
+  ],
+  &quot;url&quot;: &quot;&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Plan item agt-m-8: m-8: session log to SQLite (change)
+Gate FAIL 4/15 -&gt; PASS 9/10 over 3 runs.
+Failing at first run: ANC-025, ANC-028, ANC-005, ANC-015, ANC-020, ANC-024, ANC-026, ANC-027, ANC-031, ANC-032.
+Failing now: none.
+Excluded ANC-005: m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths.
+Excluded ANC-010: m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint.
+Excluded ANC-015: m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change.
+Excluded ANC-020: m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring.
+Excluded ANC-024: m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability.
+Excluded ANC-031: m-8 moves only sc-agent&#x27;s own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool&#x27;s storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner).
+Changed fields: description.">&#x2398;</button>
+    </div>
+  </div>
+
+  <table class="gate">
+    <thead><tr><th scope="col">Planning gate</th><th scope="col">Result</th><th scope="col">Satisfied / applicable</th><th scope="col">Failing anchors</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">First run</th><td><span class="status status-fail">FAIL</span></td><td>4/15</td><td>ANC-025, ANC-028, ANC-005, ANC-015, ANC-020, ANC-024, ANC-026, ANC-027, ANC-031, ANC-032</td></tr>
+      <tr><th scope="row">Last run</th><td><span class="status status-pass">PASS</span></td><td>9/10</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <details class="trail">
+    <summary>All 3 runs</summary>
+    <table>
+      <thead><tr><th scope="col">Run</th><th scope="col">Created</th><th scope="col">Result</th><th scope="col">Score</th><th scope="col">Failing</th></tr></thead>
+      <tbody>
+        <tr><td><code>plan-20261128T094542Z-agt-m-8</code></td><td>2026-11-28T09:45:42+00:00</td><td><span class="status status-fail">FAIL</span></td><td>4/15</td><td>ANC-025, ANC-028, ANC-005, ANC-015, ANC-020, ANC-024, ANC-026, ANC-027, ANC-031, ANC-032</td></tr>
+        <tr><td><code>plan-20261128T095013Z-agt-m-8</code></td><td>2026-11-28T09:50:13+00:00</td><td><span class="status status-fail">FAIL</span></td><td>9/11</td><td>ANC-010</td></tr>
+        <tr><td><code>plan-20261128T095144Z-agt-m-8</code></td><td>2026-11-28T09:51:44+00:00</td><td><span class="status status-pass">PASS</span></td><td>9/10</td><td></td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Excluded anchors (not judged)</h3>
+  <table class="exclusions">
+    <thead><tr><th scope="col">Anchor</th><th scope="col">Reason</th><th scope="col">Since</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><a href="#anchor-ANC-005">ANC-005</a></th><td>m-8 changes session storage and creates no production default general logger; agt-m-3 carries default logger construction and paths.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-010">ANC-010</a></th><td>m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-015">ANC-015</a></th><td>m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-020">ANC-020</a></th><td>m-8 changes session storage assertions but no injected general Logger construction path; agt-m-6 carries unchanged wheel logger wiring.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-024">ANC-024</a></th><td>m-8 changes session persistence and no general-log rotation or retention rule; agt-m-3 carries general-log writing through sc-observability.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-031">ANC-031</a></th><td>m-8 moves only sc-agent&#x27;s own session log to SQLite and adds Db::execute; it changes no judge-jev, plan-anchor or other tool&#x27;s storage. No phase-m sprint carries ANC-031 (coverage gap, waiting: owner).</td><td>this round</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Text: first judged to now</h3>
+  <p class="small">Source: bd</p>
+  <details open="open">
+    <summary>description</summary>
+    <div class="diff"><div class="eq">Sessions go to one SQLite database per repository, written through one crate. A request is stored once and each model&#x27;s reply is a row that points to it, so the same request sent to five models is one message and five responses, and the cache is one indexed read. Any tool adds its own tables by handing its SQL to the same `open` call; the core schema does not change when a tool is added. The JSONL writer and its global lock are deleted.</div><div class="eq"></div><div class="eq">## Deliverables</div><div class="eq">1. M8-1 sc-agent-schema session records and SQL: apply the corresponding verbatim inventory/change section in design.</div><div class="eq">2. M8-2 sc-agent-sqlite persistence and cache: apply the corresponding verbatim inventory/change section in design.</div><div class="eq">3. M8-3 sc-agent-log writer replacement: apply the corresponding verbatim inventory/change section in design.</div><div class="eq">4. M8-4 Update tests/contract/ and crates/sc-agent-py/tests/loopback.py session assertions to read the SQLite sessions and run links instead of sessions.jsonl/runs.jsonl, preserving their existing behavior checks (REQ-SAG-0004, REQ-SAG-0005, REQ-SAG-0701, ADR-SAG-0019).</div><div class="eq"></div><div class="eq">Architecture placement (ANC-021; ADR-SAG-0004 v0.5.0): these changes land in `sc-agent-schema`, `sc-agent-sqlite` and `sc-agent-log`, layer 1, the lowest shared layer for session records, SQL, persistence and writing because all tools store sessions through the same core crates rather than duplicating storage in their APIs.</div><div class="ad">+ </div><div class="ad">+ </div><div class="ad">+ `sc-agent-schema` holds only record structs, literal SQL and their convenience methods, with no SQLite dependency or upgrade code, and defines all core table SQL exclusively (ANC-025, ANC-026). `messages` stores each request once by sha256 and `responses` references that request; cache lookup uses request sha256 and model alone, never run_id (ANC-027, ANC-028). Each tool supplies its own `Schema.owner`, `major` and `migrations` independently of the core version, and no table definition lives in `sc-agent-py` (ANC-032).</div></div>
+  </details>
+</section>

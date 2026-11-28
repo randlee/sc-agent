@@ -1,0 +1,175 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-item" id="item-agt-m-6">
+  <div class="section-head">
+    <h2>agt-m-6 <span class="unit-title">m-6: old `sc-agent` crate deleted; CLI and wheel on the new crates</span> <span class="status status-pass">PASS</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy item data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;changes&quot;: [
+    {
+      &quot;after_chars&quot;: 1512,
+      &quot;before_chars&quot;: 1311,
+      &quot;field&quot;: &quot;description&quot;
+    }
+  ],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+      &quot;reason&quot;: &quot;m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-011&quot;,
+      &quot;reason&quot;: &quot;m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-015&quot;,
+      &quot;reason&quot;: &quot;m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;anchor_id&quot;: &quot;ANC-032&quot;,
+      &quot;reason&quot;: &quot;m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.&quot;
+    }
+  ],
+  &quot;first&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-28T09:43:46+00:00&quot;,
+    &quot;excluded&quot;: [],
+    &quot;failing&quot;: [
+      &quot;ANC-021&quot;,
+      &quot;ANC-032&quot;,
+      &quot;ANC-001&quot;,
+      &quot;ANC-011&quot;,
+      &quot;ANC-015&quot;
+    ],
+    &quot;pass&quot;: false,
+    &quot;run_id&quot;: &quot;plan-20261128T094346Z-agt-m-6&quot;,
+    &quot;score&quot;: &quot;2/8&quot;,
+    &quot;status&quot;: &quot;fail&quot;
+  },
+  &quot;id&quot;: &quot;agt-m-6&quot;,
+  &quot;last&quot;: {
+    &quot;created_at&quot;: &quot;2026-11-28T09:49:33+00:00&quot;,
+    &quot;excluded&quot;: [
+      {
+        &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+        &quot;reason&quot;: &quot;m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-011&quot;,
+        &quot;reason&quot;: &quot;m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-015&quot;,
+        &quot;reason&quot;: &quot;m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.&quot;
+      },
+      {
+        &quot;anchor_id&quot;: &quot;ANC-032&quot;,
+        &quot;reason&quot;: &quot;m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.&quot;
+      }
+    ],
+    &quot;failing&quot;: [],
+    &quot;pass&quot;: true,
+    &quot;run_id&quot;: &quot;plan-20261128T094933Z-agt-m-6&quot;,
+    &quot;score&quot;: &quot;3/4&quot;,
+    &quot;status&quot;: &quot;pass&quot;
+  },
+  &quot;runs&quot;: 2,
+  &quot;status&quot;: &quot;pass&quot;,
+  &quot;text_note&quot;: &quot;&quot;,
+  &quot;text_source&quot;: &quot;bd&quot;,
+  &quot;title&quot;: &quot;m-6: old `sc-agent` crate deleted; CLI and wheel on the new crates&quot;,
+  &quot;trail&quot;: [
+    {
+      &quot;created_at&quot;: &quot;2026-11-28T09:43:46+00:00&quot;,
+      &quot;excluded&quot;: [],
+      &quot;failing&quot;: [
+        &quot;ANC-021&quot;,
+        &quot;ANC-032&quot;,
+        &quot;ANC-001&quot;,
+        &quot;ANC-011&quot;,
+        &quot;ANC-015&quot;
+      ],
+      &quot;pass&quot;: false,
+      &quot;run_id&quot;: &quot;plan-20261128T094346Z-agt-m-6&quot;,
+      &quot;score&quot;: &quot;2/8&quot;,
+      &quot;status&quot;: &quot;fail&quot;
+    },
+    {
+      &quot;created_at&quot;: &quot;2026-11-28T09:49:33+00:00&quot;,
+      &quot;excluded&quot;: [
+        {
+          &quot;anchor_id&quot;: &quot;ANC-001&quot;,
+          &quot;reason&quot;: &quot;m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-011&quot;,
+          &quot;reason&quot;: &quot;m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-015&quot;,
+          &quot;reason&quot;: &quot;m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.&quot;
+        },
+        {
+          &quot;anchor_id&quot;: &quot;ANC-032&quot;,
+          &quot;reason&quot;: &quot;m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.&quot;
+        }
+      ],
+      &quot;failing&quot;: [],
+      &quot;pass&quot;: true,
+      &quot;run_id&quot;: &quot;plan-20261128T094933Z-agt-m-6&quot;,
+      &quot;score&quot;: &quot;3/4&quot;,
+      &quot;status&quot;: &quot;pass&quot;
+    }
+  ],
+  &quot;url&quot;: &quot;&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Plan item agt-m-6: m-6: old `sc-agent` crate deleted; CLI and wheel on the new crates
+Gate FAIL 2/8 -&gt; PASS 3/4 over 2 runs.
+Failing at first run: ANC-021, ANC-032, ANC-001, ANC-011, ANC-015.
+Failing now: none.
+Excluded ANC-001: m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration.
+Excluded ANC-011: m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification.
+Excluded ANC-015: m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.
+Excluded ANC-032: m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.
+Changed fields: description.">&#x2398;</button>
+    </div>
+  </div>
+
+  <table class="gate">
+    <thead><tr><th scope="col">Planning gate</th><th scope="col">Result</th><th scope="col">Satisfied / applicable</th><th scope="col">Failing anchors</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">First run</th><td><span class="status status-fail">FAIL</span></td><td>2/8</td><td>ANC-021, ANC-032, ANC-001, ANC-011, ANC-015</td></tr>
+      <tr><th scope="row">Last run</th><td><span class="status status-pass">PASS</span></td><td>3/4</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <details class="trail">
+    <summary>All 2 runs</summary>
+    <table>
+      <thead><tr><th scope="col">Run</th><th scope="col">Created</th><th scope="col">Result</th><th scope="col">Score</th><th scope="col">Failing</th></tr></thead>
+      <tbody>
+        <tr><td><code>plan-20261128T094346Z-agt-m-6</code></td><td>2026-11-28T09:43:46+00:00</td><td><span class="status status-fail">FAIL</span></td><td>2/8</td><td>ANC-021, ANC-032, ANC-001, ANC-011, ANC-015</td></tr>
+        <tr><td><code>plan-20261128T094933Z-agt-m-6</code></td><td>2026-11-28T09:49:33+00:00</td><td><span class="status status-pass">PASS</span></td><td>3/4</td><td></td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <h3>Excluded anchors (not judged)</h3>
+  <table class="exclusions">
+    <thead><tr><th scope="col">Anchor</th><th scope="col">Reason</th><th scope="col">Since</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><a href="#anchor-ANC-001">ANC-001</a></th><td>m-6 removes the old shell and rewires imports without changing the model table or jev resolution; agt-m-7 carries model-default configuration.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-011">ANC-011</a></th><td>m-6 rewires existing CLI and wheel imports without adding or changing their operations; agt-m-11 carries consumer integration verification.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-015">ANC-015</a></th><td>m-6 changes crate imports, workspace membership and release inputs, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move.</td><td>this round</td></tr>
+      <tr><th scope="row"><a href="#anchor-ANC-032">ANC-032</a></th><td>m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.</td><td>this round</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Text: first judged to now</h3>
+  <p class="small">Source: bd</p>
+  <details open="open">
+    <summary>description</summary>
+    <div class="diff"><div class="eq">The shell that kept every sprint green is removed. The CLI and the wheel are what they should be: argument parsing and Python binding glue over the runner&#x27;s API, with no business logic to duplicate. Nothing is written.</div><div class="eq"></div><div class="eq">## Deliverables</div><div class="eq">1. M6-1 old sc-agent crate deletion: apply the corresponding verbatim inventory/change section in design.</div><div class="eq">2. M6-2 decidr imports: apply the corresponding verbatim inventory/change section in design.</div><div class="eq">3. M6-3 sitr imports: apply the corresponding verbatim inventory/change section in design.</div><div class="eq">4. M6-4 sc-agent-py imports: apply the corresponding verbatim inventory/change section in design.</div><div class="eq">5. M6-5 Update tests/contract/test_version_sync.py::VersionSync.test_checked_in_cli_versions_match_workspace to check the replacement workspace crate version entries instead of the removed sc-agent dependency; retain the remaining version checks (REQ-SAG-0018, ADR-SAG-0017).</div><div class="eq">6. M6-6 Remove the deleted sc-agent manifest from release/sc-publish-consumer-input.json and regenerate release/publish-artifacts.toml through the pinned release installer, preserving the remaining release entries (ADR-SAG-0017, ADR-SAG-0018).</div><div class="eq"></div><div class="ch">Architecture <del>placement:</del><ins>placement</ins> <del>`decidr`,</del><ins>(ANC-021;</ins> <del>`sitr`,</del><ins>ADR-SAG-0004 v0.5.0): the import glue lands in `decidr`</ins> and <del>`sc-agent-py`</del><ins>`sc-agent-py`,</ins> <del>are</del><ins>layer</ins> <del>layer-4</del><ins>4,</ins> <del>consumers;</del><ins>and</ins> <del>this</del><ins>in</ins> <del>sprint</del><ins>`sitr`</ins> <del>removes</del><ins>on its separate `sc-treesitter` stack, the lowest layers that need CLI argument parsing and Python binding glue because the shared business logic already lives in the runner and core crates, while</ins> the former `sc-agent` shell <del>and</del><ins>is</ins> <del>updates those consumer crates.</del><ins>deleted.</ins></div></div>
+  </details>
+</section>
