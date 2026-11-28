@@ -14,7 +14,7 @@
 
 ### Requirement Statement
 
-Definitions: The information is everything sent to the decision model with a question, other than the questions themselves. A single question is one question of the request. The question digest is the SHA-256 digest of the information plus one single question.
+Definitions: sc-agent is the product provided by this repository. A decision model is a model used for decision requests, such as Jev. The information is everything sent to the decision model with a question, other than the questions themselves. A single question is one question of the request. The question digest is the SHA-256 digest of the information plus one single question. To record a question digest with a response is to store the digest in the same entry as that response, so that reading the entry gives both the digest and the response.
 
 The result cache is specified by REQ-SAG-0703. Its key is the hash of the full request text and the requested model, not the question digest.
 
