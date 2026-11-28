@@ -260,16 +260,14 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
-      # Consumer action per `sc-lint docs ci`; tag-pinned like the other actions here.
-      - name: Install sc-lint
-        id: sc-lint
-        uses: randlee/sc-lint@v1
-        with:
-          operation: setup
-          version: 0.8.9
+      # Generated Just integration (sc-lint docs installation). The runner has no
+      # `just`, so this runs the `just setup` recipe's command, then the boundary
+      # check through the managed install. No lint or test profile.
+      - name: Install sc-lint (just setup)
+        run: python3 .sc-lint/bootstrap.py setup --config sc-lint.toml
 
       - name: sc-lint boundary check
-        run: '"${{ steps.sc-lint.outputs.binary-path }}" lint sc-boundary --config sc-lint.toml'
+        run: python3 .sc-lint/bootstrap.py exec --config sc-lint.toml -- sc-lint lint sc-boundary --config sc-lint.toml
 
   # The one required status check: it always reports, passes when every job
   # above succeeded or was skipped, and fails if any failed or was cancelled.
