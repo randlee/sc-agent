@@ -14,3 +14,4 @@
 {"id": "REQ-SAG-0008", "file": "docs/requirements/REQ-SAG-0008.md", "sha256": "714bb75627fc9a5430f5e9d79051df2294142056045c89d87dc935efcec6e71e", "runs": ["flat-1", "flat-2", "flat-3"], "lowest": 0.65, "commit": "0d8a61e"}
 {"id":"REQ-SAG-0018","sha256":"f79949823d5b2d4a70f3642d60c91891d14eb05c394c1c2b81ea171d7271d9a5","runs":["REQ-SAG-0018-comb-r1","REQ-SAG-0018-comb-r2","REQ-SAG-0018-comb-r3"],"lowest":0.72}
 {"id":"REQ-SAG-0202","sha256":"e2b0ab73bfa36b61711606223082d528382f72b4cf09b3e92ead66fb5915986f","runs":["REQ-SAG-0202-c5-r1","REQ-SAG-0202-c5-r2","REQ-SAG-0202-c5-r3"],"lowest":0.72}
+{"id":"REQ-SAG-0302","sha256":"bf4411685725c364722e780773dbcb607e863546c7652563ffbfd0afa8b5056f","runs":["REQ-SAG-0302-comb-r1","REQ-SAG-0302-comb-r2","REQ-SAG-0302-comb-r3"],"lowest":0.62}
