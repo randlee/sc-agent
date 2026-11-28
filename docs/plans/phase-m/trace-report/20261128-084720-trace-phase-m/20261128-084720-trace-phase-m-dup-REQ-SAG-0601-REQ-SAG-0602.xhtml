@@ -1,0 +1,65 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-duplicate" id="dup-REQ-SAG-0601-REQ-SAG-0602">
+  <div class="section-head">
+    <h2>REQ-SAG-0601 restates REQ-SAG-0602</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="[
+  {
+    &quot;action&quot;: &quot;correct&quot;,
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;duplicate&quot;,
+    &quot;confidence&quot;: 0.92,
+    &quot;item&quot;: &quot;REQ-SAG-0601&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0602&quot;,
+    &quot;session_id&quot;: &quot;01M8GNBVRQQNDVMDVZHMZWXBB5&quot;,
+    &quot;statement&quot;: &quot;A quota-exhausted response MUST NOT be resent.&quot;,
+    &quot;statement_index&quot;: 2
+  }
+]">{}</button>
+    </div>
+  </div>
+  <p class="small">sc-agent · sc-agent</p>
+  <h3>Duplicated statement</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+    <li>REQ-SAG-0602 statement 3 (0.92): A quota-exhausted response MUST NOT be resent.</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0601 statement 1: 3393585f 2026-11-09: Add doctor, busy resend and quota requirements</li>
+    <li>REQ-SAG-0601 statement 2: 8d54a0b6 2026-11-13: fix: harden credentials retries and observability boundaries</li>
+    <li>REQ-SAG-0601 statement 3: b4a8d901 2026-11-26: REQ-SAG-0601: sends maximum is configurable, 5 by default (owner ruling 2026-11-26)</li>
+    <li>REQ-SAG-0601 statement 4: ad62941d 2026-11-24: Clarify requirement checks and separate compound statements</li>
+    <li>REQ-SAG-0601 statement 5: ad62941d 2026-11-24: Clarify requirement checks and separate compound statements</li>
+    <li>REQ-SAG-0601 statement 6: 1cbc18f5 2026-11-20: NFR-SAG-0002 Deprecated; REQ-SAG-0601 reduced to the owner&#x27;s backoff rule</li>
+    <li>REQ-SAG-0601 statement 7: 1cbc18f5 2026-11-20: NFR-SAG-0002 Deprecated; REQ-SAG-0601 reduced to the owner&#x27;s backoff rule</li>
+    <li>REQ-SAG-0601 statement 8: 3393585f 2026-11-09: Add doctor, busy resend and quota requirements</li>
+    <li>REQ-SAG-0601 statement 9: 8d06323d 2026-11-21: docs: simplify requirements and ADRs to the owner&#x27;s words</li>
+    <li>REQ-SAG-0601 statement 10: 81aac0ca 2026-11-26: phase-j record trim (sc-agent): deletions only per owner instructions 2026-11-26</li>
+    <li>REQ-SAG-0602 statement 1: 3393585f 2026-11-09: Add doctor, busy resend and quota requirements</li>
+    <li>REQ-SAG-0602 statement 2: 3393585f 2026-11-09: Add doctor, busy resend and quota requirements</li>
+    <li>REQ-SAG-0602 statement 3: 3393585f 2026-11-09: Add doctor, busy resend and quota requirements</li>
+  </ul>
+  <h3>REQ-SAG-0601 Busy resend and holdoff</h3>
+  <h3>Statements</h3>
+  <ul>
+    <li>A request that receives a busy response MUST be resent unchanged.</li>
+    <li>A request whose send has a network failure MUST be resent unchanged, counting toward the same maximum number of sends.</li>
+    <li>The maximum number of sends per request MUST be a configurable maximum, 5 by default.</li>
+    <li>When an `HttpClient` receives a busy reply from a host, the `HttpClient` MUST set a not-before time shared by every send through that client to that host.</li>
+    <li>Every later send to the provider endpoint MUST wait until the endpoint&#x27;s not-before time.</li>
+    <li>When the provider gives a `Retry-After`, it MUST set the holdoff.</li>
+    <li>When the provider gives no `Retry-After`, the holdoffs MUST back off exponentially; this requirement does not fix their values.</li>
+    <li>A held-off request MUST wait in the queue until its holdoff ends, and the wait MUST end at once when the request is cancelled.</li>
+    <li>When sends run out on busy replies, the error MUST say busy, with the send count.</li>
+    <li>Authentication (401) and quota MUST NOT be resent; they MUST be returned with the remote error id and message.</li>
+  </ul>
+  <h3>REQ-SAG-0602 Quota exhaustion is not busy</h3>
+  <h3>Statements</h3>
+  <ul>
+    <li>A busy status whose body marks quota exhaustion MUST be returned at once as the error `http.quota_exhausted`.</li>
+    <li>A 429 with a body that does not mark quota exhaustion MUST be treated as busy.</li>
+    <li>A quota-exhausted response MUST NOT be resent.</li>
+  </ul>
+</section>

@@ -1,0 +1,131 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0007">
+  <div class="section-head">
+    <h2>REQ-SAG-0007 Return values are not rounded</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0007&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T084552Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;sc-agent MUST NOT round a returned float.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;sc-agent MUST NOT convert a returned float to an integer type.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0007&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-25&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;This requirement stops an implementation from rounding or casting a value and so hiding information from the end user. Rounding is the consumer&#x27;s concern: a value rounded inside sc-agent loses information no consumer can recover.\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;I would never create a requirement requiring subnanosecond rounding for a http call.\&quot; \&quot;Don&#x27;t round % to int.\&quot;&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;sc-agent MUST NOT round a returned float.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;sc-agent MUST NOT convert a returned float to an integer type.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: A returned float is any floating-point value sc-agent returns, such as a Jev probability, confidence or score.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Rust API: a unit test sends a request whose Jev probability is 0.123456789 to a stub server and asserts `send` returns 0.123456789 exactly.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;CLI: a CLI run of `decidr send` against a stub server whose Jev probability is 0.123456789 prints 0.123456789 exactly in its JSON output.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Python bindings: a Python test calls `send` against a stub server whose Jev probability is 0.123456789 and asserts the returned value is 0.123456789 exactly.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Inspection: `rg -n &#x27;f32|Decimal|i64&#x27; crates/sc-agent/src` shows no fractional decision value held in a type other than `f64`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test passes a Jev confidence of 0.875 through sc-agent and asserts the returned value is 0.875, not 1 or 0.88.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Inspection: `rg -n &#x27;round&#x27; crates/` finds no rounding of a returned decision value.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Return values are not rounded&quot;,
+    &quot;version&quot;: &quot;0.3.2&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.3.2</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>sc-agent MUST NOT round a returned float.</li>
+    <li>sc-agent MUST NOT convert a returned float to an integer type.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: A returned float is any floating-point value sc-agent returns, such as a Jev probability, confidence or score.</p>
+  <h3>Rationale</h3>
+  <p>This requirement stops an implementation from rounding or casting a value and so hiding information from the end user. Rounding is the consumer&#x27;s concern: a value rounded inside sc-agent loses information no consumer can recover.
+
+Owner ruling (2026-11-21), Rand Lee: &quot;I would never create a requirement requiring subnanosecond rounding for a http call.&quot; &quot;Don&#x27;t round % to int.&quot;</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>Rust API: a unit test sends a request whose Jev probability is 0.123456789 to a stub server and asserts `send` returns 0.123456789 exactly.</li>
+    <li>CLI: a CLI run of `decidr send` against a stub server whose Jev probability is 0.123456789 prints 0.123456789 exactly in its JSON output.</li>
+    <li>Python bindings: a Python test calls `send` against a stub server whose Jev probability is 0.123456789 and asserts the returned value is 0.123456789 exactly.</li>
+    <li>Inspection: `rg -n &#x27;f32|Decimal|i64&#x27; crates/sc-agent/src` shows no fractional decision value held in a type other than `f64`.</li>
+    <li>A unit test passes a Jev confidence of 0.875 through sc-agent and asserts the returned value is 0.875, not 1 or 0.88.</li>
+    <li>Inspection: `rg -n &#x27;round&#x27; crates/` finds no rounding of a returned decision value.</li>
+  </ul>
+</section>

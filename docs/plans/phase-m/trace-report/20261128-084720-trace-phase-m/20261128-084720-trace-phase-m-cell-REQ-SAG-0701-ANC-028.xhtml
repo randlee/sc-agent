@@ -1,0 +1,90 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-related" id="cell-REQ-SAG-0701-ANC-028">
+  <div class="section-head">
+    <h2>REQ-SAG-0701 × ANC-028 — related</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-028&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.89,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.93,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.04
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.35,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.42,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.57
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.72,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.18,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.81
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.5,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.67,
+        &quot;unclear&quot;: 0.06,
+        &quot;yes&quot;: 0.27
+      }
+    }
+  },
+  &quot;class&quot;: &quot;related&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.04,
+    &quot;exceeds&quot;: 0.57,
+    &quot;relates&quot;: 0.81,
+    &quot;serves&quot;: 0.27
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0701&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0701/ANC-028/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GNB9V2Q8EWM5RE0SYK5Z7Z&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0701 × ANC-028 — related
+Anchor
+A cache hit is decided by the request sha256 and the model alone; `run_id` is not part of the cache key.
+Owner said: “run-id has nothing to do with caching. run is a collection of queries of which some may be cached (if caching enabled)”
+Scope: adds or changes the result cache, cache keys or run ids
+Record statements
+`sc-agent`&#x27;s `send_batch` MUST run the requests of one batch in parallel across workers.
+The number of workers MUST be the `workers` setting.
+When `workers` is not set, the number of workers MUST be 8.
+Each result MUST carry the session ULID of the request it answers.
+Each result MUST carry the input position of the request it answers.
+A failed request MUST be returned as that request&#x27;s error result.
+When one request fails, the other requests of the batch MUST still run.
+Cancelling the batch MUST stop every request that has not finished.
+Jev P(yes): relates 0.81 · serves 0.27 · exceeds 0.57 · conflicts 0.04">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>Anchor</h3>
+  <p>A cache hit is decided by the request sha256 and the model alone; `run_id` is not part of the cache key.</p>
+  <p>Owner said: “run-id has nothing to do with caching. run is a collection of queries of which some may be cached (if caching enabled)”</p>
+  <p>Scope: adds or changes the result cache, cache keys or run ids</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>`sc-agent`&#x27;s `send_batch` MUST run the requests of one batch in parallel across workers.</li>
+    <li>The number of workers MUST be the `workers` setting.</li>
+    <li>When `workers` is not set, the number of workers MUST be 8.</li>
+    <li>Each result MUST carry the session ULID of the request it answers.</li>
+    <li>Each result MUST carry the input position of the request it answers.</li>
+    <li>A failed request MUST be returned as that request&#x27;s error result.</li>
+    <li>When one request fails, the other requests of the batch MUST still run.</li>
+    <li>Cancelling the batch MUST stop every request that has not finished.</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.81 · serves 0.27 · exceeds 0.57 · conflicts 0.04</p>
+</section>

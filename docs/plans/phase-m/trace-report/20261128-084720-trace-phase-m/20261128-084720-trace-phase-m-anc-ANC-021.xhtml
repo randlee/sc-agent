@@ -1,0 +1,73 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="anc-ANC-021">
+  <div class="section-head">
+    <h2>ANC-021</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;beads&quot;: {
+    &quot;anchor&quot;: &quot;agt-s6th&quot;,
+    &quot;dev_questions&quot;: &quot;agt-s6th.2&quot;,
+    &quot;plan_questions&quot;: &quot;agt-s6th.1&quot;
+  },
+  &quot;context&quot;: &quot;phase-m planning session, 2026-11-27; layer rule of ADR-SAG-0004 v0.5.0&quot;,
+  &quot;deterministic_check&quot;: &quot;&quot;,
+  &quot;fixtures&quot;: {
+    &quot;fail&quot;: [
+      &quot;The bead puts a helper used by both providers in sc-openai and copies it into sc-anthropic.&quot;
+    ],
+    &quot;pass&quot;: [
+      &quot;The bead puts the retry helper in sc-agent-types, layer 1, because both sc-anthropic and sc-openai use it.&quot;
+    ]
+  },
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:54:55+00:00&quot;,
+      &quot;event&quot;: &quot;created&quot;,
+      &quot;status&quot;: &quot;locked&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:56:09+00:00&quot;,
+      &quot;beads&quot;: {
+        &quot;anchor&quot;: &quot;agt-s6th&quot;,
+        &quot;dev_questions&quot;: &quot;agt-s6th.2&quot;,
+        &quot;plan_questions&quot;: &quot;agt-s6th.1&quot;
+      },
+      &quot;event&quot;: &quot;beads_set&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:58:04+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;fixtures&quot;
+      ]
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-021&quot;,
+  &quot;kind&quot;: &quot;directive&quot;,
+  &quot;promoted_to&quot;: null,
+  &quot;question_overrides&quot;: {},
+  &quot;quote&quot;: &quot;You need to be able to push shared methods down and move differences up&quot;,
+  &quot;scope&quot;: &quot;adds or changes code in any crate under crates/&quot;,
+  &quot;source_ref&quot;: null,
+  &quot;source_type&quot;: &quot;ANC&quot;,
+  &quot;stated_at&quot;: &quot;2026-11-27&quot;,
+  &quot;stated_by&quot;: &quot;Rand Lee&quot;,
+  &quot;statement&quot;: &quot;Every phase-m sprint bead names the crate and layer each change lands in, and that layer is the lowest layer whose crates all use the change.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;summary&quot;: &quot;Shared code sits in the lowest layer using it&quot;,
+  &quot;version&quot;: 2
+}">{}</button>
+    </div>
+  </div>
+  <h3>Statement</h3>
+  <p class="statement">Every phase-m sprint bead names the crate and layer each change lands in, and that layer is the lowest layer whose crates all use the change.</p>
+  <h3>Owner said</h3>
+  <p class="quote">You need to be able to push shared methods down and move differences up</p>
+  <h3>Scope</h3>
+  <p>adds or changes code in any crate under crates/</p>
+  <h3>Kind</h3>
+  <p>directive</p>
+  <h3>Stated by</h3>
+  <p>Rand Lee</p>
+  <h3>Stated on</h3>
+  <p>2026-11-27</p>
+</section>

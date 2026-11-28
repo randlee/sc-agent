@@ -1,0 +1,95 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-related" id="cell-REQ-SAG-0005-ANC-028">
+  <div class="section-head">
+    <h2>REQ-SAG-0005 × ANC-028 — related</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-028&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.92,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.95,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.02
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.34,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.42,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.56
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.43,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.37,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.62
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.52,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.68,
+        &quot;unclear&quot;: 0.1,
+        &quot;yes&quot;: 0.22
+      }
+    }
+  },
+  &quot;class&quot;: &quot;related&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.02,
+    &quot;exceeds&quot;: 0.56,
+    &quot;relates&quot;: 0.62,
+    &quot;serves&quot;: 0.22
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0005&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0005/ANC-028/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GNABRQ78C4E2TX62QKZ442&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0005 × ANC-028 — related
+Anchor
+A cache hit is decided by the request sha256 and the model alone; `run_id` is not part of the cache key.
+Owner said: “run-id has nothing to do with caching. run is a collection of queries of which some may be cached (if caching enabled)”
+Scope: adds or changes the result cache, cache keys or run ids
+Record statements
+Session logs MUST be written as JSONL.
+For every query whose model call succeeded, sc-agent MUST append a session row to the query&#x27;s session log.
+sc-agent MUST NOT append more than one session row for one query.
+sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.
+History (git)
+REQ-SAG-0005 statement 1: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008
+REQ-SAG-0005 statement 2: 79a409b7 2026-11-27: records: session log written only on successful model calls (owner ruling 2026-11-27)
+REQ-SAG-0005 statement 3: 8069260d 2026-11-24: REQ-SAG-0005: split on s1 (cut to 3 statements)
+REQ-SAG-0005 statement 4: 79a409b7 2026-11-27: records: session log written only on successful model calls (owner ruling 2026-11-27)
+Jev P(yes): relates 0.62 · serves 0.22 · exceeds 0.56 · conflicts 0.02">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>Anchor</h3>
+  <p>A cache hit is decided by the request sha256 and the model alone; `run_id` is not part of the cache key.</p>
+  <p>Owner said: “run-id has nothing to do with caching. run is a collection of queries of which some may be cached (if caching enabled)”</p>
+  <p>Scope: adds or changes the result cache, cache keys or run ids</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>Session logs MUST be written as JSONL.</li>
+    <li>For every query whose model call succeeded, sc-agent MUST append a session row to the query&#x27;s session log.</li>
+    <li>sc-agent MUST NOT append more than one session row for one query.</li>
+    <li>sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0005 statement 1: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0005 statement 2: 79a409b7 2026-11-27: records: session log written only on successful model calls (owner ruling 2026-11-27)</li>
+    <li>REQ-SAG-0005 statement 3: 8069260d 2026-11-24: REQ-SAG-0005: split on s1 (cut to 3 statements)</li>
+    <li>REQ-SAG-0005 statement 4: 79a409b7 2026-11-27: records: session log written only on successful model calls (owner ruling 2026-11-27)</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.62 · serves 0.22 · exceeds 0.56 · conflicts 0.02</p>
+</section>

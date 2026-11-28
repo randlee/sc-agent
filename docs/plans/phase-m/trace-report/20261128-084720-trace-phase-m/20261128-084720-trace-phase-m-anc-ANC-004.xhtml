@@ -1,0 +1,75 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="anc-ANC-004">
+  <div class="section-head">
+    <h2>ANC-004</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;beads&quot;: {
+    &quot;anchor&quot;: &quot;agt-bouw&quot;,
+    &quot;dev_questions&quot;: &quot;agt-bouw.2&quot;,
+    &quot;plan_questions&quot;: &quot;agt-bouw.1&quot;
+  },
+  &quot;context&quot;: &quot;planning session; session, 2026-11-26&quot;,
+  &quot;deterministic_check&quot;: &quot;`rg -n &#x27;8 \\* 1024 \\* 1024\\&quot;,
+  &quot;fixtures&quot;: {
+    &quot;fail&quot;: [
+      &quot;sc-agent rejects any request body over 64 KiB before sending it.&quot;
+    ],
+    &quot;pass&quot;: [
+      &quot;Requests are sent at any size up to the model&#x27;s context window; sc-agent adds no byte cap.&quot;
+    ]
+  },
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-26T18:51:01+00:00&quot;,
+      &quot;event&quot;: &quot;created&quot;,
+      &quot;status&quot;: &quot;locked&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:55:33+00:00&quot;,
+      &quot;beads&quot;: {
+        &quot;anchor&quot;: &quot;agt-bouw&quot;,
+        &quot;dev_questions&quot;: &quot;agt-bouw.2&quot;,
+        &quot;plan_questions&quot;: &quot;agt-bouw.1&quot;
+      },
+      &quot;event&quot;: &quot;beads_set&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:58:03+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;fixtures&quot;
+      ]
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-004&quot;,
+  &quot;kind&quot;: &quot;prohibition&quot;,
+  &quot;promoted_to&quot;: null,
+  &quot;question_overrides&quot;: {},
+  &quot;quote&quot;: &quot;These limits are clearly over-specified. Input is limited by model context.&quot;,
+  &quot;scope&quot;: &quot;adds or changes a request size check, a record size check or handling of an sc-observability size error&quot;,
+  &quot;source_ref&quot;: null,
+  &quot;source_type&quot;: &quot;ANC&quot;,
+  &quot;stated_at&quot;: &quot;2026-11-26&quot;,
+  &quot;stated_by&quot;: &quot;Rand Lee&quot;,
+  &quot;statement&quot;: &quot;sc-agent must impose no request input size limit of its own beyond the selected model&#x27;s context, so input limits are not over-specified.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;summary&quot;: &quot;C04 sc-agent must impose no request input size limit of its own &quot;,
+  &quot;version&quot;: 2
+}">{}</button>
+    </div>
+  </div>
+  <h3>Statement</h3>
+  <p class="statement">sc-agent must impose no request input size limit of its own beyond the selected model&#x27;s context, so input limits are not over-specified.</p>
+  <h3>Owner said</h3>
+  <p class="quote">These limits are clearly over-specified. Input is limited by model context.</p>
+  <h3>Scope</h3>
+  <p>adds or changes a request size check, a record size check or handling of an sc-observability size error</p>
+  <h3>Deterministic check</h3>
+  <p>`rg -n &#x27;8 \* 1024 \* 1024\</p>
+  <h3>Kind</h3>
+  <p>prohibition</p>
+  <h3>Stated by</h3>
+  <p>Rand Lee</p>
+  <h3>Stated on</h3>
+  <p>2026-11-26</p>
+</section>

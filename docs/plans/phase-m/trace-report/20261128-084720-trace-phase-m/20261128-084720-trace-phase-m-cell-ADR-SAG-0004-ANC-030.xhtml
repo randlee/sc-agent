@@ -1,0 +1,86 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-conflicts" id="cell-ADR-SAG-0004-ANC-030">
+  <div class="section-head">
+    <h2>ADR-SAG-0004 × ANC-030 — conflicts</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-030&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.46,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.26,
+        &quot;unclear&quot;: 0.1,
+        &quot;yes&quot;: 0.64
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.55,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.28,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.7
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.28,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.52,
+        &quot;unclear&quot;: 0.06,
+        &quot;yes&quot;: 0.42
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.76,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.84,
+        &quot;unclear&quot;: 0.13,
+        &quot;yes&quot;: 0.03
+      }
+    }
+  },
+  &quot;class&quot;: &quot;conflicts&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.64,
+    &quot;exceeds&quot;: 0.7,
+    &quot;relates&quot;: 0.42,
+    &quot;serves&quot;: 0.03
+  },
+  &quot;record&quot;: &quot;ADR-SAG-0004&quot;,
+  &quot;request_id&quot;: &quot;trace/ADR-SAG-0004/ANC-030/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GNBJFH8RYQ6YK7YBC3V5B8&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="ADR-SAG-0004 × ANC-030 — conflicts
+What conflicts
+Anchor
+Retry and holdoff code takes its waits, limits and busy and quota rules as parameters from the calling layer, and contains no provider name, host or status-code table.
+Owner said: “retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.”
+Scope: adds or changes retry, resend, backoff or holdoff code
+Record statements
+No obligation statements.
+History (git)
+ADR-SAG-0004 statement 1: 66369ba0 2026-11-21: docs: records follow the reduction plan
+Jev P(yes): relates 0.42 · serves 0.03 · exceeds 0.70 · conflicts 0.64">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What conflicts</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+  </ul>
+  <h3>Anchor</h3>
+  <p>Retry and holdoff code takes its waits, limits and busy and quota rules as parameters from the calling layer, and contains no provider name, host or status-code table.</p>
+  <p>Owner said: “retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.”</p>
+  <p>Scope: adds or changes retry, resend, backoff or holdoff code</p>
+  <h3>Record statements</h3>
+  <p>No obligation statements.</p>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>ADR-SAG-0004 statement 1: 66369ba0 2026-11-21: docs: records follow the reduction plan</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.42 · serves 0.03 · exceeds 0.70 · conflicts 0.64</p>
+</section>

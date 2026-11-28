@@ -1,0 +1,138 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0303">
+  <div class="section-head">
+    <h2>REQ-SAG-0303 PyO3 and CLI query surfaces</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0303&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T084552Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The `sc-treesitter` Python bindings MUST accept any tree-sitter query for any loaded tree-sitter grammar.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The `sitr` CLI MUST provide the `languages` subcommand.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The `sitr` CLI MUST provide the `queries` subcommand.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The `sitr` CLI MUST provide a `--version` flag.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0303&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Python callers need full query access; the CLI runs specific predefined queries that simplify common use.\n\nOwner ruling (2026-11-21), Rand Lee: every CLI has `--version`.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The `sc-treesitter` Python bindings MUST accept any tree-sitter query for any loaded tree-sitter grammar.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The `sitr` CLI MUST provide the `languages` subcommand.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The `sitr` CLI MUST provide the `queries` subcommand.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The `sitr` CLI MUST provide a `--version` flag.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: CLI means command-line interface. A loaded grammar is a tree-sitter grammar loaded by `sc-treesitter`. The PyO3 bindings expose the Python query interface to `sc-treesitter`.\n\nThe `sitr` CLI can expose a subset of the PyO3 query surface.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A query written by the caller runs through the PyO3 bindings and returns its matches.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;`languages` lists the loaded grammars and `queries` lists the predefined queries.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;`sitr --version` prints the version.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;PyO3 and CLI query surfaces&quot;,
+    &quot;version&quot;: &quot;0.2.1&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.2.1</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>The `sc-treesitter` Python bindings MUST accept any tree-sitter query for any loaded tree-sitter grammar.</li>
+    <li>The `sitr` CLI MUST provide the `languages` subcommand.</li>
+    <li>The `sitr` CLI MUST provide the `queries` subcommand.</li>
+    <li>The `sitr` CLI MUST provide a `--version` flag.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: CLI means command-line interface. A loaded grammar is a tree-sitter grammar loaded by `sc-treesitter`. The PyO3 bindings expose the Python query interface to `sc-treesitter`.
+
+The `sitr` CLI can expose a subset of the PyO3 query surface.</p>
+  <h3>Rationale</h3>
+  <p>Python callers need full query access; the CLI runs specific predefined queries that simplify common use.
+
+Owner ruling (2026-11-21), Rand Lee: every CLI has `--version`.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A query written by the caller runs through the PyO3 bindings and returns its matches.</li>
+    <li>`languages` lists the loaded grammars and `queries` lists the predefined queries.</li>
+    <li>`sitr --version` prints the version.</li>
+  </ul>
+</section>

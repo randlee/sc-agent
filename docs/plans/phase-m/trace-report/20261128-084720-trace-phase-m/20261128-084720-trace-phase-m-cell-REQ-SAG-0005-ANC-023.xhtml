@@ -1,0 +1,100 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-conflicts" id="cell-REQ-SAG-0005-ANC-023">
+  <div class="section-head">
+    <h2>REQ-SAG-0005 × ANC-023 — conflicts</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-023&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.77,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.12,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.85
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.94,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.04,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.96
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.98,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.01,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.99
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.96,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.97,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.02
+      }
+    }
+  },
+  &quot;class&quot;: &quot;conflicts&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.85,
+    &quot;exceeds&quot;: 0.96,
+    &quot;relates&quot;: 0.99,
+    &quot;serves&quot;: 0.02
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0005&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0005/ANC-023/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GNABJZ6G73YYXM5KBHXK3P&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0005 × ANC-023 — conflicts
+What conflicts
+Anchor
+sc-agent writes each session row to the repository&#x27;s SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.
+Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp”
+Scope: adds or changes code that writes or reads session rows
+Record statements
+Session logs MUST be written as JSONL.
+For every query whose model call succeeded, sc-agent MUST append a session row to the query&#x27;s session log.
+sc-agent MUST NOT append more than one session row for one query.
+sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.
+History (git)
+REQ-SAG-0005 statement 1: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008
+REQ-SAG-0005 statement 2: 79a409b7 2026-11-27: records: session log written only on successful model calls (owner ruling 2026-11-27)
+REQ-SAG-0005 statement 3: 8069260d 2026-11-24: REQ-SAG-0005: split on s1 (cut to 3 statements)
+REQ-SAG-0005 statement 4: 79a409b7 2026-11-27: records: session log written only on successful model calls (owner ruling 2026-11-27)
+Jev P(yes): relates 0.99 · serves 0.02 · exceeds 0.96 · conflicts 0.85">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What conflicts</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+  </ul>
+  <h3>Anchor</h3>
+  <p>sc-agent writes each session row to the repository&#x27;s SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.</p>
+  <p>Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp”</p>
+  <p>Scope: adds or changes code that writes or reads session rows</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>Session logs MUST be written as JSONL.</li>
+    <li>For every query whose model call succeeded, sc-agent MUST append a session row to the query&#x27;s session log.</li>
+    <li>sc-agent MUST NOT append more than one session row for one query.</li>
+    <li>sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0005 statement 1: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0005 statement 2: 79a409b7 2026-11-27: records: session log written only on successful model calls (owner ruling 2026-11-27)</li>
+    <li>REQ-SAG-0005 statement 3: 8069260d 2026-11-24: REQ-SAG-0005: split on s1 (cut to 3 statements)</li>
+    <li>REQ-SAG-0005 statement 4: 79a409b7 2026-11-27: records: session log written only on successful model calls (owner ruling 2026-11-27)</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.99 · serves 0.02 · exceeds 0.96 · conflicts 0.85</p>
+</section>

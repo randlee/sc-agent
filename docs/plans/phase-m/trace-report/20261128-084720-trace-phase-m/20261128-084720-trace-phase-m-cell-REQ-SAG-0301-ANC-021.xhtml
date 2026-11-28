@@ -1,0 +1,92 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-REQ-SAG-0301-ANC-021">
+  <div class="section-head">
+    <h2>REQ-SAG-0301 × ANC-021 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-021&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.73,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.82,
+        &quot;unclear&quot;: 0.07,
+        &quot;yes&quot;: 0.11
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.52,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.31,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.68
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.86,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.08,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.91
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.53,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.69,
+        &quot;unclear&quot;: 0.06,
+        &quot;yes&quot;: 0.25
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.11,
+    &quot;exceeds&quot;: 0.68,
+    &quot;relates&quot;: 0.91,
+    &quot;serves&quot;: 0.25
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0301&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0301/ANC-021/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GNBCV8X2D751P7V792CDYW&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0301 × ANC-021 — exceeds
+What exceeds
+Anchor
+Every phase-m sprint bead names the crate and layer each change lands in, and that layer is the lowest layer whose crates all use the change.
+Owner said: “You need to be able to push shared methods down and move differences up”
+Scope: adds or changes code in any crate under crates/
+Record statements
+`sc-treesitter` MUST NOT depend on any sc-agent crate other than `sc-agent`, whose error and logging it shares.
+`sc-treesitter` MUST NOT contain agent or decision-model code.
+History (git)
+REQ-SAG-0301 statement 1: 66369ba0 2026-11-21: docs: records follow the reduction plan
+REQ-SAG-0301 statement 2: 1d855d0e 2026-11-09: Add requirements and architecture decisions as Raptor records
+Jev P(yes): relates 0.91 · serves 0.25 · exceeds 0.68 · conflicts 0.11">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+  </ul>
+  <h3>Anchor</h3>
+  <p>Every phase-m sprint bead names the crate and layer each change lands in, and that layer is the lowest layer whose crates all use the change.</p>
+  <p>Owner said: “You need to be able to push shared methods down and move differences up”</p>
+  <p>Scope: adds or changes code in any crate under crates/</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>`sc-treesitter` MUST NOT depend on any sc-agent crate other than `sc-agent`, whose error and logging it shares.</li>
+    <li>`sc-treesitter` MUST NOT contain agent or decision-model code.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0301 statement 1: 66369ba0 2026-11-21: docs: records follow the reduction plan</li>
+    <li>REQ-SAG-0301 statement 2: 1d855d0e 2026-11-09: Add requirements and architecture decisions as Raptor records</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.91 · serves 0.25 · exceeds 0.68 · conflicts 0.11</p>
+</section>

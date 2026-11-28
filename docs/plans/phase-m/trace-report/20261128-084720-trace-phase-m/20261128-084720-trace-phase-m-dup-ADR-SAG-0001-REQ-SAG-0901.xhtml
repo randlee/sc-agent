@@ -1,0 +1,53 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-duplicate" id="dup-ADR-SAG-0001-REQ-SAG-0901">
+  <div class="section-head">
+    <h2>ADR-SAG-0001 restates REQ-SAG-0901</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="[
+  {
+    &quot;action&quot;: &quot;correct&quot;,
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;duplicate&quot;,
+    &quot;confidence&quot;: 0.61,
+    &quot;item&quot;: &quot;ADR-SAG-0001&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0901&quot;,
+    &quot;session_id&quot;: &quot;01M8GNBTPN43NTXSN73VT0A8Z0&quot;,
+    &quot;statement&quot;: &quot;The covered model handling the decision request MUST pass the request&#x27;s inputs to the provider.&quot;,
+    &quot;statement_index&quot;: 5
+  }
+]">{}</button>
+    </div>
+  </div>
+  <p class="small">sc-agent · sc-agent</p>
+  <h3>Duplicated statement</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+    <li>REQ-SAG-0901 statement 6 (0.61): The covered model handling the decision request MUST pass the request&#x27;s inputs to the provider.</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>ADR-SAG-0001 statement 1: 057b8146 2026-11-26: phase-j plan: decision and LLM traits are parallel; drop LlmDecision adapter (owner ruling 2026-11-26)</li>
+    <li>REQ-SAG-0901 statement 1: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+    <li>REQ-SAG-0901 statement 2: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+    <li>REQ-SAG-0901 statement 3: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+    <li>REQ-SAG-0901 statement 4: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+    <li>REQ-SAG-0901 statement 5: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+    <li>REQ-SAG-0901 statement 6: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+    <li>REQ-SAG-0901 statement 7: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+  </ul>
+  <h3>ADR-SAG-0001 Every decision provider receives one request form</h3>
+  <h3>Decision</h3>
+  <p>For decision requests, every decision provider receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, and LLM providers one LLM trait (JSON in, JSON out). Jev implements the decision trait over SystemOne. One type per wire format, OpenAI-compatible chat/completions and Anthropic-compatible Messages, implements both traits and is shared by every provider of that format. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them.</p>
+  <h3>REQ-SAG-0901 LLM decision backends return the Jev schema</h3>
+  <h3>Statements</h3>
+  <ul>
+    <li>In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.</li>
+    <li>In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.</li>
+    <li>In decider mode, answers from each covered model MUST conform to the required schema.</li>
+    <li>Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.</li>
+    <li>If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.</li>
+    <li>The covered model handling the decision request MUST pass the request&#x27;s inputs to the provider.</li>
+    <li>If the provider rejects a request input, the decision backend MUST return the provider&#x27;s error.</li>
+  </ul>
+</section>

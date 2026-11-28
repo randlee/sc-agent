@@ -1,0 +1,124 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-REQ-SAG-0103-ANC-026">
+  <div class="section-head">
+    <h2>REQ-SAG-0103 × ANC-026 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-026&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.82,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.88,
+        &quot;unclear&quot;: 0.09,
+        &quot;yes&quot;: 0.03
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.43,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.37,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.62
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.8,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.12,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.87
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.72,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.81,
+        &quot;unclear&quot;: 0.12,
+        &quot;yes&quot;: 0.07
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.03,
+    &quot;exceeds&quot;: 0.62,
+    &quot;relates&quot;: 0.87,
+    &quot;serves&quot;: 0.07
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0103&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0103/ANC-026/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GNB6B3SKWZ5X20G4DWAFP0&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0103 × ANC-026 — exceeds
+What exceeds
+Anchor
+Every core table&#x27;s SQL is defined in `sc-agent-schema` and nowhere else.
+Owner said: “SQLite schema is in sc-agent-schema.”
+Scope: adds or changes SQL table definitions anywhere in the workspace
+Record statements
+A model-table row MUST store its provider in a field separate from its model.
+A request MUST carry the model id stored in the selected model-table row.
+sc-agent MUST be able to send requests through Together.
+sc-agent MUST be able to send requests through OpenRouter.
+When configuration names a provider for a model, sc-agent MUST send that model&#x27;s requests to that provider.
+When no provider is configured for a model, sc-agent MUST prefer a provider that needs no key over one that needs a key.
+When no provider is configured for a model and every provider serving it needs a key, sc-agent MUST use the first of them whose key is found.
+The provider that sends requests to the OpenAI API MUST have the name `openai`.
+A short name MUST NOT encode its provider.
+A request MUST NOT require the caller to name a provider.
+History (git)
+REQ-SAG-0103 statement 1: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0103 statement 2: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0103 statement 3: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0103 statement 4: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0103 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0103 statement 6: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0103 statement 7: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0103 statement 8: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0103 statement 9: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings
+REQ-SAG-0103 statement 10: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+Jev P(yes): relates 0.87 · serves 0.07 · exceeds 0.62 · conflicts 0.03">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+  </ul>
+  <h3>Anchor</h3>
+  <p>Every core table&#x27;s SQL is defined in `sc-agent-schema` and nowhere else.</p>
+  <p>Owner said: “SQLite schema is in sc-agent-schema.”</p>
+  <p>Scope: adds or changes SQL table definitions anywhere in the workspace</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>A model-table row MUST store its provider in a field separate from its model.</li>
+    <li>A request MUST carry the model id stored in the selected model-table row.</li>
+    <li>sc-agent MUST be able to send requests through Together.</li>
+    <li>sc-agent MUST be able to send requests through OpenRouter.</li>
+    <li>When configuration names a provider for a model, sc-agent MUST send that model&#x27;s requests to that provider.</li>
+    <li>When no provider is configured for a model, sc-agent MUST prefer a provider that needs no key over one that needs a key.</li>
+    <li>When no provider is configured for a model and every provider serving it needs a key, sc-agent MUST use the first of them whose key is found.</li>
+    <li>The provider that sends requests to the OpenAI API MUST have the name `openai`.</li>
+    <li>A short name MUST NOT encode its provider.</li>
+    <li>A request MUST NOT require the caller to name a provider.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0103 statement 1: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0103 statement 2: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0103 statement 3: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0103 statement 4: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0103 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0103 statement 6: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0103 statement 7: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0103 statement 8: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0103 statement 9: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0103 statement 10: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.87 · serves 0.07 · exceeds 0.62 · conflicts 0.03</p>
+</section>

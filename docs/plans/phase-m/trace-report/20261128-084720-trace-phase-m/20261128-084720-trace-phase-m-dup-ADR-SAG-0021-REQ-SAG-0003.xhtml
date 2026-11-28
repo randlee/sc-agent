@@ -1,0 +1,139 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-duplicate" id="dup-ADR-SAG-0021-REQ-SAG-0003">
+  <div class="section-head">
+    <h2>ADR-SAG-0021 restates REQ-SAG-0003</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="[
+  {
+    &quot;action&quot;: &quot;correct&quot;,
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;duplicate&quot;,
+    &quot;confidence&quot;: 0.97,
+    &quot;item&quot;: &quot;ADR-SAG-0021&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0003&quot;,
+    &quot;session_id&quot;: &quot;01M8GNBTYARP4XMV24ZSYVDRCJ&quot;,
+    &quot;statement&quot;: &quot;With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/&lt;cli&gt;.log.jsonl`.&quot;,
+    &quot;statement_index&quot;: 0
+  },
+  {
+    &quot;action&quot;: &quot;correct&quot;,
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;duplicate&quot;,
+    &quot;confidence&quot;: 0.91,
+    &quot;item&quot;: &quot;ADR-SAG-0021&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0003&quot;,
+    &quot;session_id&quot;: &quot;01M8GNBTYARP4XMV24ZSYVDRCJ&quot;,
+    &quot;statement&quot;: &quot;Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).&quot;,
+    &quot;statement_index&quot;: 3
+  },
+  {
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;possible&quot;,
+    &quot;confidence&quot;: 0.58,
+    &quot;item&quot;: &quot;ADR-SAG-0021&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0003&quot;,
+    &quot;session_id&quot;: &quot;01M8GNBTYARP4XMV24ZSYVDRCJ&quot;,
+    &quot;statement&quot;: &quot;A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.&quot;,
+    &quot;statement_index&quot;: 4
+  },
+  {
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;possible&quot;,
+    &quot;confidence&quot;: 0.53,
+    &quot;item&quot;: &quot;ADR-SAG-0021&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0003&quot;,
+    &quot;session_id&quot;: &quot;01M8GNBTYARP4XMV24ZSYVDRCJ&quot;,
+    &quot;statement&quot;: &quot;sc-agent MUST NOT remove a run log.&quot;,
+    &quot;statement_index&quot;: 8
+  }
+]">{}</button>
+    </div>
+  </div>
+  <p class="small">sc-agent · sc-agent</p>
+  <h3>Duplicated statement</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+    <li>REQ-SAG-0003 statement 1 (0.97): With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/&lt;cli&gt;.log.jsonl`.</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+  </ul>
+  <h3>Duplicated statement</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+    <li>REQ-SAG-0003 statement 4 (0.91): Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+  </ul>
+  <h3>Possibly duplicated statement</h3>
+  <ul>
+    <li>REQ-SAG-0003 statement 5 (0.58): A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+  </ul>
+  <h3>Possibly duplicated statement</h3>
+  <ul>
+    <li>REQ-SAG-0003 statement 9 (0.53): sc-agent MUST NOT remove a run log.</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>ADR-SAG-0021 statement 1: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 1: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 2: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 3: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0003 statement 4: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 5: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 6: 13c45130 2026-11-24: docs(phase-j): round-3 rulings: runs.jsonl link table, haiku/luna keyless</li>
+    <li>REQ-SAG-0003 statement 7: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0003 statement 8: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0003 statement 9: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+  </ul>
+  <h3>ADR-SAG-0021 One sc-observability Logger per process, owned by the entry point; general logs and session logs in separate trees</h3>
+  <h3>Decision</h3>
+  <p>**One Logger per process, owned by the entry point.** The entry point is the CLI&#x27;s `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.
+
+**The wheel exposes the crate&#x27;s Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.
+
+**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.
+
+| Product | Contains |
+|---|---|
+| `decidr` CLI | decidr, sc-observability |
+| `sitr` CLI | sitr, sc-observability |
+| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |
+
+There is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.
+
+**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller&#x27;s responsibility.
+
+**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.
+
+**Paths.** The log root is `~/.sc-agent`. One function returns a CLI&#x27;s log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel&#x27;s `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).
+
+| Entry point | General log | Session logs |
+|---|---|---|
+| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/sessions.jsonl` |
+| `sitr` CLI | `logs/sitr.log.jsonl` | none |
+| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/&lt;repo&gt;/plan-anchor/&lt;project&gt;/sessions.jsonl` |
+| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/&lt;repo&gt;/judge-jev/&lt;project&gt;/sessions.jsonl` |
+
+A wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.
+
+**Session identity.**
+
+- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.
+- `tool` and `tool_version` name the program that sent the query and its version: the generated client&#x27;s name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).
+- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it &quot;project/phase&quot;.
+
+**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger&#x27;s failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.</p>
+  <h3>REQ-SAG-0003 Log locations and retention</h3>
+  <h3>Statements</h3>
+  <ul>
+    <li>With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/&lt;cli&gt;.log.jsonl`.</li>
+    <li>When `&lt;CLI&gt;_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`.</li>
+    <li>When `&lt;CLIENT&gt;_LOG_ROOT` is set and not empty, the generated client MUST use that folder in place of `~/.sc-agent/` for its logs.</li>
+    <li>Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).</li>
+    <li>A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.</li>
+    <li>A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.</li>
+    <li>sc-agent MUST NOT contain code that removes a general log.</li>
+    <li>sc-agent MUST NOT remove a session log.</li>
+    <li>sc-agent MUST NOT remove a run log.</li>
+  </ul>
+</section>

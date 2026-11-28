@@ -1,0 +1,110 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-ADR-SAG-0018">
+  <div class="section-head">
+    <h2>ADR-SAG-0018 sc-publish kit owns release surface</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;ADR-SAG-0018&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T084552Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;ADR&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: null,
+    &quot;note&quot;: &quot;No obligation statements.&quot;,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: null
+  },
+  &quot;raptor&quot;: {
+    &quot;alternatives&quot;: {
+      &quot;groups&quot;: [
+        {
+          &quot;cons&quot;: [],
+          &quot;description&quot;: &quot;Edit release workflows directly rather than use sc-publish.&quot;,
+          &quot;name&quot;: &quot;Ad-hoc workflow edits&quot;,
+          &quot;pros&quot;: [],
+          &quot;why_rejected&quot;: &quot;The pinned kit owns the rendered release files; direct edits can drift from its consumer input.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;consequences&quot;: {
+      &quot;negative&quot;: [
+        &quot;Drift between JSON and rendered TOML is a hard fail until re-install.&quot;
+      ],
+      &quot;neutral&quot;: [],
+      &quot;positive&quot;: [
+        &quot;Kit upgrades flow through pin bump + dry-run.&quot;
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;context&quot;: {
+      &quot;background&quot;: &quot;&quot;,
+      &quot;problem_statement&quot;: &quot;&quot;,
+      &quot;text&quot;: &quot;Release workflows, channel contracts, and `publish-artifacts.toml` are rendered from consumer input by [sc-publish](https://github.com/randlee/sc-publish).\nThe problem is keeping the rendered release files consistent with that input and the pinned kit.&quot;
+    },
+    &quot;created&quot;: &quot;2026-11-11&quot;,
+    &quot;decision&quot;: {
+      &quot;chosen_approach&quot;: &quot;&quot;,
+      &quot;key_principles&quot;: [
+        &quot;Pin a single qualified 40-character kit SHA in `release/sc-publish-pin.toml`.&quot;,
+        &quot;Consumer input is the sole source of crate order, binaries, channels, and optional **docli** preflight checks.&quot;
+      ],
+      &quot;text&quot;: &quot;Edit `release/sc-publish-consumer-input.json` and re-run `install.py` from the pinned kit; do not hand-edit rendered files under `release/` or kit-owned `.github/workflows` publish YAML except through the installer.&quot;
+    },
+    &quot;decision_date&quot;: &quot;2026-11-11&quot;,
+    &quot;id&quot;: &quot;ADR-SAG-0018&quot;,
+    &quot;impact_analysis&quot;: {
+      &quot;affected_components&quot;: &quot;&quot;,
+      &quot;maintainability_impact&quot;: &quot;&quot;,
+      &quot;performance_impact&quot;: &quot;&quot;,
+      &quot;security_impact&quot;: &quot;&quot;,
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;implementation&quot;: {
+      &quot;code_examples&quot;: &quot;&quot;,
+      &quot;integration_points&quot;: [],
+      &quot;key_components&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;rationale&quot;: {
+      &quot;benefits&quot;: [],
+      &quot;text&quot;: &quot;- The pinned kit renders release workflows and channel contracts from consumer input.&quot;,
+      &quot;trade_offs&quot;: []
+    },
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;title&quot;: &quot;sc-publish kit owns release surface&quot;,
+    &quot;version&quot;: &quot;0.1.1&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">ADR · sc-agent · Approved · version 0.1.1</p>
+  <h3>Context</h3>
+  <p>Release workflows, channel contracts, and `publish-artifacts.toml` are rendered from consumer input by [sc-publish](https://github.com/randlee/sc-publish).
+The problem is keeping the rendered release files consistent with that input and the pinned kit.</p>
+  <h3>Decision</h3>
+  <p>Edit `release/sc-publish-consumer-input.json` and re-run `install.py` from the pinned kit; do not hand-edit rendered files under `release/` or kit-owned `.github/workflows` publish YAML except through the installer.</p>
+  <h3>Key principles</h3>
+  <ul>
+    <li>Pin a single qualified 40-character kit SHA in `release/sc-publish-pin.toml`.</li>
+    <li>Consumer input is the sole source of crate order, binaries, channels, and optional **docli** preflight checks.</li>
+  </ul>
+  <h3>Rationale</h3>
+  <p>- The pinned kit renders release workflows and channel contracts from consumer input.</p>
+  <h3>Positive consequences</h3>
+  <p>Kit upgrades flow through pin bump + dry-run.</p>
+  <h3>Negative consequences</h3>
+  <p>Drift between JSON and rendered TOML is a hard fail until re-install.</p>
+</section>

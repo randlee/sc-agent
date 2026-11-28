@@ -1,0 +1,229 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0005">
+  <div class="section-head">
+    <h2>REQ-SAG-0005 Session log rows and run links</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0005&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T084552Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Session logs MUST be written as JSONL.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;For every query whose model call succeeded, sc-agent MUST append a session row to the query&#x27;s session log.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;sc-agent MUST NOT append more than one session row for one query.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;3afa4f9e&quot;,
+        &quot;date&quot;: &quot;2026-11-18&quot;,
+        &quot;summary&quot;: &quot;Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008&quot;
+      },
+      &quot;statement&quot;: &quot;Session logs MUST be written as JSONL.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;79a409b7&quot;,
+        &quot;date&quot;: &quot;2026-11-27&quot;,
+        &quot;summary&quot;: &quot;records: session log written only on successful model calls (owner ruling 2026-11-27)&quot;
+      },
+      &quot;statement&quot;: &quot;For every query whose model call succeeded, sc-agent MUST append a session row to the query&#x27;s session log.&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;8069260d&quot;,
+        &quot;date&quot;: &quot;2026-11-24&quot;,
+        &quot;summary&quot;: &quot;REQ-SAG-0005: split on s1 (cut to 3 statements)&quot;
+      },
+      &quot;statement&quot;: &quot;sc-agent MUST NOT append more than one session row for one query.&quot;,
+      &quot;statement_index&quot;: 2
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;79a409b7&quot;,
+        &quot;date&quot;: &quot;2026-11-27&quot;,
+        &quot;summary&quot;: &quot;records: session log written only on successful model calls (owner ruling 2026-11-27)&quot;
+      },
+      &quot;statement&quot;: &quot;sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.&quot;,
+      &quot;statement_index&quot;: 3
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0003&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0004&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0102&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0002&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0021&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0005&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-25&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Every successfully answered query from every tool lands in the session log, while errors go to the general log, so a tool references a row by `session_id` instead of copying the query or the response. The run log records which Run each row answered, because one row can answer many Runs through cache hits. What a row and a link record hold, and that both logs are never rotated or pruned, is in ADR-SAG-0021 (Session log).&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Session logs MUST be written as JSONL.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;For every query whose model call succeeded, sc-agent MUST append a session row to the query&#x27;s session log.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;sc-agent MUST NOT append more than one session row for one query.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A query is one decision request sent through `send`, or one request of a `send_batch` call. A query&#x27;s session log is the JSONL file `sessions.jsonl`, and its run log is the JSONL file `runs.jsonl` in the same directory. A session row is the one line of a session log that records one query whose model call succeeded and its result. A failed call is one that ends in an error (auth, busy, quota, network or cancel). A Run is the context object through which every query is sent (ADR-SAG-0019 decision 14). A link record is the one line of a run log that ties a Run to the session row that answered one of its queries.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Every line of the `sessions.jsonl` that three sends write parses as one JSON object.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Three sends with `repo` `github.com/randlee/sc-agent`, `agent_role` `rust-developer` and `project` `phase-b` add three rows to one `sessions.jsonl`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;One Python `sc_agent.send` adds one row to a `sessions.jsonl` under `&lt;log_root&gt;/sessions/`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A `decidr` CLI send with `repo` `github.com/randlee/sc-agent`, `agent_role` `rust-developer` and `project` `phase-b` adds one row to `sessions.jsonl`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A query sent four times after three busy responses adds one row.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A send that fails with a 401 adds no row to `sessions.jsonl`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A batch of 3 through a Run adds 3 link records to `runs.jsonl` in the same directory.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Session log rows and run links&quot;,
+    &quot;version&quot;: &quot;0.8.2&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.8.2</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>Session logs MUST be written as JSONL.</li>
+    <li>For every query whose model call succeeded, sc-agent MUST append a session row to the query&#x27;s session log.</li>
+    <li>sc-agent MUST NOT append more than one session row for one query.</li>
+    <li>sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: JSON is JavaScript Object Notation (RFC 8259). JSONL is newline-delimited JSON: one JSON object per line. A query is one decision request sent through `send`, or one request of a `send_batch` call. A query&#x27;s session log is the JSONL file `sessions.jsonl`, and its run log is the JSONL file `runs.jsonl` in the same directory. A session row is the one line of a session log that records one query whose model call succeeded and its result. A failed call is one that ends in an error (auth, busy, quota, network or cancel). A Run is the context object through which every query is sent (ADR-SAG-0019 decision 14). A link record is the one line of a run log that ties a Run to the session row that answered one of its queries.</p>
+  <h3>Rationale</h3>
+  <p>Every successfully answered query from every tool lands in the session log, while errors go to the general log, so a tool references a row by `session_id` instead of copying the query or the response. The run log records which Run each row answered, because one row can answer many Runs through cache hits. What a row and a link record hold, and that both logs are never rotated or pruned, is in ADR-SAG-0021 (Session log).</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>Every line of the `sessions.jsonl` that three sends write parses as one JSON object.</li>
+    <li>Three sends with `repo` `github.com/randlee/sc-agent`, `agent_role` `rust-developer` and `project` `phase-b` add three rows to one `sessions.jsonl`.</li>
+    <li>One Python `sc_agent.send` adds one row to a `sessions.jsonl` under `&lt;log_root&gt;/sessions/`.</li>
+    <li>A `decidr` CLI send with `repo` `github.com/randlee/sc-agent`, `agent_role` `rust-developer` and `project` `phase-b` adds one row to `sessions.jsonl`.</li>
+    <li>A query sent four times after three busy responses adds one row.</li>
+    <li>A send that fails with a 401 adds no row to `sessions.jsonl`.</li>
+    <li>A batch of 3 through a Run adds 3 link records to `runs.jsonl` in the same directory.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>REQ-SAG-0003</li>
+    <li>REQ-SAG-0004</li>
+    <li>REQ-SAG-0102</li>
+    <li>REQ-SAG-0601</li>
+    <li>ADR-SAG-0002</li>
+    <li>ADR-SAG-0019</li>
+    <li>ADR-SAG-0021</li>
+  </ul>
+</section>

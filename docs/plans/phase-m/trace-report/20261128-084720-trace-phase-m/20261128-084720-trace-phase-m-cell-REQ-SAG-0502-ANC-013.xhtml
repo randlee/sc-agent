@@ -1,0 +1,88 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-REQ-SAG-0502-ANC-013">
+  <div class="section-head">
+    <h2>REQ-SAG-0502 × ANC-013 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-013&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.92,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.95,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.02
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.48,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.34,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.65
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.8,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.12,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.87
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.89,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.93,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.04
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.02,
+    &quot;exceeds&quot;: 0.65,
+    &quot;relates&quot;: 0.87,
+    &quot;serves&quot;: 0.04
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0502&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0502/ANC-013/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GNBBJ4XP6E2ZPH4R5MKRFA&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0502 × ANC-013 — exceeds
+What exceeds
+Anchor
+sc-agent must provide an LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider speaking that format, so callers reach any LLM through one interface.
+Owner said: “we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”
+Scope: adds or changes LLM (non-Jev) calls in sc-agent
+Record statements
+sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.
+History (git)
+REQ-SAG-0502 statement 1: c7a40068 2026-11-09: Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema
+Jev P(yes): relates 0.87 · serves 0.04 · exceeds 0.65 · conflicts 0.02">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+  </ul>
+  <h3>Anchor</h3>
+  <p>sc-agent must provide an LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider speaking that format, so callers reach any LLM through one interface.</p>
+  <p>Owner said: “we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”</p>
+  <p>Scope: adds or changes LLM (non-Jev) calls in sc-agent</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0502 statement 1: c7a40068 2026-11-09: Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.87 · serves 0.04 · exceeds 0.65 · conflicts 0.02</p>
+</section>
