@@ -1,0 +1,1329 @@
+{
+  "success": true,
+  "canceled": false,
+  "aborted_by": null,
+  "data": {
+    "operation": "tune",
+    "gate": "planning",
+    "accepted": false,
+    "tournament_protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "production_confidence_threshold": 0.6,
+    "confidence_reference_threshold": 0.8,
+    "semantic_score": {
+      "exact_role_cells": 52,
+      "total_role_cells": 54,
+      "exact_semantic_verdicts": 16,
+      "total_semantic_verdicts": 18,
+      "stable_cases": 9,
+      "total_cases": 9,
+      "regressions": 0
+    },
+    "confidence_diagnostics": {
+      "threshold": 0.8,
+      "cells_at_or_above_threshold": 43,
+      "total_cells": 54,
+      "minimum": 0.04,
+      "p10": 0.553,
+      "median": 0.98,
+      "mean": 0.8652
+    },
+    "tuning_history_before_sha256": "23b5b87a6888ba75fc291fbd2301d128a73e47a7db0fad0b8a1afc497ac5b254",
+    "tuning_history_after": {
+      "schema": "plan-anchor/tuning-history/2",
+      "history_id": "phase-m/ANC-019/planning",
+      "events": [
+        {
+          "event_index": 1,
+          "previous_event_sha256": null,
+          "event": "question_set_rejected",
+          "protocol_version": "plan-anchor/question-tournament/2.0.0",
+          "authority": {
+            "intent_id": "phase-m/intent",
+            "intent_version": 1,
+            "intent_sha256": "0bbd5fd276ec8838194c51e1d28dc391e3a6d4123eabb9669f0980f46ebb7ade",
+            "anchor_id": "ANC-019",
+            "anchor_version": 3,
+            "anchor_record_sha256": "bfcc473e86c46947da71f32af9173ab01eea97b69117d928e66ed02661c04e03"
+          },
+          "oracle": {
+            "sha256": "5ff39a4a21be4b7e011bcd08ce4b367fc2c150c0a3458a27f4a58c308be2e381",
+            "case_ids": [
+              "fixture-pass",
+              "fixture-fail",
+              "compliant",
+              "silent",
+              "topical",
+              "conflict",
+              "irrelevant",
+              "boundary",
+              "exception"
+            ],
+            "case_count": 9,
+            "repeat_count": 2
+          },
+          "candidate": {
+            "candidate_id": "baseline",
+            "question_sha256": "8e9e29b043185ff7a76912e1d28726222bcd3fc867dcabb78a9bef523029ec05"
+          },
+          "evidence": {
+            "canonical_request_sha256": [
+              "40eaa1a60a4b616a4aa10b75d59c88704acf213c827f35ae83c8720fb6c23358",
+              "40eaa1a60a4b616a4aa10b75d59c88704acf213c827f35ae83c8720fb6c23358",
+              "b7e5809a82c21211ccaee64793ea492c5f808b016fbfef2004ab932443d049d4",
+              "b7e5809a82c21211ccaee64793ea492c5f808b016fbfef2004ab932443d049d4",
+              "4cdd0b89f710d908fa70e1ef66d99ad5167ee7c21ed75b483776d87ec43e615f",
+              "4cdd0b89f710d908fa70e1ef66d99ad5167ee7c21ed75b483776d87ec43e615f",
+              "3c9b21967b3045e469c5fe2fe9abf5d8f7df4300297a77ca260fa658fdad5dc2",
+              "3c9b21967b3045e469c5fe2fe9abf5d8f7df4300297a77ca260fa658fdad5dc2",
+              "2064685c8e69cd1993dc9fc05f7ca1dd182c1c5d1c811d42308a62e211786b6e",
+              "2064685c8e69cd1993dc9fc05f7ca1dd182c1c5d1c811d42308a62e211786b6e",
+              "ccfc80b00bd94184f13c7fd87b3c9f197ca88b87604e478c99d03443b87c934b",
+              "ccfc80b00bd94184f13c7fd87b3c9f197ca88b87604e478c99d03443b87c934b",
+              "57570ae85952904c771756379c1ea6e2bec41aeba5850e4d748480666f161d5b",
+              "57570ae85952904c771756379c1ea6e2bec41aeba5850e4d748480666f161d5b",
+              "041bbb14a16588b1a57df5de56a4aef9d022acbb6f53fba2a9ac0aade5d41313",
+              "041bbb14a16588b1a57df5de56a4aef9d022acbb6f53fba2a9ac0aade5d41313",
+              "c3ebefb9d23732434c1108e74a22fffa98db8db1fb3447a79d310db4876994f5",
+              "c3ebefb9d23732434c1108e74a22fffa98db8db1fb3447a79d310db4876994f5"
+            ],
+            "raw_response_sha256": [
+              "5417adbe96c8a3d54d58c32faf308f352436ee54dffd2226b6bdcd6d36e6f325",
+              "5417adbe96c8a3d54d58c32faf308f352436ee54dffd2226b6bdcd6d36e6f325",
+              "adcfa2a273cc04280da9b6524452f4febee77944728ff2ae27d4d7d15e300037",
+              "d868b433802dea419156005a62e0339f9a9b3b2d01ab3a1451fd41ea984a77d4",
+              "1ff0792482b9360c377732a4068b43aa92e52880a9343b00f7ce0975a7700133",
+              "f7953c514aabc4163159351241a74159332453ba132d4bb2547ada0c5beff4c8",
+              "431c5e708165e0cbfc640d0b5aa6a73a82f2850c8c026f156593338381c107cd",
+              "a506e5d50fb7b7f294a562a5bf925210ffe83066cbeab84980254e9fee3f8d81",
+              "a4d1a52eb204332b5e79b850bf17b939b322454f037f5b931d748ae0453fd43f",
+              "96e719d565081428b395d59445a12666bb0c8fccc90f4da4d831cf689563bea3",
+              "6f74682f9cb4177e2e958e897d1920e32589a6d7d82dcbbc3d009acc4942baef",
+              "8b8631bf9f58436a1789307b465cec2f5fe08068e3d1670d08fbf6f43c4e724b",
+              "414227f0d5849f109fb53fbcf5d1515c3d3a2adf2b3bf30cb7ce1a2e1e1b560b",
+              "414227f0d5849f109fb53fbcf5d1515c3d3a2adf2b3bf30cb7ce1a2e1e1b560b",
+              "7647df0808301a7871a345a3ac911a768494a1a346468b0d972302f295c0b0b5",
+              "1507a5081bde662f31890b048761cef076f1467077725600f88dfad01298a8b8",
+              "f8538579020c80914b913bd9f2fcf0e117bdba6ce2a46b3f7f7e9f079bc98cd6",
+              "6cb48c98ff08ba5d29d65b8cd50fedb456b8b5e98e7c71632fc73e3e498b2a3d"
+            ],
+            "run_ids": [
+              "f109f7eac3cb78a2",
+              "eab6c0864d620eef",
+              "09711555453ebd31",
+              "010b7b3ab17c128a",
+              "8c0c78ec58f67647",
+              "f60d6a42eb56b822",
+              "f9689b59a67ff34f",
+              "ce38514cfaff1793",
+              "e01814676bd96602",
+              "09d2f2985bd657ad",
+              "5300bc759717a031",
+              "0442d2fc82748d44",
+              "4ff4482e5accb91f",
+              "0c8be5c32e4251a9",
+              "509275bb3c8b1b13",
+              "9913bd88f11c9aca",
+              "e630c9366cb9a3bb",
+              "471a8658e62a6907"
+            ]
+          },
+          "score": {
+            "exact_role_cells": 52,
+            "total_role_cells": 54,
+            "exact_semantic_verdicts": 16,
+            "total_semantic_verdicts": 18,
+            "stable_cases": 9,
+            "total_cases": 9,
+            "regressions": 0,
+            "confidence": {
+              "threshold": 0.8,
+              "cells_at_or_above_threshold": 43,
+              "total_cells": 54,
+              "minimum": 0.04,
+              "p10": 0.553,
+              "median": 0.98,
+              "mean": 0.8652
+            }
+          },
+          "decision": {
+            "status": "rejected",
+            "question_set_sha256": null,
+            "reason_code": "TOURNAMENT.SEMANTIC_REJECTED"
+          },
+          "supersedes": null
+        }
+      ]
+    },
+    "tuning_history_after_sha256": "bff01481fa080b669840eca5a7afe43a54756cd53cacf2b7659a4b712853a686",
+    "production_semantics_unchanged": true,
+    "authority_citations": [
+      "ANC-019 v3 statement (locked)",
+      "ANC-019 fixtures (approved)",
+      "phase-m/intent v1"
+    ],
+    "oracle_sha256": "5ff39a4a21be4b7e011bcd08ce4b367fc2c150c0a3458a27f4a58c308be2e381",
+    "sealed_question_set": null,
+    "candidate_rankings": [
+      {
+        "rank": 1,
+        "bundle_id": "baseline",
+        "roles": {
+          "addressed": "current",
+          "contradicted": "current",
+          "relevant": "current"
+        },
+        "question_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 52,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 16,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 43,
+          "total_cells": 54,
+          "minimum": 0.04,
+          "p10": 0.553,
+          "median": 0.98,
+          "mean": 0.8652
+        },
+        "complexity_bytes": 2554,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: silent: relevant no, expected yes; silent: verdict not_applicable, expected not_addressed.",
+        "mismatches": [
+          "silent: relevant no, expected yes",
+          "silent: verdict not_applicable, expected not_addressed"
+        ]
+      },
+      {
+        "rank": 2,
+        "bundle_id": "r1-a1-c1",
+        "roles": {
+          "relevant": "r1",
+          "addressed": "a1",
+          "contradicted": "c1"
+        },
+        "question_sha256": "44f96be5858dcaf30c1dab9feba9f7fb6489ad52ffa9678d933cfeec7edd919e",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 52,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 16,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 42,
+          "total_cells": 54,
+          "minimum": 0.2,
+          "p10": 0.572,
+          "median": 1.0,
+          "mean": 0.8961
+        },
+        "complexity_bytes": 2614,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: topical: relevant no, expected yes; topical: verdict not_applicable, expected not_addressed; 1 regression(s) against the baseline: topical.",
+        "mismatches": [
+          "topical: relevant no, expected yes",
+          "topical: verdict not_applicable, expected not_addressed",
+          "1 regression(s) against the baseline: topical"
+        ]
+      },
+      {
+        "rank": 3,
+        "bundle_id": "r3-a3-c3",
+        "roles": {
+          "relevant": "r3",
+          "addressed": "a3",
+          "contradicted": "c3"
+        },
+        "question_sha256": "167376f6f6371ff6a91d9bb8558cbf3685dfd5ca27f646971675c56f54da708c",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 51,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 15,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 8,
+        "total_cases": 9,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 46,
+          "total_cells": 54,
+          "minimum": 0.24,
+          "p10": 0.635,
+          "median": 1.0,
+          "mean": 0.9054
+        },
+        "complexity_bytes": 2174,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: silent: relevant no, expected yes; silent: unstable across repeats; silent: verdict not_applicable, expected not_addressed; topical: relevant no, expected yes; topical: verdict not_applicable, expected not_addressed; 1 regression(s) against the baseline: topical.",
+        "mismatches": [
+          "silent: relevant no, expected yes",
+          "silent: unstable across repeats",
+          "silent: verdict not_applicable, expected not_addressed",
+          "topical: relevant no, expected yes",
+          "topical: verdict not_applicable, expected not_addressed",
+          "1 regression(s) against the baseline: topical"
+        ]
+      },
+      {
+        "rank": 4,
+        "bundle_id": "r3-a1-c2",
+        "roles": {
+          "relevant": "r3",
+          "addressed": "a1",
+          "contradicted": "c2"
+        },
+        "question_sha256": "a59a0b95882f85c6fcb4b259d77a27e6c8374ff1ece778195c0227a5b9c30cc1",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 51,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 15,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 8,
+        "total_cases": 9,
+        "regressions": 2,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 46,
+          "total_cells": 54,
+          "minimum": 0.22,
+          "p10": 0.72,
+          "median": 1.0,
+          "mean": 0.9191
+        },
+        "complexity_bytes": 2537,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: boundary: addressed no, expected yes; boundary: unstable across repeats; boundary: verdict not_addressed, expected satisfied; topical: relevant no, expected yes; topical: verdict not_applicable, expected not_addressed; 2 regression(s) against the baseline: topical, boundary.",
+        "mismatches": [
+          "boundary: addressed no, expected yes",
+          "boundary: unstable across repeats",
+          "boundary: verdict not_addressed, expected satisfied",
+          "topical: relevant no, expected yes",
+          "topical: verdict not_applicable, expected not_addressed",
+          "2 regression(s) against the baseline: topical, boundary"
+        ]
+      },
+      {
+        "rank": 5,
+        "bundle_id": "r2-a3-c1",
+        "roles": {
+          "relevant": "r2",
+          "addressed": "a3",
+          "contradicted": "c1"
+        },
+        "question_sha256": "d004abe1727b1798322a8a3ca4262df9bb1461095ac806297366b8f07f8365af",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 50,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 14,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 46,
+          "total_cells": 54,
+          "minimum": 0.31,
+          "p10": 0.692,
+          "median": 1.0,
+          "mean": 0.9246
+        },
+        "complexity_bytes": 2259,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: silent: relevant no, expected yes; silent: verdict not_applicable, expected not_addressed; topical: relevant no, expected yes; topical: verdict not_applicable, expected not_addressed; 1 regression(s) against the baseline: topical.",
+        "mismatches": [
+          "silent: relevant no, expected yes",
+          "silent: verdict not_applicable, expected not_addressed",
+          "topical: relevant no, expected yes",
+          "topical: verdict not_applicable, expected not_addressed",
+          "1 regression(s) against the baseline: topical"
+        ]
+      },
+      {
+        "rank": 6,
+        "bundle_id": "r1-a2-c3",
+        "roles": {
+          "relevant": "r1",
+          "addressed": "a2",
+          "contradicted": "c3"
+        },
+        "question_sha256": "be5a25c00b75024325b8013be18017a396f81449efd5412e8ed6e7b215303fc8",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 50,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 14,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 2,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 44,
+          "total_cells": 54,
+          "minimum": 0.35,
+          "p10": 0.56,
+          "median": 1.0,
+          "mean": 0.905
+        },
+        "complexity_bytes": 2275,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: boundary: addressed no, expected yes; boundary: verdict not_addressed, expected satisfied; topical: relevant no, expected yes; topical: verdict not_applicable, expected not_addressed; 2 regression(s) against the baseline: topical, boundary.",
+        "mismatches": [
+          "boundary: addressed no, expected yes",
+          "boundary: verdict not_addressed, expected satisfied",
+          "topical: relevant no, expected yes",
+          "topical: verdict not_applicable, expected not_addressed",
+          "2 regression(s) against the baseline: topical, boundary"
+        ]
+      },
+      {
+        "rank": 7,
+        "bundle_id": "r2-a2-c2",
+        "roles": {
+          "relevant": "r2",
+          "addressed": "a2",
+          "contradicted": "c2"
+        },
+        "question_sha256": "92542fe485868bee2ad2792e22d33308f359b0ed7b8efe13377cbb1c9d718a58",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 48,
+        "total_role_cells": 54,
+        "exact_semantic_verdicts": 12,
+        "total_semantic_verdicts": 18,
+        "stable_cases": 9,
+        "total_cases": 9,
+        "regressions": 2,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 48,
+          "total_cells": 54,
+          "minimum": 0.3,
+          "p10": 0.766,
+          "median": 1.0,
+          "mean": 0.9331
+        },
+        "complexity_bytes": 2283,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: boundary: addressed no, expected yes; boundary: verdict not_addressed, expected satisfied; silent: relevant no, expected yes; silent: verdict not_applicable, expected not_addressed; topical: relevant no, expected yes; topical: verdict not_applicable, expected not_addressed; 2 regression(s) against the baseline: topical, boundary.",
+        "mismatches": [
+          "boundary: addressed no, expected yes",
+          "boundary: verdict not_addressed, expected satisfied",
+          "silent: relevant no, expected yes",
+          "silent: verdict not_applicable, expected not_addressed",
+          "topical: relevant no, expected yes",
+          "topical: verdict not_applicable, expected not_addressed",
+          "2 regression(s) against the baseline: topical, boundary"
+        ]
+      }
+    ],
+    "acceptance_table": [
+      {
+        "case_id": "fixture-pass",
+        "probe": "fixture_pass",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "ANC-019 pass fixture."
+      },
+      {
+        "case_id": "fixture-fail",
+        "probe": "fixture_fail",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.79,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 0.82,
+            "contradicted": 0.98,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "ANC-019 fail fixture."
+      },
+      {
+        "case_id": "compliant",
+        "probe": "compliant",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.98,
+            "contradicted": 0.55,
+            "relevant": 0.97
+          },
+          {
+            "addressed": 0.98,
+            "contradicted": 0.52,
+            "relevant": 0.98
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "underspecified",
+          "underspecified"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Paraphrase."
+      },
+      {
+        "case_id": "silent",
+        "probe": "silent",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_addressed",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.61
+          },
+          {
+            "addressed": 0.98,
+            "contradicted": 1.0,
+            "relevant": 0.73
+          }
+        ],
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true,
+        "accepted": false,
+        "baseline_exact": false,
+        "regression": false,
+        "rationale": "Changes CI matrix; silent on version."
+      },
+      {
+        "case_id": "topical",
+        "probe": "topical_only",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_addressed",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.85,
+            "contradicted": 1.0,
+            "relevant": 0.24
+          },
+          {
+            "addressed": 0.82,
+            "contradicted": 1.0,
+            "relevant": 0.25
+          }
+        ],
+        "semantic_verdicts": [
+          "not_addressed",
+          "not_addressed"
+        ],
+        "production_verdicts_at_threshold": [
+          "underspecified",
+          "underspecified"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Topic only."
+      },
+      {
+        "case_id": "conflict",
+        "probe": "conflicting",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.61,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 0.56,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Below 3.11."
+      },
+      {
+        "case_id": "irrelevant",
+        "probe": "irrelevant",
+        "expected_roles": {
+          "relevant": "no",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_applicable",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Not Python version."
+      },
+      {
+        "case_id": "boundary",
+        "probe": "boundary",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.04,
+            "contradicted": 0.98,
+            "relevant": 0.97
+          },
+          {
+            "addressed": 0.09,
+            "contradicted": 0.98,
+            "relevant": 0.96
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "underspecified",
+          "underspecified"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Newer allowed; 3.11 floor kept."
+      },
+      {
+        "case_id": "exception",
+        "probe": "exception",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.89,
+            "contradicted": 0.89,
+            "relevant": 0.96
+          },
+          {
+            "addressed": 0.89,
+            "contradicted": 0.88,
+            "relevant": 0.97
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "abi3-py311 is a 3.11 floor."
+      }
+    ],
+    "evidence": {
+      "out_dir": "docs/plans/phase-m/anchor-runs/tune-ANC-019-planning-1",
+      "results_path": "docs/plans/phase-m/anchor-runs/tune-ANC-019-planning-1/results.jsonl",
+      "oracle_path": "docs/plans/phase-m/anchor-runs/tune-ANC-019-planning-1/oracle.frozen.json",
+      "oracle_frozen_before_first_jev_call": true,
+      "calls": 126,
+      "failed_calls": [],
+      "missing_calls": [],
+      "retries": 0,
+      "max_parallel_evaluators": 4,
+      "repeat_requests_byte_identical": true,
+      "models_answered": [
+        "jev-1.14.0"
+      ],
+      "baseline_bundle": "baseline",
+      "bundles": {
+        "baseline": {
+          "addressed": "current",
+          "contradicted": "current",
+          "relevant": "current"
+        },
+        "r1-a1-c1": {
+          "relevant": "r1",
+          "addressed": "a1",
+          "contradicted": "c1"
+        },
+        "r2-a2-c2": {
+          "relevant": "r2",
+          "addressed": "a2",
+          "contradicted": "c2"
+        },
+        "r3-a3-c3": {
+          "relevant": "r3",
+          "addressed": "a3",
+          "contradicted": "c3"
+        },
+        "r1-a2-c3": {
+          "relevant": "r1",
+          "addressed": "a2",
+          "contradicted": "c3"
+        },
+        "r2-a3-c1": {
+          "relevant": "r2",
+          "addressed": "a3",
+          "contradicted": "c1"
+        },
+        "r3-a1-c2": {
+          "relevant": "r3",
+          "addressed": "a1",
+          "contradicted": "c2"
+        }
+      },
+      "role_rankings": {
+        "addressed": [
+          {
+            "candidate_id": "a3",
+            "bundles": [
+              "r3-a3-c3",
+              "r2-a3-c1"
+            ],
+            "exact_cells": 36,
+            "total_cells": 36,
+            "stable_cases": 18,
+            "total_cases": 18
+          },
+          {
+            "candidate_id": "a1",
+            "bundles": [
+              "r1-a1-c1",
+              "r3-a1-c2"
+            ],
+            "exact_cells": 35,
+            "total_cells": 36,
+            "stable_cases": 17,
+            "total_cases": 18
+          },
+          {
+            "candidate_id": "a2",
+            "bundles": [
+              "r2-a2-c2",
+              "r1-a2-c3"
+            ],
+            "exact_cells": 32,
+            "total_cells": 36,
+            "stable_cases": 18,
+            "total_cases": 18
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          }
+        ],
+        "contradicted": [
+          {
+            "candidate_id": "c1",
+            "bundles": [
+              "r1-a1-c1",
+              "r2-a3-c1"
+            ],
+            "exact_cells": 36,
+            "total_cells": 36,
+            "stable_cases": 18,
+            "total_cases": 18
+          },
+          {
+            "candidate_id": "c2",
+            "bundles": [
+              "r2-a2-c2",
+              "r3-a1-c2"
+            ],
+            "exact_cells": 36,
+            "total_cells": 36,
+            "stable_cases": 18,
+            "total_cases": 18
+          },
+          {
+            "candidate_id": "c3",
+            "bundles": [
+              "r3-a3-c3",
+              "r1-a2-c3"
+            ],
+            "exact_cells": 36,
+            "total_cells": 36,
+            "stable_cases": 18,
+            "total_cases": 18
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 18,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          }
+        ],
+        "relevant": [
+          {
+            "candidate_id": "r1",
+            "bundles": [
+              "r1-a1-c1",
+              "r1-a2-c3"
+            ],
+            "exact_cells": 32,
+            "total_cells": 36,
+            "stable_cases": 18,
+            "total_cases": 18
+          },
+          {
+            "candidate_id": "r3",
+            "bundles": [
+              "r3-a3-c3",
+              "r3-a1-c2"
+            ],
+            "exact_cells": 31,
+            "total_cells": 36,
+            "stable_cases": 17,
+            "total_cases": 18
+          },
+          {
+            "candidate_id": "r2",
+            "bundles": [
+              "r2-a2-c2",
+              "r2-a3-c1"
+            ],
+            "exact_cells": 28,
+            "total_cells": 36,
+            "stable_cases": 18,
+            "total_cases": 18
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 16,
+            "total_cells": 18,
+            "stable_cases": 9,
+            "total_cases": 9
+          }
+        ]
+      },
+      "ranking_order": "semantic acceptance, exact role cells, exact semantic verdicts, stable cases, fewest regressions, cells at or above the confidence reference, then minimum, p10, median and mean confidence, fewest question bytes, bundle id",
+      "run_ids_all": [
+        "0026031fd1e9a850",
+        "010b7b3ab17c128a",
+        "0146d0a1ba61346d",
+        "0442d2fc82748d44",
+        "04ed6eca46fd248d",
+        "09711555453ebd31",
+        "09aaf84ee13dbeac",
+        "09d2f2985bd657ad",
+        "0c8be5c32e4251a9",
+        "0cc8ad6dcbe7babf",
+        "0f5f76fa05a09b70",
+        "10b48ac968820227",
+        "11d93834458dd3ae",
+        "183d458bb3660a26",
+        "1888e6e1b960e683",
+        "18ea9446b3e51bfe",
+        "20d5ebad78516350",
+        "20fef397bd63b290",
+        "24fa68e45568cc0b",
+        "28e04b15bcf1679d",
+        "2ca81be6212d3c2b",
+        "2d05538f7b4adde3",
+        "2e713d7ee5f1d6c4",
+        "2e9fe130c177fcef",
+        "30454456959dc64f",
+        "31819fc7bace88af",
+        "344072d8d718a397",
+        "38af8ce238baa1cc",
+        "3b5c3846086ac5a1",
+        "3dd29e2ad8a648d0",
+        "3f7905bd96ae54a8",
+        "40012ebf2bd691d6",
+        "409a10cf2185dffc",
+        "40a0ca5521741b3c",
+        "422211e11d68452a",
+        "432f56cc0870c2e2",
+        "471a8658e62a6907",
+        "481a34431674b43c",
+        "487483ea65a117cc",
+        "4d40492710e74d2e",
+        "4ee1d89acf378cf6",
+        "4f78fd377ed3aff0",
+        "4ff4482e5accb91f",
+        "509275bb3c8b1b13",
+        "51ead71a1d83e95b",
+        "5258437c278e27a8",
+        "5300bc759717a031",
+        "545578a8dc2af060",
+        "5a58a2bea786d580",
+        "5b05f9b1f7584cfe",
+        "5e7f9259eba3e754",
+        "638b99c8be545dfc",
+        "650913e41921718f",
+        "65658d67a5d89309",
+        "67ed449c417958f2",
+        "67f4e3ad1bf74c41",
+        "6ada2276960f332e",
+        "6b0f08b0af85fc1e",
+        "6c6bc77655fcbc46",
+        "6e19d35bcb1e0c37",
+        "6e1ec2e6b3feaf8c",
+        "6e9adaf3480db50e",
+        "6fb91d3d595b18b6",
+        "715223aba7a15542",
+        "768dd0b1e223bfe7",
+        "78bb6d44b40ee057",
+        "7ac0d9d9a9c66573",
+        "7c5520ab5d492089",
+        "7ca745177271c971",
+        "80ef0d2d3db110ca",
+        "84bf53eeca09b4e3",
+        "8834a4bdc4a8b562",
+        "88b183abac519bb0",
+        "8c0c78ec58f67647",
+        "961aba0d42a2a3d1",
+        "9638f5d1771275da",
+        "979636edf95b6b47",
+        "9913bd88f11c9aca",
+        "a13c7c08f9f6f52d",
+        "a390b32ebbfd55ce",
+        "a435212559f51d49",
+        "a55d0b5198b86f5b",
+        "a66ff196bd24d4fa",
+        "ab49a297f2aa1c6f",
+        "aee302bb56912b1b",
+        "b18e0d5470407b52",
+        "b207bef530c01ee5",
+        "b52f97f3c6288244",
+        "b8c026c426957206",
+        "b8c9b9b4e1ad83d2",
+        "bc1cb802dfa60626",
+        "bcb1c520095096e5",
+        "c3c81386b5938876",
+        "c50e4be102dc8bce",
+        "c55d04bc2ef53db0",
+        "c73617b0406ca4f9",
+        "c8c3990760e22694",
+        "ce38514cfaff1793",
+        "d1cdc7c7f579a9a7",
+        "d2d782a29cfc2633",
+        "d3711faed0c4de30",
+        "d49325b6504499bc",
+        "d5a2f26dac5d50f7",
+        "d62fe0a855ae6deb",
+        "da8e4c55121a2aab",
+        "de41c50e3f7588f3",
+        "e01814676bd96602",
+        "e079cbdf4f8111e0",
+        "e189bf65cbd83e63",
+        "e2600609c77eb0d5",
+        "e2dabcf9cc23f596",
+        "e30602d6b0fba160",
+        "e3774fb968d4becb",
+        "e37b4a6e83a1f445",
+        "e630c9366cb9a3bb",
+        "e735be1f79fe31af",
+        "e8e9edaab60ce94f",
+        "eab6c0864d620eef",
+        "eabbf5cffc99bf30",
+        "f109f7eac3cb78a2",
+        "f21157caab2ca0a8",
+        "f4e161719cad0515",
+        "f60d6a42eb56b822",
+        "f8a9db7bd11fc554",
+        "f9689b59a67ff34f",
+        "fcd55e9e528d4054"
+      ],
+      "tie": null
+    },
+    "explanation": "7 role-complete bundles (baseline included) x 9 frozen oracle cases x 2 repeats: 126 calls, 0 retries. No bundle met semantic acceptance; the top-ranked bundle baseline has 52/54 role cells, 16/18 verdicts, 9/9 stable cases and 0 regressions (TOURNAMENT.SEMANTIC_REJECTED). Confidence is diagnostic only; production review keeps the 0.6 threshold.",
+    "planner_action": "Keep the current questions. Read the acceptance table and candidate rankings, then evaluate new candidates against the same frozen oracle.",
+    "question_action": null,
+    "sealed_question_set_digest_before": null,
+    "sealed_question_set_digest_after": null,
+    "authority_recommendations": []
+  },
+  "error": null,
+  "metadata": {
+    "duration_ms": 4211,
+    "tool_calls": 126,
+    "retry_count": 0,
+    "correlation_id": "phase-m-tune-ANC-019-planning-1",
+    "jev_run_ids": [
+      "0026031fd1e9a850",
+      "010b7b3ab17c128a",
+      "0146d0a1ba61346d",
+      "0442d2fc82748d44",
+      "04ed6eca46fd248d",
+      "09711555453ebd31",
+      "09aaf84ee13dbeac",
+      "09d2f2985bd657ad",
+      "0c8be5c32e4251a9",
+      "0cc8ad6dcbe7babf",
+      "0f5f76fa05a09b70",
+      "10b48ac968820227",
+      "11d93834458dd3ae",
+      "183d458bb3660a26",
+      "1888e6e1b960e683",
+      "18ea9446b3e51bfe",
+      "20d5ebad78516350",
+      "20fef397bd63b290",
+      "24fa68e45568cc0b",
+      "28e04b15bcf1679d",
+      "2ca81be6212d3c2b",
+      "2d05538f7b4adde3",
+      "2e713d7ee5f1d6c4",
+      "2e9fe130c177fcef",
+      "30454456959dc64f",
+      "31819fc7bace88af",
+      "344072d8d718a397",
+      "38af8ce238baa1cc",
+      "3b5c3846086ac5a1",
+      "3dd29e2ad8a648d0",
+      "3f7905bd96ae54a8",
+      "40012ebf2bd691d6",
+      "409a10cf2185dffc",
+      "40a0ca5521741b3c",
+      "422211e11d68452a",
+      "432f56cc0870c2e2",
+      "471a8658e62a6907",
+      "481a34431674b43c",
+      "487483ea65a117cc",
+      "4d40492710e74d2e",
+      "4ee1d89acf378cf6",
+      "4f78fd377ed3aff0",
+      "4ff4482e5accb91f",
+      "509275bb3c8b1b13",
+      "51ead71a1d83e95b",
+      "5258437c278e27a8",
+      "5300bc759717a031",
+      "545578a8dc2af060",
+      "5a58a2bea786d580",
+      "5b05f9b1f7584cfe",
+      "5e7f9259eba3e754",
+      "638b99c8be545dfc",
+      "650913e41921718f",
+      "65658d67a5d89309",
+      "67ed449c417958f2",
+      "67f4e3ad1bf74c41",
+      "6ada2276960f332e",
+      "6b0f08b0af85fc1e",
+      "6c6bc77655fcbc46",
+      "6e19d35bcb1e0c37",
+      "6e1ec2e6b3feaf8c",
+      "6e9adaf3480db50e",
+      "6fb91d3d595b18b6",
+      "715223aba7a15542",
+      "768dd0b1e223bfe7",
+      "78bb6d44b40ee057",
+      "7ac0d9d9a9c66573",
+      "7c5520ab5d492089",
+      "7ca745177271c971",
+      "80ef0d2d3db110ca",
+      "84bf53eeca09b4e3",
+      "8834a4bdc4a8b562",
+      "88b183abac519bb0",
+      "8c0c78ec58f67647",
+      "961aba0d42a2a3d1",
+      "9638f5d1771275da",
+      "979636edf95b6b47",
+      "9913bd88f11c9aca",
+      "a13c7c08f9f6f52d",
+      "a390b32ebbfd55ce",
+      "a435212559f51d49",
+      "a55d0b5198b86f5b",
+      "a66ff196bd24d4fa",
+      "ab49a297f2aa1c6f",
+      "aee302bb56912b1b",
+      "b18e0d5470407b52",
+      "b207bef530c01ee5",
+      "b52f97f3c6288244",
+      "b8c026c426957206",
+      "b8c9b9b4e1ad83d2",
+      "bc1cb802dfa60626",
+      "bcb1c520095096e5",
+      "c3c81386b5938876",
+      "c50e4be102dc8bce",
+      "c55d04bc2ef53db0",
+      "c73617b0406ca4f9",
+      "c8c3990760e22694",
+      "ce38514cfaff1793",
+      "d1cdc7c7f579a9a7",
+      "d2d782a29cfc2633",
+      "d3711faed0c4de30",
+      "d49325b6504499bc",
+      "d5a2f26dac5d50f7",
+      "d62fe0a855ae6deb",
+      "da8e4c55121a2aab",
+      "de41c50e3f7588f3",
+      "e01814676bd96602",
+      "e079cbdf4f8111e0",
+      "e189bf65cbd83e63",
+      "e2600609c77eb0d5",
+      "e2dabcf9cc23f596",
+      "e30602d6b0fba160",
+      "e3774fb968d4becb",
+      "e37b4a6e83a1f445",
+      "e630c9366cb9a3bb",
+      "e735be1f79fe31af",
+      "e8e9edaab60ce94f",
+      "eab6c0864d620eef",
+      "eabbf5cffc99bf30",
+      "f109f7eac3cb78a2",
+      "f21157caab2ca0a8",
+      "f4e161719cad0515",
+      "f60d6a42eb56b822",
+      "f8a9db7bd11fc554",
+      "f9689b59a67ff34f",
+      "fcd55e9e528d4054"
+    ],
+    "planner_observation_trust": null,
+    "authoritative_sources_unchanged": true
+  }
+}

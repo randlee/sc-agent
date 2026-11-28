@@ -17,11 +17,15 @@
       "scope": "adds or changes model resolution, the model table or the jev alias in sc-agent or decidr",
       "deterministic_check": "unit test: resolve(\"jev\") == first Jev row of the date-sorted table; with config default set, == configured id",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "With no config default set, `--model jev` resolves to the newest Jev row in the model table."
+        ],
+        "fail": [
+          "The jev alias is pinned in code to jev-2025-06, and a code change is needed to move it."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -43,6 +47,13 @@
             "plan_questions": "agt-jzag.1",
             "dev_questions": "agt-jzag.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:03+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -60,11 +71,15 @@
       "scope": "adds or changes code that reads batch result lines, session rows or run records",
       "deterministic_check": "`rg -n 'jev-batch-result/1\\",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "The session reader accepts only the schema version the writer emits and errors on any other version."
+        ],
+        "fail": [
+          "A v1 fallback reader is added so old batch result lines still load."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -86,6 +101,13 @@
             "plan_questions": "agt-8y0m.1",
             "dev_questions": "agt-8y0m.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:03+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -103,11 +125,15 @@
       "scope": "removes or changes a reader of an earlier record schema version, or its tests",
       "deterministic_check": "the sprint diff deletes the reader's tests and fixtures; `rg` finds no skip/xfail/#[ignore] mentioning the removed reader",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "The v1 run-record reader is deleted together with its tests and fixtures."
+        ],
+        "fail": [
+          "The v1 reader is removed but its tests are kept and marked #[ignore]."
+        ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -137,6 +163,13 @@
             "plan_questions": "agt-tvqh.1",
             "dev_questions": "agt-tvqh.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:03+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -154,11 +187,15 @@
       "scope": "adds or changes a request size check, a record size check or handling of an sc-observability size error",
       "deterministic_check": "`rg -n '8 \\* 1024 \\* 1024\\",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "Requests are sent at any size up to the model's context window; sc-agent adds no byte cap."
+        ],
+        "fail": [
+          "sc-agent rejects any request body over 64 KiB before sending it."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -180,6 +217,13 @@
             "plan_questions": "agt-bouw.1",
             "dev_questions": "agt-bouw.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:03+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -197,11 +241,15 @@
       "scope": "adds or changes creation of a default sc-observability Logger in sc-agent, decidr or the client template",
       "deterministic_check": "test: default_logger(name) path == `<log_root>/logs/<name>.log.jsonl`; session sink path == `<log_root>/sessions/<repo-id>/<role>/<project>/sessions.jsonl`",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "The default logger writes to <log_root>/sc-agent/general.log, a fixed folder and file name."
+        ],
+        "fail": [
+          "The default logger writes to a temp file with a random name in the working directory."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -223,6 +271,13 @@
             "plan_questions": "agt-2mm1.1",
             "dev_questions": "agt-2mm1.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:03+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -240,11 +295,15 @@
       "scope": "adds or changes code that receives, wraps, flushes or closes an injected sc-observability Logger",
       "deterministic_check": "test: Run with injected Logger never calls shutdown/rebuild on it, and its root/sinks are unchanged after close; `rg LoggerBuilder` only on the default path",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "An injected logger is used as given; sc-agent does not change its level, sink or flush policy."
+        ],
+        "fail": [
+          "sc-agent sets the injected logger's level to INFO and wraps it in its own sink."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -266,6 +325,13 @@
             "plan_questions": "agt-o43c.1",
             "dev_questions": "agt-o43c.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:03+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -283,11 +349,15 @@
       "scope": "adds or changes non-test Rust source in the sc-agent repository",
       "deterministic_check": "`git diff --numstat <phase-j base>..<phase-j tip> -- 'crates/**/*.rs'`, tests excluded, net added ≤ 2580",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "At sprint end scripts/gate/rewrite.py reports 2,540 of 2,590 lines."
+        ],
+        "fail": [
+          "The sprint ends with rewrite.py reporting 2,710 lines against the 2,590 limit."
+        ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -317,6 +387,13 @@
             "plan_questions": "agt-ctuj.1",
             "dev_questions": "agt-ctuj.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:03+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -334,11 +411,15 @@
       "scope": "adds or changes function or method signatures in sc-agent code",
       "deterministic_check": "review of changed pub fn signatures: no function takes run_id/tool/tool_version/cache/model/provider as separate params",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "The five methods that took endpoint, model and timeout now take one `ProviderTarget` struct."
+        ],
+        "fail": [
+          "Each new method repeats the same endpoint, model, timeout and retry parameters."
+        ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -369,6 +450,13 @@
             "plan_questions": "agt-jorx.1",
             "dev_questions": "agt-jorx.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:03+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -386,11 +474,15 @@
       "scope": "adds or changes the model table or model configuration in sc-agent",
       "deterministic_check": "test: a config file with an extra model row makes `decidr models` list it, and a send with that id resolves",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "A model row added under [models] in the config file is usable alongside the built-in rows."
+        ],
+        "fail": [
+          "Adding a model requires editing the hard-coded model table and cutting a release."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -412,6 +504,13 @@
             "plan_questions": "agt-1quf.1",
             "dev_questions": "agt-1quf.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:03+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -429,11 +528,15 @@
       "scope": "adds or changes code in judge-jev, plan-anchor or the client template that both tools use",
       "deterministic_check": "a duplicate-code scan (e.g. jscpd/`rg` of shared helper bodies) across judge-jev and plan-anchor shows no new duplicated block",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "judge-jev and plan-anchor both call the shared client generated from the template."
+        ],
+        "fail": [
+          "plan-anchor gets a copied and pasted version of judge-jev's result parser."
+        ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -463,6 +566,13 @@
             "plan_questions": "agt-43sg.1",
             "dev_questions": "agt-43sg.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:03+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -480,11 +590,15 @@
       "scope": "adds or changes a decidr subcommand or a function in the sc-agent Python bindings",
       "deterministic_check": "for each `decidr` subcommand touched in phase j (models, send, batch), a Python binding exists and has a test",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "The new `decidr batch` subcommand is also exposed as `sc_agent.batch()` in the Python API."
+        ],
+        "fail": [
+          "`decidr cache clear` is added to the CLI with no Python API equivalent."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -506,6 +620,13 @@
             "plan_questions": "agt-sa4v.1",
             "dev_questions": "agt-sa4v.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:03+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -523,11 +644,15 @@
       "scope": "adds or changes decision providers, provider dispatch or the provider table in sc-agent",
       "deterministic_check": "grep: one decision trait; one impl per wire format; no match on wire strings outside those impls; adding a compatible provider is a config/table row only",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "The new provider is a row naming the OpenAI-compatible wire format and reuses that implementation."
+        ],
+        "fail": [
+          "A dedicated Together decision provider is written that duplicates the OpenAI-compatible request code."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -549,6 +674,13 @@
             "plan_questions": "agt-et87.1",
             "dev_questions": "agt-et87.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -566,11 +698,15 @@
       "scope": "adds or changes LLM (non-Jev) calls in sc-agent",
       "deterministic_check": "grep: one LLM trait with one impl per wire format; decision-over-LLM uses it; test sends JSON and receives schema-valid JSON for each wire format",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "LLM calls go through the `Llm` trait, and the OpenRouter provider uses the shared OpenAI-compatible implementation."
+        ],
+        "fail": [
+          "Each LLM provider gets its own call function with its own JSON request building."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -592,6 +728,13 @@
             "plan_questions": "agt-jod5.1",
             "dev_questions": "agt-jod5.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -609,11 +752,15 @@
       "scope": "adds or changes how an LLM is prompted to answer a decision request, or decidr config keys",
       "deterministic_check": "test: request to luna/haiku carries a system message equal to the default; with decidr.luna-system-prompt / decidr.haiku-system-prompt set in config it equals the configured text",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "Luna answering a decision request gets the built-in system prompt unless decidr.luna-system-prompt overrides it."
+        ],
+        "fail": [
+          "The haiku system prompt is a string constant with no config override."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -635,6 +782,13 @@
             "plan_questions": "agt-pahi.1",
             "dev_questions": "agt-pahi.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -652,11 +806,15 @@
       "scope": "adds or changes REQ/NFR/ADR records of judge-jev, plan-anchor or another sc-agent-based tool",
       "deterministic_check": "no derivative-tool record states log placement, model resolution, consent, retries or result-line fields; each points to the sc-agent record",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "judge-jev's records name the tool and its own behaviour and point to sc-agent for the logging rule."
+        ],
+        "fail": [
+          "judge-jev's REQ restates sc-agent's log-root and model-resolution rules in full."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -678,6 +836,13 @@
             "plan_questions": "agt-fokq.1",
             "dev_questions": "agt-fokq.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -695,11 +860,15 @@
       "scope": "adds or changes logger construction or injection in sc-agent or a derivative tool",
       "deterministic_check": "grep derivative tools' non-test code for logger injection: none; one sc-agent record defines the injection path",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "plan-anchor's production code uses the default logger; only its tests inject a logger."
+        ],
+        "fail": [
+          "plan-anchor's CLI injects its own logger in production runs."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -721,6 +890,13 @@
             "plan_questions": "agt-mww2.1",
             "dev_questions": "agt-mww2.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -978,11 +1154,15 @@
       "scope": "adds or changes code in any crate under crates/",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "The bead puts the retry helper in sc-agent-types, layer 1, because both sc-anthropic and sc-openai use it."
+        ],
+        "fail": [
+          "The bead puts a helper used by both providers in sc-openai and copies it into sc-anthropic."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1004,6 +1184,13 @@
             "plan_questions": "agt-s6th.1",
             "dev_questions": "agt-s6th.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -1021,11 +1208,15 @@
       "scope": "adds or changes the model table, model configuration or local-model handling",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "A local model is reached only through a config row giving its URL and model id."
+        ],
+        "fail": [
+          "The model table gains a hard-coded row for llama3 at http://localhost:11434."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1047,6 +1238,13 @@
             "plan_questions": "agt-czru.1",
             "dev_questions": "agt-czru.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -1064,11 +1262,15 @@
       "scope": "adds or changes code that writes or reads session rows",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "Session rows are inserted through sc-agent-sqlite into the repository database, and sessions.jsonl is no longer written."
+        ],
+        "fail": [
+          "Each session is appended to sessions.jsonl as before."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1090,6 +1292,13 @@
             "plan_questions": "agt-rdga.1",
             "dev_questions": "agt-rdga.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -1107,11 +1316,15 @@
       "scope": "adds or changes general-log writing, rotation or deletion",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "General-log rotation and deletion are left to sc-observability's policy."
+        ],
+        "fail": [
+          "sc-agent deletes general logs older than 7 days with its own cleanup task."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1133,6 +1346,13 @@
             "plan_questions": "agt-69i3.1",
             "dev_questions": "agt-69i3.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -1150,11 +1370,15 @@
       "scope": "adds or changes any file under crates/sc-agent-schema",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "sc-agent-schema adds the `Session` struct and its CREATE TABLE text, with no rusqlite dependency."
+        ],
+        "fail": [
+          "sc-agent-schema gains a rusqlite dependency and a migrate_v1_to_v2 function."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1176,6 +1400,13 @@
             "plan_questions": "agt-3fwl.1",
             "dev_questions": "agt-3fwl.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -1193,11 +1424,15 @@
       "scope": "adds or changes SQL table definitions anywhere in the workspace",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "The responses table's CREATE TABLE text is added in sc-agent-schema and used from there."
+        ],
+        "fail": [
+          "sc-agent-sqlite defines its own CREATE TABLE for sessions."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1219,6 +1454,13 @@
             "plan_questions": "agt-lw7b.1",
             "dev_questions": "agt-lw7b.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -1236,11 +1478,15 @@
       "scope": "adds or changes the session tables or code that stores a request or a model reply",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "A repeated request is stored once in messages by sha256, and each reply is a responses row referencing it."
+        ],
+        "fail": [
+          "Each session row stores the full request text alongside its single reply."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1262,6 +1508,13 @@
             "plan_questions": "agt-kkrv.1",
             "dev_questions": "agt-kkrv.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -1279,11 +1532,15 @@
       "scope": "adds or changes the result cache, cache keys or run ids",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "The cache is looked up by (request_sha256, model) only."
+        ],
+        "fail": [
+          "The cache key includes run_id, so a new run never hits the cache."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1305,6 +1562,13 @@
             "plan_questions": "agt-0fau.1",
             "dev_questions": "agt-0fau.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -1322,11 +1586,15 @@
       "scope": "adds or changes --resume or session resumption",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "`--resume` is handled in sc-llm and turns a decision session into an LLM session."
+        ],
+        "fail": [
+          "`--resume` is implemented in sc-decision-runner and keeps the session a decision session."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1348,6 +1616,13 @@
             "plan_questions": "agt-x65j.1",
             "dev_questions": "agt-x65j.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -1365,11 +1640,15 @@
       "scope": "adds or changes retry, resend, backoff or holdoff code",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "The retry helper takes its waits, limits and busy and quota rules as parameters from the provider crate and contains no provider name, host or status-code table."
+        ],
+        "fail": [
+          "The retry helper hard-codes 429 and 529 handling for api.anthropic.com."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1391,6 +1670,20 @@
             "plan_questions": "agt-2sum.1",
             "dev_questions": "agt-2sum.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:04+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-28T07:58:56+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -1408,11 +1701,15 @@
       "scope": "adds or changes how judge-jev, plan-anchor or another sc-agent-based tool stores results",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "judge-jev writes its quality results to the repository SQLite database."
+        ],
+        "fail": [
+          "plan-anchor writes each gate run to anchor-runs/<run>.json as its result store."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1434,6 +1731,13 @@
             "plan_questions": "agt-yz3r.1",
             "dev_questions": "agt-yz3r.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:05+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     },
@@ -1451,11 +1755,15 @@
       "scope": "adds or changes a tool's table definitions, schema versions, or crates/sc-agent-py",
       "deterministic_check": "",
       "fixtures": {
-        "pass": [],
-        "fail": []
+        "pass": [
+          "judge-jev's tables have their own schema version, separate from the core schema version."
+        ],
+        "fail": [
+          "sc-agent-py defines the judge-jev result table and versions it with the core schema."
+        ]
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1477,6 +1785,13 @@
             "plan_questions": "agt-ws1i.1",
             "dev_questions": "agt-ws1i.2"
           }
+        },
+        {
+          "at": "2026-11-28T07:58:05+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
         }
       ]
     }

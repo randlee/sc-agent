@@ -1,0 +1,50 @@
+{
+ "digest": "ccf825bf76cc74f0d245e43fd1533ae58ef09c0d3c84f90f2a8b12ed166b1496",
+ "questions": {
+  "faithful": {
+   "criteria": {
+    "no": "The statement adds a requirement of a different kind (for example a specific algorithm, cipher, standard, count or trigger the quote does not give), or drops or reverses what the quote asks.",
+    "unclear": "A detail in the statement might or might not go beyond the quote, and the quote does not settle it.",
+    "yes": "The statement asks for the same thing as the quote, with at most the ordinary normalizations listed."
+   },
+   "instructions": "Compare `anchor.statement` with `anchor.quote` and decide whether the statement keeps the quote's meaning. These changes are ordinary normalization and keep the meaning: informal wording (needs to, should, do not, I want) becoming must or must never; naming the concrete channel the quote's output already goes to (print, output, logs or errors becoming stdout, stderr or a log file); JSON or machine-readable output becoming JSON or a JSON object; spelling out a concrete case the quote describes (a canary key becoming a specific value); and choosing one directive from a quote that has several. A statement is unfaithful only when it adds a requirement of a different kind that the quote does not ask for, such as a specific algorithm, cipher, standard, number of retries, or new trigger, or when it drops or reverses what the quote asks. Do not judge vagueness, testability or grammar.",
+   "type": "choice"
+  },
+  "observable": {
+   "criteria": {
+    "no": "It supplies only a subjective quality, undefined shorthand, or an approval with no observable record.",
+    "unclear": "Some evidence is named, but the observation needed to settle compliance remains ambiguous.",
+    "yes": "It names evidence or behavior that can be inspected with a determinate outcome."
+   },
+   "instructions": "Does anchor.statement define a checkable behavior or artifact without relying on an undefined label or an approval that has no identified record? Judge only whether the stated outcome can be observed.",
+   "type": "choice"
+  },
+  "scoped": {
+   "criteria": {
+    "no": "No work area or applicability set is identifiable.",
+    "unclear": "An area is named but its applicability cannot be determined.",
+    "yes": "A reviewer can identify the work area where this anchor applies, including an explicit all-items set."
+   },
+   "instructions": "Do anchor.statement and anchor.scope identify the governed activity, component, artifact, or explicit global set, independent of whether the requirement itself is vague or otherwise defective?",
+   "type": "choice"
+  },
+  "self_contained": {
+   "criteria": {
+    "no": "At least one decisive term is an undefined subjective quality or private label, or compliance needs an approval with no named record.",
+    "unclear": "A term might depend on outside context, but whether it decides compliance cannot be determined.",
+    "yes": "No disqualifier is present; the statement can be applied using only its own words and ordinary technical knowledge."
+   },
+   "instructions": "Can `anchor.statement` be applied by a reviewer who has no private context? Disqualifiers are only: an undefined subjective quality (for example robust), a private label or code whose meaning is not given (for example R7), or a requirement for a person's approval with no named recorded artifact. Ordinary technical terms, file paths, flags, environment variables, concrete prohibitions and second-person phrasing are not disqualifiers. Ignore grammar, bundling, fidelity and scope.",
+   "type": "choice"
+  },
+  "single_constraint": {
+   "criteria": {
+    "no": "At least two independently enforceable duties are joined in the statement.",
+    "unclear": "The statement leaves independence of its duties ambiguous.",
+    "yes": "All details enforce the same invariant and would be evaluated together."
+   },
+   "instructions": "Is anchor.statement one invariant applied to a subject, trigger, and possibly several output surfaces? Do not count the number of nouns or listed artifacts; count independently enforceable duties.",
+   "type": "choice"
+  }
+ }
+}

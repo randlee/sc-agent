@@ -1,0 +1,65 @@
+[
+ {
+  "id": "lint-01-must",
+  "expected": "pass",
+  "observed": "pass",
+  "warnings": []
+ },
+ {
+  "id": "lint-02-prohibition",
+  "expected": "pass",
+  "observed": "pass",
+  "warnings": []
+ },
+ {
+  "id": "lint-03-is",
+  "expected": "pass",
+  "observed": "pass",
+  "warnings": []
+ },
+ {
+  "id": "lint-04-first-person",
+  "expected": "fail",
+  "observed": "fail",
+  "warnings": [
+   "written as speech, not as a requirement",
+   "not phrased as a testable requirement"
+  ]
+ },
+ {
+  "id": "lint-05-second-person",
+  "expected": "fail",
+  "observed": "fail",
+  "warnings": [
+   "written as speech, not as a requirement",
+   "not phrased as a testable requirement"
+  ]
+ },
+ {
+  "id": "lint-06-suggestion",
+  "expected": "fail",
+  "observed": "fail",
+  "warnings": [
+   "hedged wording; state the requirement",
+   "written as speech, not as a requirement",
+   "not phrased as a testable requirement"
+  ]
+ },
+ {
+  "id": "lint-07-question",
+  "expected": "fail",
+  "observed": "fail",
+  "warnings": [
+   "hedged wording; state the requirement",
+   "not phrased as a testable requirement"
+  ]
+ },
+ {
+  "id": "lint-08-imperative",
+  "expected": "fail",
+  "observed": "fail",
+  "warnings": [
+   "not phrased as a testable requirement"
+  ]
+ }
+]

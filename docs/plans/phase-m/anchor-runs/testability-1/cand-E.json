@@ -1,0 +1,50 @@
+{
+ "digest": "acff3f9733ec49de9d2dab2a44b74a511f58c59530367bc6ceb7e1341e2b5c11",
+ "questions": {
+  "faithful": {
+   "criteria": {
+    "no": "The statement commits the speaker to a method, algorithm, cipher, standard or number they never named, or changes or drops their request.",
+    "unclear": "It cannot be told whether the speaker would accept a detail in the statement.",
+    "yes": "The speaker would agree: the statement asks for what the quote asks, using only the allowed restatements."
+   },
+   "instructions": "Would a person who said `anchor.quote` agree that `anchor.statement` says what they asked for? Treat as agreement: restating a request as must or must never; making the quote's output channel concrete (print, output, logs or error output as stdout, stderr or files); JSON as a JSON object; a test scenario restated with its concrete values; one of several directives taken alone. Treat as disagreement: the statement picks a specific method, algorithm, cipher, standard or number the speaker never named, or changes or drops what they asked for. Ignore vagueness and sentence form.",
+   "type": "choice"
+  },
+  "observable": {
+   "criteria": {
+    "no": "It supplies only a subjective quality, undefined shorthand, or an approval with no observable record.",
+    "unclear": "Some evidence is named, but the observation needed to settle compliance remains ambiguous.",
+    "yes": "It names evidence or behavior that can be inspected with a determinate outcome."
+   },
+   "instructions": "Does anchor.statement define a checkable behavior or artifact without relying on an undefined label or an approval that has no identified record? Judge only whether the stated outcome can be observed.",
+   "type": "choice"
+  },
+  "scoped": {
+   "criteria": {
+    "no": "No work area or applicability set is identifiable.",
+    "unclear": "An area is named but its applicability cannot be determined.",
+    "yes": "A reviewer can identify the work area where this anchor applies, including an explicit all-items set."
+   },
+   "instructions": "Do anchor.statement and anchor.scope identify the governed activity, component, artifact, or explicit global set, independent of whether the requirement itself is vague or otherwise defective?",
+   "type": "choice"
+  },
+  "self_contained": {
+   "criteria": {
+    "no": "At least one decisive term is an undefined quality or private label, or compliance depends on an approval with no identified record.",
+    "unclear": "A possible outside-context dependency exists but the statement does not show whether it is decisive.",
+    "yes": "None of those outside-context dependencies is needed; ordinary technical terms, concrete prohibitions, lists, and explicit input/action/outcome conditions are sufficient."
+   },
+   "instructions": "Is anchor.statement independently understandable and applicable without any of these disqualifiers: an undefined subjective quality (for example robust), private shorthand, or a human approval that has no identified recorded artifact? Ignore grammar, bundling, fidelity, and scope.",
+   "type": "choice"
+  },
+  "single_constraint": {
+   "criteria": {
+    "no": "At least two independently enforceable duties are joined in the statement.",
+    "unclear": "The statement leaves independence of its duties ambiguous.",
+    "yes": "All details enforce the same invariant and would be evaluated together."
+   },
+   "instructions": "Is anchor.statement one invariant applied to a subject, trigger, and possibly several output surfaces? Do not count the number of nouns or listed artifacts; count independently enforceable duties.",
+   "type": "choice"
+  }
+ }
+}

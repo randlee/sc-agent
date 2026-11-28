@@ -1,0 +1,26 @@
+{
+ "schema": "plan-anchoring/anchors/1",
+ "plan": "calibration",
+ "intent_ref": "none",
+ "anchors": [
+  {
+   "id": "ANC-001",
+   "source_type": "ANC",
+   "source_ref": null,
+   "statement": "Record the build digest in build.json.",
+   "quote": "(calibration provenance quote)",
+   "kind": "directive",
+   "stated_by": "calibration",
+   "stated_at": "2026-11-28",
+   "context": "testability calibration",
+   "summary": "calibration",
+   "scope": "calibration",
+   "status": "locked",
+   "version": 1,
+   "fixtures": {
+    "pass": [],
+    "fail": []
+   }
+  }
+ ]
+}

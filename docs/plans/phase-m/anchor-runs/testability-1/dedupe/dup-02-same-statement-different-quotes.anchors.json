@@ -1,0 +1,45 @@
+{
+ "schema": "plan-anchoring/anchors/1",
+ "plan": "calibration",
+ "intent_ref": "none",
+ "anchors": [
+  {
+   "id": "ANC-001",
+   "source_type": "ANC",
+   "source_ref": null,
+   "statement": "Every CLI command must emit JSON to stdout.",
+   "quote": "CLI output must always be JSON",
+   "kind": "directive",
+   "stated_by": "calibration",
+   "stated_at": "2026-11-28",
+   "context": "testability calibration",
+   "summary": "Every CLI command must emit JSON to stdout.",
+   "scope": "all CLI commands",
+   "status": "locked",
+   "version": 1,
+   "fixtures": {
+    "pass": [],
+    "fail": []
+   }
+  },
+  {
+   "id": "ANC-002",
+   "source_type": "ANC",
+   "source_ref": null,
+   "statement": "Every CLI command must emit JSON to stdout.",
+   "quote": "all commands should print machine-readable JSON",
+   "kind": "directive",
+   "stated_by": "calibration",
+   "stated_at": "2026-11-28",
+   "context": "testability calibration",
+   "summary": "Every CLI command must emit JSON to stdout.",
+   "scope": "all CLI commands",
+   "status": "locked",
+   "version": 1,
+   "fixtures": {
+    "pass": [],
+    "fail": []
+   }
+  }
+ ]
+}
