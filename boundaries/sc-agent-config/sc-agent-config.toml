@@ -18,7 +18,7 @@ roots = []
 
 [dependencies]
 allowed_dependencies = ["sc-agent-types"]
-allowed_dependents = []
+allowed_dependents = ["sc-agent-log"]
 allowed_dev_dependencies = []
 allowed_dev_dependents = []
 forbidden_edges = []

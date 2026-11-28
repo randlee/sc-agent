@@ -17,7 +17,7 @@ constructor = "none"
 roots = []
 
 [dependencies]
-allowed_dependencies = ["sc-agent-types", "sc-agent-sqlite", "sc-agent-schema"]
+allowed_dependencies = ["sc-agent-types", "sc-agent-config", "sc-agent-sqlite", "sc-agent-schema"]
 allowed_dependents = []
 allowed_dev_dependencies = []
 allowed_dev_dependents = []

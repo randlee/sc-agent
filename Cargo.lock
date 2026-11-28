@@ -1151,6 +1151,7 @@ dependencies = [
 name = "sc-agent-log"
 version = "0.4.1"
 dependencies = [
+ "sc-agent-config",
  "sc-agent-schema",
  "sc-agent-sqlite",
  "sc-agent-types",
@@ -1176,6 +1177,7 @@ name = "sc-agent-sqlite"
 version = "0.4.1"
 dependencies = [
  "sc-agent-schema",
+ "sc-agent-types",
 ]
 
 [[package]]

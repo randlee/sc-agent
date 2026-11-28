@@ -17,7 +17,7 @@ constructor = "none"
 roots = []
 
 [dependencies]
-allowed_dependencies = ["sc-agent-schema"]
+allowed_dependencies = ["sc-agent-schema", "sc-agent-types"]
 allowed_dependents = ["sc-agent-log"]
 allowed_dev_dependencies = []
 allowed_dev_dependents = []
