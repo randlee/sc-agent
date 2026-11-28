@@ -1,0 +1,42 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-5">
+  <div class="section-head">
+    <h2>5. Make providers configuration rows in REQ-SAG-0103 (docs/sc-agent-config/)</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="5. Make providers configuration rows in REQ-SAG-0103 (docs/sc-agent-config/)
+Wave 1 · resolve conflict
+Records: REQ-SAG-0103
+Change:
+- Resolution: reconcile.
+- Reword REQ-SAG-0103: “sc-agent MUST be able to send requests through Together.” → “A provider MUST be defined as a configuration row.”
+- Delete from REQ-SAG-0103: “sc-agent MUST be able to send requests through OpenRouter.”
+- Delete from REQ-SAG-0103: “The provider that sends requests to the OpenAI API MUST have the name `openai`.”
+Rewording (rare; justified): REQ-SAG-0103: Arch-ai directs replacing named providers with configurable provider rows.
+Justification: Arch-ai directs that a provider is a configuration row rather than a hard-coded named provider. ANC-012 owner quote: “there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”
+Source of truth: ANC-009 — Owner said: “hard-coded rows will get stale quickly and often” — commit 67203e2f
+Expected improvement:
+- Providers are configured rather than fixed as named source obligations.
+- Records 49 → 49; statements 205 → 203; duplicates cleared 0 of 32; conflicts resolved 0 of 16; exceeds cleared 0 of 52">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 1 · resolve conflict</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0103" data-panel="rec-REQ-SAG-0103">REQ-SAG-0103</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Resolution: reconcile.</li>
+    <li>Reword REQ-SAG-0103: “sc-agent MUST be able to send requests through Together.” → “A provider MUST be defined as a configuration row.”</li>
+    <li>Delete from REQ-SAG-0103: “sc-agent MUST be able to send requests through OpenRouter.”</li>
+    <li>Delete from REQ-SAG-0103: “The provider that sends requests to the OpenAI API MUST have the name `openai`.”</li>
+  </ul>
+  <h3>Rewording (rare; justified)</h3>
+  <p>REQ-SAG-0103: Arch-ai directs replacing named providers with configurable provider rows.</p>
+  <h3>Justification</h3>
+  <p>Arch-ai directs that a provider is a configuration row rather than a hard-coded named provider. ANC-012 owner quote: “there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”</p>
+  <h3>Source of truth</h3>
+  <p>ANC-009 — Owner said: “hard-coded rows will get stale quickly and often” — commit 67203e2f</p>
+  <h3>Expected improvement</h3>
+  <p>Providers are configured rather than fixed as named source obligations.</p>
+  <p>Records 49 → 49; statements 205 → 203; duplicates cleared 0 of 32; conflicts resolved 0 of 16; exceeds cleared 0 of 52</p>
+</section>

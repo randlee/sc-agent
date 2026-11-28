@@ -1,0 +1,50 @@
+{
+ "digest": "e38f5c726727ee314784d409ce95036fbd1fdf06fdb2ced49cc894c49d0d82da",
+ "questions": {
+  "faithful": {
+   "criteria": {
+    "no": "The statement adds a substantive requirement the quote does not contain (for example a specific algorithm, number or mechanism), or changes the quote's meaning.",
+    "unclear": "It cannot be determined whether a detail in the statement goes beyond the quote.",
+    "yes": "Every requirement in the statement is stated or directly implied by the quote; only ordinary normalization was applied."
+   },
+   "instructions": "Compare `anchor.statement` with `anchor.quote`. Ordinary normalization is faithful: an informal request may become must, print may become emit to stdout, machine-readable JSON may become JSON, keeping the user's own second-person phrasing is faithful, and the statement may capture just one of several directives in the quote. Decide whether the statement adds or drops a substantive requirement such as a specific algorithm, strength, trigger, value or outcome that the quote does not state. Do not judge vagueness, testability or grammar.",
+   "type": "choice"
+  },
+  "observable": {
+   "criteria": {
+    "no": "Compliance rests only on a subjective quality (for example robust, clean, fast), an undefined label or code (for example R7), or a person's approval with no named record.",
+    "unclear": "A concrete artifact or behavior is named, but what would count as compliance is still not determinable.",
+    "yes": "The statement names a concrete behavior, artifact, path, output or value whose presence or absence can be checked."
+   },
+   "instructions": "Judge only `anchor.statement`. Could a reviewer inspect a concrete behavior, file, output, path or value and decide compliance yes or no? Ignore grammar or sentence form, fidelity to the quote, and bundling.",
+   "type": "choice"
+  },
+  "scoped": {
+   "criteria": {
+    "no": "No governed area or applicability set can be identified.",
+    "unclear": "An area is named but which work it applies to cannot be determined.",
+    "yes": "The governed component, activity, artifact or explicit global set is identifiable."
+   },
+   "instructions": "Using `anchor.statement` and `anchor.scope`, can a reviewer tell which activity, component, command, artifact or explicit global set (for example all CLI commands) the anchor governs? Judge only whether the area is identifiable, even when the requirement itself is vague or defective.",
+   "type": "choice"
+  },
+  "self_contained": {
+   "criteria": {
+    "no": "At least one decisive term is an undefined subjective quality or private label, or compliance needs an approval with no named record.",
+    "unclear": "A term might depend on outside context, but whether it decides compliance cannot be determined.",
+    "yes": "No disqualifier is present; the statement can be applied using only its own words and ordinary technical knowledge."
+   },
+   "instructions": "Can `anchor.statement` be applied by a reviewer who has no private context? Disqualifiers are only: an undefined subjective quality (for example robust), a private label or code whose meaning is not given (for example R7), or a requirement for a person's approval with no named recorded artifact. Ordinary technical terms, file paths, flags, environment variables, concrete prohibitions and second-person phrasing are not disqualifiers. Ignore grammar, bundling, fidelity and scope.",
+   "type": "choice"
+  },
+  "single_constraint": {
+   "criteria": {
+    "no": "The statement joins two or more independent duties, such as two different components each required to do a different thing.",
+    "unclear": "It cannot be determined whether the listed parts are one duty or several independent duties.",
+    "yes": "The statement imposes exactly one duty; any listed outputs, targets or conditions all serve that one duty."
+   },
+   "instructions": "Judge only `anchor.statement`. Count the independently enforceable duties it imposes: a duty is independent if one could be satisfied while the other is violated and they govern different subjects or outcomes. A single duty may name several outputs, targets, or conditions (for example stdout, stderr and saved files) and still be one duty. Ignore the quote, scope, vagueness and wording.",
+   "type": "choice"
+  }
+ }
+}

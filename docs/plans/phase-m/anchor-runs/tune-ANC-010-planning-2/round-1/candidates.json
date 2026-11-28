@@ -1,0 +1,217 @@
+{
+ "schema": "plan-anchor/tune-candidates/1",
+ "gate": "planning",
+ "anchor_id": "ANC-010",
+ "candidates": {
+  "relevant": {
+   "cur": {
+    "criteria": {
+     "no": "The item is about something else and leaves code in judge-jev, plan-anchor or the client template both tools use untouched.",
+     "unclear": "The item names this area only vaguely, so overlap cannot be decided.",
+     "yes": "The item is about code in judge-jev, plan-anchor or the client template both tools use."
+    },
+    "instructions": "Is `item.text` about the same subject as `anchor.statement`, namely code in judge-jev, plan-anchor or the client template both tools use? An item that adds or changes code in judge-jev, plan-anchor or the shared client template is about this subject even if it never mentions the anchor. An item about other components, documents or activities is not.",
+    "type": "choice"
+   },
+   "sig": {
+    "type": "choice",
+    "instructions": "Does `item.text` plan any of these changes: (1) adds or changes source code in an sc-agent crate (crates/sc-agent*, crates/decidr or another crates/ member), in judge-jev, in plan-anchor, or in the client template both tools use; (2) adds a helper, parser or function; (3) copies, ports or vendors code from one file, crate or tool into another? Judge only whether the item changes code in that way. An item that changes no code - documentation, plan notes, CI or workflow configuration, tracker housekeeping, meetings - is not relevant, even if it mentions judge-jev, plan-anchor, duplication or shared code.",
+    "criteria": {
+     "yes": "The item plans at least one listed change: it adds or changes source in an sc-agent crate, judge-jev, plan-anchor or the shared client template; or adds a helper, parser or function; or copies, ports or vendors code between files, crates or tools.",
+     "no": "The item plans none of the listed changes: it changes no source code (for example docs-only, a plan note, a CI config change, a meeting or tracker work), or changes code only outside these crates and tools.",
+     "unclear": "The item may change code but does not say where, so it cannot be told whether a listed change is planned."
+    }
+   },
+   "sig2": {
+    "type": "choice",
+    "instructions": "Does `item.text` change source code that `anchor.scope` covers? The covered code is: source in sc-agent crates (crates/sc-agent*, crates/decidr and the other crates/ members), judge-jev, plan-anchor, and the client template both tools use; an item that adds a helper, parser or function, or copies, ports or vendors code from one file, crate or tool into another, is also covered. Mentioning those names or the topic of duplication without changing code does not count.",
+    "criteria": {
+     "yes": "The item adds, changes, copies, ports, vendors or regenerates source code in one of the covered crates, tools or the shared template, or adds a helper, parser or function.",
+     "no": "The item changes no covered source code: it is documentation, planning text, CI configuration, tracker work, a discussion, or code elsewhere.",
+     "unclear": "The item refers to code changes too vaguely to tell whether covered source is changed."
+    }
+   },
+   "sig3": {
+    "type": "choice",
+    "instructions": "Decide whether this anchor applies to `item.text`. It applies only when the item will change code in one of these ways: (1) adds or changes source code in an sc-agent crate (crates/sc-agent*, crates/decidr or another crates/ member), in judge-jev, in plan-anchor, or in the client template both tools use; (2) adds a helper, parser or function; (3) copies, ports or vendors code from one file, crate or tool into another. It does not apply to an item whose work is documentation, notes, CI configuration, tracker work or discussion, even when that item names these tools or talks about duplication.",
+    "criteria": {
+     "yes": "The item will change code in at least one listed way.",
+     "no": "The item will change no code in any listed way; it is docs, notes, CI configuration, tracker work, discussion, or unrelated code.",
+     "unclear": "It cannot be told from the item whether it changes code in a listed way."
+    }
+   }
+  },
+  "addressed": {
+   "cur": {
+    "criteria": {
+     "no": "The item does not state that logic is not copied and pasted between files or tools; shared logic lives in one place both use: it is silent about it or only mentions the topic.",
+     "unclear": "The item mentions something close to this requirement, but it cannot be told whether it states the requirement itself.",
+     "yes": "The item explicitly states or plans that logic is not copied and pasted between files or tools; shared logic lives in one place both use, in any wording, for example: 'both tools call the shared client generated from the template', 'move the duplicated parser into the shared module'."
+    },
+    "instructions": "Does `item.text` explicitly state or plan what `anchor.statement` requires: logic is not copied and pasted between files or tools; shared logic lives in one place both use? The anchor is a prohibition; an item that simply never does the forbidden thing but does not say so has not stated it. Count it only when the item's text contains that specific content, for example: 'both tools call the shared client generated from the template', 'move the duplicated parser into the shared module'. A mention of the topic without that content does not count. Judge presence only, not conflict.",
+    "type": "choice"
+   },
+   "a2": {
+    "type": "choice",
+    "instructions": "Does `item.text` state or plan that logic shared by files, crates or tools lives in one place they all use (a shared module, crate, or the client template from which code is generated), or that existing duplicated logic is moved into such a place? Judge presence of that statement only, not conflict. An item that simply does not copy anything but says nothing about shared logic has not stated it.",
+    "criteria": {
+     "yes": "The item says two or more files, crates or tools use one shared implementation (for example 'both tools call the shared client generated from the template', 'move the duplicated parser into the shared module', 'regenerate the client in both tools from the shared template').",
+     "no": "The item says nothing about sharing one implementation: it is silent, adds tool-specific code, only mentions the topic, or copies code.",
+     "unclear": "The item hints at sharing but it cannot be told whether one shared implementation is used."
+    }
+   },
+   "a3": {
+    "type": "choice",
+    "instructions": "Does `item.text` explicitly plan to keep one shared implementation instead of separate copies, for logic used by more than one file, crate or tool? Count it only when the item names the shared place or says the copies are removed or generated from one source. Do not judge whether the item copies code.",
+    "criteria": {
+     "yes": "The item names one shared implementation used by several files, crates or tools, or says duplicates are removed or generated from one source.",
+     "no": "The item does not plan a shared implementation; silence, a mere mention of the topic, or tool-specific code all count as no.",
+     "unclear": "The item mentions sharing but does not make clear whether one implementation is used."
+    }
+   }
+  },
+  "contradicted": {
+   "cur": {
+    "criteria": {
+     "no": "No step, decision or design in the item goes against the requirement; silence counts as no.",
+     "unclear": "A step could be read as going against the requirement, but it is ambiguous.",
+     "yes": "A step, decision or design in the item goes against the requirement."
+    },
+    "instructions": "The anchor requires that logic is not copied and pasted between files or tools; shared logic lives in one place both use. Does any step, decision or design in `item.text` go against that requirement, such as: copying, pasting, vendoring or duplicating a function or parser from one tool or file into another? An item that is silent about the requirement does not go against it.",
+    "type": "choice"
+   },
+   "c2": {
+    "type": "choice",
+    "instructions": "Does `item.text` plan to copy, paste, duplicate, port or vendor logic from one file, crate or tool into another, so the same logic exists in two places? Regenerating code from one shared template is not copying. An item that is silent about copying does not plan it.",
+    "criteria": {
+     "yes": "The item plans to copy, paste, duplicate, port or vendor a function, parser or other logic from one file, crate or tool into another.",
+     "no": "The item plans no such copy: it is silent, shares one implementation, generates code from one template, or adds logic with no counterpart elsewhere.",
+     "unclear": "The item could be read as duplicating logic, but it is ambiguous."
+    }
+   },
+   "c3": {
+    "type": "choice",
+    "instructions": "The anchor forbids copying and pasting logic between files, crates or tools. Does any step in `item.text` create a second copy of existing logic in another file, crate or tool (copy, paste, duplicate, port, vendor, fork)? Silence is not a copy; code generated from one shared template is not a copy.",
+    "criteria": {
+     "yes": "A step creates a second copy of existing logic in another file, crate or tool.",
+     "no": "No step creates a second copy; silence counts as no.",
+     "unclear": "A step might create a second copy, but it cannot be told."
+    }
+   }
+  }
+ },
+ "bundles": [
+  {
+   "bundle_id": "sig-cur-cur",
+   "roles": {
+    "relevant": "sig",
+    "addressed": "cur",
+    "contradicted": "cur"
+   }
+  },
+  {
+   "bundle_id": "sig-cur-c2",
+   "roles": {
+    "relevant": "sig",
+    "addressed": "cur",
+    "contradicted": "c2"
+   }
+  },
+  {
+   "bundle_id": "sig-a2-cur",
+   "roles": {
+    "relevant": "sig",
+    "addressed": "a2",
+    "contradicted": "cur"
+   }
+  },
+  {
+   "bundle_id": "sig-a2-c2",
+   "roles": {
+    "relevant": "sig",
+    "addressed": "a2",
+    "contradicted": "c2"
+   }
+  },
+  {
+   "bundle_id": "sig2-cur-cur",
+   "roles": {
+    "relevant": "sig2",
+    "addressed": "cur",
+    "contradicted": "cur"
+   }
+  },
+  {
+   "bundle_id": "sig2-cur-c2",
+   "roles": {
+    "relevant": "sig2",
+    "addressed": "cur",
+    "contradicted": "c2"
+   }
+  },
+  {
+   "bundle_id": "sig2-a2-cur",
+   "roles": {
+    "relevant": "sig2",
+    "addressed": "a2",
+    "contradicted": "cur"
+   }
+  },
+  {
+   "bundle_id": "sig2-a2-c2",
+   "roles": {
+    "relevant": "sig2",
+    "addressed": "a2",
+    "contradicted": "c2"
+   }
+  },
+  {
+   "bundle_id": "sig3-cur-cur",
+   "roles": {
+    "relevant": "sig3",
+    "addressed": "cur",
+    "contradicted": "cur"
+   }
+  },
+  {
+   "bundle_id": "sig3-cur-c2",
+   "roles": {
+    "relevant": "sig3",
+    "addressed": "cur",
+    "contradicted": "c2"
+   }
+  },
+  {
+   "bundle_id": "sig3-a2-cur",
+   "roles": {
+    "relevant": "sig3",
+    "addressed": "a2",
+    "contradicted": "cur"
+   }
+  },
+  {
+   "bundle_id": "sig3-a2-c2",
+   "roles": {
+    "relevant": "sig3",
+    "addressed": "a2",
+    "contradicted": "c2"
+   }
+  },
+  {
+   "bundle_id": "sig-a3-c3",
+   "roles": {
+    "relevant": "sig",
+    "addressed": "a3",
+    "contradicted": "c3"
+   }
+  },
+  {
+   "bundle_id": "sig2-a3-c3",
+   "roles": {
+    "relevant": "sig2",
+    "addressed": "a3",
+    "contradicted": "c3"
+   }
+  }
+ ]
+}

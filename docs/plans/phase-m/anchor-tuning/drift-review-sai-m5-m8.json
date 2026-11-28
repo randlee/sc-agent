@@ -1,0 +1,62 @@
+{
+  "schema": "plan-anchoring/drift-review/1",
+  "reviewed_at": "2026-11-28T09:53:45.229469+00:00",
+  "compared": "agt-m-5..agt-m-8 initial and final live beads; all 33 anchor statements, scopes, quotes, fixtures and versions against pre-run snapshot; inventory/design text before and after",
+  "not_reviewed": "No production implementation or deterministic line-count gate execution; this is planning only. Other agents own m-0..m-4 and m-9..m-11.",
+  "findings": [
+    {
+      "id": "M7-DISPUTED",
+      "severity": "material",
+      "location": "agt-m-7 ANC-008",
+      "what_changed": "One Settings grouping clarification was added, but valid run plan-20261128T095135Z-agt-m-7 remains underspecified: relevant no 0.30; addressed yes 0.80; diagnostic yes_struct_change 1.0. No exclusion or question change is justified.",
+      "authority": {
+        "ref": "ANC-008",
+        "quote": "Related values are strategically grouped in one struct to remove repeated method parameters, for efficient encapsulation and to minimize repeated code as the architecture scales."
+      },
+      "suggested_fix": "Leave the failing cell intact for arch-ai and independent tuner adjudication; add no further prose.",
+      "status": "owner_decision",
+      "fix_note": "Lead message 01M8GS4MXBFG3DY1A7AV6MQ5ZS directs preserving FAIL and referring to arch-ai; exact disputed note appended to agt-m-7."
+    },
+    {
+      "id": "M8-COVERAGE",
+      "severity": "material",
+      "location": "ANC-031 phase coverage",
+      "what_changed": "m-8 exclusion records that core session persistence does not migrate derivative-tool result storage, and no phase-m sprint carries that migration.",
+      "authority": {
+        "ref": "ANC-031",
+        "quote": "At the end of the day, I want all the 'results' from plan-anchor, judge-jev or any other app to save data to SQLite."
+      },
+      "suggested_fix": "Keep the gap explicit pending the owner; do not claim core session logging satisfies derivative-tool storage.",
+      "status": "owner_decision",
+      "fix_note": "Exact exclusion reason authorized by lead 01M8GRT316R9TMY03RJP8XE4CK; lead noted it on m-8 and sent it to arch-ai."
+    }
+  ],
+  "acceptable_choices": [
+    {
+      "location": "agt-m-5..agt-m-8 descriptions",
+      "note": "All growth names locked ANC IDs predating the failed runs. Layer rationale comes from each existing Summary and ADR-SAG-0004 v0.5.0. m-7 explicitly states existing locked model/configuration/test constraints; m-8 explains existing schema/Db signatures without changing them."
+    },
+    {
+      "location": "exclusions",
+      "note": "Carry-forward reasons name their carrying sprints. Untouched derivative-record/consumer-code scopes name no invented carrier; ANC-031 explicitly has no carrier. Low-relevance exclusion counts: m5=6, m6=3, m7=4, m8=4."
+    }
+  ],
+  "confirmations": [
+    {
+      "area": "source preservation",
+      "note": "Each full design is byte-identical before/after this gate work; no inventory, signature, requirement or ADR text changed."
+    },
+    {
+      "area": "anchor integrity",
+      "note": "All 33 statements, scopes, quotes, fixtures, versions and question definitions unchanged; only per-item exclusions added."
+    },
+    {
+      "area": "outcomes",
+      "note": "m-5, m-6 and m-8 pass. m-7 FAIL remains visible; no self-certification or scope exclusion hides ANC-008."
+    },
+    {
+      "area": "invalid runs",
+      "note": "Three invalid setup attempts are outside anchor-runs under scratchpad/invalid-runs: 094117Z-m5, 094139Z-m6, 094229Z-m7. Excluded from coverage and stopping count."
+    }
+  ]
+}

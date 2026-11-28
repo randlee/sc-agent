@@ -1,0 +1,179 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-conflicts" id="cell-REQ-SAG-0011-ANC-031">
+  <div class="section-head">
+    <h2>REQ-SAG-0011 × ANC-031 — conflicts</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-031&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [],
+    &quot;jev_disputed&quot;: true,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;1a9af55a&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0011&quot;,
+        &quot;statement&quot;: &quot;When `decidr` receives an interrupt, it MUST cancel the batch.&quot;,
+        &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;1a9af55a&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0011&quot;,
+        &quot;statement&quot;: &quot;When a `KeyboardInterrupt` is raised in `sc-agent-py`, it MUST cancel the batch.&quot;,
+        &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;1a9af55a&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0011&quot;,
+        &quot;statement&quot;: &quot;After an interrupt, every unfinished request MUST end with `decision.cancelled`.&quot;,
+        &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;328dce28&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0011&quot;,
+        &quot;statement&quot;: &quot;The session log MUST hold the row of every request that finished before the interrupt when `decidr` exits or the Python call returns.&quot;,
+        &quot;summary&quot;: &quot;REQ-SAG-0011, REQ-SAG-0104: restore meaning per ai-qa&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0011&quot;,
+        &quot;statement&quot;: &quot;A `KeyboardInterrupt` in `sc-agent-py` MUST be caught inside the Python call.&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;1a9af55a&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0011&quot;,
+        &quot;statement&quot;: &quot;After a `KeyboardInterrupt`, the Python call MUST return one result per request of the batch.&quot;,
+        &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;a8ad3042&quot;,
+        &quot;date&quot;: &quot;2026-11-11&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0011&quot;,
+        &quot;statement&quot;: &quot;`decidr` MUST exit non-zero after an interrupt.&quot;,
+        &quot;summary&quot;: &quot;docs: name the decision CLI decidr and the treesitter binary sitr&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;No proposal: the specific storage conflict is covered by ANC-023, and ANC-031 does not establish a separate change for this cell.&quot;,
+    &quot;stale&quot;: null,
+    &quot;what&quot;: &quot;ANC-031 concerns sc-agent-based tool results; it does not by itself establish that this session-log definition conflicts with the anchor. ANC-023 directly covers the JSONL-to-SQLite change. Proposer paraphrase omitted; inspect the served record text and provenance.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.44,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.34,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.63
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.79,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.86,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.14
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.73,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.82,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.17
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.96,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.97,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.02
+      }
+    }
+  },
+  &quot;class&quot;: &quot;conflicts&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.63,
+    &quot;exceeds&quot;: 0.14,
+    &quot;relates&quot;: 0.17,
+    &quot;serves&quot;: 0.02
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0011&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0011/ANC-031/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ6GM7P33A4ZB5FAS63499&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0011 × ANC-031 — conflicts
+What conflicts
+Reviewer disputes Jev: ANC-031 concerns sc-agent-based tool results; it does not by itself establish that this session-log definition conflicts with the anchor. ANC-023 directly covers the JSONL-to-SQLite change. Proposer paraphrase omitted; inspect the served record text and provenance.
+Proposed remedy
+No proposal: the specific storage conflict is covered by ANC-023, and ANC-031 does not establish a separate change for this cell.
+Anchor
+judge-jev, plan-anchor and every other sc-agent-based tool store their results in the repository&#x27;s SQLite database, not in JSON or JSONL result files.
+Owner said: “At the end of the day, I want all the &#x27;results&#x27; from plan-anchor, judge-jev or any other app to save data to SQLite.”
+Scope: adds or changes how judge-jev, plan-anchor or another sc-agent-based tool stores results
+Record statements
+When `decidr` receives an interrupt, it MUST cancel the batch.
+When a `KeyboardInterrupt` is raised in `sc-agent-py`, it MUST cancel the batch.
+After an interrupt, every unfinished request MUST end with `decision.cancelled`.
+The session log MUST hold the row of every request that finished before the interrupt when `decidr` exits or the Python call returns.
+A `KeyboardInterrupt` in `sc-agent-py` MUST be caught inside the Python call.
+After a `KeyboardInterrupt`, the Python call MUST return one result per request of the batch.
+`decidr` MUST exit non-zero after an interrupt.
+History (git)
+REQ-SAG-0011 statement 1: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0011 statement 2: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0011 statement 3: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0011 statement 4: 328dce28 2026-11-25: REQ-SAG-0011, REQ-SAG-0104: restore meaning per ai-qa
+REQ-SAG-0011 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0011 statement 6: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0011 statement 7: a8ad3042 2026-11-11: docs: name the decision CLI decidr and the treesitter binary sitr
+Jev P(yes): relates 0.17 · serves 0.02 · exceeds 0.14 · conflicts 0.63">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What conflicts</h3>
+  <ul>
+  </ul>
+  <p>Reviewer disputes Jev: ANC-031 concerns sc-agent-based tool results; it does not by itself establish that this session-log definition conflicts with the anchor. ANC-023 directly covers the JSONL-to-SQLite change. Proposer paraphrase omitted; inspect the served record text and provenance.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>No proposal: the specific storage conflict is covered by ANC-023, and ANC-031 does not establish a separate change for this cell.</p>
+  <h3>Anchor</h3>
+  <p>judge-jev, plan-anchor and every other sc-agent-based tool store their results in the repository&#x27;s SQLite database, not in JSON or JSONL result files.</p>
+  <p>Owner said: “At the end of the day, I want all the &#x27;results&#x27; from plan-anchor, judge-jev or any other app to save data to SQLite.”</p>
+  <p>Scope: adds or changes how judge-jev, plan-anchor or another sc-agent-based tool stores results</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>When `decidr` receives an interrupt, it MUST cancel the batch.</li>
+    <li>When a `KeyboardInterrupt` is raised in `sc-agent-py`, it MUST cancel the batch.</li>
+    <li>After an interrupt, every unfinished request MUST end with `decision.cancelled`.</li>
+    <li>The session log MUST hold the row of every request that finished before the interrupt when `decidr` exits or the Python call returns.</li>
+    <li>A `KeyboardInterrupt` in `sc-agent-py` MUST be caught inside the Python call.</li>
+    <li>After a `KeyboardInterrupt`, the Python call MUST return one result per request of the batch.</li>
+    <li>`decidr` MUST exit non-zero after an interrupt.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0011 statement 1: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0011 statement 2: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0011 statement 3: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0011 statement 4: 328dce28 2026-11-25: REQ-SAG-0011, REQ-SAG-0104: restore meaning per ai-qa</li>
+    <li>REQ-SAG-0011 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0011 statement 6: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0011 statement 7: a8ad3042 2026-11-11: docs: name the decision CLI decidr and the treesitter binary sitr</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.17 · serves 0.02 · exceeds 0.14 · conflicts 0.63</p>
+</section>

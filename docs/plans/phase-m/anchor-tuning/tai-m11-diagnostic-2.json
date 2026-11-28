@@ -1,0 +1,547 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261128T095710Z-agt-m-11",
+  "gate": "plan",
+  "created_at": "2026-11-28T09:57:10+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "agt-m-11",
+    "title": "",
+    "source": "scratchpad/agt-m-11.item.txt",
+    "chars": 1633
+  },
+  "model_requested": "jev",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [
+    {
+      "path": "/tmp/tai-m11-diagnostics.jsonl",
+      "sha256": "f2103f8c9129d56cff15dae45234d0414711e6375dc813a3fcc2c28579834d33",
+      "ids": [
+        "m11_determinism",
+        "m11_layers",
+        "m11_live"
+      ]
+    },
+    {
+      "path": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/.sc/plan-anchor/triage/plan-questions.jsonl",
+      "sha256": "68180fbd2de8a3dee2421351672f9a321506af1f4bb19531c2c26d7d21c2c521",
+      "ids": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "anchor_id": "ANC-017",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent tests must not depend on races, wall-clock timing, sleeps, event-loop ordering or system load; a test found to depend on one must be redesigned to drive its logic with controlled inputs.",
+      "quote": "Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "anchor_version": 2,
+      "deterministic_check": "review changed tests for sleep, wall-clock assertions, poll-until-timeout and unsynchronized thread ordering; a failure-only backstop that fails with captured output is allowed",
+      "kind": "prohibition",
+      "leaning": "contradicted",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "cc0d4b32af174ddfd670affbdf4fc3d5f794099bbc6bdbf660053076440d2dd8",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.86,
+          "probabilities": {
+            "no": 0.91,
+            "unclear": 0.05,
+            "yes": 0.04
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.24,
+          "probabilities": {
+            "no": 0.4,
+            "unclear": 0.11,
+            "yes": 0.49
+          }
+        },
+        "m11_determinism": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.86,
+          "probabilities": {
+            "no": 0.91,
+            "unclear": 0.01,
+            "yes": 0.08
+          }
+        },
+        "m11_layers": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "m11_live": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.83,
+          "probabilities": {
+            "no": 0.1,
+            "unclear": 0.01,
+            "yes": 0.89
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.91,
+          "probabilities": {
+            "no": 0.94,
+            "unclear": 0.01,
+            "yes": 0.05
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.55,
+          "probabilities": {
+            "no": 0.7,
+            "unclear": 0.01,
+            "yes": 0.29
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.24,
+      "explanation": "Jev was not confident (min confidence 0.24); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1690,
+        "output_tokens": 237
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "conflict",
+          "question_id": "contradicted",
+          "choice": "yes",
+          "confidence": 0.24
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 1633
+    },
+    {
+      "anchor_id": "ANC-018",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent's integration tests must be its unit tests run against live agents, triggered manually.",
+      "quote": "I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "anchor_version": 4,
+      "deterministic_check": "grep .github/workflows for live-provider test jobs triggered on push, pull_request or schedule; each live test name matches an existing mocked unit test",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "cc0d4b32af174ddfd670affbdf4fc3d5f794099bbc6bdbf660053076440d2dd8",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.3,
+          "probabilities": {
+            "no": 0.53,
+            "unclear": 0.03,
+            "yes": 0.44
+          }
+        },
+        "m11_determinism": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "m11_layers": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "m11_live": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.73,
+          "probabilities": {
+            "no": 0.18,
+            "unclear": 0.0,
+            "yes": 0.82
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.86,
+          "probabilities": {
+            "no": 0.08,
+            "unclear": 0.01,
+            "yes": 0.91
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.55,
+          "probabilities": {
+            "no": 0.3,
+            "unclear": 0.0,
+            "yes": 0.7
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.31,
+          "probabilities": {
+            "no": 0.45,
+            "unclear": 0.01,
+            "yes": 0.54
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.89,
+          "probabilities": {
+            "no": 0.07,
+            "unclear": 0.0,
+            "yes": 0.93
+          }
+        }
+      },
+      "min_confidence": 0.3,
+      "explanation": "Jev was not confident (min confidence 0.30); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1666,
+        "output_tokens": 237
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "conflict",
+          "question_id": "contradicted",
+          "choice": "no",
+          "confidence": 0.3
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 1633
+    },
+    {
+      "anchor_id": "ANC-021",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every phase-m sprint bead names the crate and layer each change lands in, and that layer is the lowest layer whose crates all use the change.",
+      "quote": "You need to be able to push shared methods down and move differences up",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27; layer rule of ADR-SAG-0004 v0.5.0",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "cc0d4b32af174ddfd670affbdf4fc3d5f794099bbc6bdbf660053076440d2dd8",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.22,
+          "probabilities": {
+            "no": 0.4,
+            "unclear": 0.12,
+            "yes": 0.48
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.38,
+          "probabilities": {
+            "no": 0.59,
+            "unclear": 0.04,
+            "yes": 0.37
+          }
+        },
+        "m11_determinism": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "m11_layers": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "m11_live": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.67,
+          "probabilities": {
+            "no": 0.21,
+            "unclear": 0.01,
+            "yes": 0.78
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.56,
+          "probabilities": {
+            "no": 0.71,
+            "unclear": 0.04,
+            "yes": 0.25
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.61,
+          "probabilities": {
+            "no": 0.74,
+            "unclear": 0.08,
+            "yes": 0.18
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.88,
+          "probabilities": {
+            "no": 0.08,
+            "unclear": 0.0,
+            "yes": 0.92
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.0,
+            "yes": 0.02
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.77,
+          "probabilities": {
+            "no": 0.85,
+            "unclear": 0.01,
+            "yes": 0.14
+          }
+        }
+      },
+      "min_confidence": 0.22,
+      "explanation": "Jev was not confident (min confidence 0.22); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1662,
+        "output_tokens": 237
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "yes",
+          "confidence": 0.22
+        },
+        {
+          "ask": "first",
+          "role": "conflict",
+          "question_id": "contradicted",
+          "choice": "no",
+          "confidence": 0.38
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 1633
+    }
+  ],
+  "summary": {
+    "counts": {
+      "underspecified": 3
+    },
+    "failing": [
+      "ANC-017",
+      "ANC-018",
+      "ANC-021"
+    ],
+    "leaning_counts": {
+      "contradicted": 1,
+      "satisfied": 2
+    },
+    "unstable": [],
+    "errors": [],
+    "excluded": [],
+    "pass": false
+  }
+}

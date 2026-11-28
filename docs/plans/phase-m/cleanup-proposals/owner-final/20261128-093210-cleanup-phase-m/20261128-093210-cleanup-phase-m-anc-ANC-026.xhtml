@@ -1,0 +1,97 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="anc-ANC-026">
+  <div class="section-head">
+    <h2>ANC-026</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;beads&quot;: {
+    &quot;anchor&quot;: &quot;agt-lw7b&quot;,
+    &quot;dev_questions&quot;: &quot;agt-lw7b.2&quot;,
+    &quot;plan_questions&quot;: &quot;agt-lw7b.1&quot;
+  },
+  &quot;context&quot;: &quot;phase-m planning session, 2026-11-27&quot;,
+  &quot;deterministic_check&quot;: &quot;&quot;,
+  &quot;exclude&quot;: [
+    {
+      &quot;item&quot;: &quot;agt-m-0&quot;,
+      &quot;reason&quot;: &quot;m-0 adds no SQL table definition anywhere; sc-agent-schema is an empty crate in this sprint.&quot;
+    },
+    {
+      &quot;item&quot;: &quot;agt-m-2&quot;,
+      &quot;reason&quot;: &quot;This sprint moves configuration code and does not add or change SQL table definitions.&quot;
+    }
+  ],
+  &quot;fixtures&quot;: {
+    &quot;fail&quot;: [
+      &quot;sc-agent-sqlite defines its own CREATE TABLE for sessions.&quot;
+    ],
+    &quot;pass&quot;: [
+      &quot;The responses table&#x27;s CREATE TABLE text is added in sc-agent-schema and used from there.&quot;
+    ]
+  },
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:54:55+00:00&quot;,
+      &quot;event&quot;: &quot;created&quot;,
+      &quot;status&quot;: &quot;locked&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:56:19+00:00&quot;,
+      &quot;beads&quot;: {
+        &quot;anchor&quot;: &quot;agt-lw7b&quot;,
+        &quot;dev_questions&quot;: &quot;agt-lw7b.2&quot;,
+        &quot;plan_questions&quot;: &quot;agt-lw7b.1&quot;
+      },
+      &quot;event&quot;: &quot;beads_set&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:58:04+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;fixtures&quot;
+      ]
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T08:21:10+00:00&quot;,
+      &quot;event&quot;: &quot;excluded&quot;,
+      &quot;item&quot;: &quot;agt-m-0&quot;,
+      &quot;reason&quot;: &quot;m-0 adds no SQL table definition anywhere; sc-agent-schema is an empty crate in this sprint.&quot;,
+      &quot;replaced&quot;: false
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T09:08:56+00:00&quot;,
+      &quot;event&quot;: &quot;excluded&quot;,
+      &quot;item&quot;: &quot;agt-m-2&quot;,
+      &quot;reason&quot;: &quot;This sprint moves configuration code and does not add or change SQL table definitions.&quot;,
+      &quot;replaced&quot;: false
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-026&quot;,
+  &quot;kind&quot;: &quot;directive&quot;,
+  &quot;promoted_to&quot;: null,
+  &quot;question_overrides&quot;: {},
+  &quot;quote&quot;: &quot;SQLite schema is in sc-agent-schema.&quot;,
+  &quot;scope&quot;: &quot;adds or changes SQL table definitions anywhere in the workspace&quot;,
+  &quot;source_ref&quot;: null,
+  &quot;source_type&quot;: &quot;ANC&quot;,
+  &quot;stated_at&quot;: &quot;2026-11-27&quot;,
+  &quot;stated_by&quot;: &quot;Rand Lee&quot;,
+  &quot;statement&quot;: &quot;Every core table&#x27;s SQL is defined in `sc-agent-schema` and nowhere else.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;summary&quot;: &quot;Core table SQL defined only in sc-agent-schema&quot;,
+  &quot;version&quot;: 2
+}">{}</button>
+    </div>
+  </div>
+  <h3>Statement</h3>
+  <p class="statement">Every core table&#x27;s SQL is defined in `sc-agent-schema` and nowhere else.</p>
+  <h3>Owner said</h3>
+  <p class="quote">SQLite schema is in sc-agent-schema.</p>
+  <h3>Scope</h3>
+  <p>adds or changes SQL table definitions anywhere in the workspace</p>
+  <h3>Kind</h3>
+  <p>directive</p>
+  <h3>Stated by</h3>
+  <p>Rand Lee</p>
+  <h3>Stated on</h3>
+  <p>2026-11-27</p>
+</section>

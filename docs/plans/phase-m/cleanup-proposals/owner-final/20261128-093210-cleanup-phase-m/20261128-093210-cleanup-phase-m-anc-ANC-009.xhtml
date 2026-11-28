@@ -1,0 +1,88 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="anc-ANC-009">
+  <div class="section-head">
+    <h2>ANC-009</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;beads&quot;: {
+    &quot;anchor&quot;: &quot;agt-1quf&quot;,
+    &quot;dev_questions&quot;: &quot;agt-1quf.2&quot;,
+    &quot;plan_questions&quot;: &quot;agt-1quf.1&quot;
+  },
+  &quot;context&quot;: &quot;planning session; PRD D15, owner 2026-11-24&quot;,
+  &quot;deterministic_check&quot;: &quot;test: a config file with an extra model row makes `decidr models` list it, and a send with that id resolves&quot;,
+  &quot;exclude&quot;: [
+    {
+      &quot;item&quot;: &quot;agt-m-2&quot;,
+      &quot;reason&quot;: &quot;This sprint relocates the existing model table unchanged; additional model rows from configuration are introduced in m-7.&quot;
+    }
+  ],
+  &quot;fixtures&quot;: {
+    &quot;fail&quot;: [
+      &quot;Adding a model requires editing the hard-coded model table and cutting a release.&quot;
+    ],
+    &quot;pass&quot;: [
+      &quot;A model row added under [models] in the config file is usable alongside the built-in rows.&quot;
+    ]
+  },
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-26T18:51:02+00:00&quot;,
+      &quot;event&quot;: &quot;created&quot;,
+      &quot;status&quot;: &quot;locked&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:55:44+00:00&quot;,
+      &quot;beads&quot;: {
+        &quot;anchor&quot;: &quot;agt-1quf&quot;,
+        &quot;dev_questions&quot;: &quot;agt-1quf.2&quot;,
+        &quot;plan_questions&quot;: &quot;agt-1quf.1&quot;
+      },
+      &quot;event&quot;: &quot;beads_set&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:58:03+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;fixtures&quot;
+      ]
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T09:08:56+00:00&quot;,
+      &quot;event&quot;: &quot;excluded&quot;,
+      &quot;item&quot;: &quot;agt-m-2&quot;,
+      &quot;reason&quot;: &quot;This sprint relocates the existing model table unchanged; additional model rows from configuration are introduced in m-7.&quot;,
+      &quot;replaced&quot;: false
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-009&quot;,
+  &quot;kind&quot;: &quot;directive&quot;,
+  &quot;promoted_to&quot;: null,
+  &quot;question_overrides&quot;: {},
+  &quot;quote&quot;: &quot;hard-coded rows will get stale quickly and often&quot;,
+  &quot;scope&quot;: &quot;adds or changes the model table or model configuration in sc-agent&quot;,
+  &quot;source_ref&quot;: null,
+  &quot;source_type&quot;: &quot;ANC&quot;,
+  &quot;stated_at&quot;: &quot;2026-11-26&quot;,
+  &quot;stated_by&quot;: &quot;Rand Lee&quot;,
+  &quot;statement&quot;: &quot;The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;summary&quot;: &quot;C10 The sc-agent model table must accept extra model rows from c&quot;,
+  &quot;version&quot;: 2
+}">{}</button>
+    </div>
+  </div>
+  <h3>Statement</h3>
+  <p class="statement">The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.</p>
+  <h3>Owner said</h3>
+  <p class="quote">hard-coded rows will get stale quickly and often</p>
+  <h3>Scope</h3>
+  <p>adds or changes the model table or model configuration in sc-agent</p>
+  <h3>Deterministic check</h3>
+  <p>test: a config file with an extra model row makes `decidr models` list it, and a send with that id resolves</p>
+  <h3>Kind</h3>
+  <p>directive</p>
+  <h3>Stated by</h3>
+  <p>Rand Lee</p>
+  <h3>Stated on</h3>
+  <p>2026-11-26</p>
+</section>

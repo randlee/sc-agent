@@ -1,0 +1,75 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="anc-ANC-014">
+  <div class="section-head">
+    <h2>ANC-014</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;beads&quot;: {
+    &quot;anchor&quot;: &quot;agt-pahi&quot;,
+    &quot;dev_questions&quot;: &quot;agt-pahi.2&quot;,
+    &quot;plan_questions&quot;: &quot;agt-pahi.1&quot;
+  },
+  &quot;context&quot;: &quot;planning session; session, 2026-11-26&quot;,
+  &quot;deterministic_check&quot;: &quot;test: request to luna/haiku carries a system message equal to the default; with decidr.luna-system-prompt / decidr.haiku-system-prompt set in config it equals the configured text&quot;,
+  &quot;fixtures&quot;: {
+    &quot;fail&quot;: [
+      &quot;The haiku system prompt is a string constant with no config override.&quot;
+    ],
+    &quot;pass&quot;: [
+      &quot;Luna answering a decision request gets the built-in system prompt unless decidr.luna-system-prompt overrides it.&quot;
+    ]
+  },
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-26T19:52:47+00:00&quot;,
+      &quot;event&quot;: &quot;created&quot;,
+      &quot;status&quot;: &quot;locked&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:55:54+00:00&quot;,
+      &quot;beads&quot;: {
+        &quot;anchor&quot;: &quot;agt-pahi&quot;,
+        &quot;dev_questions&quot;: &quot;agt-pahi.2&quot;,
+        &quot;plan_questions&quot;: &quot;agt-pahi.1&quot;
+      },
+      &quot;event&quot;: &quot;beads_set&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:58:04+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;fixtures&quot;
+      ]
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-014&quot;,
+  &quot;kind&quot;: &quot;directive&quot;,
+  &quot;promoted_to&quot;: null,
+  &quot;question_overrides&quot;: {},
+  &quot;quote&quot;: &quot;make sure config allows settings for decidr.luna-system-prompt and decidr.haiku-system-prompt as alternatives that can be overridden from config when we do more extensive testing w/out code changes.&quot;,
+  &quot;scope&quot;: &quot;adds or changes how an LLM is prompted to answer a decision request, or decidr config keys&quot;,
+  &quot;source_ref&quot;: null,
+  &quot;source_type&quot;: &quot;ANC&quot;,
+  &quot;stated_at&quot;: &quot;2026-11-26&quot;,
+  &quot;stated_by&quot;: &quot;Rand Lee&quot;,
+  &quot;statement&quot;: &quot;When an LLM answers a decision request in place of Jev, sc-agent must send a built-in default system prompt, and the config settings decidr.luna-system-prompt and decidr.haiku-system-prompt must each override that prompt for their model, so prompts can be tested without code changes.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;summary&quot;: &quot;LLM-as-Jev system prompt; luna/haiku config overrides&quot;,
+  &quot;version&quot;: 2
+}">{}</button>
+    </div>
+  </div>
+  <h3>Statement</h3>
+  <p class="statement">When an LLM answers a decision request in place of Jev, sc-agent must send a built-in default system prompt, and the config settings decidr.luna-system-prompt and decidr.haiku-system-prompt must each override that prompt for their model, so prompts can be tested without code changes.</p>
+  <h3>Owner said</h3>
+  <p class="quote">make sure config allows settings for decidr.luna-system-prompt and decidr.haiku-system-prompt as alternatives that can be overridden from config when we do more extensive testing w/out code changes.</p>
+  <h3>Scope</h3>
+  <p>adds or changes how an LLM is prompted to answer a decision request, or decidr config keys</p>
+  <h3>Deterministic check</h3>
+  <p>test: request to luna/haiku carries a system message equal to the default; with decidr.luna-system-prompt / decidr.haiku-system-prompt set in config it equals the configured text</p>
+  <h3>Kind</h3>
+  <p>directive</p>
+  <h3>Stated by</h3>
+  <p>Rand Lee</p>
+  <h3>Stated on</h3>
+  <p>2026-11-26</p>
+</section>

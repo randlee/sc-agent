@@ -1,0 +1,3022 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261128T100627Z-agt-m-3",
+  "gate": "plan",
+  "created_at": "2026-11-28T10:06:27+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "agt-m-3",
+    "title": "m-3: sc-agent-log and digest() into sc-agent-sqlite",
+    "source": "/tmp/m3-current-item.txt",
+    "chars": 849
+  },
+  "model_requested": "jev",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [
+    {
+      "path": "/tmp/m3-extra.jsonl",
+      "sha256": "4e58b78d5424673debc8001c7a6b878ce3cd047dc9813da1aa1956293200111d",
+      "ids": [
+        "candidate_ANC_008",
+        "candidate_ANC_027",
+        "candidate_ANC_028",
+        "candidate_ANC_031",
+        "candidate_ANC_005",
+        "candidate_ANC_015",
+        "candidate_ANC_017",
+        "candidate_ANC_020",
+        "candidate_ANC_023",
+        "candidate_ANC_024",
+        "candidate_ANC_026"
+      ]
+    },
+    {
+      "path": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/.sc/plan-anchor/triage/plan-questions.jsonl",
+      "sha256": "68180fbd2de8a3dee2421351672f9a321506af1f4bb19531c2c26d7d21c2c521",
+      "ids": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "anchor_id": "ANC-026",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every core table's SQL is defined in `sc-agent-schema` and nowhere else.",
+      "quote": "SQLite schema is in sc-agent-schema.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "contradicted",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "369e2c3fbd67ecec9fff96a3810b343a7300ae0ac183fde785b10ae117967073",
+      "verdict": "not_addressed",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.76,
+          "probabilities": {
+            "no": 0.84,
+            "unclear": 0.08,
+            "yes": 0.08
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.37,
+          "probabilities": {
+            "no": 0.27,
+            "unclear": 0.58,
+            "yes": 0.15
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.35,
+          "probabilities": {
+            "no": 0.57,
+            "unclear": 0.41,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.52,
+          "probabilities": {
+            "no": 0.27,
+            "unclear": 0.68,
+            "yes": 0.05
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.46,
+          "probabilities": {
+            "no": 0.32,
+            "unclear": 0.64,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.31,
+          "probabilities": {
+            "no": 0.43,
+            "unclear": 0.54,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.18,
+          "probabilities": {
+            "no": 0.39,
+            "unclear": 0.45,
+            "yes": 0.16
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.44,
+          "probabilities": {
+            "no": 0.34,
+            "unclear": 0.63,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.34,
+          "probabilities": {
+            "no": 0.37,
+            "unclear": 0.07,
+            "yes": 0.56
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.48,
+          "probabilities": {
+            "no": 0.65,
+            "unclear": 0.32,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.3,
+          "probabilities": {
+            "no": 0.53,
+            "unclear": 0.45,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.52,
+          "probabilities": {
+            "no": 0.68,
+            "unclear": 0.27,
+            "yes": 0.05
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.22,
+          "probabilities": {
+            "no": 0.47,
+            "unclear": 0.05,
+            "yes": 0.48
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.74,
+          "probabilities": {
+            "no": 0.16,
+            "unclear": 0.01,
+            "yes": 0.83
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.55,
+          "probabilities": {
+            "no": 0.7,
+            "unclear": 0.02,
+            "yes": 0.28
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.38,
+          "probabilities": {
+            "no": 0.4,
+            "unclear": 0.01,
+            "yes": 0.59
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.22,
+      "explanation": "This bead does not carry the directive forward.",
+      "usage": {
+        "input_tokens": 3814,
+        "output_tokens": 585
+      },
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 849
+    },
+    {
+      "anchor_id": "ANC-005",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "In production runs, every logger sc-agent creates by default, not injected by a caller, must write under the configured log root with a fixed folder and file name, so tools can find the logs.",
+      "quote": "I mandated - that all default loggers created in production have root/folder/file naming conventions specified.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session 2026-11-26; also memory `owner-logger-mandate`",
+      "anchor_version": 2,
+      "deterministic_check": "test: default_logger(name) path == `<log_root>/logs/<name>.log.jsonl`; session sink path == `<log_root>/sessions/<repo-id>/<role>/<project>/sessions.jsonl`",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "369e2c3fbd67ecec9fff96a3810b343a7300ae0ac183fde785b10ae117967073",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.16,
+          "probabilities": {
+            "no": 0.13,
+            "unclear": 0.43,
+            "yes": 0.44
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.67,
+          "probabilities": {
+            "no": 0.2,
+            "unclear": 0.02,
+            "yes": 0.78
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.26,
+          "probabilities": {
+            "no": 0.51,
+            "unclear": 0.48,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.35,
+          "probabilities": {
+            "no": 0.36,
+            "unclear": 0.57,
+            "yes": 0.07
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.4,
+          "probabilities": {
+            "no": 0.37,
+            "unclear": 0.6,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.66,
+            "unclear": 0.27,
+            "yes": 0.07
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.2,
+          "probabilities": {
+            "no": 0.47,
+            "unclear": 0.46,
+            "yes": 0.07
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.66,
+            "unclear": 0.29,
+            "yes": 0.05
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.28,
+          "probabilities": {
+            "no": 0.4,
+            "unclear": 0.52,
+            "yes": 0.08
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.33,
+          "probabilities": {
+            "no": 0.44,
+            "unclear": 0.55,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.3,
+          "probabilities": {
+            "no": 0.46,
+            "unclear": 0.53,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.53,
+          "probabilities": {
+            "no": 0.69,
+            "unclear": 0.3,
+            "yes": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.74,
+          "probabilities": {
+            "no": 0.83,
+            "unclear": 0.09,
+            "yes": 0.08
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.94,
+          "probabilities": {
+            "no": 0.04,
+            "unclear": 0.0,
+            "yes": 0.96
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.66,
+          "probabilities": {
+            "no": 0.16,
+            "unclear": 0.07,
+            "yes": 0.77
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.13,
+          "probabilities": {
+            "no": 0.42,
+            "unclear": 0.25,
+            "yes": 0.33
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.02,
+            "unclear": 0.0,
+            "yes": 0.98
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.92,
+          "probabilities": {
+            "no": 0.95,
+            "unclear": 0.01,
+            "yes": 0.04
+          }
+        }
+      },
+      "min_confidence": 0.16,
+      "explanation": "Jev was not confident (min confidence 0.16); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 3850,
+        "output_tokens": 584
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "yes",
+          "confidence": 0.16
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 849
+    },
+    {
+      "anchor_id": "ANC-008",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "In sc-agent code, related values passed to several methods must be grouped in one struct that replaces those repeated parameters, so encapsulation is efficient and repeated code stays minimal as the architecture scales.",
+      "quote": "Related values are strategically grouped in one struct to remove repeated method parameters, for efficient encapsulation and to minimize repeated code as the architecture scales.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 3,
+      "deterministic_check": "review of changed pub fn signatures: no function takes run_id/tool/tool_version/cache/model/provider as separate params",
+      "kind": "directive",
+      "leaning": "not_addressed",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "369e2c3fbd67ecec9fff96a3810b343a7300ae0ac183fde785b10ae117967073",
+      "near_threshold": true,
+      "unstable": true,
+      "answers_second": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.92,
+          "probabilities": {
+            "no": 0.95,
+            "unclear": 0.03,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.46,
+          "probabilities": {
+            "no": 0.29,
+            "unclear": 0.64,
+            "yes": 0.07
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.6,
+          "probabilities": {
+            "no": 0.73,
+            "unclear": 0.11,
+            "yes": 0.16
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.5,
+          "probabilities": {
+            "no": 0.28,
+            "unclear": 0.67,
+            "yes": 0.05
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.46,
+          "probabilities": {
+            "no": 0.33,
+            "unclear": 0.64,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.31,
+          "probabilities": {
+            "no": 0.54,
+            "unclear": 0.43,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.44,
+          "probabilities": {
+            "no": 0.63,
+            "unclear": 0.32,
+            "yes": 0.05
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.3,
+          "probabilities": {
+            "no": 0.53,
+            "unclear": 0.44,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.19,
+          "probabilities": {
+            "no": 0.46,
+            "unclear": 0.44,
+            "yes": 0.1
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.37,
+          "probabilities": {
+            "no": 0.58,
+            "unclear": 0.4,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.43,
+          "probabilities": {
+            "no": 0.62,
+            "unclear": 0.37,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.72,
+          "probabilities": {
+            "no": 0.81,
+            "unclear": 0.17,
+            "yes": 0.02
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.72,
+          "probabilities": {
+            "no": 0.81,
+            "unclear": 0.02,
+            "yes": 0.17
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.52,
+          "probabilities": {
+            "no": 0.31,
+            "unclear": 0.01,
+            "yes": 0.68
+          }
+        }
+      },
+      "verdict_first": "not_addressed",
+      "verdict_second": "underspecified",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.92,
+          "probabilities": {
+            "no": 0.95,
+            "unclear": 0.03,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.27,
+            "unclear": 0.66,
+            "yes": 0.07
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.62,
+          "probabilities": {
+            "no": 0.75,
+            "unclear": 0.09,
+            "yes": 0.16
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.46,
+          "probabilities": {
+            "no": 0.3,
+            "unclear": 0.64,
+            "yes": 0.06
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.5,
+          "probabilities": {
+            "no": 0.31,
+            "unclear": 0.67,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.35,
+          "probabilities": {
+            "no": 0.57,
+            "unclear": 0.41,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.44,
+          "probabilities": {
+            "no": 0.63,
+            "unclear": 0.32,
+            "yes": 0.05
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.28,
+          "probabilities": {
+            "no": 0.45,
+            "unclear": 0.52,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.2,
+          "probabilities": {
+            "no": 0.42,
+            "unclear": 0.47,
+            "yes": 0.11
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.44,
+          "probabilities": {
+            "no": 0.63,
+            "unclear": 0.36,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.66,
+            "unclear": 0.33,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.72,
+          "probabilities": {
+            "no": 0.81,
+            "unclear": 0.17,
+            "yes": 0.02
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.6,
+          "probabilities": {
+            "no": 0.73,
+            "unclear": 0.02,
+            "yes": 0.25
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.67,
+          "probabilities": {
+            "no": 0.22,
+            "unclear": 0.0,
+            "yes": 0.78
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.79,
+          "probabilities": {
+            "no": 0.86,
+            "unclear": 0.01,
+            "yes": 0.13
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.3,
+          "probabilities": {
+            "no": 0.46,
+            "unclear": 0.01,
+            "yes": 0.53
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.52,
+      "explanation": "Jev was not confident (min confidence 0.52); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 3838,
+        "output_tokens": 584
+      },
+      "low_questions": [
+        {
+          "ask": "second",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "yes",
+          "confidence": 0.52
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 849
+    },
+    {
+      "anchor_id": "ANC-015",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A rule that applies to every decidr-based tool (logging, model resolution and the like) must be specified only in sc-agent's records; a derivative tool's records (judge-jev, plan-anchor and others) must not restate it and give only the tool name and the tool's own behaviour, so each rule has one source.",
+      "quote": "judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26; also: 'same thing for REQ-JEV-0009 (this is sc-agent requirement) and applies to all tools'",
+      "anchor_version": 2,
+      "deterministic_check": "no derivative-tool record states log placement, model resolution, consent, retries or result-line fields; each points to the sc-agent record",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "369e2c3fbd67ecec9fff96a3810b343a7300ae0ac183fde785b10ae117967073",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.74,
+          "probabilities": {
+            "no": 0.83,
+            "unclear": 0.04,
+            "yes": 0.13
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.26,
+          "probabilities": {
+            "no": 0.51,
+            "unclear": 0.4,
+            "yes": 0.09
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.24,
+          "probabilities": {
+            "no": 0.48,
+            "unclear": 0.49,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.44,
+          "probabilities": {
+            "no": 0.31,
+            "unclear": 0.06,
+            "yes": 0.63
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.38,
+          "probabilities": {
+            "no": 0.36,
+            "unclear": 0.59,
+            "yes": 0.05
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.24,
+          "probabilities": {
+            "no": 0.49,
+            "unclear": 0.47,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.19,
+          "probabilities": {
+            "no": 0.46,
+            "unclear": 0.33,
+            "yes": 0.21
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.28,
+          "probabilities": {
+            "no": 0.52,
+            "unclear": 0.37,
+            "yes": 0.11
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.33,
+          "probabilities": {
+            "no": 0.32,
+            "unclear": 0.55,
+            "yes": 0.13
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.31,
+          "probabilities": {
+            "no": 0.54,
+            "unclear": 0.44,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.28,
+          "probabilities": {
+            "no": 0.52,
+            "unclear": 0.44,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.66,
+            "unclear": 0.3,
+            "yes": 0.04
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.68,
+          "probabilities": {
+            "no": 0.79,
+            "unclear": 0.04,
+            "yes": 0.17
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.66,
+            "unclear": 0.01,
+            "yes": 0.33
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.91,
+          "probabilities": {
+            "no": 0.94,
+            "unclear": 0.01,
+            "yes": 0.05
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.74,
+          "probabilities": {
+            "no": 0.83,
+            "unclear": 0.03,
+            "yes": 0.14
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.31,
+          "probabilities": {
+            "no": 0.45,
+            "unclear": 0.01,
+            "yes": 0.54
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.94,
+          "probabilities": {
+            "no": 0.96,
+            "unclear": 0.01,
+            "yes": 0.03
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.89,
+          "probabilities": {
+            "no": 0.93,
+            "unclear": 0.0,
+            "yes": 0.07
+          }
+        }
+      },
+      "min_confidence": 0.49,
+      "explanation": "Jev was not confident (min confidence 0.49); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 3879,
+        "output_tokens": 582
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "no",
+          "confidence": 0.49
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 849
+    },
+    {
+      "anchor_id": "ANC-020",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When a caller passes its own sc_observability Logger into an sc-agent wheel call, sc-agent must not build a second Logger for that log.",
+      "quote": "we created a oversized set of sprints expressly to normalize config and logging around sc-observability logger (injected).  why do you keep adding more loggers to the design? ... add a new anchor banning python_logger ... lock this",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "anchor_version": 2,
+      "deterministic_check": "no LoggerBuilder call in crates/sc-agent-py runs on a path where the caller supplied a logger",
+      "kind": "prohibition",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "369e2c3fbd67ecec9fff96a3810b343a7300ae0ac183fde785b10ae117967073",
+      "near_threshold": true,
+      "unstable": true,
+      "answers_second": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.37,
+          "probabilities": {
+            "no": 0.58,
+            "unclear": 0.27,
+            "yes": 0.15
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.25,
+          "probabilities": {
+            "no": 0.5,
+            "unclear": 0.43,
+            "yes": 0.07
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.34,
+          "probabilities": {
+            "no": 0.56,
+            "unclear": 0.43,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.55,
+          "probabilities": {
+            "no": 0.28,
+            "unclear": 0.7,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.44,
+          "probabilities": {
+            "no": 0.33,
+            "unclear": 0.63,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.55,
+          "probabilities": {
+            "no": 0.27,
+            "unclear": 0.03,
+            "yes": 0.7
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.44,
+          "probabilities": {
+            "no": 0.63,
+            "unclear": 0.32,
+            "yes": 0.05
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.37,
+          "probabilities": {
+            "no": 0.58,
+            "unclear": 0.36,
+            "yes": 0.06
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.42,
+          "probabilities": {
+            "no": 0.35,
+            "unclear": 0.61,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.3,
+          "probabilities": {
+            "no": 0.53,
+            "unclear": 0.46,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.35,
+          "probabilities": {
+            "no": 0.57,
+            "unclear": 0.43,
+            "yes": 0.0
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.64,
+          "probabilities": {
+            "no": 0.76,
+            "unclear": 0.23,
+            "yes": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.89,
+          "probabilities": {
+            "no": 0.93,
+            "unclear": 0.02,
+            "yes": 0.05
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.61,
+          "probabilities": {
+            "no": 0.23,
+            "unclear": 0.03,
+            "yes": 0.74
+          }
+        }
+      },
+      "verdict_first": "underspecified",
+      "verdict_second": "satisfied",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.4,
+          "probabilities": {
+            "no": 0.6,
+            "unclear": 0.25,
+            "yes": 0.15
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.22,
+          "probabilities": {
+            "no": 0.45,
+            "unclear": 0.48,
+            "yes": 0.07
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.28,
+          "probabilities": {
+            "no": 0.52,
+            "unclear": 0.47,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.46,
+          "probabilities": {
+            "no": 0.32,
+            "unclear": 0.64,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.42,
+          "probabilities": {
+            "no": 0.36,
+            "unclear": 0.61,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.48,
+          "probabilities": {
+            "no": 0.31,
+            "unclear": 0.04,
+            "yes": 0.65
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.42,
+          "probabilities": {
+            "no": 0.61,
+            "unclear": 0.35,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.37,
+          "probabilities": {
+            "no": 0.58,
+            "unclear": 0.35,
+            "yes": 0.07
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.38,
+          "probabilities": {
+            "no": 0.36,
+            "unclear": 0.59,
+            "yes": 0.05
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.3,
+          "probabilities": {
+            "no": 0.53,
+            "unclear": 0.46,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.5,
+          "probabilities": {
+            "no": 0.67,
+            "unclear": 0.33,
+            "yes": 0.0
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.7,
+          "probabilities": {
+            "no": 0.8,
+            "unclear": 0.19,
+            "yes": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.88,
+          "probabilities": {
+            "no": 0.92,
+            "unclear": 0.02,
+            "yes": 0.06
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.58,
+          "probabilities": {
+            "no": 0.24,
+            "unclear": 0.04,
+            "yes": 0.72
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.46,
+          "probabilities": {
+            "no": 0.64,
+            "unclear": 0.14,
+            "yes": 0.22
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.2,
+          "probabilities": {
+            "no": 0.44,
+            "unclear": 0.09,
+            "yes": 0.47
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.44,
+          "probabilities": {
+            "no": 0.36,
+            "unclear": 0.01,
+            "yes": 0.63
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.02,
+            "yes": 0.01
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.0,
+            "yes": 0.02
+          }
+        }
+      },
+      "min_confidence": 0.58,
+      "explanation": "Jev was not confident (min confidence 0.58); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 3844,
+        "output_tokens": 583
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "yes",
+          "confidence": 0.58
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 849
+    },
+    {
+      "anchor_id": "ANC-024",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The general log is written through sc-observability under its rotation and deletion policy; sc-agent adds no retention rule of its own.",
+      "quote": "general logs follow sc-obs rotation/deletion guidelines",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_addressed",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "369e2c3fbd67ecec9fff96a3810b343a7300ae0ac183fde785b10ae117967073",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.06,
+          "probabilities": {
+            "no": 0.37,
+            "unclear": 0.29,
+            "yes": 0.34
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.25,
+          "probabilities": {
+            "no": 0.35,
+            "unclear": 0.5,
+            "yes": 0.15
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.31,
+          "probabilities": {
+            "no": 0.54,
+            "unclear": 0.44,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.52,
+          "probabilities": {
+            "no": 0.25,
+            "unclear": 0.68,
+            "yes": 0.07
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.5,
+          "probabilities": {
+            "no": 0.3,
+            "unclear": 0.67,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.19,
+          "probabilities": {
+            "no": 0.44,
+            "unclear": 0.46,
+            "yes": 0.1
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.22,
+          "probabilities": {
+            "no": 0.3,
+            "unclear": 0.48,
+            "yes": 0.22
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.86,
+          "probabilities": {
+            "no": 0.08,
+            "unclear": 0.01,
+            "yes": 0.91
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.38,
+          "probabilities": {
+            "no": 0.27,
+            "unclear": 0.59,
+            "yes": 0.14
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.25,
+          "probabilities": {
+            "no": 0.47,
+            "unclear": 0.5,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.31,
+          "probabilities": {
+            "no": 0.54,
+            "unclear": 0.45,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.46,
+          "probabilities": {
+            "no": 0.64,
+            "unclear": 0.33,
+            "yes": 0.03
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.76,
+          "probabilities": {
+            "no": 0.84,
+            "unclear": 0.03,
+            "yes": 0.13
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.7,
+          "probabilities": {
+            "no": 0.19,
+            "unclear": 0.01,
+            "yes": 0.8
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.66,
+          "probabilities": {
+            "no": 0.77,
+            "unclear": 0.08,
+            "yes": 0.15
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.55,
+          "probabilities": {
+            "no": 0.7,
+            "unclear": 0.1,
+            "yes": 0.2
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.82,
+          "probabilities": {
+            "no": 0.12,
+            "unclear": 0.0,
+            "yes": 0.88
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.02,
+            "yes": 0.01
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.89,
+          "probabilities": {
+            "no": 0.93,
+            "unclear": 0.01,
+            "yes": 0.06
+          }
+        }
+      },
+      "min_confidence": 0.06,
+      "explanation": "Jev was not confident (min confidence 0.06); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 3825,
+        "output_tokens": 586
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "no",
+          "confidence": 0.06
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 849
+    },
+    {
+      "anchor_id": "ANC-027",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The session schema stores a request once in `messages`, keyed by sha256, and each model reply as a row in `responses` that references it.",
+      "quote": "We likely want message+sha256 and response+model in separate tables as this is one->many",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "underspecified",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "369e2c3fbd67ecec9fff96a3810b343a7300ae0ac183fde785b10ae117967073",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.34,
+          "probabilities": {
+            "no": 0.35,
+            "unclear": 0.56,
+            "yes": 0.09
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.34,
+          "probabilities": {
+            "no": 0.32,
+            "unclear": 0.56,
+            "yes": 0.12
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.4,
+          "probabilities": {
+            "no": 0.6,
+            "unclear": 0.39,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.56,
+          "probabilities": {
+            "no": 0.23,
+            "unclear": 0.71,
+            "yes": 0.06
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.43,
+          "probabilities": {
+            "no": 0.34,
+            "unclear": 0.62,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.35,
+          "probabilities": {
+            "no": 0.4,
+            "unclear": 0.57,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.16,
+          "probabilities": {
+            "no": 0.44,
+            "unclear": 0.42,
+            "yes": 0.14
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.48,
+          "probabilities": {
+            "no": 0.32,
+            "unclear": 0.65,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.35,
+          "probabilities": {
+            "no": 0.16,
+            "unclear": 0.57,
+            "yes": 0.27
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.4,
+          "probabilities": {
+            "no": 0.34,
+            "unclear": 0.06,
+            "yes": 0.6
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.26,
+          "probabilities": {
+            "no": 0.45,
+            "unclear": 0.51,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.6,
+          "probabilities": {
+            "no": 0.73,
+            "unclear": 0.24,
+            "yes": 0.03
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.85,
+          "probabilities": {
+            "no": 0.9,
+            "unclear": 0.05,
+            "yes": 0.05
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.28,
+            "unclear": 0.06,
+            "yes": 0.66
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.86,
+          "probabilities": {
+            "no": 0.91,
+            "unclear": 0.07,
+            "yes": 0.02
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.7,
+          "probabilities": {
+            "no": 0.19,
+            "unclear": 0.01,
+            "yes": 0.8
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.34,
+      "explanation": "Jev was not confident (min confidence 0.34); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 3836,
+        "output_tokens": 587
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "unclear",
+          "confidence": 0.34
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 849
+    },
+    {
+      "anchor_id": "ANC-028",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A cache hit is decided by the request sha256 and the model alone; `run_id` is not part of the cache key.",
+      "quote": "run-id has nothing to do with caching. run is a collection of queries of which some may be cached (if caching enabled)",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "underspecified",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "369e2c3fbd67ecec9fff96a3810b343a7300ae0ac183fde785b10ae117967073",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.24,
+          "probabilities": {
+            "no": 0.24,
+            "unclear": 0.49,
+            "yes": 0.27
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.44,
+          "probabilities": {
+            "no": 0.28,
+            "unclear": 0.63,
+            "yes": 0.09
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.31,
+          "probabilities": {
+            "no": 0.54,
+            "unclear": 0.45,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.46,
+          "probabilities": {
+            "no": 0.32,
+            "unclear": 0.64,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.46,
+          "probabilities": {
+            "no": 0.33,
+            "unclear": 0.64,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.33,
+          "probabilities": {
+            "no": 0.43,
+            "unclear": 0.55,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.22,
+          "probabilities": {
+            "no": 0.4,
+            "unclear": 0.48,
+            "yes": 0.12
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.31,
+            "unclear": 0.66,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.46,
+          "probabilities": {
+            "no": 0.29,
+            "unclear": 0.64,
+            "yes": 0.07
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.43,
+          "probabilities": {
+            "no": 0.37,
+            "unclear": 0.62,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.73,
+          "probabilities": {
+            "no": 0.16,
+            "unclear": 0.02,
+            "yes": 0.82
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.55,
+          "probabilities": {
+            "no": 0.7,
+            "unclear": 0.28,
+            "yes": 0.02
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.55,
+          "probabilities": {
+            "no": 0.7,
+            "unclear": 0.04,
+            "yes": 0.26
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.66,
+            "unclear": 0.05,
+            "yes": 0.29
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.79,
+          "probabilities": {
+            "no": 0.86,
+            "unclear": 0.08,
+            "yes": 0.06
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.91,
+          "probabilities": {
+            "no": 0.06,
+            "unclear": 0.0,
+            "yes": 0.94
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.01,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.86,
+          "probabilities": {
+            "no": 0.91,
+            "unclear": 0.01,
+            "yes": 0.08
+          }
+        }
+      },
+      "min_confidence": 0.24,
+      "explanation": "Jev was not confident (min confidence 0.24); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 3828,
+        "output_tokens": 588
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "unclear",
+          "confidence": 0.24
+        },
+        {
+          "ask": "first",
+          "role": "conflict",
+          "question_id": "contradicted",
+          "choice": "no",
+          "confidence": 0.55
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 849
+    },
+    {
+      "anchor_id": "ANC-031",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "judge-jev, plan-anchor and every other sc-agent-based tool store their results in the repository's SQLite database, not in JSON or JSONL result files.",
+      "quote": "At the end of the day, I want all the 'results' from plan-anchor, judge-jev or any other app to save data to SQLite.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "369e2c3fbd67ecec9fff96a3810b343a7300ae0ac183fde785b10ae117967073",
+      "near_threshold": true,
+      "unstable": true,
+      "answers_second": {
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.56,
+          "probabilities": {
+            "no": 0.17,
+            "unclear": 0.12,
+            "yes": 0.71
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.3,
+          "probabilities": {
+            "no": 0.39,
+            "unclear": 0.53,
+            "yes": 0.08
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.66,
+            "unclear": 0.33,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.37,
+          "probabilities": {
+            "no": 0.32,
+            "unclear": 0.58,
+            "yes": 0.1
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.37,
+          "probabilities": {
+            "no": 0.39,
+            "unclear": 0.58,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.25,
+          "probabilities": {
+            "no": 0.48,
+            "unclear": 0.5,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.22,
+          "probabilities": {
+            "no": 0.22,
+            "unclear": 0.3,
+            "yes": 0.48
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.37,
+          "probabilities": {
+            "no": 0.39,
+            "unclear": 0.58,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.22,
+          "probabilities": {
+            "no": 0.26,
+            "unclear": 0.48,
+            "yes": 0.26
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.26,
+          "probabilities": {
+            "no": 0.45,
+            "unclear": 0.51,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.26,
+          "probabilities": {
+            "no": 0.51,
+            "unclear": 0.47,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.6,
+          "probabilities": {
+            "no": 0.73,
+            "unclear": 0.02,
+            "yes": 0.25
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.89,
+          "probabilities": {
+            "no": 0.93,
+            "unclear": 0.01,
+            "yes": 0.06
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        }
+      },
+      "verdict_first": "satisfied",
+      "verdict_second": "underspecified",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.68,
+          "probabilities": {
+            "no": 0.12,
+            "unclear": 0.09,
+            "yes": 0.79
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.26,
+          "probabilities": {
+            "no": 0.39,
+            "unclear": 0.51,
+            "yes": 0.1
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.42,
+          "probabilities": {
+            "no": 0.61,
+            "unclear": 0.38,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.3,
+          "probabilities": {
+            "no": 0.36,
+            "unclear": 0.53,
+            "yes": 0.11
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.37,
+          "probabilities": {
+            "no": 0.39,
+            "unclear": 0.58,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.25,
+          "probabilities": {
+            "no": 0.5,
+            "unclear": 0.48,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.2,
+          "probabilities": {
+            "no": 0.24,
+            "unclear": 0.29,
+            "yes": 0.47
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.33,
+          "probabilities": {
+            "no": 0.42,
+            "unclear": 0.55,
+            "yes": 0.03
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.16,
+          "probabilities": {
+            "no": 0.28,
+            "unclear": 0.44,
+            "yes": 0.28
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.25,
+          "probabilities": {
+            "no": 0.44,
+            "unclear": 0.5,
+            "yes": 0.06
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.3,
+          "probabilities": {
+            "no": 0.53,
+            "unclear": 0.45,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.61,
+          "probabilities": {
+            "no": 0.74,
+            "unclear": 0.02,
+            "yes": 0.24
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.89,
+          "probabilities": {
+            "no": 0.93,
+            "unclear": 0.01,
+            "yes": 0.06
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.77,
+          "probabilities": {
+            "no": 0.13,
+            "unclear": 0.02,
+            "yes": 0.85
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.42,
+          "probabilities": {
+            "no": 0.61,
+            "unclear": 0.17,
+            "yes": 0.22
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.92,
+          "probabilities": {
+            "no": 0.05,
+            "unclear": 0.0,
+            "yes": 0.95
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.92,
+          "probabilities": {
+            "no": 0.95,
+            "unclear": 0.02,
+            "yes": 0.03
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.67,
+          "probabilities": {
+            "no": 0.78,
+            "unclear": 0.02,
+            "yes": 0.2
+          }
+        }
+      },
+      "min_confidence": 0.56,
+      "explanation": "Jev was not confident (min confidence 0.56); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 3838,
+        "output_tokens": 585
+      },
+      "low_questions": [
+        {
+          "ask": "second",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "yes",
+          "confidence": 0.56
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 849
+    },
+    {
+      "anchor_id": "ANC-023",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent writes each session row to the repository's SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.",
+      "quote": "I want session logs written to SQLite, jsonl was just a quick item for mvp",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "369e2c3fbd67ecec9fff96a3810b343a7300ae0ac183fde785b10ae117967073",
+      "verdict": "satisfied",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.02,
+            "unclear": 0.01,
+            "yes": 0.97
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.42,
+          "probabilities": {
+            "no": 0.28,
+            "unclear": 0.61,
+            "yes": 0.11
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.55,
+          "probabilities": {
+            "no": 0.7,
+            "unclear": 0.28,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.56,
+          "probabilities": {
+            "no": 0.25,
+            "unclear": 0.71,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.28,
+          "probabilities": {
+            "no": 0.44,
+            "unclear": 0.52,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.31,
+          "probabilities": {
+            "no": 0.4,
+            "unclear": 0.54,
+            "yes": 0.06
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.74,
+          "probabilities": {
+            "no": 0.16,
+            "unclear": 0.01,
+            "yes": 0.83
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.2,
+          "probabilities": {
+            "no": 0.46,
+            "unclear": 0.47,
+            "yes": 0.07
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.42,
+          "probabilities": {
+            "no": 0.23,
+            "unclear": 0.61,
+            "yes": 0.16
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.7,
+          "probabilities": {
+            "no": 0.8,
+            "unclear": 0.18,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.37,
+          "probabilities": {
+            "no": 0.58,
+            "unclear": 0.4,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.44,
+          "probabilities": {
+            "no": 0.63,
+            "unclear": 0.09,
+            "yes": 0.28
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        }
+      },
+      "min_confidence": 0.96,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 3826,
+        "output_tokens": 585
+      },
+      "attempts": 1,
+      "item_chars_sent": 849
+    },
+    {
+      "anchor_id": "ANC-017",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent tests must not depend on races, wall-clock timing, sleeps, event-loop ordering or system load; a test found to depend on one must be redesigned to drive its logic with controlled inputs.",
+      "quote": "Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "anchor_version": 2,
+      "deterministic_check": "review changed tests for sleep, wall-clock assertions, poll-until-timeout and unsynchronized thread ordering; a failure-only backstop that fails with captured output is allowed",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "369e2c3fbd67ecec9fff96a3810b343a7300ae0ac183fde785b10ae117967073",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "candidate_ANC_005": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.5,
+          "probabilities": {
+            "no": 0.27,
+            "unclear": 0.67,
+            "yes": 0.06
+          }
+        },
+        "candidate_ANC_008": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.25,
+          "probabilities": {
+            "no": 0.49,
+            "unclear": 0.5,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_015": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.55,
+          "probabilities": {
+            "no": 0.26,
+            "unclear": 0.7,
+            "yes": 0.04
+          }
+        },
+        "candidate_ANC_017": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.66,
+            "unclear": 0.11,
+            "yes": 0.23
+          }
+        },
+        "candidate_ANC_020": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.26,
+          "probabilities": {
+            "no": 0.51,
+            "unclear": 0.47,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_023": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.25,
+          "probabilities": {
+            "no": 0.5,
+            "unclear": 0.45,
+            "yes": 0.05
+          }
+        },
+        "candidate_ANC_024": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.33,
+          "probabilities": {
+            "no": 0.43,
+            "unclear": 0.55,
+            "yes": 0.02
+          }
+        },
+        "candidate_ANC_026": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.4,
+          "probabilities": {
+            "no": 0.31,
+            "unclear": 0.6,
+            "yes": 0.09
+          }
+        },
+        "candidate_ANC_027": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.37,
+          "probabilities": {
+            "no": 0.41,
+            "unclear": 0.58,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_028": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.35,
+          "probabilities": {
+            "no": 0.42,
+            "unclear": 0.57,
+            "yes": 0.01
+          }
+        },
+        "candidate_ANC_031": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.46,
+          "probabilities": {
+            "no": 0.64,
+            "unclear": 0.34,
+            "yes": 0.02
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 3854,
+        "output_tokens": 586
+      },
+      "attempts": 1,
+      "item_chars_sent": 849
+    }
+  ],
+  "summary": {
+    "counts": {
+      "not_addressed": 1,
+      "underspecified": 8,
+      "satisfied": 1,
+      "not_applicable": 1
+    },
+    "failing": [
+      "ANC-026",
+      "ANC-005",
+      "ANC-008",
+      "ANC-015",
+      "ANC-020",
+      "ANC-024",
+      "ANC-027",
+      "ANC-028",
+      "ANC-031"
+    ],
+    "leaning_counts": {
+      "contradicted": 1,
+      "not_addressed": 2,
+      "not_applicable": 2,
+      "satisfied": 4,
+      "underspecified": 2
+    },
+    "unstable": [
+      "ANC-008",
+      "ANC-020",
+      "ANC-031"
+    ],
+    "errors": [],
+    "excluded": [],
+    "pass": false
+  }
+}

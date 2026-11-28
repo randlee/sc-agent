@@ -1,0 +1,50 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-11">
+  <div class="section-head">
+    <h2>11. Remove fixed local model ids from REQ-SAG-0801 (docs/sc-agent-config/)</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="11. Remove fixed local model ids from REQ-SAG-0801 (docs/sc-agent-config/)
+Wave 1 · resolve conflict
+Records: REQ-SAG-0801
+Change:
+- Resolution: reconcile.
+- Reword REQ-SAG-0801: “Each local decision runner&#x27;s model MUST have a fixed model id in the model table.” → “Each local decision runner&#x27;s model id MUST come from configuration.”
+- Delete from REQ-SAG-0801: “A selection of `decider` MUST resolve to the 4b decider model.”
+Rewording (rare; justified): REQ-SAG-0801: The owner requires both local model address and model string to come from configuration.
+Clears:
+- REQ-SAG-0801 × ANC-001 (conflicts)
+- REQ-SAG-0801 × ANC-009 (exceeds)
+- REQ-SAG-0801 × ANC-022 (exceeds)
+Justification: The owner directs that local model URLs and model ids come from configuration. Remove the fixed model id and fixed `decider` selection obligations while retaining the existing configuration requirements.
+Source of truth: ANC-022 — Owner said: “local models come from config. Both ip &amp; model string.” — commit 67203e2f
+Expected improvement:
+- The record no longer fixes a local model id or requires `decider` to resolve to one particular model.
+- Records 49 → 49; statements 205 → 204; duplicates cleared 0 of 32; conflicts resolved 1 of 16; exceeds cleared 2 of 52">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 1 · resolve conflict</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0801" data-panel="rec-REQ-SAG-0801">REQ-SAG-0801</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Resolution: reconcile.</li>
+    <li>Reword REQ-SAG-0801: “Each local decision runner&#x27;s model MUST have a fixed model id in the model table.” → “Each local decision runner&#x27;s model id MUST come from configuration.”</li>
+    <li>Delete from REQ-SAG-0801: “A selection of `decider` MUST resolve to the 4b decider model.”</li>
+  </ul>
+  <h3>Rewording (rare; justified)</h3>
+  <p>REQ-SAG-0801: The owner requires both local model address and model string to come from configuration.</p>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0801-ANC-001" data-panel="cell-REQ-SAG-0801-ANC-001">REQ-SAG-0801 × ANC-001 (conflicts)</a></li>
+    <li><a href="#cell-REQ-SAG-0801-ANC-009" data-panel="cell-REQ-SAG-0801-ANC-009">REQ-SAG-0801 × ANC-009 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0801-ANC-022" data-panel="cell-REQ-SAG-0801-ANC-022">REQ-SAG-0801 × ANC-022 (exceeds)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>The owner directs that local model URLs and model ids come from configuration. Remove the fixed model id and fixed `decider` selection obligations while retaining the existing configuration requirements.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-022 — Owner said: “local models come from config. Both ip &amp; model string.” — commit 67203e2f</p>
+  <h3>Expected improvement</h3>
+  <p>The record no longer fixes a local model id or requires `decider` to resolve to one particular model.</p>
+  <p>Records 49 → 49; statements 205 → 204; duplicates cleared 0 of 32; conflicts resolved 1 of 16; exceeds cleared 2 of 52</p>
+</section>

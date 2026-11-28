@@ -1,0 +1,201 @@
+{
+  "success": true,
+  "data": {
+    "threshold": 0.6,
+    "dry_run": false,
+    "fixture": false,
+    "path": null,
+    "anchors": [
+      {
+        "id": "candidate",
+        "statement": "The CLI must emit JSON and the daemon must write an audit log.",
+        "quote": "the CLI must emit JSON and the daemon must write an audit log",
+        "scope": "CLI output and daemon audit",
+        "verdict": "inconclusive",
+        "failing": [
+          "single_constraint",
+          "faithful",
+          "statement is the verbatim quote"
+        ],
+        "answers": {
+          "faithful": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.43,
+            "probabilities": {
+              "no": 0.38,
+              "unclear": 0.0,
+              "yes": 0.62
+            }
+          },
+          "observable": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.74,
+            "probabilities": {
+              "no": 0.01,
+              "unclear": 0.16,
+              "yes": 0.83
+            }
+          },
+          "scoped": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.0,
+              "unclear": 0.01,
+              "yes": 0.99
+            }
+          },
+          "self_contained": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.92,
+            "probabilities": {
+              "no": 0.02,
+              "unclear": 0.03,
+              "yes": 0.95
+            }
+          },
+          "single_constraint": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 1.0,
+              "unclear": 0.0,
+              "yes": 0.0
+            }
+          }
+        },
+        "lint": {
+          "warnings": [
+            "statement is the verbatim quote"
+          ],
+          "errors": [
+            "statement is the verbatim quote"
+          ]
+        },
+        "inputs": {
+          "question_seal": "a50dea7e80911d24042b9864ecd931a1c36b3647a57ddb1611d70054c5aed051",
+          "request_sha256": "195bbc29045c8b15668a51e9a24a7da013b6bfffd4ae4060cfae49c3b70fdaaf"
+        },
+        "answers_second": {
+          "faithful": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.42,
+            "probabilities": {
+              "no": 0.39,
+              "unclear": 0.0,
+              "yes": 0.61
+            }
+          },
+          "observable": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.76,
+            "probabilities": {
+              "no": 0.02,
+              "unclear": 0.14,
+              "yes": 0.84
+            }
+          },
+          "scoped": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.0,
+              "unclear": 0.01,
+              "yes": 0.99
+            }
+          },
+          "self_contained": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.91,
+            "probabilities": {
+              "no": 0.03,
+              "unclear": 0.03,
+              "yes": 0.94
+            }
+          },
+          "single_constraint": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 1.0,
+              "unclear": 0.0,
+              "yes": 0.0
+            }
+          }
+        },
+        "attempts": 2,
+        "confirmations": {
+          "verdict": "inconclusive",
+          "failing": [
+            "single_constraint",
+            "faithful",
+            "statement is the verbatim quote"
+          ],
+          "low_confidence": [
+            "faithful"
+          ],
+          "unstable": [],
+          "initial_disagreements": [],
+          "resolved": {
+            "faithful": {
+              "choice": "yes",
+              "confidence": 0.42,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "observable": {
+              "choice": "yes",
+              "confidence": 0.74,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "scoped": {
+              "choice": "yes",
+              "confidence": 0.98,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "self_contained": {
+              "choice": "yes",
+              "confidence": 0.91,
+              "matching_calls": [
+                1,
+                2
+              ]
+            },
+            "single_constraint": {
+              "choice": "no",
+              "confidence": 1.0,
+              "matching_calls": [
+                1,
+                2
+              ]
+            }
+          }
+        },
+        "next": "Plan diagnosis: run `judge` on the item, then `report --run <run>` for triage answers and routes. A disputed rubric role on a locked anchor: anchor-tuning `triage` with `gate: testability`."
+      }
+    ],
+    "needs_work": [
+      "candidate"
+    ],
+    "pass": false
+  },
+  "error": null
+}

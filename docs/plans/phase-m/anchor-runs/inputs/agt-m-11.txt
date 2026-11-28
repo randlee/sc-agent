@@ -1,0 +1,28 @@
+# m-11: integration and landing
+
+## Description
+
+Nothing is built. The phase is proven against its two real consumers before it reaches develop. This sprint proves the library's extension points against its two real consumers and moves the size and boundary limits to sc-lint so they stay mechanically enforced.
+
+### Deliverables
+1. M11-1: Install judge-jev and plan-anchor against the phase-m wheel and run their own suites. Run sc-agent's tests against live agents, triggered manually.
+2. M11-2 landing and replacement closure: apply the corresponding verbatim inventory/change section in design.
+3. M11-3 sc-lint limits and rewrite-gate removal: apply the corresponding verbatim inventory/change section in design.
+4. M11-4 In the existing wheel job of .github/workflows/ci.yml, replace the rewrite.py invocation with the build/install prerequisites and direct execution of python -m unittest discover -s tests/contract -v and python crates/sc-agent-py/tests/loopback.py. Retain the still-required error, dependency and wheel-signature checks there without the deleted script or a new CI job (REQ-SAG-0008, REQ-SAG-0016, REQ-SAG-0018).
+
+
+
+
+The manually triggered live-agent integration run uses sc-agent unit tests against live agents.
+
+## Acceptance criteria
+
+### Acceptance Criteria
+Both consumers' suites pass on the phase-m wheel; develop holds the phase-m crates; the gate script is gone and sc-lint carries the limits.
+
+
+### Validation
+- cargo test --workspace --all-features
+- cargo fmt --check --all
+- cargo clippy --workspace --all-targets --all-features -- -D warnings
+- sc-lint lint sc-boundary --config sc-lint.toml

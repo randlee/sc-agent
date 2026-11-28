@@ -1,0 +1,92 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-REQ-SAG-0202-ANC-027">
+  <div class="section-head">
+    <h2>REQ-SAG-0202 × ANC-027 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-027&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.46,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.64,
+        &quot;unclear&quot;: 0.09,
+        &quot;yes&quot;: 0.27
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.85,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.1,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.9
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.79,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.13,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.86
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.37,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.58,
+        &quot;unclear&quot;: 0.11,
+        &quot;yes&quot;: 0.31
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.27,
+    &quot;exceeds&quot;: 0.9,
+    &quot;relates&quot;: 0.86,
+    &quot;serves&quot;: 0.31
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0202&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0202/ANC-027/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GNBAX4AN2MF72SKWM4B1ZH&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0202 × ANC-027 — exceeds
+What exceeds
+Anchor
+The session schema stores a request once in `messages`, keyed by sha256, and each model reply as a row in `responses` that references it.
+Owner said: “We likely want message+sha256 and response+model in separate tables as this is one-&gt;many”
+Scope: adds or changes the session tables or code that stores a request or a model reply
+Record statements
+When sc-agent sends a question to a decision model, sc-agent MUST compute the question digest of that question.
+sc-agent MUST record each question digest with the decision model&#x27;s response to the question the digest was computed from.
+History (git)
+REQ-SAG-0202 statement 1: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0202 statement 2: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+Jev P(yes): relates 0.86 · serves 0.31 · exceeds 0.90 · conflicts 0.27">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+  </ul>
+  <h3>Anchor</h3>
+  <p>The session schema stores a request once in `messages`, keyed by sha256, and each model reply as a row in `responses` that references it.</p>
+  <p>Owner said: “We likely want message+sha256 and response+model in separate tables as this is one-&gt;many”</p>
+  <p>Scope: adds or changes the session tables or code that stores a request or a model reply</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>When sc-agent sends a question to a decision model, sc-agent MUST compute the question digest of that question.</li>
+    <li>sc-agent MUST record each question digest with the decision model&#x27;s response to the question the digest was computed from.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0202 statement 1: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0202 statement 2: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.86 · serves 0.31 · exceeds 0.90 · conflicts 0.27</p>
+</section>

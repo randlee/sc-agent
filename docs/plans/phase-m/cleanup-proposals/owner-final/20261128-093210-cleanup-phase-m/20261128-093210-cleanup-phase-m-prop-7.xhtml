@@ -1,0 +1,37 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-7">
+  <div class="section-head">
+    <h2>7. Remove the obsolete session log path (docs/sc-agent-log/)</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="7. Remove the obsolete session log path (docs/sc-agent-log/)
+Wave 1 · cut excess
+Records: REQ-SAG-0003
+Change: Delete from REQ-SAG-0003: “Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).”
+Clears: REQ-SAG-0003 × ANC-023 (conflicts)
+Justification: The owner ruled: &quot;I want session logs written to SQLite, jsonl was just a quick item for mvp&quot;. This 2026-11-19 session path predates that ruling. Retention remains required: &quot;Session logs not deleted.&quot;
+Source of truth: ANC-023 — Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp” — commit f023c0d1
+Expected improvement:
+- REQ-SAG-0003 no longer requires the obsolete session log file path.
+- Records 49 → 49; statements 205 → 204; duplicates cleared 1 of 32; conflicts resolved 1 of 16; exceeds cleared 0 of 52
+Other proposals changing these records: 8">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 1 · cut excess</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0003" data-panel="rec-REQ-SAG-0003">REQ-SAG-0003</a></li>
+  </ul>
+  <h3>Change</h3>
+  <p>Delete from REQ-SAG-0003: “Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).”</p>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0003-ANC-023" data-panel="cell-REQ-SAG-0003-ANC-023">REQ-SAG-0003 × ANC-023 (conflicts)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>The owner ruled: &quot;I want session logs written to SQLite, jsonl was just a quick item for mvp&quot;. This 2026-11-19 session path predates that ruling. Retention remains required: &quot;Session logs not deleted.&quot;</p>
+  <h3>Source of truth</h3>
+  <p>ANC-023 — Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp” — commit f023c0d1</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0003 no longer requires the obsolete session log file path.</p>
+  <p>Records 49 → 49; statements 205 → 204; duplicates cleared 1 of 32; conflicts resolved 1 of 16; exceeds cleared 0 of 52</p>
+  <p>Other proposals changing these records: 8</p>
+</section>

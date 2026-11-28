@@ -1,0 +1,154 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-REQ-SAG-0602-ANC-030">
+  <div class="section-head">
+    <h2>REQ-SAG-0602 × ANC-030 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-030&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [
+      &quot;A busy status whose body marks quota exhaustion MUST be returned at once as the error `http.quota_exhausted`.&quot;,
+      &quot;A 429 with a body that does not mark quota exhaustion MUST be treated as busy.&quot;,
+      &quot;A quota-exhausted response MUST NOT be resent.&quot;
+    ],
+    &quot;jev_disputed&quot;: false,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;3393585f&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0602&quot;,
+        &quot;statement&quot;: &quot;A busy status whose body marks quota exhaustion MUST be returned at once as the error `http.quota_exhausted`.&quot;,
+        &quot;summary&quot;: &quot;Add doctor, busy resend and quota requirements&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;3393585f&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0602&quot;,
+        &quot;statement&quot;: &quot;A 429 with a body that does not mark quota exhaustion MUST be treated as busy.&quot;,
+        &quot;summary&quot;: &quot;Add doctor, busy resend and quota requirements&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;3393585f&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0602&quot;,
+        &quot;statement&quot;: &quot;A quota-exhausted response MUST NOT be resent.&quot;,
+        &quot;summary&quot;: &quot;Add doctor, busy resend and quota requirements&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;Not proposed pending confirmation of where these externally visible quota rules are implemented.&quot;,
+    &quot;stale&quot;: {
+      &quot;reason&quot;: &quot;These clauses predate the 2026-11-27 parameterization anchor, but their implementation layer is unclear.&quot;,
+      &quot;record&quot;: &quot;REQ-SAG-0602&quot;,
+      &quot;statement&quot;: &quot;A quota-exhausted response MUST NOT be resent.&quot;
+    },
+    &quot;what&quot;: &quot;These clauses define quota classification and response behavior. They may be consumer-visible behavior rather than a requirement that the retry layer implement those rules internally; the cell alone does not establish which layer owns them.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.43,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.62,
+        &quot;unclear&quot;: 0.07,
+        &quot;yes&quot;: 0.31
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.85,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.1,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.9
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.88,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.07,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.92
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.53,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.69,
+        &quot;unclear&quot;: 0.07,
+        &quot;yes&quot;: 0.24
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.31,
+    &quot;exceeds&quot;: 0.9,
+    &quot;relates&quot;: 0.92,
+    &quot;serves&quot;: 0.24
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0602&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0602/ANC-030/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ6VWCWR75KJ7H6K49XFSE&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0602 × ANC-030 — exceeds
+What exceeds
+“A busy status whose body marks quota exhaustion MUST be returned at once as the error `http.quota_exhausted`.”
+“A 429 with a body that does not mark quota exhaustion MUST be treated as busy.”
+“A quota-exhausted response MUST NOT be resent.”
+These clauses define quota classification and response behavior. They may be consumer-visible behavior rather than a requirement that the retry layer implement those rules internally; the cell alone does not establish which layer owns them.
+Proposed remedy
+Not proposed pending confirmation of where these externally visible quota rules are implemented.
+Stale
+REQ-SAG-0602 “A quota-exhausted response MUST NOT be resent.”: These clauses predate the 2026-11-27 parameterization anchor, but their implementation layer is unclear.
+Anchor
+Retry and holdoff code takes its waits, limits and busy and quota rules as parameters from the calling layer, and contains no provider name, host or status-code table.
+Owner said: “retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.”
+Scope: adds or changes retry, resend, backoff or holdoff code
+Record statements
+A busy status whose body marks quota exhaustion MUST be returned at once as the error `http.quota_exhausted`.
+A 429 with a body that does not mark quota exhaustion MUST be treated as busy.
+A quota-exhausted response MUST NOT be resent.
+History (git)
+REQ-SAG-0602 statement 1: 3393585f 2026-11-09: Add doctor, busy resend and quota requirements
+REQ-SAG-0602 statement 2: 3393585f 2026-11-09: Add doctor, busy resend and quota requirements
+REQ-SAG-0602 statement 3: 3393585f 2026-11-09: Add doctor, busy resend and quota requirements
+Jev P(yes): relates 0.92 · serves 0.24 · exceeds 0.90 · conflicts 0.31">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <ul>
+    <li>“A busy status whose body marks quota exhaustion MUST be returned at once as the error `http.quota_exhausted`.”</li>
+    <li>“A 429 with a body that does not mark quota exhaustion MUST be treated as busy.”</li>
+    <li>“A quota-exhausted response MUST NOT be resent.”</li>
+  </ul>
+  <p>These clauses define quota classification and response behavior. They may be consumer-visible behavior rather than a requirement that the retry layer implement those rules internally; the cell alone does not establish which layer owns them.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>Not proposed pending confirmation of where these externally visible quota rules are implemented.</p>
+  <h3>Stale</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>REQ-SAG-0602 “A quota-exhausted response MUST NOT be resent.”: These clauses predate the 2026-11-27 parameterization anchor, but their implementation layer is unclear.</p>
+  <h3>Anchor</h3>
+  <p>Retry and holdoff code takes its waits, limits and busy and quota rules as parameters from the calling layer, and contains no provider name, host or status-code table.</p>
+  <p>Owner said: “retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.”</p>
+  <p>Scope: adds or changes retry, resend, backoff or holdoff code</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>A busy status whose body marks quota exhaustion MUST be returned at once as the error `http.quota_exhausted`.</li>
+    <li>A 429 with a body that does not mark quota exhaustion MUST be treated as busy.</li>
+    <li>A quota-exhausted response MUST NOT be resent.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0602 statement 1: 3393585f 2026-11-09: Add doctor, busy resend and quota requirements</li>
+    <li>REQ-SAG-0602 statement 2: 3393585f 2026-11-09: Add doctor, busy resend and quota requirements</li>
+    <li>REQ-SAG-0602 statement 3: 3393585f 2026-11-09: Add doctor, busy resend and quota requirements</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.92 · serves 0.24 · exceeds 0.90 · conflicts 0.31</p>
+</section>

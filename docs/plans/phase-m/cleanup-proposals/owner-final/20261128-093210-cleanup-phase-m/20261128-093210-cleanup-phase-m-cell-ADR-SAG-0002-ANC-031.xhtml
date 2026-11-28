@@ -1,0 +1,129 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-conflicts" id="cell-ADR-SAG-0002-ANC-031">
+  <div class="section-head">
+    <h2>ADR-SAG-0002 × ANC-031 — conflicts</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-031&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [
+      &quot;For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021).&quot;,
+      &quot;Later they load into a local SQLite database that syncs to a server for long-term storage.&quot;
+    ],
+    &quot;jev_disputed&quot;: false,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;998015d2&quot;,
+        &quot;date&quot;: &quot;2026-11-18&quot;,
+        &quot;record&quot;: &quot;ADR-SAG-0002&quot;,
+        &quot;statement&quot;: &quot;For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.&quot;,
+        &quot;summary&quot;: &quot;docs: ADR-SAG-0020/0021 config scopes and separate session-log tree&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;Replace the JSONL-first and server-sync design with repository SQLite storage.&quot;,
+    &quot;stale&quot;: {
+      &quot;reason&quot;: &quot;The ADR text dates to 2026-11-18; ANC-031 was stated on 2026-11-27.&quot;,
+      &quot;record&quot;: &quot;ADR-SAG-0002&quot;,
+      &quot;statement&quot;: &quot;For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.&quot;
+    },
+    &quot;what&quot;: &quot;The ADR&#x27;s JSONL-first and later server-sync design conflicts with storing sc-agent-based tool results in the repository&#x27;s SQLite database.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.77,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.14,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.85
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.49,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.33,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.66
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.67,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.21,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.78
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.67,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.78,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.2
+      }
+    }
+  },
+  &quot;class&quot;: &quot;conflicts&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.85,
+    &quot;exceeds&quot;: 0.66,
+    &quot;relates&quot;: 0.78,
+    &quot;serves&quot;: 0.2
+  },
+  &quot;record&quot;: &quot;ADR-SAG-0002&quot;,
+  &quot;request_id&quot;: &quot;trace/ADR-SAG-0002/ANC-031/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ7C4V5ZWTMFBRHR2WVHYG&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="ADR-SAG-0002 × ANC-031 — conflicts
+Proposals: 12
+What conflicts
+“For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021).”
+“Later they load into a local SQLite database that syncs to a server for long-term storage.”
+The ADR&#x27;s JSONL-first and later server-sync design conflicts with storing sc-agent-based tool results in the repository&#x27;s SQLite database.
+Proposed remedy
+Replace the JSONL-first and server-sync design with repository SQLite storage.
+Stale
+ADR-SAG-0002 “For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.”: The ADR text dates to 2026-11-18; ANC-031 was stated on 2026-11-27.
+Anchor
+judge-jev, plan-anchor and every other sc-agent-based tool store their results in the repository&#x27;s SQLite database, not in JSON or JSONL result files.
+Owner said: “At the end of the day, I want all the &#x27;results&#x27; from plan-anchor, judge-jev or any other app to save data to SQLite.”
+Scope: adds or changes how judge-jev, plan-anchor or another sc-agent-based tool stores results
+Record statements
+No obligation statements.
+History (git)
+ADR-SAG-0002 statement 1: 998015d2 2026-11-18: docs: ADR-SAG-0020/0021 config scopes and separate session-log tree
+Jev P(yes): relates 0.78 · serves 0.20 · exceeds 0.66 · conflicts 0.85">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <p>Proposals: 12</p>
+  <h3>What conflicts</h3>
+  <ul>
+    <li>“For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021).”</li>
+    <li>“Later they load into a local SQLite database that syncs to a server for long-term storage.”</li>
+  </ul>
+  <p>The ADR&#x27;s JSONL-first and later server-sync design conflicts with storing sc-agent-based tool results in the repository&#x27;s SQLite database.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>Replace the JSONL-first and server-sync design with repository SQLite storage.</p>
+  <h3>Stale</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>ADR-SAG-0002 “For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.”: The ADR text dates to 2026-11-18; ANC-031 was stated on 2026-11-27.</p>
+  <h3>Anchor</h3>
+  <p>judge-jev, plan-anchor and every other sc-agent-based tool store their results in the repository&#x27;s SQLite database, not in JSON or JSONL result files.</p>
+  <p>Owner said: “At the end of the day, I want all the &#x27;results&#x27; from plan-anchor, judge-jev or any other app to save data to SQLite.”</p>
+  <p>Scope: adds or changes how judge-jev, plan-anchor or another sc-agent-based tool stores results</p>
+  <h3>Record statements</h3>
+  <p>No obligation statements.</p>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>ADR-SAG-0002 statement 1: 998015d2 2026-11-18: docs: ADR-SAG-0020/0021 config scopes and separate session-log tree</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.78 · serves 0.20 · exceeds 0.66 · conflicts 0.85</p>
+</section>

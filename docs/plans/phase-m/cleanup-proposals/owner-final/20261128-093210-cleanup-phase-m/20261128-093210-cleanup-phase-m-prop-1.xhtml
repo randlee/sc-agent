@@ -1,0 +1,38 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-1">
+  <div class="section-head">
+    <h2>1. Clarify layer-1 dependency order in ADR-SAG-0004 (docs/sc-agent-schema/)</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="1. Clarify layer-1 dependency order in ADR-SAG-0004 (docs/sc-agent-schema/)
+Wave 1 · resolve conflict
+Records: ADR-SAG-0004
+Change:
+- Resolution: reconcile.
+- Reword ADR-SAG-0004: “Crates are in four layers, and a crate depends only on crates in lower layers. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.” → “Crates are in four layers. A crate depends only on crates in lower layers, except within layer 1: schema, then types, then config and sqlite, then log; a layer-1 crate depends only on layer-1 crates earlier in that order. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.”
+Rewording (rare; justified): ADR-SAG-0004: R02 records the explicitly directed internal layer-1 dependency order while retaining the four-layer decision.
+Justification: Review finding R02: schema, then types, then config and sqlite, then log; a layer-1 crate depends only on earlier layer-1 crates.
+Source of truth: ANC-021 — Owner said: “You need to be able to push shared methods down and move differences up” — commit 31c8ee33
+Expected improvement:
+- Makes the layer-1 exception explicit.
+- Records 49 → 49; statements 205 → 205; duplicates cleared 0 of 32; conflicts resolved 0 of 16; exceeds cleared 0 of 52">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 1 · resolve conflict</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-ADR-SAG-0004" data-panel="rec-ADR-SAG-0004">ADR-SAG-0004</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Resolution: reconcile.</li>
+    <li>Reword ADR-SAG-0004: “Crates are in four layers, and a crate depends only on crates in lower layers. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.” → “Crates are in four layers. A crate depends only on crates in lower layers, except within layer 1: schema, then types, then config and sqlite, then log; a layer-1 crate depends only on layer-1 crates earlier in that order. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.”</li>
+  </ul>
+  <h3>Rewording (rare; justified)</h3>
+  <p>ADR-SAG-0004: R02 records the explicitly directed internal layer-1 dependency order while retaining the four-layer decision.</p>
+  <h3>Justification</h3>
+  <p>Review finding R02: schema, then types, then config and sqlite, then log; a layer-1 crate depends only on earlier layer-1 crates.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-021 — Owner said: “You need to be able to push shared methods down and move differences up” — commit 31c8ee33</p>
+  <h3>Expected improvement</h3>
+  <p>Makes the layer-1 exception explicit.</p>
+  <p>Records 49 → 49; statements 205 → 205; duplicates cleared 0 of 32; conflicts resolved 0 of 16; exceeds cleared 0 of 52</p>
+</section>

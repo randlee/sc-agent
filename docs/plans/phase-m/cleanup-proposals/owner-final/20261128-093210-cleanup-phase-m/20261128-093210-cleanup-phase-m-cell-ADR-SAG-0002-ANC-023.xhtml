@@ -1,0 +1,129 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-conflicts" id="cell-ADR-SAG-0002-ANC-023">
+  <div class="section-head">
+    <h2>ADR-SAG-0002 × ANC-023 — conflicts</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-023&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [
+      &quot;For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021).&quot;,
+      &quot;Later they load into a local SQLite database that syncs to a server for long-term storage.&quot;
+    ],
+    &quot;jev_disputed&quot;: false,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;998015d2&quot;,
+        &quot;date&quot;: &quot;2026-11-18&quot;,
+        &quot;record&quot;: &quot;ADR-SAG-0002&quot;,
+        &quot;statement&quot;: &quot;For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.&quot;,
+        &quot;summary&quot;: &quot;docs: ADR-SAG-0020/0021 config scopes and separate session-log tree&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;Replace the JSONL-first and server-sync design with the SQLite storage direction.&quot;,
+    &quot;stale&quot;: {
+      &quot;reason&quot;: &quot;The ADR text dates to 2026-11-18; ANC-023 was stated on 2026-11-27.&quot;,
+      &quot;record&quot;: &quot;ADR-SAG-0002&quot;,
+      &quot;statement&quot;: &quot;For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.&quot;
+    },
+    &quot;what&quot;: &quot;The decision explicitly makes JSONL the first store and adds server sync, while ANC-023 requires session rows to be written to the repository&#x27;s SQLite database.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.4,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.37,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.6
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.7,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.19,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.8
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.97,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.02,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.98
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.76,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.84,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.15
+      }
+    }
+  },
+  &quot;class&quot;: &quot;conflicts&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.6,
+    &quot;exceeds&quot;: 0.8,
+    &quot;relates&quot;: 0.98,
+    &quot;serves&quot;: 0.15
+  },
+  &quot;record&quot;: &quot;ADR-SAG-0002&quot;,
+  &quot;request_id&quot;: &quot;trace/ADR-SAG-0002/ANC-023/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ7BWCN2SFQG59F00SWXGS&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="ADR-SAG-0002 × ANC-023 — conflicts
+Proposals: 12
+What conflicts
+“For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021).”
+“Later they load into a local SQLite database that syncs to a server for long-term storage.”
+The decision explicitly makes JSONL the first store and adds server sync, while ANC-023 requires session rows to be written to the repository&#x27;s SQLite database.
+Proposed remedy
+Replace the JSONL-first and server-sync design with the SQLite storage direction.
+Stale
+ADR-SAG-0002 “For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.”: The ADR text dates to 2026-11-18; ANC-023 was stated on 2026-11-27.
+Anchor
+sc-agent writes each session row to the repository&#x27;s SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.
+Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp”
+Scope: adds or changes code that writes or reads session rows
+Record statements
+No obligation statements.
+History (git)
+ADR-SAG-0002 statement 1: 998015d2 2026-11-18: docs: ADR-SAG-0020/0021 config scopes and separate session-log tree
+Jev P(yes): relates 0.98 · serves 0.15 · exceeds 0.80 · conflicts 0.60">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <p>Proposals: 12</p>
+  <h3>What conflicts</h3>
+  <ul>
+    <li>“For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021).”</li>
+    <li>“Later they load into a local SQLite database that syncs to a server for long-term storage.”</li>
+  </ul>
+  <p>The decision explicitly makes JSONL the first store and adds server sync, while ANC-023 requires session rows to be written to the repository&#x27;s SQLite database.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>Replace the JSONL-first and server-sync design with the SQLite storage direction.</p>
+  <h3>Stale</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>ADR-SAG-0002 “For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.”: The ADR text dates to 2026-11-18; ANC-023 was stated on 2026-11-27.</p>
+  <h3>Anchor</h3>
+  <p>sc-agent writes each session row to the repository&#x27;s SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.</p>
+  <p>Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp”</p>
+  <p>Scope: adds or changes code that writes or reads session rows</p>
+  <h3>Record statements</h3>
+  <p>No obligation statements.</p>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>ADR-SAG-0002 statement 1: 998015d2 2026-11-18: docs: ADR-SAG-0020/0021 config scopes and separate session-log tree</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.98 · serves 0.15 · exceeds 0.80 · conflicts 0.60</p>
+</section>

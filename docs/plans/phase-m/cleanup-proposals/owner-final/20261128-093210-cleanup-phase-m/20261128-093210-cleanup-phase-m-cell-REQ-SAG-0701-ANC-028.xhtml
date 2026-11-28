@@ -1,0 +1,215 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-REQ-SAG-0701-ANC-028">
+  <div class="section-head">
+    <h2>REQ-SAG-0701 × ANC-028 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-028&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [
+      &quot;`sc-agent`&#x27;s `send_batch` MUST run the requests of one batch in parallel across workers.&quot;,
+      &quot;The number of workers MUST be the `workers` setting.&quot;,
+      &quot;When `workers` is not set, the number of workers MUST be 8.&quot;,
+      &quot;Each result MUST carry the session ULID of the request it answers.&quot;,
+      &quot;Each result MUST carry the input position of the request it answers.&quot;,
+      &quot;A failed request MUST be returned as that request&#x27;s error result.&quot;,
+      &quot;When one request fails, the other requests of the batch MUST still run.&quot;,
+      &quot;Cancelling the batch MUST stop every request that has not finished.&quot;
+    ],
+    &quot;jev_disputed&quot;: false,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;66369ba0&quot;,
+        &quot;date&quot;: &quot;2026-11-21&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0701&quot;,
+        &quot;statement&quot;: &quot;`sc-agent`&#x27;s `send_batch` MUST run the requests of one batch in parallel across workers.&quot;,
+        &quot;summary&quot;: &quot;docs: records follow the reduction plan&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;0748113f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0701&quot;,
+        &quot;statement&quot;: &quot;The number of workers MUST be the `workers` setting.&quot;,
+        &quot;summary&quot;: &quot;REQ-SAG-0701: name the workers setting in statements 2 and 3&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;0748113f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0701&quot;,
+        &quot;statement&quot;: &quot;When `workers` is not set, the number of workers MUST be 8.&quot;,
+        &quot;summary&quot;: &quot;REQ-SAG-0701: name the workers setting in statements 2 and 3&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0701&quot;,
+        &quot;statement&quot;: &quot;Each result MUST carry the session ULID of the request it answers.&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0701&quot;,
+        &quot;statement&quot;: &quot;Each result MUST carry the input position of the request it answers.&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;c7a40068&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0701&quot;,
+        &quot;statement&quot;: &quot;A failed request MUST be returned as that request&#x27;s error result.&quot;,
+        &quot;summary&quot;: &quot;Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0701&quot;,
+        &quot;statement&quot;: &quot;When one request fails, the other requests of the batch MUST still run.&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;c7a40068&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0701&quot;,
+        &quot;statement&quot;: &quot;Cancelling the batch MUST stop every request that has not finished.&quot;,
+        &quot;summary&quot;: &quot;Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;No change proposed; do not delete batch requirements solely because ANC-028 covers cache-key behavior.&quot;,
+    &quot;stale&quot;: null,
+    &quot;what&quot;: &quot;The batch requirements intersect with caching, but the trace does not identify a specific stale or conflicting clause.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.85,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.9,
+        &quot;unclear&quot;: 0.05,
+        &quot;yes&quot;: 0.05
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.42,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.38,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.61
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.7,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.19,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.8
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.37,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.58,
+        &quot;unclear&quot;: 0.08,
+        &quot;yes&quot;: 0.34
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.05,
+    &quot;exceeds&quot;: 0.61,
+    &quot;relates&quot;: 0.8,
+    &quot;serves&quot;: 0.34
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0701&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0701/ANC-028/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ73MD8JY0TR364S4BMQNX&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0701 × ANC-028 — exceeds
+What exceeds
+“`sc-agent`&#x27;s `send_batch` MUST run the requests of one batch in parallel across workers.”
+“The number of workers MUST be the `workers` setting.”
+“When `workers` is not set, the number of workers MUST be 8.”
+“Each result MUST carry the session ULID of the request it answers.”
+“Each result MUST carry the input position of the request it answers.”
+“A failed request MUST be returned as that request&#x27;s error result.”
+“When one request fails, the other requests of the batch MUST still run.”
+“Cancelling the batch MUST stop every request that has not finished.”
+The batch requirements intersect with caching, but the trace does not identify a specific stale or conflicting clause.
+Proposed remedy
+No change proposed; do not delete batch requirements solely because ANC-028 covers cache-key behavior.
+Anchor
+A cache hit is decided by the request sha256 and the model alone; `run_id` is not part of the cache key.
+Owner said: “run-id has nothing to do with caching. run is a collection of queries of which some may be cached (if caching enabled)”
+Scope: adds or changes the result cache, cache keys or run ids
+Record statements
+`sc-agent`&#x27;s `send_batch` MUST run the requests of one batch in parallel across workers.
+The number of workers MUST be the `workers` setting.
+When `workers` is not set, the number of workers MUST be 8.
+Each result MUST carry the session ULID of the request it answers.
+Each result MUST carry the input position of the request it answers.
+A failed request MUST be returned as that request&#x27;s error result.
+When one request fails, the other requests of the batch MUST still run.
+Cancelling the batch MUST stop every request that has not finished.
+History (git)
+REQ-SAG-0701 statement 1: 66369ba0 2026-11-21: docs: records follow the reduction plan
+REQ-SAG-0701 statement 2: 0748113f 2026-11-25: REQ-SAG-0701: name the workers setting in statements 2 and 3
+REQ-SAG-0701 statement 3: 0748113f 2026-11-25: REQ-SAG-0701: name the workers setting in statements 2 and 3
+REQ-SAG-0701 statement 4: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0701 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0701 statement 6: c7a40068 2026-11-09: Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema
+REQ-SAG-0701 statement 7: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0701 statement 8: c7a40068 2026-11-09: Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema
+Jev P(yes): relates 0.80 · serves 0.34 · exceeds 0.61 · conflicts 0.05">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <ul>
+    <li>“`sc-agent`&#x27;s `send_batch` MUST run the requests of one batch in parallel across workers.”</li>
+    <li>“The number of workers MUST be the `workers` setting.”</li>
+    <li>“When `workers` is not set, the number of workers MUST be 8.”</li>
+    <li>“Each result MUST carry the session ULID of the request it answers.”</li>
+    <li>“Each result MUST carry the input position of the request it answers.”</li>
+    <li>“A failed request MUST be returned as that request&#x27;s error result.”</li>
+    <li>“When one request fails, the other requests of the batch MUST still run.”</li>
+    <li>“Cancelling the batch MUST stop every request that has not finished.”</li>
+  </ul>
+  <p>The batch requirements intersect with caching, but the trace does not identify a specific stale or conflicting clause.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>No change proposed; do not delete batch requirements solely because ANC-028 covers cache-key behavior.</p>
+  <h3>Anchor</h3>
+  <p>A cache hit is decided by the request sha256 and the model alone; `run_id` is not part of the cache key.</p>
+  <p>Owner said: “run-id has nothing to do with caching. run is a collection of queries of which some may be cached (if caching enabled)”</p>
+  <p>Scope: adds or changes the result cache, cache keys or run ids</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>`sc-agent`&#x27;s `send_batch` MUST run the requests of one batch in parallel across workers.</li>
+    <li>The number of workers MUST be the `workers` setting.</li>
+    <li>When `workers` is not set, the number of workers MUST be 8.</li>
+    <li>Each result MUST carry the session ULID of the request it answers.</li>
+    <li>Each result MUST carry the input position of the request it answers.</li>
+    <li>A failed request MUST be returned as that request&#x27;s error result.</li>
+    <li>When one request fails, the other requests of the batch MUST still run.</li>
+    <li>Cancelling the batch MUST stop every request that has not finished.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0701 statement 1: 66369ba0 2026-11-21: docs: records follow the reduction plan</li>
+    <li>REQ-SAG-0701 statement 2: 0748113f 2026-11-25: REQ-SAG-0701: name the workers setting in statements 2 and 3</li>
+    <li>REQ-SAG-0701 statement 3: 0748113f 2026-11-25: REQ-SAG-0701: name the workers setting in statements 2 and 3</li>
+    <li>REQ-SAG-0701 statement 4: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0701 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0701 statement 6: c7a40068 2026-11-09: Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema</li>
+    <li>REQ-SAG-0701 statement 7: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0701 statement 8: c7a40068 2026-11-09: Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.80 · serves 0.34 · exceeds 0.61 · conflicts 0.05</p>
+</section>

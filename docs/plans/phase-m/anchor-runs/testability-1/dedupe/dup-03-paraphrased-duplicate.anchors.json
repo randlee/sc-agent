@@ -1,0 +1,45 @@
+{
+ "schema": "plan-anchoring/anchors/1",
+ "plan": "calibration",
+ "intent_ref": "none",
+ "anchors": [
+  {
+   "id": "ANC-001",
+   "source_type": "ANC",
+   "source_ref": null,
+   "statement": "The API client must retry HTTP 503 responses twice.",
+   "quote": "retry service unavailable twice",
+   "kind": "directive",
+   "stated_by": "calibration",
+   "stated_at": "2026-11-28",
+   "context": "testability calibration",
+   "summary": "The API client must retry HTTP 503 responses twice.",
+   "scope": "API client",
+   "status": "locked",
+   "version": 1,
+   "fixtures": {
+    "pass": [],
+    "fail": []
+   }
+  },
+  {
+   "id": "ANC-002",
+   "source_type": "ANC",
+   "source_ref": null,
+   "statement": "On HTTP 503, the API client must make two retry attempts.",
+   "quote": "two retries for 503",
+   "kind": "directive",
+   "stated_by": "calibration",
+   "stated_at": "2026-11-28",
+   "context": "testability calibration",
+   "summary": "On HTTP 503, the API client must make two retry attempts.",
+   "scope": "API client",
+   "status": "locked",
+   "version": 1,
+   "fixtures": {
+    "pass": [],
+    "fail": []
+   }
+  }
+ ]
+}

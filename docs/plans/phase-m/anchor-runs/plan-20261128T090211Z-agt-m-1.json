@@ -1,0 +1,2940 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261128T090211Z-agt-m-1",
+  "gate": "plan",
+  "created_at": "2026-11-28T09:02:11+00:00",
+  "anchors_path": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "agt-m-1",
+    "title": "",
+    "source": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/scratchpad/agt-m-1.item.txt",
+    "chars": 1062
+  },
+  "model_requested": "jev",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [
+    {
+      "path": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/.sc/plan-anchor/triage/plan-questions.jsonl",
+      "sha256": "68180fbd2de8a3dee2421351672f9a321506af1f4bb19531c2c26d7d21c2c521",
+      "ids": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "anchor_id": "ANC-002",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Until SQLite schema 1.0, sc-agent, judge-jev and plan-anchor must read only the record schema version they write and contain no reader for an older version, so read and write stay in step.",
+      "quote": "We need to read what we are writing, no back compat until SQLite 1.0",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 2,
+      "deterministic_check": "`rg -n 'jev-batch-result/1\\",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "near_threshold": true,
+      "unstable": true,
+      "answers_second": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.01,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.94,
+          "probabilities": {
+            "no": 0.96,
+            "unclear": 0.01,
+            "yes": 0.03
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.56,
+          "probabilities": {
+            "no": 0.71,
+            "unclear": 0.05,
+            "yes": 0.24
+          }
+        }
+      },
+      "verdict_first": "not_applicable",
+      "verdict_second": "underspecified",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.01,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.01,
+            "yes": 0.02
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.66,
+          "probabilities": {
+            "no": 0.77,
+            "unclear": 0.04,
+            "yes": 0.19
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.85,
+          "probabilities": {
+            "no": 0.9,
+            "unclear": 0.05,
+            "yes": 0.05
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.83,
+          "probabilities": {
+            "no": 0.89,
+            "unclear": 0.01,
+            "yes": 0.1
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.56,
+      "explanation": "Jev was not confident (min confidence 0.56); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1262,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "second",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "no",
+          "confidence": 0.56
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-003",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When a backward-compatible reader is removed, its code and its tests must both be deleted, because backward-compatible reads are baselined later in SQLite.",
+      "quote": "remove code & tests, don't just remove. We will baseline backward compatible reads in SQLite.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 3,
+      "deterministic_check": "the sprint diff deletes the reader's tests and fixtures; `rg` finds no skip/xfail/#[ignore] mentioning the removed reader",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.94,
+          "probabilities": {
+            "no": 0.96,
+            "unclear": 0.03,
+            "yes": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.89,
+          "probabilities": {
+            "no": 0.93,
+            "unclear": 0.03,
+            "yes": 0.04
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.28,
+          "probabilities": {
+            "no": 0.52,
+            "unclear": 0.25,
+            "yes": 0.23
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.66,
+            "unclear": 0.24,
+            "yes": 0.1
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.72,
+          "probabilities": {
+            "no": 0.81,
+            "unclear": 0.01,
+            "yes": 0.18
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.28,
+      "explanation": "Jev was not confident (min confidence 0.28); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1250,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "no",
+          "confidence": 0.28
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-008",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "In sc-agent code, related values passed to several methods must be grouped in one struct that replaces those repeated parameters, so encapsulation is efficient and repeated code stays minimal as the architecture scales.",
+      "quote": "Related values are strategically grouped in one struct to remove repeated method parameters, for efficient encapsulation and to minimize repeated code as the architecture scales.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 3,
+      "deterministic_check": "review of changed pub fn signatures: no function takes run_id/tool/tool_version/cache/model/provider as separate params",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.02,
+            "yes": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.01,
+            "yes": 0.02
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.25,
+          "probabilities": {
+            "no": 0.5,
+            "unclear": 0.04,
+            "yes": 0.46
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.74,
+          "probabilities": {
+            "no": 0.83,
+            "unclear": 0.1,
+            "yes": 0.07
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.58,
+          "probabilities": {
+            "no": 0.72,
+            "unclear": 0.01,
+            "yes": 0.27
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.25,
+      "explanation": "Jev was not confident (min confidence 0.25); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1255,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "no",
+          "confidence": 0.25
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-010",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent, judge-jev and plan-anchor code must not copy and paste logic between files or tools, so the code base does not grow unnecessarily.",
+      "quote": "For years any copy/paste was a big red flag that I was growing the code base unnecessarily.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; PRD D20, owner 2026-11-24",
+      "anchor_version": 3,
+      "deterministic_check": "a duplicate-code scan (e.g. jscpd/`rg` of shared helper bodies) across judge-jev and plan-anchor shows no new duplicated block",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.38,
+          "probabilities": {
+            "no": 0.35,
+            "unclear": 0.06,
+            "yes": 0.59
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.56,
+          "probabilities": {
+            "no": 0.71,
+            "unclear": 0.04,
+            "yes": 0.25
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.48,
+          "probabilities": {
+            "no": 0.65,
+            "unclear": 0.02,
+            "yes": 0.33
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.5,
+          "probabilities": {
+            "no": 0.67,
+            "unclear": 0.02,
+            "yes": 0.31
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.49,
+          "probabilities": {
+            "no": 0.66,
+            "unclear": 0.04,
+            "yes": 0.3
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.6,
+          "probabilities": {
+            "no": 0.26,
+            "unclear": 0.01,
+            "yes": 0.73
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.88,
+          "probabilities": {
+            "no": 0.92,
+            "unclear": 0.01,
+            "yes": 0.07
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.79,
+          "probabilities": {
+            "no": 0.86,
+            "unclear": 0.01,
+            "yes": 0.13
+          }
+        }
+      },
+      "min_confidence": 0.48,
+      "explanation": "Jev was not confident (min confidence 0.48); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1253,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "no",
+          "confidence": 0.48
+        },
+        {
+          "ask": "first",
+          "role": "conflict",
+          "question_id": "contradicted",
+          "choice": "no",
+          "confidence": 0.56
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-011",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every operation the decidr CLI offers must also be callable from the sc-agent Python API, so the Python API is never less flexible than the CLI.",
+      "quote": "I expect the python api may allow more flexibility than cli, NOT less.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; phase-a ANC-006 quote",
+      "anchor_version": 2,
+      "deterministic_check": "for each `decidr` subcommand touched in phase j (models, send, batch), a Python binding exists and has a test",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.91,
+          "probabilities": {
+            "no": 0.94,
+            "unclear": 0.05,
+            "yes": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.01,
+            "yes": 0.02
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.48,
+          "probabilities": {
+            "no": 0.65,
+            "unclear": 0.03,
+            "yes": 0.32
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.88,
+          "probabilities": {
+            "no": 0.92,
+            "unclear": 0.01,
+            "yes": 0.07
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.48,
+      "explanation": "Jev was not confident (min confidence 0.48); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1252,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "no",
+          "confidence": 0.48
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-012",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent's decision providers must implement one decision trait, with one implementation per wire format (Jev TypeSafe systemone, OpenAI-compatible chat/completions, Anthropic-compatible Messages), and every provider that speaks a wire format must use that format's implementation, so adding a provider needs no new code or hard-coding.",
+      "quote": "there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 2,
+      "deterministic_check": "grep: one decision trait; one impl per wire format; no match on wire strings outside those impls; adding a compatible provider is a config/table row only",
+      "kind": "directive",
+      "leaning": "underspecified",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.18,
+          "probabilities": {
+            "no": 0.25,
+            "unclear": 0.45,
+            "yes": 0.3
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.43,
+          "probabilities": {
+            "no": 0.62,
+            "unclear": 0.09,
+            "yes": 0.29
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.03,
+            "unclear": 0.0,
+            "yes": 0.97
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.38,
+          "probabilities": {
+            "no": 0.35,
+            "unclear": 0.06,
+            "yes": 0.59
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.26,
+          "probabilities": {
+            "no": 0.51,
+            "unclear": 0.31,
+            "yes": 0.18
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.02,
+            "unclear": 0.0,
+            "yes": 0.98
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.82,
+          "probabilities": {
+            "no": 0.88,
+            "unclear": 0.02,
+            "yes": 0.1
+          }
+        }
+      },
+      "min_confidence": 0.18,
+      "explanation": "Jev was not confident (min confidence 0.18); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1289,
+        "output_tokens": 118
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "unclear",
+          "confidence": 0.18
+        },
+        {
+          "ask": "first",
+          "role": "conflict",
+          "question_id": "contradicted",
+          "choice": "no",
+          "confidence": 0.43
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-013",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent must provide an LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider speaking that format, so callers reach any LLM through one interface.",
+      "quote": "we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 2,
+      "deterministic_check": "grep: one LLM trait with one impl per wire format; decision-over-LLM uses it; test sends JSON and receives schema-valid JSON for each wire format",
+      "kind": "directive",
+      "leaning": "underspecified",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.19,
+          "probabilities": {
+            "no": 0.42,
+            "unclear": 0.46,
+            "yes": 0.12
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.83,
+          "probabilities": {
+            "no": 0.89,
+            "unclear": 0.05,
+            "yes": 0.06
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.8,
+          "probabilities": {
+            "no": 0.09,
+            "unclear": 0.04,
+            "yes": 0.87
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.2,
+          "probabilities": {
+            "no": 0.47,
+            "unclear": 0.17,
+            "yes": 0.36
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.48,
+          "probabilities": {
+            "no": 0.65,
+            "unclear": 0.28,
+            "yes": 0.07
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.85,
+          "probabilities": {
+            "no": 0.09,
+            "unclear": 0.01,
+            "yes": 0.9
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.91,
+          "probabilities": {
+            "no": 0.94,
+            "unclear": 0.01,
+            "yes": 0.05
+          }
+        }
+      },
+      "min_confidence": 0.19,
+      "explanation": "Jev was not confident (min confidence 0.19); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1269,
+        "output_tokens": 118
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "unclear",
+          "confidence": 0.19
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-021",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every phase-m sprint bead names the crate and layer each change lands in, and that layer is the lowest layer whose crates all use the change.",
+      "quote": "You need to be able to push shared methods down and move differences up",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27; layer rule of ADR-SAG-0004 v0.5.0",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_addressed",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.33,
+          "probabilities": {
+            "no": 0.55,
+            "unclear": 0.1,
+            "yes": 0.35
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.62,
+          "probabilities": {
+            "no": 0.75,
+            "unclear": 0.05,
+            "yes": 0.2
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.02,
+            "unclear": 0.0,
+            "yes": 0.98
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.66,
+          "probabilities": {
+            "no": 0.77,
+            "unclear": 0.03,
+            "yes": 0.2
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.73,
+          "probabilities": {
+            "no": 0.82,
+            "unclear": 0.06,
+            "yes": 0.12
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.83,
+          "probabilities": {
+            "no": 0.11,
+            "unclear": 0.0,
+            "yes": 0.89
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.83,
+          "probabilities": {
+            "no": 0.89,
+            "unclear": 0.0,
+            "yes": 0.11
+          }
+        }
+      },
+      "min_confidence": 0.33,
+      "explanation": "Jev was not confident (min confidence 0.33); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1243,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "no",
+          "confidence": 0.33
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-025",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "`sc-agent-schema` contains only struct definitions, literal SQL text and convenience methods on those structs; it has no SQLite dependency and no upgrade code.",
+      "quote": "I consider schema to hold schema (structs and literal sql text) only. Exceptions would be extension convenience methods/transforms and schema versioning/upgrade code.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27; Rand, 2026-11-27 23:44, on this candidate: \"6. Remove upgrade\"",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.26,
+          "probabilities": {
+            "no": 0.19,
+            "unclear": 0.3,
+            "yes": 0.51
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.73,
+          "probabilities": {
+            "no": 0.15,
+            "unclear": 0.03,
+            "yes": 0.82
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.07,
+          "probabilities": {
+            "no": 0.38,
+            "unclear": 0.33,
+            "yes": 0.29
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.94,
+          "probabilities": {
+            "no": 0.04,
+            "unclear": 0.0,
+            "yes": 0.96
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.83,
+          "probabilities": {
+            "no": 0.89,
+            "unclear": 0.01,
+            "yes": 0.1
+          }
+        }
+      },
+      "min_confidence": 0.26,
+      "explanation": "Jev was not confident (min confidence 0.26); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1244,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "yes",
+          "confidence": 0.26
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-026",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every core table's SQL is defined in `sc-agent-schema` and nowhere else.",
+      "quote": "SQLite schema is in sc-agent-schema.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "underspecified",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.13,
+          "probabilities": {
+            "no": 0.3,
+            "unclear": 0.42,
+            "yes": 0.28
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.92,
+          "probabilities": {
+            "no": 0.95,
+            "unclear": 0.03,
+            "yes": 0.02
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.92,
+          "probabilities": {
+            "no": 0.03,
+            "unclear": 0.02,
+            "yes": 0.95
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.5,
+          "probabilities": {
+            "no": 0.23,
+            "unclear": 0.1,
+            "yes": 0.67
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.72,
+          "probabilities": {
+            "no": 0.81,
+            "unclear": 0.12,
+            "yes": 0.07
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.26,
+          "probabilities": {
+            "no": 0.48,
+            "unclear": 0.01,
+            "yes": 0.51
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.91,
+          "probabilities": {
+            "no": 0.94,
+            "unclear": 0.01,
+            "yes": 0.05
+          }
+        }
+      },
+      "min_confidence": 0.13,
+      "explanation": "Jev was not confident (min confidence 0.13); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1231,
+        "output_tokens": 118
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "unclear",
+          "confidence": 0.13
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-027",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The session schema stores a request once in `messages`, keyed by sha256, and each model reply as a row in `responses` that references it.",
+      "quote": "We likely want message+sha256 and response+model in separate tables as this is one->many",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.88,
+          "probabilities": {
+            "no": 0.92,
+            "unclear": 0.07,
+            "yes": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.01,
+            "yes": 0.02
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.56,
+          "probabilities": {
+            "no": 0.71,
+            "unclear": 0.09,
+            "yes": 0.2
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.66,
+          "probabilities": {
+            "no": 0.77,
+            "unclear": 0.14,
+            "yes": 0.09
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.0,
+            "yes": 0.03
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.56,
+      "explanation": "Jev was not confident (min confidence 0.56); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1253,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "no",
+          "confidence": 0.56
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-032",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Each tool's tables carry their own schema version, independent of the core schema version; no table definition is in the wheel crate `sc-agent-py`.",
+      "quote": "Also schema is not encoded at individual wheel layer. Schema is versioned for app tables independently.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.72,
+          "probabilities": {
+            "no": 0.81,
+            "unclear": 0.14,
+            "yes": 0.05
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.86,
+          "probabilities": {
+            "no": 0.91,
+            "unclear": 0.02,
+            "yes": 0.07
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.31,
+          "probabilities": {
+            "no": 0.54,
+            "unclear": 0.04,
+            "yes": 0.42
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.91,
+          "probabilities": {
+            "no": 0.94,
+            "unclear": 0.03,
+            "yes": 0.03
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.02,
+            "yes": 0.01
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.62,
+          "probabilities": {
+            "no": 0.75,
+            "unclear": 0.01,
+            "yes": 0.24
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.31,
+      "explanation": "Jev was not confident (min confidence 0.31); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1253,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "no",
+          "confidence": 0.31
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The decidr model name `jev` must select the newest Jev model in sc-agent's model table unless a config file sets another default, so callers get the latest Jev without a code change.",
+      "quote": "I want 'jev' to select latest, config can override default.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 2,
+      "deterministic_check": "unit test: resolve(\"jev\") == first Jev row of the date-sorted table; with config default set, == configured id",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.91,
+          "probabilities": {
+            "no": 0.94,
+            "unclear": 0.02,
+            "yes": 0.04
+          }
+        }
+      },
+      "min_confidence": 0.91,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1265,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-004",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent must impose no request input size limit of its own beyond the selected model's context, so input limits are not over-specified.",
+      "quote": "These limits are clearly over-specified. Input is limited by model context.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 2,
+      "deterministic_check": "`rg -n '8 \\* 1024 \\* 1024\\",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.01,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.74,
+          "probabilities": {
+            "no": 0.83,
+            "unclear": 0.08,
+            "yes": 0.09
+          }
+        }
+      },
+      "min_confidence": 0.74,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1255,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-005",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "In production runs, every logger sc-agent creates by default, not injected by a caller, must write under the configured log root with a fixed folder and file name, so tools can find the logs.",
+      "quote": "I mandated - that all default loggers created in production have root/folder/file naming conventions specified.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session 2026-11-26; also memory `owner-logger-mandate`",
+      "anchor_version": 2,
+      "deterministic_check": "test: default_logger(name) path == `<log_root>/logs/<name>.log.jsonl`; session sink path == `<log_root>/sessions/<repo-id>/<role>/<project>/sessions.jsonl`",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1267,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-006",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent must not change a logger the caller injects, so tests keep control of injected loggers.",
+      "quote": "Injected loggers are not changed (this was specifically set for ease of testing)",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session 2026-11-26; memory `owner-logger-mandate`",
+      "anchor_version": 2,
+      "deterministic_check": "test: Run with injected Logger never calls shutdown/rebuild on it, and its root/sinks are unchanged after close; `rg LoggerBuilder` only on the default path",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.01,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1248,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-009",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.",
+      "quote": "hard-coded rows will get stale quickly and often",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; PRD D15, owner 2026-11-24",
+      "anchor_version": 2,
+      "deterministic_check": "test: a config file with an extra model row makes `decidr models` list it, and a send with that id resolves",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.01,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.0,
+            "yes": 0.03
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.82,
+          "probabilities": {
+            "no": 0.88,
+            "unclear": 0.04,
+            "yes": 0.08
+          }
+        }
+      },
+      "min_confidence": 0.82,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1247,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-014",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When an LLM answers a decision request in place of Jev, sc-agent must send a built-in default system prompt, and the config settings decidr.luna-system-prompt and decidr.haiku-system-prompt must each override that prompt for their model, so prompts can be tested without code changes.",
+      "quote": "make sure config allows settings for decidr.luna-system-prompt and decidr.haiku-system-prompt as alternatives that can be overridden from config when we do more extensive testing w/out code changes.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 2,
+      "deterministic_check": "test: request to luna/haiku carries a system message equal to the default; with decidr.luna-system-prompt / decidr.haiku-system-prompt set in config it equals the configured text",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.97,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1287,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-015",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A rule that applies to every decidr-based tool (logging, model resolution and the like) must be specified only in sc-agent's records; a derivative tool's records (judge-jev, plan-anchor and others) must not restate it and give only the tool name and the tool's own behaviour, so each rule has one source.",
+      "quote": "judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26; also: 'same thing for REQ-JEV-0009 (this is sc-agent requirement) and applies to all tools'",
+      "anchor_version": 2,
+      "deterministic_check": "no derivative-tool record states log placement, model resolution, consent, retries or result-line fields; each points to the sc-agent record",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.92,
+          "probabilities": {
+            "no": 0.95,
+            "unclear": 0.01,
+            "yes": 0.04
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.64,
+          "probabilities": {
+            "no": 0.76,
+            "unclear": 0.01,
+            "yes": 0.23
+          }
+        }
+      },
+      "min_confidence": 0.64,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1296,
+        "output_tokens": 117
+      },
+      "attempts": 2,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-016",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent's records must define the logger-injection path, and a derivative tool's production code must not use it, only its tests, so production logs always follow sc-agent's default rules.",
+      "quote": "judge-jev/plan-anchor and other derivative tools should defer to the default tool rules and not use injection path for production code (test only).",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 2,
+      "deterministic_check": "grep derivative tools' non-test code for logger injection: none; one sc-agent record defines the injection path",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.97,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1258,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-017",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent tests must not depend on races, wall-clock timing, sleeps, event-loop ordering or system load; a test found to depend on one must be redesigned to drive its logic with controlled inputs.",
+      "quote": "Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "anchor_version": 2,
+      "deterministic_check": "review changed tests for sleep, wall-clock assertions, poll-until-timeout and unsynchronized thread ordering; a failure-only backstop that fails with captured output is allowed",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.01,
+            "yes": 0.02
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.82,
+          "probabilities": {
+            "no": 0.88,
+            "unclear": 0.02,
+            "yes": 0.1
+          }
+        }
+      },
+      "min_confidence": 0.82,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1271,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-018",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent's integration tests must be its unit tests run against live agents, triggered manually.",
+      "quote": "I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "anchor_version": 4,
+      "deterministic_check": "grep .github/workflows for live-provider test jobs triggered on push, pull_request or schedule; each live test name matches an existing mocked unit test",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.0,
+            "yes": 0.03
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.89,
+          "probabilities": {
+            "no": 0.93,
+            "unclear": 0.0,
+            "yes": 0.07
+          }
+        }
+      },
+      "min_confidence": 0.89,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1247,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-019",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent must require Python 3.11 or newer.",
+      "quote": "sc-agent, judge-jev, prompt-anchor all must be 3.11+",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "anchor_version": 3,
+      "deterministic_check": "grep requires-python in every sc-agent pyproject.toml reads >=3.11",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1238,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-020",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When a caller passes its own sc_observability Logger into an sc-agent wheel call, sc-agent must not build a second Logger for that log.",
+      "quote": "we created a oversized set of sprints expressly to normalize config and logging around sc-observability logger (injected).  why do you keep adding more loggers to the design? ... add a new anchor banning python_logger ... lock this",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "carried forward 2026-11-27 (record clean-up layer 1)",
+      "anchor_version": 2,
+      "deterministic_check": "no LoggerBuilder call in crates/sc-agent-py runs on a path where the caller supplied a logger",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.97,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1261,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-022",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent has no hard-coded row for a local model: a local model's URL and model id come only from config.",
+      "quote": "local models come from config. Both ip & model string.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.92,
+          "probabilities": {
+            "no": 0.95,
+            "unclear": 0.02,
+            "yes": 0.03
+          }
+        }
+      },
+      "min_confidence": 0.92,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1242,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-023",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent writes each session row to the repository's SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.",
+      "quote": "I want session logs written to SQLite, jsonl was just a quick item for mvp",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.94,
+          "probabilities": {
+            "no": 0.96,
+            "unclear": 0.01,
+            "yes": 0.03
+          }
+        }
+      },
+      "min_confidence": 0.94,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1243,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-024",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The general log is written through sc-observability under its rotation and deletion policy; sc-agent adds no retention rule of its own.",
+      "quote": "general logs follow sc-obs rotation/deletion guidelines",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 1.0,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1242,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-028",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A cache hit is decided by the request sha256 and the model alone; `run_id` is not part of the cache key.",
+      "quote": "run-id has nothing to do with caching. run is a collection of queries of which some may be cached (if caching enabled)",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1245,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-029",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "`--resume` is implemented in `sc-llm`.",
+      "quote": "Refers to sc-llm behavior. —resume on decision session would convert it to llm-session",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 3,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1228,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-030",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Retry and holdoff code takes its waits, limits and busy and quota rules as parameters from the calling layer, and contains no provider name, host or status-code table.",
+      "quote": "retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 3,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.97,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1251,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-031",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "judge-jev, plan-anchor and every other sc-agent-based tool store their results in the repository's SQLite database, not in JSON or JSONL result files.",
+      "quote": "At the end of the day, I want all the 'results' from plan-anchor, judge-jev or any other app to save data to SQLite.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.91,
+          "probabilities": {
+            "no": 0.94,
+            "unclear": 0.01,
+            "yes": 0.05
+          }
+        }
+      },
+      "min_confidence": 0.91,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1255,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-033",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Resuming a decision session with `--resume` continues that session as an LLM session.",
+      "quote": "—resume on decision session would convert it to llm-session",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27; split from ANC-029 by arch-ai 2026-11-28 because the tuner found two duties; owner review pending",
+      "anchor_version": 2,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "not_applicable",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 1.0,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1234,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1062
+    },
+    {
+      "anchor_id": "ANC-007",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Phase m's non-test Rust code, as counted by scripts/gate/rewrite.py, must total at most 2,590 lines at every sprint end, so the phase stays small.",
+      "quote": "2.5k phase cap is what matters",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 4,
+      "deterministic_check": "python3 scripts/gate/rewrite.py passes at sprint end with LIMIT = 2590 (non-test Rust lines of the PACKAGES list)",
+      "kind": "structural",
+      "leaning": null,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "verdict": "deterministic_only",
+      "answers": null,
+      "min_confidence": null,
+      "explanation": "Structural anchor: verified by its deterministic_check, not by Jev",
+      "attempts": 0,
+      "item_chars_sent": 1062
+    }
+  ],
+  "summary": {
+    "counts": {
+      "underspecified": 12,
+      "not_applicable": 20,
+      "deterministic_only": 1
+    },
+    "failing": [
+      "ANC-002",
+      "ANC-003",
+      "ANC-008",
+      "ANC-010",
+      "ANC-011",
+      "ANC-012",
+      "ANC-013",
+      "ANC-021",
+      "ANC-025",
+      "ANC-026",
+      "ANC-027",
+      "ANC-032"
+    ],
+    "leaning_counts": {
+      "not_addressed": 1,
+      "not_applicable": 27,
+      "satisfied": 1,
+      "underspecified": 3
+    },
+    "unstable": [
+      "ANC-002"
+    ],
+    "errors": [],
+    "excluded": [],
+    "pass": false
+  }
+}

@@ -1,0 +1,131 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-NFR-SAG-0004-ANC-032">
+  <div class="section-head">
+    <h2>NFR-SAG-0004 × ANC-032 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-032&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [
+      &quot;Every shared fact MUST have a single owner.&quot;,
+      &quot;Code that needs a shared fact MUST obtain it by calling its owner.&quot;
+    ],
+    &quot;jev_disputed&quot;: true,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;2712a7fb&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;NFR-SAG-0004&quot;,
+        &quot;statement&quot;: &quot;Every shared fact MUST have a single owner.&quot;,
+        &quot;summary&quot;: &quot;NFR-SAG-0004: state single ownership as one obligation&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;a63c0a59&quot;,
+        &quot;date&quot;: &quot;2026-11-24&quot;,
+        &quot;record&quot;: &quot;NFR-SAG-0004&quot;,
+        &quot;statement&quot;: &quot;Code that needs a shared fact MUST obtain it by calling its owner.&quot;,
+        &quot;summary&quot;: &quot;Amend phase-j records for the Run, one-owner and struct rules (plan review)&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;No change proposed; the trace classification does not establish that these obligations exceed ANC-032.&quot;,
+    &quot;stale&quot;: null,
+    &quot;what&quot;: &quot;The anchor covers tool table definitions, schema versions, and the wheel crate. These statements require single ownership and calls to owners; they do not define a tool table or schema version.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.74,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.83,
+        &quot;unclear&quot;: 0.09,
+        &quot;yes&quot;: 0.08
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.61,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.25,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.74
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.53,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.29,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.69
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.52,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.68,
+        &quot;unclear&quot;: 0.09,
+        &quot;yes&quot;: 0.23
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.08,
+    &quot;exceeds&quot;: 0.74,
+    &quot;relates&quot;: 0.69,
+    &quot;serves&quot;: 0.23
+  },
+  &quot;record&quot;: &quot;NFR-SAG-0004&quot;,
+  &quot;request_id&quot;: &quot;trace/NFR-SAG-0004/ANC-032/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ64Q4Z5MSGR5K5E6Q8AWK&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="NFR-SAG-0004 × ANC-032 — exceeds
+What exceeds
+“Every shared fact MUST have a single owner.”
+“Code that needs a shared fact MUST obtain it by calling its owner.”
+Reviewer disputes Jev: The anchor covers tool table definitions, schema versions, and the wheel crate. These statements require single ownership and calls to owners; they do not define a tool table or schema version.
+Proposed remedy
+No change proposed; the trace classification does not establish that these obligations exceed ANC-032.
+Anchor
+Each tool&#x27;s tables carry their own schema version, independent of the core schema version; no table definition is in the wheel crate `sc-agent-py`.
+Owner said: “Also schema is not encoded at individual wheel layer. Schema is versioned for app tables independently.”
+Scope: adds or changes a tool&#x27;s table definitions, schema versions, or crates/sc-agent-py
+Record statements
+Every shared fact MUST have a single owner.
+Code that needs a shared fact MUST obtain it by calling its owner.
+History (git)
+NFR-SAG-0004 statement 1: 2712a7fb 2026-11-25: NFR-SAG-0004: state single ownership as one obligation
+NFR-SAG-0004 statement 2: a63c0a59 2026-11-24: Amend phase-j records for the Run, one-owner and struct rules (plan review)
+Jev P(yes): relates 0.69 · serves 0.23 · exceeds 0.74 · conflicts 0.08">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <ul>
+    <li>“Every shared fact MUST have a single owner.”</li>
+    <li>“Code that needs a shared fact MUST obtain it by calling its owner.”</li>
+  </ul>
+  <p>Reviewer disputes Jev: The anchor covers tool table definitions, schema versions, and the wheel crate. These statements require single ownership and calls to owners; they do not define a tool table or schema version.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>No change proposed; the trace classification does not establish that these obligations exceed ANC-032.</p>
+  <h3>Anchor</h3>
+  <p>Each tool&#x27;s tables carry their own schema version, independent of the core schema version; no table definition is in the wheel crate `sc-agent-py`.</p>
+  <p>Owner said: “Also schema is not encoded at individual wheel layer. Schema is versioned for app tables independently.”</p>
+  <p>Scope: adds or changes a tool&#x27;s table definitions, schema versions, or crates/sc-agent-py</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>Every shared fact MUST have a single owner.</li>
+    <li>Code that needs a shared fact MUST obtain it by calling its owner.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>NFR-SAG-0004 statement 1: 2712a7fb 2026-11-25: NFR-SAG-0004: state single ownership as one obligation</li>
+    <li>NFR-SAG-0004 statement 2: a63c0a59 2026-11-24: Amend phase-j records for the Run, one-owner and struct rules (plan review)</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.69 · serves 0.23 · exceeds 0.74 · conflicts 0.08</p>
+</section>

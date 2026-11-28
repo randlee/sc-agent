@@ -1,0 +1,247 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0801">
+  <div class="section-head">
+    <h2>REQ-SAG-0801 Local decision runners come from configuration</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0801&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T084552Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Each local decision runner&#x27;s network address MUST come from configuration.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Each local decision runner&#x27;s model MUST have a fixed model id in the model table.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A selection of `decider` MUST resolve to the 4b decider model.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Each local decision runner MUST be selectable by its name wherever a decision model is selected.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Configuration MUST be able to add a local model that runs on another computer.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;`sc-agent` MUST NOT hard-code the network address of any local decision runner.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;Each local decision runner&#x27;s network address MUST come from configuration.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;aa1190ba&quot;,
+        &quot;date&quot;: &quot;2026-11-24&quot;,
+        &quot;summary&quot;: &quot;Amend phase-j records to match plan v4 and the fixed-model-id ruling&quot;
+      },
+      &quot;statement&quot;: &quot;Each local decision runner&#x27;s model MUST have a fixed model id in the model table.&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;A selection of `decider` MUST resolve to the 4b decider model.&quot;,
+      &quot;statement_index&quot;: 2
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;a63c0a59&quot;,
+        &quot;date&quot;: &quot;2026-11-24&quot;,
+        &quot;summary&quot;: &quot;Amend phase-j records for the Run, one-owner and struct rules (plan review)&quot;
+      },
+      &quot;statement&quot;: &quot;Each local decision runner MUST be selectable by its name wherever a decision model is selected.&quot;,
+      &quot;statement_index&quot;: 3
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;Configuration MUST be able to add a local model that runs on another computer.&quot;,
+      &quot;statement_index&quot;: 4
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1a9af55a&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+      },
+      &quot;statement&quot;: &quot;`sc-agent` MUST NOT hard-code the network address of any local decision runner.&quot;,
+      &quot;statement_index&quot;: 5
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0001&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0201&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0801&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-25&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;People are building local runners that duplicate the Jev API, and they differ only in where they run and how they report their loaded models. decider is an alternative local model to laya with a different connection string.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Each local decision runner&#x27;s network address MUST come from configuration.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Each local decision runner&#x27;s model MUST have a fixed model id in the model table.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A selection of `decider` MUST resolve to the 4b decider model.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Each local decision runner MUST be selectable by its name wherever a decision model is selected.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Configuration MUST be able to add a local model that runs on another computer.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;`sc-agent` MUST NOT hard-code the network address of any local decision runner.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: The Jev API is the request and reply format of TypeSafe&#x27;s Jev decision service (ADR-SAG-0001). A local decision runner is a daemon on the user&#x27;s machine or network that serves a decision model through the Jev API. sc-agent has two, `laya` and `decider`. A runner&#x27;s network address is its host and port. A decision model is a model that `sc-agent` can send a decision request to. The 4b decider model is the `decider-4b-v2.1` row. A local model is a model-table row whose model is served by a local decision runner. A paid API is a provider that needs an API key; its key is sent only to the provider&#x27;s built-in endpoint.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test sets `laya.host` and `laya.port` in configuration and checks the request goes to them with no rebuild.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test finds a fixed model id in the model-table row of every local decision runner model.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test resolves `decider` to the 4b decider row.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A CLI run of each command that selects a decision model accepts `--model laya` and `--model decider`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test with a stub local runner checks that the request it receives is in the Jev API format.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test sends to a local model row added in configuration with another computer&#x27;s host and checks the request reaches that host.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A search of the whole workspace, outside tests, finds no host or port literal for a local runner.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test with configuration naming another endpoint for a paid provider checks that the provider&#x27;s key is still sent only to its built-in endpoint.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Local decision runners come from configuration&quot;,
+    &quot;version&quot;: &quot;0.7.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.7.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>Each local decision runner&#x27;s network address MUST come from configuration.</li>
+    <li>Each local decision runner&#x27;s model MUST have a fixed model id in the model table.</li>
+    <li>A selection of `decider` MUST resolve to the 4b decider model.</li>
+    <li>Each local decision runner MUST be selectable by its name wherever a decision model is selected.</li>
+    <li>Configuration MUST be able to add a local model that runs on another computer.</li>
+    <li>`sc-agent` MUST NOT hard-code the network address of any local decision runner.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: The Jev API is the request and reply format of TypeSafe&#x27;s Jev decision service (ADR-SAG-0001). A local decision runner is a daemon on the user&#x27;s machine or network that serves a decision model through the Jev API. sc-agent has two, `laya` and `decider`. A runner&#x27;s network address is its host and port. A decision model is a model that `sc-agent` can send a decision request to. The 4b decider model is the `decider-4b-v2.1` row. A local model is a model-table row whose model is served by a local decision runner. A paid API is a provider that needs an API key; its key is sent only to the provider&#x27;s built-in endpoint.</p>
+  <h3>Rationale</h3>
+  <p>People are building local runners that duplicate the Jev API, and they differ only in where they run and how they report their loaded models. decider is an alternative local model to laya with a different connection string.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A unit test sets `laya.host` and `laya.port` in configuration and checks the request goes to them with no rebuild.</li>
+    <li>A unit test finds a fixed model id in the model-table row of every local decision runner model.</li>
+    <li>A unit test resolves `decider` to the 4b decider row.</li>
+    <li>A CLI run of each command that selects a decision model accepts `--model laya` and `--model decider`.</li>
+    <li>A unit test with a stub local runner checks that the request it receives is in the Jev API format.</li>
+    <li>A unit test sends to a local model row added in configuration with another computer&#x27;s host and checks the request reaches that host.</li>
+    <li>A search of the whole workspace, outside tests, finds no host or port literal for a local runner.</li>
+    <li>A unit test with configuration naming another endpoint for a paid provider checks that the provider&#x27;s key is still sent only to its built-in endpoint.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>ADR-SAG-0001</li>
+    <li>REQ-SAG-0201</li>
+  </ul>
+</section>

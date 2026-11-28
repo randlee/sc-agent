@@ -1,0 +1,87 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-related" id="cell-NFR-SAG-0004-ANC-012">
+  <div class="section-head">
+    <h2>NFR-SAG-0004 × ANC-012 — related</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-012&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.94,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.96,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.02
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.34,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.42,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.56
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.91,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.06,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.94
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.44,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.63,
+        &quot;unclear&quot;: 0.08,
+        &quot;yes&quot;: 0.29
+      }
+    }
+  },
+  &quot;class&quot;: &quot;related&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.02,
+    &quot;exceeds&quot;: 0.56,
+    &quot;relates&quot;: 0.94,
+    &quot;serves&quot;: 0.29
+  },
+  &quot;record&quot;: &quot;NFR-SAG-0004&quot;,
+  &quot;request_id&quot;: &quot;trace/NFR-SAG-0004/ANC-012/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ642QAEJQ32N9BHDXGN4Z&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="NFR-SAG-0004 × ANC-012 — related
+Anchor
+sc-agent&#x27;s decision providers must implement one decision trait, with one implementation per wire format (Jev TypeSafe systemone, OpenAI-compatible chat/completions, Anthropic-compatible Messages), and every provider that speaks a wire format must use that format&#x27;s implementation, so adding a provider needs no new code or hard-coding.
+Owner said: “there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”
+Scope: adds or changes decision providers, provider dispatch or the provider table in sc-agent
+Record statements
+Every shared fact MUST have a single owner.
+Code that needs a shared fact MUST obtain it by calling its owner.
+History (git)
+NFR-SAG-0004 statement 1: 2712a7fb 2026-11-25: NFR-SAG-0004: state single ownership as one obligation
+NFR-SAG-0004 statement 2: a63c0a59 2026-11-24: Amend phase-j records for the Run, one-owner and struct rules (plan review)
+Jev P(yes): relates 0.94 · serves 0.29 · exceeds 0.56 · conflicts 0.02">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>Anchor</h3>
+  <p>sc-agent&#x27;s decision providers must implement one decision trait, with one implementation per wire format (Jev TypeSafe systemone, OpenAI-compatible chat/completions, Anthropic-compatible Messages), and every provider that speaks a wire format must use that format&#x27;s implementation, so adding a provider needs no new code or hard-coding.</p>
+  <p>Owner said: “there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”</p>
+  <p>Scope: adds or changes decision providers, provider dispatch or the provider table in sc-agent</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>Every shared fact MUST have a single owner.</li>
+    <li>Code that needs a shared fact MUST obtain it by calling its owner.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>NFR-SAG-0004 statement 1: 2712a7fb 2026-11-25: NFR-SAG-0004: state single ownership as one obligation</li>
+    <li>NFR-SAG-0004 statement 2: a63c0a59 2026-11-24: Amend phase-j records for the Run, one-owner and struct rules (plan review)</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.94 · serves 0.29 · exceeds 0.56 · conflicts 0.02</p>
+</section>

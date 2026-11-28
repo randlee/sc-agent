@@ -1,0 +1,214 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0102">
+  <div class="section-head">
+    <h2>REQ-SAG-0102 Model catalog: built-in and configured model rows</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0102&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T091833Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The built-in rows of the model table MUST be sorted by release date, newest first.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A short name MUST resolve to its newest row in the model table, unless a configured model entry for that name overrides it (REQ-SAG-0019).&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A full model id MUST select its row exactly.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Each built-in model MUST carry the model&#x27;s published release date.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;`sc-agent` MUST NOT branch on a catalog name.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;f13fc3d8&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;ADR-SAG-0019 d13, REQ-SAG-0102: a configured model entry overrides the model its name selects&quot;
+      },
+      &quot;statement&quot;: &quot;The built-in rows of the model table MUST be sorted by release date, newest first.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;b98b4112&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size&quot;
+      },
+      &quot;statement&quot;: &quot;A short name MUST resolve to its newest row in the model table, unless a configured model entry for that name overrides it (REQ-SAG-0019).&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;66369ba0&quot;,
+        &quot;date&quot;: &quot;2026-11-21&quot;,
+        &quot;summary&quot;: &quot;docs: records follow the reduction plan&quot;
+      },
+      &quot;statement&quot;: &quot;A full model id MUST select its row exactly.&quot;,
+      &quot;statement_index&quot;: 2
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;c7a40068&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;summary&quot;: &quot;Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema&quot;
+      },
+      &quot;statement&quot;: &quot;Each built-in model MUST carry the model&#x27;s published release date.&quot;,
+      &quot;statement_index&quot;: 3
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1a9af55a&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+      },
+      &quot;statement&quot;: &quot;`sc-agent` MUST NOT branch on a catalog name.&quot;,
+      &quot;statement_index&quot;: 4
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0101&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0103&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0102&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-26&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;When a new model is released, short names such as `haiku`, `luna`, `opus` and `sol` must launch it immediately. Hard-coded rows go stale quickly, so configuration can add rows, and a configured row wins its short name (owner ruling 2026-11-25). When several providers serve the newest row, REQ-SAG-0103 orders them. Provider and model are values carried in typed data, not names to branch on.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The built-in rows of the model table MUST be sorted by release date, newest first.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A short name MUST resolve to its newest row in the model table, unless a configured model entry for that name overrides it (REQ-SAG-0019).&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A full model id MUST select its row exactly.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Each built-in model MUST carry the model&#x27;s published release date.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;`sc-agent` MUST NOT branch on a catalog name.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: `sc-agent` is the program this record governs. The model table is the list of models built into `sc-agent`, together with the rows configuration adds. Each row has a short name, a fixed model id, a release date and a provider. A built-in model is a row built into `sc-agent`, not added by configuration. A full model id is a row&#x27;s fixed model id, such as `claude-haiku-5-5`. A model&#x27;s published release date is the date its maker announced the model as available. A catalog name is a provider name, a short name or a model id. To branch on a catalog name is to compare it with a string literal to choose what the code does.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test verifies that, with a configuration row added, the built-in rows are sorted by release date, newest first, and the configuration row is selected for its short name.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test verifies that, of two rows sharing a short name, the short name resolves to the row with the later release date.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test verifies that selecting a built-in row&#x27;s full model id returns that row.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test verifies that every built-in row has a release date.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A search of `crates/sc-agent/src` finds no comparison of a catalog name with a string literal outside the model and provider tables.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Model catalog: built-in and configured model rows&quot;,
+    &quot;version&quot;: &quot;0.9.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.9.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>The built-in rows of the model table MUST be sorted by release date, newest first.</li>
+    <li>A short name MUST resolve to its newest row in the model table, unless a configured model entry for that name overrides it (REQ-SAG-0019).</li>
+    <li>A full model id MUST select its row exactly.</li>
+    <li>Each built-in model MUST carry the model&#x27;s published release date.</li>
+    <li>`sc-agent` MUST NOT branch on a catalog name.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: `sc-agent` is the program this record governs. The model table is the list of models built into `sc-agent`, together with the rows configuration adds. Each row has a short name, a fixed model id, a release date and a provider. A built-in model is a row built into `sc-agent`, not added by configuration. A full model id is a row&#x27;s fixed model id, such as `claude-haiku-5-5`. A model&#x27;s published release date is the date its maker announced the model as available. A catalog name is a provider name, a short name or a model id. To branch on a catalog name is to compare it with a string literal to choose what the code does.</p>
+  <h3>Rationale</h3>
+  <p>When a new model is released, short names such as `haiku`, `luna`, `opus` and `sol` must launch it immediately. Hard-coded rows go stale quickly, so configuration can add rows, and a configured row wins its short name (owner ruling 2026-11-25). When several providers serve the newest row, REQ-SAG-0103 orders them. Provider and model are values carried in typed data, not names to branch on.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A unit test verifies that, with a configuration row added, the built-in rows are sorted by release date, newest first, and the configuration row is selected for its short name.</li>
+    <li>A unit test verifies that, of two rows sharing a short name, the short name resolves to the row with the later release date.</li>
+    <li>A unit test verifies that selecting a built-in row&#x27;s full model id returns that row.</li>
+    <li>A unit test verifies that every built-in row has a release date.</li>
+    <li>A search of `crates/sc-agent/src` finds no comparison of a catalog name with a string literal outside the model and provider tables.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>REQ-SAG-0101</li>
+    <li>REQ-SAG-0103</li>
+  </ul>
+</section>

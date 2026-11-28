@@ -1,0 +1,75 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="anc-ANC-012">
+  <div class="section-head">
+    <h2>ANC-012</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;beads&quot;: {
+    &quot;anchor&quot;: &quot;agt-et87&quot;,
+    &quot;dev_questions&quot;: &quot;agt-et87.2&quot;,
+    &quot;plan_questions&quot;: &quot;agt-et87.1&quot;
+  },
+  &quot;context&quot;: &quot;planning session; session, 2026-11-26&quot;,
+  &quot;deterministic_check&quot;: &quot;grep: one decision trait; one impl per wire format; no match on wire strings outside those impls; adding a compatible provider is a config/table row only&quot;,
+  &quot;fixtures&quot;: {
+    &quot;fail&quot;: [
+      &quot;A dedicated Together decision provider is written that duplicates the OpenAI-compatible request code.&quot;
+    ],
+    &quot;pass&quot;: [
+      &quot;The new provider is a row naming the OpenAI-compatible wire format and reuses that implementation.&quot;
+    ]
+  },
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-26T19:52:46+00:00&quot;,
+      &quot;event&quot;: &quot;created&quot;,
+      &quot;status&quot;: &quot;locked&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:55:50+00:00&quot;,
+      &quot;beads&quot;: {
+        &quot;anchor&quot;: &quot;agt-et87&quot;,
+        &quot;dev_questions&quot;: &quot;agt-et87.2&quot;,
+        &quot;plan_questions&quot;: &quot;agt-et87.1&quot;
+      },
+      &quot;event&quot;: &quot;beads_set&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:58:04+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;fixtures&quot;
+      ]
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-012&quot;,
+  &quot;kind&quot;: &quot;directive&quot;,
+  &quot;promoted_to&quot;: null,
+  &quot;question_overrides&quot;: {},
+  &quot;quote&quot;: &quot;there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.&quot;,
+  &quot;scope&quot;: &quot;adds or changes decision providers, provider dispatch or the provider table in sc-agent&quot;,
+  &quot;source_ref&quot;: null,
+  &quot;source_type&quot;: &quot;ANC&quot;,
+  &quot;stated_at&quot;: &quot;2026-11-26&quot;,
+  &quot;stated_by&quot;: &quot;Rand Lee&quot;,
+  &quot;statement&quot;: &quot;sc-agent&#x27;s decision providers must implement one decision trait, with one implementation per wire format (Jev TypeSafe systemone, OpenAI-compatible chat/completions, Anthropic-compatible Messages), and every provider that speaks a wire format must use that format&#x27;s implementation, so adding a provider needs no new code or hard-coding.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;summary&quot;: &quot;one decision trait, one implementation per wire format&quot;,
+  &quot;version&quot;: 2
+}">{}</button>
+    </div>
+  </div>
+  <h3>Statement</h3>
+  <p class="statement">sc-agent&#x27;s decision providers must implement one decision trait, with one implementation per wire format (Jev TypeSafe systemone, OpenAI-compatible chat/completions, Anthropic-compatible Messages), and every provider that speaks a wire format must use that format&#x27;s implementation, so adding a provider needs no new code or hard-coding.</p>
+  <h3>Owner said</h3>
+  <p class="quote">there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.</p>
+  <h3>Scope</h3>
+  <p>adds or changes decision providers, provider dispatch or the provider table in sc-agent</p>
+  <h3>Deterministic check</h3>
+  <p>grep: one decision trait; one impl per wire format; no match on wire strings outside those impls; adding a compatible provider is a config/table row only</p>
+  <h3>Kind</h3>
+  <p>directive</p>
+  <h3>Stated by</h3>
+  <p>Rand Lee</p>
+  <h3>Stated on</h3>
+  <p>2026-11-26</p>
+</section>

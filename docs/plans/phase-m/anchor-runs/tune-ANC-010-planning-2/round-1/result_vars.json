@@ -1,0 +1,2547 @@
+{
+  "success": true,
+  "canceled": false,
+  "aborted_by": null,
+  "data": {
+    "operation": "tune",
+    "gate": "planning",
+    "accepted": false,
+    "tournament_protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "production_confidence_threshold": 0.6,
+    "confidence_reference_threshold": 0.8,
+    "semantic_score": {
+      "exact_role_cells": 82,
+      "total_role_cells": 84,
+      "exact_semantic_verdicts": 26,
+      "total_semantic_verdicts": 28,
+      "stable_cases": 14,
+      "total_cases": 14,
+      "regressions": 1
+    },
+    "confidence_diagnostics": {
+      "threshold": 0.8,
+      "cells_at_or_above_threshold": 78,
+      "total_cells": 84,
+      "minimum": 0.34,
+      "p10": 0.94,
+      "median": 1.0,
+      "mean": 0.9498
+    },
+    "tuning_history_before_sha256": "e3ac94a325145aab6d99c16b4138851bc31365d5b7ed2ad4acf13461c9c90049",
+    "tuning_history_after": {
+      "schema": "plan-anchor/tuning-history/2",
+      "history_id": "phase-m/ANC-010/planning",
+      "events": [
+        {
+          "event_index": 1,
+          "previous_event_sha256": null,
+          "event": "question_set_rejected",
+          "protocol_version": "plan-anchor/question-tournament/2.0.0",
+          "authority": {
+            "intent_id": "phase-m/intent",
+            "intent_version": 1,
+            "intent_sha256": "0bbd5fd276ec8838194c51e1d28dc391e3a6d4123eabb9669f0980f46ebb7ade",
+            "anchor_id": "ANC-010",
+            "anchor_version": 4,
+            "anchor_record_sha256": "d97527281bfd0dfcfd6f8ae3f56d2dfd87f695479d43d8a47d8ab0a1d6ddfe6c"
+          },
+          "oracle": {
+            "sha256": "ff8ac6a67259d15e90a4847f88cb3cfb0c3e37fe822137eccacc612f7314358f",
+            "case_ids": [
+              "fixture-pass",
+              "fixture-fail",
+              "compliant",
+              "silent-tool",
+              "silent-crate",
+              "topical-note",
+              "topical-retro",
+              "irrelevant-docs",
+              "irrelevant-ci",
+              "irrelevant-tracker",
+              "conflict-tool",
+              "conflict-crate",
+              "boundary",
+              "exception"
+            ],
+            "case_count": 14,
+            "repeat_count": 2
+          },
+          "candidate": {
+            "candidate_id": "sig2-a2-c2",
+            "question_sha256": "c683bb650431f5a9e938eb79a3e3de005fefea38abf6d34d0cea7776c7ec2d22"
+          },
+          "evidence": {
+            "canonical_request_sha256": [
+              "20830ba8ff458e9c3848f62af25b0faf9cea4464e22a0f132c9373fcb3b261e0",
+              "20830ba8ff458e9c3848f62af25b0faf9cea4464e22a0f132c9373fcb3b261e0",
+              "a6c02209eb764e513702e1525e3204a8ff0c92bb2d0981bd14a0c0e6103378bb",
+              "a6c02209eb764e513702e1525e3204a8ff0c92bb2d0981bd14a0c0e6103378bb",
+              "d8a458b6edb2959c7dd33a1ebce76dba0b91770d5a102de0bdd779071cf55f68",
+              "d8a458b6edb2959c7dd33a1ebce76dba0b91770d5a102de0bdd779071cf55f68",
+              "1e8df8300c8d302c102758276243bbce4e65751fe637f1232b4b84423a83b196",
+              "1e8df8300c8d302c102758276243bbce4e65751fe637f1232b4b84423a83b196",
+              "13b4b9b6a0c48b8884653520924f980e74f15c07368189605ff2ce752075bffb",
+              "13b4b9b6a0c48b8884653520924f980e74f15c07368189605ff2ce752075bffb",
+              "7087a5cb632887b4b2e3972991818f46db88d1a418acb606e04258b0a2a42ca0",
+              "7087a5cb632887b4b2e3972991818f46db88d1a418acb606e04258b0a2a42ca0",
+              "5e53901f9ce1a5cd47b722c3d476cc1b5a2fbb3091c9889509ff052b2292574a",
+              "5e53901f9ce1a5cd47b722c3d476cc1b5a2fbb3091c9889509ff052b2292574a",
+              "fc8054f60dac8a091753f232bb7bcedd0c007843df26491517d5a1fc78253ccc",
+              "fc8054f60dac8a091753f232bb7bcedd0c007843df26491517d5a1fc78253ccc",
+              "0b7e9ca653051cd06b94e7e45e3e360b2d671ccc32ff892f5c81da45d2f232f9",
+              "0b7e9ca653051cd06b94e7e45e3e360b2d671ccc32ff892f5c81da45d2f232f9",
+              "67a31ff6b7628def4b61de1d478894e4bbc11019851b5ee3defedbb8cbbad2f0",
+              "67a31ff6b7628def4b61de1d478894e4bbc11019851b5ee3defedbb8cbbad2f0",
+              "53227c8927c4da2bf1363bb94eecab4b985aa93a4c83751c0a56171b78f1bc90",
+              "53227c8927c4da2bf1363bb94eecab4b985aa93a4c83751c0a56171b78f1bc90",
+              "5d448a1cd93564050b50a9bd6c471d2f4af08f046e567a8a945d03b0b6418c47",
+              "5d448a1cd93564050b50a9bd6c471d2f4af08f046e567a8a945d03b0b6418c47",
+              "f7bf39d4b80be636d8f6d6849b742123368b690eb7e01f1b7aa2dcfdb9f0a466",
+              "f7bf39d4b80be636d8f6d6849b742123368b690eb7e01f1b7aa2dcfdb9f0a466",
+              "6d4093f7785532b46f207f77b36cac41d08bf87384b297319cb80e6189c693a1",
+              "6d4093f7785532b46f207f77b36cac41d08bf87384b297319cb80e6189c693a1"
+            ],
+            "raw_response_sha256": [
+              "268c3aaae1a70dbcb2f140ca06fd90dc1904a6ce2858cdbb9e52ab095e3d1eae",
+              "b627d6e9788d4bdb2c0e1c34bd9713f0346abba88f7d99434c04682c27739779",
+              "51705b81b5ff134fbd241db45a9a4622ebd3e3c3eae83a6e589ba9caf6d356d2",
+              "b99c2e923100ad330ce20ebcac3652a01f40920f55ca124013896f7ea9265bdc",
+              "7eb9e75b7ddd859fee9df64c1fdfcd5a7aa2973efe649b14c30e52d729258091",
+              "8e5d0cfe4cb67301062704af0f54669417f9701ec8bf6358e4df349afa0d2a19",
+              "cd46a27b018c653f7d8551c032e6bb49c7eeae61d9d2fc1c231209a64c1dbf65",
+              "ceb0689bd2ce13dfa53f7b6746249bfe69ecb5a1b1e6e69960da72fd61ed8f36",
+              "e84813addee8788fc4a45f0ec3da29f480528e67834f0de34eb6b4d35ce40bcb",
+              "59e8043095cf776190d682ee5724de384792ed0b4703ae7394fdbffb8a4a52f0",
+              "85df85003f9498f9f2c7d58df241c902c16adc6956fa78f20449efa7922e2424",
+              "44d2de12b8d79e4d9106bb66bc5dd9ea72e829a8b431dfafa50dcf3d38b94aa3",
+              "10aa68015bbd7bba7afd866d95540412294cf23f1d3f08b5cee11b6d8f5c6008",
+              "10aa68015bbd7bba7afd866d95540412294cf23f1d3f08b5cee11b6d8f5c6008",
+              "414227f0d5849f109fb53fbcf5d1515c3d3a2adf2b3bf30cb7ce1a2e1e1b560b",
+              "414227f0d5849f109fb53fbcf5d1515c3d3a2adf2b3bf30cb7ce1a2e1e1b560b",
+              "414227f0d5849f109fb53fbcf5d1515c3d3a2adf2b3bf30cb7ce1a2e1e1b560b",
+              "414227f0d5849f109fb53fbcf5d1515c3d3a2adf2b3bf30cb7ce1a2e1e1b560b",
+              "89adb062abc0b1d40d86bbda43401c2d10876bb71e9e1441e4f511e36c023bb3",
+              "414227f0d5849f109fb53fbcf5d1515c3d3a2adf2b3bf30cb7ce1a2e1e1b560b",
+              "4ad5472ac8f55076b410efbe16b5b8e6c801b131b88bceaf9ef702fa33d7550d",
+              "62ec8a377275538246023bcba7244820b9808cfe5253cd18423e318d41965eab",
+              "4ad5472ac8f55076b410efbe16b5b8e6c801b131b88bceaf9ef702fa33d7550d",
+              "51705b81b5ff134fbd241db45a9a4622ebd3e3c3eae83a6e589ba9caf6d356d2",
+              "94658447f7128c20629a93c63982bb3bb8b4cd693dd45f9049f34dcac2caef34",
+              "4a6182eb8a32582baeda5bcb9d67e5dac67a16f7e86430d29ae3e49245fa22f2",
+              "c834c4b38b4fe9cd52258256977b0c140b901d9463c98f8086942e1b4f342e1a",
+              "6ef8794ab2aa6bd68bf3c5cf527633cef640dadc00d7977819d3d489832190ad"
+            ],
+            "run_ids": [
+              "e8d17543d2b8edf0",
+              "e5515572ec9e9dfe",
+              "1ee4e1aaffd7e823",
+              "558c2868bad3e186",
+              "a0a3ef79bb5a7604",
+              "454623592aab3423",
+              "2ec14339216de399",
+              "293685edcbbb6e11",
+              "8cb94276df032f90",
+              "bcfed8c09c61a007",
+              "aeabc7a4d2e298c0",
+              "afd90525d414f4dc",
+              "4e1b46216712ef9d",
+              "97d4556188bcac69",
+              "e4e74dc2b0470ea3",
+              "7db433868cbb8439",
+              "16c045b52b28fb08",
+              "47e7ef148f76b303",
+              "b54bd8750161e346",
+              "2588da7d78d4a9cf",
+              "c5dc2a3f228fc10b",
+              "64a4f665658b0f06",
+              "2065f8b2f5c3d780",
+              "31d0cf52741e404a",
+              "c2dde8d84146299e",
+              "75aa26c5556fecc5",
+              "6194071e015ab873",
+              "e2643e467c7510e1"
+            ]
+          },
+          "score": {
+            "exact_role_cells": 82,
+            "total_role_cells": 84,
+            "exact_semantic_verdicts": 26,
+            "total_semantic_verdicts": 28,
+            "stable_cases": 14,
+            "total_cases": 14,
+            "regressions": 1,
+            "confidence": {
+              "threshold": 0.8,
+              "cells_at_or_above_threshold": 78,
+              "total_cells": 84,
+              "minimum": 0.34,
+              "p10": 0.94,
+              "median": 1.0,
+              "mean": 0.9498
+            }
+          },
+          "decision": {
+            "status": "rejected",
+            "question_set_sha256": null,
+            "reason_code": "TOURNAMENT.SEMANTIC_REJECTED"
+          },
+          "supersedes": null
+        }
+      ]
+    },
+    "tuning_history_after_sha256": "597e69e35363b7881ab3c62608e3aa39957bf548b474e9aa8cfc8ac4ccd5b95c",
+    "production_semantics_unchanged": true,
+    "authority_citations": [
+      "ANC-010 v4 statement, quote and scope (locked; arch-ai approved scope)",
+      "ANC-010 v4 fixtures (approved)",
+      "phase-m/intent v1"
+    ],
+    "oracle_sha256": "ff8ac6a67259d15e90a4847f88cb3cfb0c3e37fe822137eccacc612f7314358f",
+    "sealed_question_set": null,
+    "candidate_rankings": [
+      {
+        "rank": 1,
+        "bundle_id": "sig2-a2-c2",
+        "roles": {
+          "relevant": "sig2",
+          "addressed": "a2",
+          "contradicted": "c2"
+        },
+        "question_sha256": "8240d701e0ec05c165fb18aeb397a29392eb96ce4957fe1dd110e2a1e344674b",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 82,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 26,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 78,
+          "total_cells": 84,
+          "minimum": 0.34,
+          "p10": 0.94,
+          "median": 1.0,
+          "mean": 0.9498
+        },
+        "complexity_bytes": 2652,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      },
+      {
+        "rank": 2,
+        "bundle_id": "sig-cur-c2",
+        "roles": {
+          "relevant": "sig",
+          "addressed": "cur",
+          "contradicted": "c2"
+        },
+        "question_sha256": "5734a2d526ce8e0a05874e9c26cce762a18d5a9a7fc8e9634b172fdfa0fd076c",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 82,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 26,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 78,
+          "total_cells": 84,
+          "minimum": 0.26,
+          "p10": 0.85,
+          "median": 1.0,
+          "mean": 0.9387
+        },
+        "complexity_bytes": 3216,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      },
+      {
+        "rank": 3,
+        "bundle_id": "sig-a2-c2",
+        "roles": {
+          "relevant": "sig",
+          "addressed": "a2",
+          "contradicted": "c2"
+        },
+        "question_sha256": "648f7a4fc88b0ed4f91b46f772bd52ff6daa18f763ab8e9609fa56f41e61c67c",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 82,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 26,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 78,
+          "total_cells": 84,
+          "minimum": 0.25,
+          "p10": 0.883,
+          "median": 1.0,
+          "mean": 0.9487
+        },
+        "complexity_bytes": 2952,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      },
+      {
+        "rank": 4,
+        "bundle_id": "sig2-cur-c2",
+        "roles": {
+          "relevant": "sig2",
+          "addressed": "cur",
+          "contradicted": "c2"
+        },
+        "question_sha256": "42e32514bc2a6047db5373d297cf9937d36886aba207676ae08baf91912965bb",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 82,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 26,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 77,
+          "total_cells": 84,
+          "minimum": 0.38,
+          "p10": 0.91,
+          "median": 1.0,
+          "mean": 0.9439
+        },
+        "complexity_bytes": 2916,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      },
+      {
+        "rank": 5,
+        "bundle_id": "sig3-cur-cur",
+        "roles": {
+          "relevant": "sig3",
+          "addressed": "cur",
+          "contradicted": "cur"
+        },
+        "question_sha256": "7e9498546f42f190abea9c8c8788e823ca9ed2d8eaf785392f01772ec9fdf21b",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 82,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 26,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 76,
+          "total_cells": 84,
+          "minimum": 0.5,
+          "p10": 0.8,
+          "median": 1.0,
+          "mean": 0.9393
+        },
+        "complexity_bytes": 2900,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      },
+      {
+        "rank": 6,
+        "bundle_id": "sig2-cur-cur",
+        "roles": {
+          "relevant": "sig2",
+          "addressed": "cur",
+          "contradicted": "cur"
+        },
+        "question_sha256": "b8023e71b71f43876648cf2fc1dd9db9536f61d7cb38bb058f8edc33219ec7db",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 82,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 26,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 76,
+          "total_cells": 84,
+          "minimum": 0.49,
+          "p10": 0.809,
+          "median": 0.99,
+          "mean": 0.9458
+        },
+        "complexity_bytes": 2915,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      },
+      {
+        "rank": 7,
+        "bundle_id": "sig2-a2-cur",
+        "roles": {
+          "relevant": "sig2",
+          "addressed": "a2",
+          "contradicted": "cur"
+        },
+        "question_sha256": "4320f7fbf055847210b8f14f66951443aee9bea9e04d6d80dcc1333358edfa35",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 82,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 26,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 76,
+          "total_cells": 84,
+          "minimum": 0.46,
+          "p10": 0.896,
+          "median": 1.0,
+          "mean": 0.9515
+        },
+        "complexity_bytes": 2651,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      },
+      {
+        "rank": 8,
+        "bundle_id": "sig3-a2-cur",
+        "roles": {
+          "relevant": "sig3",
+          "addressed": "a2",
+          "contradicted": "cur"
+        },
+        "question_sha256": "bb7957e76c370f1f900617a888888c041247c2e096fd1ef4099c9688929c0daa",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 82,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 26,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 76,
+          "total_cells": 84,
+          "minimum": 0.43,
+          "p10": 0.806,
+          "median": 1.0,
+          "mean": 0.9517
+        },
+        "complexity_bytes": 2636,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      },
+      {
+        "rank": 9,
+        "bundle_id": "sig3-a2-c2",
+        "roles": {
+          "relevant": "sig3",
+          "addressed": "a2",
+          "contradicted": "c2"
+        },
+        "question_sha256": "8442a8b67f5521f49501a57ecda7168dd6ce1195ea06d1a3a07af4ff90c3e07d",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 82,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 26,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 76,
+          "total_cells": 84,
+          "minimum": 0.25,
+          "p10": 0.859,
+          "median": 1.0,
+          "mean": 0.9442
+        },
+        "complexity_bytes": 2637,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      },
+      {
+        "rank": 10,
+        "bundle_id": "sig-a2-cur",
+        "roles": {
+          "relevant": "sig",
+          "addressed": "a2",
+          "contradicted": "cur"
+        },
+        "question_sha256": "7deae320061e8d0491fa03f3ce9cc23fbfb74cdbaa4e24f1e1611812f8195ff0",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 82,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 26,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 76,
+          "total_cells": 84,
+          "minimum": 0.24,
+          "p10": 0.823,
+          "median": 1.0,
+          "mean": 0.9448
+        },
+        "complexity_bytes": 2951,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      },
+      {
+        "rank": 11,
+        "bundle_id": "sig-cur-cur",
+        "roles": {
+          "relevant": "sig",
+          "addressed": "cur",
+          "contradicted": "cur"
+        },
+        "question_sha256": "e775b1282318f54cd227eac3b00dc32717603833b8ad1439708ba7bb59e2fabd",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 82,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 26,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 1,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 75,
+          "total_cells": 84,
+          "minimum": 0.24,
+          "p10": 0.787,
+          "median": 1.0,
+          "mean": 0.9389
+        },
+        "complexity_bytes": 3215,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 1 regression(s) against the baseline: fixture-pass.",
+        "mismatches": [
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "1 regression(s) against the baseline: fixture-pass"
+        ]
+      },
+      {
+        "rank": 12,
+        "bundle_id": "sig3-cur-c2",
+        "roles": {
+          "relevant": "sig3",
+          "addressed": "cur",
+          "contradicted": "c2"
+        },
+        "question_sha256": "9fc9d2113f1257bdb321fe9df56520200675e3af43f1133a6bcb9aa219d08bb8",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 81,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 25,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 13,
+        "total_cases": 14,
+        "regressions": 2,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 77,
+          "total_cells": 84,
+          "minimum": 0.25,
+          "p10": 0.82,
+          "median": 1.0,
+          "mean": 0.9377
+        },
+        "complexity_bytes": 2901,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: compliant: contradicted yes, expected no; compliant: unstable across repeats; compliant: verdict contradicted, expected satisfied; fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 2 regression(s) against the baseline: fixture-pass, compliant.",
+        "mismatches": [
+          "compliant: contradicted yes, expected no",
+          "compliant: unstable across repeats",
+          "compliant: verdict contradicted, expected satisfied",
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "2 regression(s) against the baseline: fixture-pass, compliant"
+        ]
+      },
+      {
+        "rank": 13,
+        "bundle_id": "sig-a3-c3",
+        "roles": {
+          "relevant": "sig",
+          "addressed": "a3",
+          "contradicted": "c3"
+        },
+        "question_sha256": "c976f9ca3d68058f8d3f76d834209b33526697ba78e79944e74b325f0a52df44",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 81,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 25,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 13,
+        "total_cases": 14,
+        "regressions": 2,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 76,
+          "total_cells": 84,
+          "minimum": 0.25,
+          "p10": 0.818,
+          "median": 1.0,
+          "mean": 0.9442
+        },
+        "complexity_bytes": 2581,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: compliant: contradicted yes, expected no; compliant: unstable across repeats; compliant: verdict contradicted, expected satisfied; fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 2 regression(s) against the baseline: fixture-pass, compliant.",
+        "mismatches": [
+          "compliant: contradicted yes, expected no",
+          "compliant: unstable across repeats",
+          "compliant: verdict contradicted, expected satisfied",
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "2 regression(s) against the baseline: fixture-pass, compliant"
+        ]
+      },
+      {
+        "rank": 14,
+        "bundle_id": "sig2-a3-c3",
+        "roles": {
+          "relevant": "sig2",
+          "addressed": "a3",
+          "contradicted": "c3"
+        },
+        "question_sha256": "f71912f11d1fedf9387ed79e2324324838ef107c99cbd513e70278fc4571b88d",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 80,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 24,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 2,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 76,
+          "total_cells": 84,
+          "minimum": 0.3,
+          "p10": 0.892,
+          "median": 1.0,
+          "mean": 0.9489
+        },
+        "complexity_bytes": 2281,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: compliant: contradicted yes, expected no; compliant: verdict contradicted, expected satisfied; fixture-pass: relevant no, expected yes; fixture-pass: verdict not_applicable, expected satisfied; 2 regression(s) against the baseline: fixture-pass, compliant.",
+        "mismatches": [
+          "compliant: contradicted yes, expected no",
+          "compliant: verdict contradicted, expected satisfied",
+          "fixture-pass: relevant no, expected yes",
+          "fixture-pass: verdict not_applicable, expected satisfied",
+          "2 regression(s) against the baseline: fixture-pass, compliant"
+        ]
+      },
+      {
+        "rank": 15,
+        "bundle_id": "baseline",
+        "roles": {
+          "addressed": "current",
+          "contradicted": "current",
+          "relevant": "current"
+        },
+        "question_sha256": "a2c6c4a0d12fe3270b7b00cc59f6a735727f15acb566d7cd82a06e57fec8baaf",
+        "semantic_accepted": false,
+        "complete": true,
+        "exact_role_cells": 76,
+        "total_role_cells": 84,
+        "exact_semantic_verdicts": 20,
+        "total_semantic_verdicts": 28,
+        "stable_cases": 14,
+        "total_cases": 14,
+        "regressions": 0,
+        "confidence": {
+          "threshold": 0.8,
+          "cells_at_or_above_threshold": 75,
+          "total_cells": 84,
+          "minimum": 0.4,
+          "p10": 0.779,
+          "median": 0.99,
+          "mean": 0.9301
+        },
+        "complexity_bytes": 2677,
+        "selected": false,
+        "co_leader": false,
+        "reason": "Rejected: conflict-crate: relevant no, expected yes; conflict-crate: verdict not_applicable, expected contradicted; silent-crate: relevant no, expected yes; silent-crate: verdict not_applicable, expected satisfied; topical-note: relevant yes, expected no; topical-note: verdict satisfied, expected not_applicable; topical-retro: relevant yes, expected no; topical-retro: verdict satisfied, expected not_applicable.",
+        "mismatches": [
+          "conflict-crate: relevant no, expected yes",
+          "conflict-crate: verdict not_applicable, expected contradicted",
+          "silent-crate: relevant no, expected yes",
+          "silent-crate: verdict not_applicable, expected satisfied",
+          "topical-note: relevant yes, expected no",
+          "topical-note: verdict satisfied, expected not_applicable",
+          "topical-retro: relevant yes, expected no",
+          "topical-retro: verdict satisfied, expected not_applicable"
+        ]
+      }
+    ],
+    "acceptance_table": [
+      {
+        "case_id": "fixture-pass",
+        "probe": "fixture_pass",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.97
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.94
+          }
+        ],
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true,
+        "accepted": false,
+        "baseline_exact": true,
+        "regression": true,
+        "rationale": "ANC-010 v4 pass fixture. Changes judge-jev/plan-anchor code (scope signal 1) and states shared logic lives in one place; no copying."
+      },
+      {
+        "case_id": "fixture-fail",
+        "probe": "fixture_fail",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.97
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.98,
+            "relevant": 0.98
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "ANC-010 v4 fail fixture. Copies code between tools (scope signal 3); statement forbids it."
+      },
+      {
+        "case_id": "compliant",
+        "probe": "compliant",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 0.34,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 0.37,
+            "relevant": 0.98
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "underspecified",
+          "underspecified"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Changes tool code and puts shared logic in one place, as the statement requires."
+      },
+      {
+        "case_id": "silent-tool",
+        "probe": "silent",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.92
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.96
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Changes judge-jev source (scope signal 1); silent on copying; a prohibition is satisfied by silence."
+      },
+      {
+        "case_id": "silent-crate",
+        "probe": "silent",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.91
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.94
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": false,
+        "regression": false,
+        "rationale": "Changes source in an sc-agent crate (scope signal 1, v4); silent on copying."
+      },
+      {
+        "case_id": "topical-note",
+        "probe": "topical_only",
+        "expected_roles": {
+          "relevant": "no",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_applicable",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.37,
+            "contradicted": 0.94,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 0.34,
+            "contradicted": 0.96,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": false,
+        "regression": false,
+        "rationale": "Mentions the subject but adds/changes no source, adds no helper and copies nothing: no v4 scope signal."
+      },
+      {
+        "case_id": "topical-retro",
+        "probe": "topical_only",
+        "expected_roles": {
+          "relevant": "no",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_applicable",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 0.96,
+            "contradicted": 0.97,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 0.96,
+            "contradicted": 0.97,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": false,
+        "regression": false,
+        "rationale": "Mentions duplication but changes no code: no v4 scope signal."
+      },
+      {
+        "case_id": "irrelevant-docs",
+        "probe": "irrelevant",
+        "expected_roles": {
+          "relevant": "no",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_applicable",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Docs-only; touches nothing in the scope."
+      },
+      {
+        "case_id": "irrelevant-ci",
+        "probe": "irrelevant",
+        "expected_roles": {
+          "relevant": "no",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_applicable",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "CI config change; no crate, tool or template source; nothing copied."
+      },
+      {
+        "case_id": "irrelevant-tracker",
+        "probe": "irrelevant",
+        "expected_roles": {
+          "relevant": "no",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "not_applicable",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "no"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.98
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 1.0
+          }
+        ],
+        "semantic_verdicts": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "production_verdicts_at_threshold": [
+          "not_applicable",
+          "not_applicable"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Tracker housekeeping; touches nothing in the scope."
+      },
+      {
+        "case_id": "conflict-tool",
+        "probe": "conflicting",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.96
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.94
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Copy-paste between tools; statement forbids it."
+      },
+      {
+        "case_id": "conflict-crate",
+        "probe": "conflicting",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "yes"
+        },
+        "expected_verdict": "contradicted",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "yes",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.96
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.97
+          }
+        ],
+        "semantic_verdicts": [
+          "contradicted",
+          "contradicted"
+        ],
+        "production_verdicts_at_threshold": [
+          "contradicted",
+          "contradicted"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": false,
+        "regression": false,
+        "rationale": "Copies code between sc-agent crates (v4 scope); statement forbids it."
+      },
+      {
+        "case_id": "boundary",
+        "probe": "boundary",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "yes",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "yes",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.96
+          },
+          {
+            "addressed": 0.98,
+            "contradicted": 1.0,
+            "relevant": 0.96
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Generated from one shared source is not copy-paste; shared logic lives in one place."
+      },
+      {
+        "case_id": "exception",
+        "probe": "exception",
+        "expected_roles": {
+          "relevant": "yes",
+          "addressed": "no",
+          "contradicted": "no"
+        },
+        "expected_verdict": "satisfied",
+        "observed_roles": [
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          },
+          {
+            "addressed": "no",
+            "contradicted": "no",
+            "relevant": "yes"
+          }
+        ],
+        "observed_confidence": [
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.67
+          },
+          {
+            "addressed": 1.0,
+            "contradicted": 1.0,
+            "relevant": 0.67
+          }
+        ],
+        "semantic_verdicts": [
+          "satisfied",
+          "satisfied"
+        ],
+        "production_verdicts_at_threshold": [
+          "satisfied",
+          "satisfied"
+        ],
+        "stable": true,
+        "accepted": true,
+        "baseline_exact": true,
+        "regression": false,
+        "rationale": "Changes tool code; tool-specific logic with no counterpart elsewhere is not a copy."
+      }
+    ],
+    "evidence": {
+      "out_dir": "docs/plans/phase-m/anchor-runs/tune-ANC-010-planning-2",
+      "results_path": "docs/plans/phase-m/anchor-runs/tune-ANC-010-planning-2/results.jsonl",
+      "oracle_path": "docs/plans/phase-m/anchor-runs/tune-ANC-010-planning-2/oracle.frozen.json",
+      "oracle_frozen_before_first_jev_call": true,
+      "calls": 420,
+      "failed_calls": [],
+      "missing_calls": [],
+      "retries": 0,
+      "max_parallel_evaluators": 4,
+      "repeat_requests_byte_identical": true,
+      "models_answered": [
+        "jev-1.14.0"
+      ],
+      "baseline_bundle": "baseline",
+      "bundles": {
+        "baseline": {
+          "addressed": "current",
+          "contradicted": "current",
+          "relevant": "current"
+        },
+        "sig-cur-cur": {
+          "relevant": "sig",
+          "addressed": "cur",
+          "contradicted": "cur"
+        },
+        "sig-cur-c2": {
+          "relevant": "sig",
+          "addressed": "cur",
+          "contradicted": "c2"
+        },
+        "sig-a2-cur": {
+          "relevant": "sig",
+          "addressed": "a2",
+          "contradicted": "cur"
+        },
+        "sig-a2-c2": {
+          "relevant": "sig",
+          "addressed": "a2",
+          "contradicted": "c2"
+        },
+        "sig2-cur-cur": {
+          "relevant": "sig2",
+          "addressed": "cur",
+          "contradicted": "cur"
+        },
+        "sig2-cur-c2": {
+          "relevant": "sig2",
+          "addressed": "cur",
+          "contradicted": "c2"
+        },
+        "sig2-a2-cur": {
+          "relevant": "sig2",
+          "addressed": "a2",
+          "contradicted": "cur"
+        },
+        "sig2-a2-c2": {
+          "relevant": "sig2",
+          "addressed": "a2",
+          "contradicted": "c2"
+        },
+        "sig3-cur-cur": {
+          "relevant": "sig3",
+          "addressed": "cur",
+          "contradicted": "cur"
+        },
+        "sig3-cur-c2": {
+          "relevant": "sig3",
+          "addressed": "cur",
+          "contradicted": "c2"
+        },
+        "sig3-a2-cur": {
+          "relevant": "sig3",
+          "addressed": "a2",
+          "contradicted": "cur"
+        },
+        "sig3-a2-c2": {
+          "relevant": "sig3",
+          "addressed": "a2",
+          "contradicted": "c2"
+        },
+        "sig-a3-c3": {
+          "relevant": "sig",
+          "addressed": "a3",
+          "contradicted": "c3"
+        },
+        "sig2-a3-c3": {
+          "relevant": "sig2",
+          "addressed": "a3",
+          "contradicted": "c3"
+        }
+      },
+      "role_rankings": {
+        "addressed": [
+          {
+            "candidate_id": "a2",
+            "bundles": [
+              "sig-a2-cur",
+              "sig-a2-c2",
+              "sig2-a2-cur",
+              "sig2-a2-c2",
+              "sig3-a2-cur",
+              "sig3-a2-c2"
+            ],
+            "exact_cells": 168,
+            "total_cells": 168,
+            "stable_cases": 84,
+            "total_cases": 84
+          },
+          {
+            "candidate_id": "cur",
+            "bundles": [
+              "sig-cur-cur",
+              "sig-cur-c2",
+              "sig2-cur-cur",
+              "sig2-cur-c2",
+              "sig3-cur-cur",
+              "sig3-cur-c2"
+            ],
+            "exact_cells": 168,
+            "total_cells": 168,
+            "stable_cases": 84,
+            "total_cases": 84
+          },
+          {
+            "candidate_id": "a3",
+            "bundles": [
+              "sig-a3-c3",
+              "sig2-a3-c3"
+            ],
+            "exact_cells": 56,
+            "total_cells": 56,
+            "stable_cases": 28,
+            "total_cases": 28
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 28,
+            "total_cells": 28,
+            "stable_cases": 14,
+            "total_cases": 14
+          }
+        ],
+        "contradicted": [
+          {
+            "candidate_id": "cur",
+            "bundles": [
+              "sig-cur-cur",
+              "sig-a2-cur",
+              "sig2-cur-cur",
+              "sig2-a2-cur",
+              "sig3-cur-cur",
+              "sig3-a2-cur"
+            ],
+            "exact_cells": 168,
+            "total_cells": 168,
+            "stable_cases": 84,
+            "total_cases": 84
+          },
+          {
+            "candidate_id": "c2",
+            "bundles": [
+              "sig-cur-c2",
+              "sig-a2-c2",
+              "sig2-cur-c2",
+              "sig2-a2-c2",
+              "sig3-cur-c2",
+              "sig3-a2-c2"
+            ],
+            "exact_cells": 167,
+            "total_cells": 168,
+            "stable_cases": 83,
+            "total_cases": 84
+          },
+          {
+            "candidate_id": "c3",
+            "bundles": [
+              "sig-a3-c3",
+              "sig2-a3-c3"
+            ],
+            "exact_cells": 53,
+            "total_cells": 56,
+            "stable_cases": 27,
+            "total_cases": 28
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 28,
+            "total_cells": 28,
+            "stable_cases": 14,
+            "total_cases": 14
+          }
+        ],
+        "relevant": [
+          {
+            "candidate_id": "sig",
+            "bundles": [
+              "sig-cur-cur",
+              "sig-cur-c2",
+              "sig-a2-cur",
+              "sig-a2-c2",
+              "sig-a3-c3"
+            ],
+            "exact_cells": 130,
+            "total_cells": 140,
+            "stable_cases": 70,
+            "total_cases": 70
+          },
+          {
+            "candidate_id": "sig2",
+            "bundles": [
+              "sig2-cur-cur",
+              "sig2-cur-c2",
+              "sig2-a2-cur",
+              "sig2-a2-c2",
+              "sig2-a3-c3"
+            ],
+            "exact_cells": 130,
+            "total_cells": 140,
+            "stable_cases": 70,
+            "total_cases": 70
+          },
+          {
+            "candidate_id": "sig3",
+            "bundles": [
+              "sig3-cur-cur",
+              "sig3-cur-c2",
+              "sig3-a2-cur",
+              "sig3-a2-c2"
+            ],
+            "exact_cells": 104,
+            "total_cells": 112,
+            "stable_cases": 56,
+            "total_cases": 56
+          },
+          {
+            "candidate_id": "current",
+            "bundles": [
+              "baseline"
+            ],
+            "exact_cells": 20,
+            "total_cells": 28,
+            "stable_cases": 14,
+            "total_cases": 14
+          }
+        ]
+      },
+      "ranking_order": "semantic acceptance, exact role cells, exact semantic verdicts, stable cases, fewest regressions, cells at or above the confidence reference, then minimum, p10, median and mean confidence, fewest question bytes, bundle id",
+      "run_ids_all": [
+        "01317750fe5f6041",
+        "013fe801df6dea85",
+        "025cb38903278fe4",
+        "03098c4d61b8bec2",
+        "0380507d680f5264",
+        "04a25a030f9e6acf",
+        "0520bfefbaabe3cf",
+        "06da6d1eaa06d7ba",
+        "08a6eadec45320cb",
+        "099817664a141f98",
+        "0a3bd2e53b9d475a",
+        "0a62d8b1fbe956b2",
+        "0b1880c8b007613e",
+        "0c068a20d10c09c8",
+        "0c909061ea0e99e4",
+        "0cd71dab369caf72",
+        "0d6c85c93f1d4345",
+        "0dc5f609ac84a2ef",
+        "0f3c8ba4c85bd976",
+        "0f920f222c21eff3",
+        "0fac2c90a4d8029b",
+        "0fe7ac62515574c5",
+        "1199c0dcded6545f",
+        "120c67cb240347a3",
+        "12936d295bc6aac1",
+        "12e83a13fa7d8b7b",
+        "136fa1d67a80f85a",
+        "13f1e54b8770b1a1",
+        "1499c59e04d34b09",
+        "153299d12faf5e6e",
+        "15e5b3c7f885d376",
+        "16c045b52b28fb08",
+        "170bb12dd888237d",
+        "179bec2e62bce411",
+        "17a9eee2774581ce",
+        "17c90aff6a15b2cf",
+        "17e67c83d7970171",
+        "189635b278dab5d0",
+        "18d07b397057ff5f",
+        "18f6cec3218800fb",
+        "198b674055a6e4d4",
+        "19d45c6a03a9340e",
+        "1a3965c1047a5b59",
+        "1b6e4335ca3d90aa",
+        "1b8e40f6d9518934",
+        "1d15586baef70505",
+        "1da6e0d7f99d0fb3",
+        "1e62aa86735d0f53",
+        "1e99ef58e1994126",
+        "1ee4e1aaffd7e823",
+        "1f716075b8fcc9d7",
+        "1fd6b44d96d720c8",
+        "2065f8b2f5c3d780",
+        "2198a10789647ef9",
+        "24396eb33e2a9791",
+        "2501fafd1c048368",
+        "2588da7d78d4a9cf",
+        "26e20808e44bd1d1",
+        "27dea490261ca554",
+        "28410cf431111740",
+        "28ac121057a90e55",
+        "28d62adc3aa005a9",
+        "293685edcbbb6e11",
+        "29fc3f5a5824c3d0",
+        "2a0870e19fdbfb60",
+        "2a91005f1c5c54b3",
+        "2b7495e96cfee41f",
+        "2b7b12eb8ef007dd",
+        "2cf47c2e60db852f",
+        "2e3f30eef0215bb3",
+        "2ec14339216de399",
+        "2ed44f6364023174",
+        "2f1f07184ae2692c",
+        "2f9de2b12a675fc4",
+        "2fc3bab0f2379f01",
+        "304a97ce2d5c8089",
+        "304dc9cdeaa34a15",
+        "30857728f3dccd75",
+        "319e9e02b75cdca5",
+        "31d0cf52741e404a",
+        "3269b65969981778",
+        "32a944b7894ab49e",
+        "332d5a1a55380f7a",
+        "338721e528e547c9",
+        "33d74db2cfa5fc6b",
+        "340436f0f8076278",
+        "34566fdc01e12db3",
+        "352ec3af130998b2",
+        "35c06f16ec1dd1ba",
+        "37241f60b453f7c8",
+        "3758a748870049f8",
+        "3785dec851531489",
+        "38542f856b92f778",
+        "38a13f14557abdfc",
+        "38b999ea68d949f9",
+        "3a18402fd5ad6869",
+        "3a4b76a906fabb80",
+        "3b5b7e09c1f1ebe4",
+        "3bcaf593deb8d1e1",
+        "3cd8cf99bf925bc0",
+        "3d4dc6f679404b89",
+        "3f0c8a361bd3d4c5",
+        "3f2bb944e5f90e50",
+        "3ffdbf46b92783c6",
+        "4170726e50ac6fbe",
+        "41a9c7b28d66ce68",
+        "42a5eb2e89988291",
+        "437a0a354a7ab1dd",
+        "44154048cee35d31",
+        "45232a32414de97f",
+        "4528e4a63fa50ab7",
+        "454623592aab3423",
+        "45750f3fa9ec9604",
+        "46072b5ae45896d3",
+        "46bbd70314491f5c",
+        "47e7ef148f76b303",
+        "4864ba9c81002f45",
+        "4a21fa2f6f69e90a",
+        "4a81795cde349004",
+        "4a9918d1d2dfe220",
+        "4ac980b2b7ea861b",
+        "4aff4fc285226395",
+        "4bf55b91f03e8e92",
+        "4cac38798cbe8f40",
+        "4e1b46216712ef9d",
+        "4f60d6893ec70929",
+        "4f70406c64d47100",
+        "5166d9890f589ee1",
+        "5256e3b0e7a926a1",
+        "5292b628283d6879",
+        "52987136c38e46a9",
+        "53119d79d3ac497d",
+        "5318259f94a041f7",
+        "538aeb6411ae2897",
+        "5519c1dd23fd1ea4",
+        "558c2868bad3e186",
+        "55a3c91ea58f311b",
+        "55ddced7136ab033",
+        "5676dc740e7a3bfd",
+        "5684cf21c88ae94b",
+        "598c3a854343bca7",
+        "5a1356ccc47eed3a",
+        "5a27610a04b17b13",
+        "5a5154776b17f2c7",
+        "5adacb430fd07c6c",
+        "5adb90761c5fae62",
+        "5b32a6525c0f2f39",
+        "5bf5637149578d89",
+        "5c02b680a6a8d5de",
+        "5c33a27d0c8fc58a",
+        "5d178152f2aefac8",
+        "5d4d31f7a78a0c5f",
+        "5db02a8a37ff9bd4",
+        "5f8264f446d06d99",
+        "5fbc4c81a641f190",
+        "606a40142acd5346",
+        "60c23f8af209140a",
+        "6179c77d6d7f67b0",
+        "6194071e015ab873",
+        "61b7fb480c0e0e40",
+        "62e959b6217dad38",
+        "637b044da5467b5e",
+        "644aa65d6f9c15e2",
+        "6468f1ff6e232d92",
+        "647df5110e6f5af0",
+        "64a4f665658b0f06",
+        "64d26d54f75d739d",
+        "6519ec0b82b60438",
+        "6608b1e28ad7f37f",
+        "6621fc15b5d5ac1a",
+        "666b438523af9a50",
+        "668dc534acb5b299",
+        "685b920b5e1ecf68",
+        "68a9c341158ecd5e",
+        "6b1d957a5e476a91",
+        "6b72ebed49a410fa",
+        "6c539fe3e8d56328",
+        "6c5aa7f37a275958",
+        "6db5e0729160cfe6",
+        "6df3c3662a1160a2",
+        "6e2651216bba8969",
+        "6ebef787ff375093",
+        "709bb9a1c1fa5530",
+        "713ce4b7bfb980eb",
+        "71b99648090c3c58",
+        "72a020a1ebe6c8cb",
+        "72c536b2b02d047f",
+        "72d87df7aca4b348",
+        "736b3b976abc6393",
+        "7457cc0515892e9e",
+        "75aa26c5556fecc5",
+        "76106e269e039316",
+        "766e0ca15439d15e",
+        "76cf53a32bddb816",
+        "77548750d3d1022b",
+        "7859ffbd60ddee9e",
+        "788e9c76a310e4e8",
+        "78ebf51603286b62",
+        "796640d0eae6831c",
+        "799f614f34f64bf2",
+        "79f1ee8a1de0dfc1",
+        "7a5e329e67c782b2",
+        "7aecd63745a537db",
+        "7b40eebfb21cc3aa",
+        "7b41e73da478795c",
+        "7b7f90a1057d9df9",
+        "7b9c1b99bf1d9e70",
+        "7d47a18c7bd76b56",
+        "7d95f81d4e2023e8",
+        "7db433868cbb8439",
+        "7e774eb3d4c0b3ea",
+        "7f637a28702e2120",
+        "7fca80a6bf9b463b",
+        "80393bd4fd2fa210",
+        "809e37f8d79782be",
+        "82250111e52a0f05",
+        "824032e1c5930388",
+        "8273653994d61de9",
+        "8276be7c338dcf79",
+        "8467b398276dc276",
+        "84974d2d019c1c6e",
+        "85a75870f8770c41",
+        "85e42fc44ffa789b",
+        "868c344caf18774e",
+        "8712429052cb3a19",
+        "8742b42c63fe657e",
+        "87ba48c307ed9142",
+        "87e954803fed7d96",
+        "87f9207154d9bcdf",
+        "8874f849ab726f14",
+        "88a72bc3a43469fc",
+        "8ad19da12f5337d3",
+        "8b8f5101ac3980aa",
+        "8c1cb59868dcc806",
+        "8cb94276df032f90",
+        "8d31fa5624e2236a",
+        "8dcd19d3cf16b3c8",
+        "8de3b5b885bda8e2",
+        "8e376746fa270718",
+        "8e59b5b974545739",
+        "8f1e7644cbb72318",
+        "8f9aceedd5fbe2cb",
+        "8ff20b9351c69927",
+        "8ff68fffe7cc7310",
+        "90c03e346f838698",
+        "9176455f11e37ea1",
+        "936056463cde4f3c",
+        "939c586da872e813",
+        "93d1e65970e5d121",
+        "94d2bbe6f351260b",
+        "95f42e3194cb6787",
+        "96cce48d35abf962",
+        "96d4a6b9461f2a33",
+        "97d4556188bcac69",
+        "985029c4049ae0c0",
+        "992b30c79a9eecf1",
+        "9aa23d2aabf11c5c",
+        "9b491d8b4b600156",
+        "9c8fb99cb407f17a",
+        "9de750e456ed5e70",
+        "9ee69102b310fbb1",
+        "9f9fd9a08bedd769",
+        "9fb97cc09cbb1f9e",
+        "a04e74c8c3f7861f",
+        "a0a3ef79bb5a7604",
+        "a0b89fd152207fa3",
+        "a17ca7a6385134c8",
+        "a2e560f9f6f5e733",
+        "a385517851710268",
+        "a42ab633420f64a4",
+        "a51634dbb2f145f8",
+        "a5e8d51657b57fe7",
+        "a648997047c8e566",
+        "a65f9ff3fd47e007",
+        "a6a52eebb8a946ce",
+        "a6fb0af554ccc7fd",
+        "a763e9ef25c24184",
+        "a90f5bce6c34daaa",
+        "ab284092c384f30a",
+        "abd58f3d248021cf",
+        "ac1ca6273d9feb63",
+        "ad0ff419865e6765",
+        "adc61737e68c4438",
+        "ae46fe7c20f9d3ea",
+        "aeabc7a4d2e298c0",
+        "aed2311233753602",
+        "aef329487928d869",
+        "af3c4f1caebcb6fe",
+        "afc13a4cc64f8135",
+        "afd90525d414f4dc",
+        "b0313ee1e6cbf1f7",
+        "b10a2331f970f224",
+        "b15c3799a0d7c87f",
+        "b1651994a3ece56f",
+        "b2092778dd04c6ae",
+        "b255023181936a96",
+        "b2e8cf0a960acbf8",
+        "b396c77240a9a35d",
+        "b4ac59f73443867f",
+        "b54bd8750161e346",
+        "b61c2ad1b706946c",
+        "b66db86a58b2e8ed",
+        "b7229fd66ee2bfd2",
+        "b7c727a71e66b2ab",
+        "b82640db44b380dc",
+        "b85b96af69e03975",
+        "b85ffb714e4b0145",
+        "b8991699f41a1bee",
+        "b97841ad5d6fb26a",
+        "ba6966868aa54157",
+        "ba9b6d0b7041ad07",
+        "bc4fc527270284ef",
+        "bcfed8c09c61a007",
+        "bd97730961927194",
+        "bdffaedde66da5d7",
+        "be8cb27ce5a3989b",
+        "bef1aeb320578183",
+        "bf55559e9cc2f010",
+        "bf6ae48da544cfd2",
+        "bfde3d265158fa1b",
+        "c09065b2c6037610",
+        "c1406cb931bc4c31",
+        "c1523c1cc7d26883",
+        "c1dfc8f10ff60b51",
+        "c2dde8d84146299e",
+        "c3f679c8645f846f",
+        "c50a7901ef924cef",
+        "c513a48eae24c1f7",
+        "c57f84e771f3262d",
+        "c5dc2a3f228fc10b",
+        "c6865fe73e6e8877",
+        "c6b8363ecf18ac90",
+        "c6f4a48a8eb7affc",
+        "c7227fbf893c489c",
+        "c7b56dc1358fb3e4",
+        "c83454752670ed81",
+        "c8a3a0355f3a4add",
+        "c8bad63bc02124cc",
+        "ca558079d7fbea52",
+        "cd02cece87138ad0",
+        "cd381789126ee787",
+        "ceab8622ed5a9227",
+        "cf00dcd8b4711b45",
+        "d033023b282c3f20",
+        "d07fd79e6f6546fe",
+        "d0912ba7134cf268",
+        "d0b67c27e6f28eda",
+        "d0db927a860b6b5f",
+        "d2dc8ae72e67a696",
+        "d32f9c82a17919a4",
+        "d46e0e532d76a76d",
+        "d58325b32ef3f2b0",
+        "d6e5c15ee01dfd88",
+        "d7de3cfba96afd76",
+        "d84ad7e75bd7b496",
+        "d8b8c35bd4f07017",
+        "d9d30620a4c1aa2c",
+        "dabab6ecbb3b69e8",
+        "dd0420a3fcda2bce",
+        "de439c22b1fe66a7",
+        "de8367ec97cf48f1",
+        "df0700c4f92149cc",
+        "df6f96fe388e6e0c",
+        "df9cb6999bccb9bb",
+        "dfeb71e28946ee6c",
+        "e0dd455f1bea1656",
+        "e1d42e74b35e1acd",
+        "e224f2d75e19b663",
+        "e2643e467c7510e1",
+        "e2ad693e2ed16485",
+        "e396a5d2b817d106",
+        "e3ec99ebd89bbd42",
+        "e416ed5cca1cbd19",
+        "e4c2f1a437eafeee",
+        "e4e74dc2b0470ea3",
+        "e5515572ec9e9dfe",
+        "e5780385eb013e9a",
+        "e72ff9f956b740b1",
+        "e745264903b59185",
+        "e7a70d6472dd167f",
+        "e7f0a6a222830689",
+        "e812409eda5efa57",
+        "e888b39685e66d3c",
+        "e8afd2c487a9b8cd",
+        "e8d17543d2b8edf0",
+        "e8f8ac592335d541",
+        "e97b600e2b29529c",
+        "e981d88049608bb1",
+        "e9df91565f75c988",
+        "e9ebc3cf177b9f6b",
+        "ea50b8740ac5904e",
+        "eae66b77281b33b6",
+        "eb620f228da5c6c6",
+        "ec6e9c8e95d546fc",
+        "ed23c2b69b5bd0a3",
+        "edacaf8a447d8d9b",
+        "ee9d7bb8c55a73e6",
+        "eec9448bf2f980d2",
+        "eed48ae01e504ed8",
+        "f1903c125a401612",
+        "f1f1f0fb2d5b02fe",
+        "f2ea848b64836f27",
+        "f301d87a1d199cf9",
+        "f454736cd2765b23",
+        "f4a1e3784fda9614",
+        "f59f2a26bf655dd0",
+        "f5b741d753df6201",
+        "f6d1a2ecad81fa46",
+        "f6da629b1502fda8",
+        "f78b1f7bde60c04a",
+        "f82c8093b827ea20",
+        "f862b027bbf982ae",
+        "fa7db714d6a1a5b8",
+        "fada1d72d16ed8fe",
+        "fb0c578ee659d073",
+        "fb5bcb4cd0865df8",
+        "fe2d1370a4e7440e",
+        "fe4f6b21e0e74983",
+        "ff50abb6edfb3e22",
+        "ff5d423f483cbb55"
+      ],
+      "tie": null
+    },
+    "explanation": "15 role-complete bundles (baseline included) x 14 frozen oracle cases x 2 repeats: 420 calls, 0 retries. No bundle met semantic acceptance; the top-ranked bundle sig2-a2-c2 has 82/84 role cells, 26/28 verdicts, 14/14 stable cases and 1 regressions (TOURNAMENT.SEMANTIC_REJECTED). Confidence is diagnostic only; production review keeps the 0.6 threshold.",
+    "planner_action": "Keep the current questions. Read the acceptance table and candidate rankings, then evaluate new candidates against the same frozen oracle.",
+    "question_action": null,
+    "sealed_question_set_digest_before": null,
+    "sealed_question_set_digest_after": null,
+    "authority_recommendations": []
+  },
+  "error": null,
+  "metadata": {
+    "duration_ms": 13411,
+    "tool_calls": 420,
+    "retry_count": 0,
+    "correlation_id": "phase-m-tune-ANC-010-planning-2",
+    "jev_run_ids": [
+      "01317750fe5f6041",
+      "013fe801df6dea85",
+      "025cb38903278fe4",
+      "03098c4d61b8bec2",
+      "0380507d680f5264",
+      "04a25a030f9e6acf",
+      "0520bfefbaabe3cf",
+      "06da6d1eaa06d7ba",
+      "08a6eadec45320cb",
+      "099817664a141f98",
+      "0a3bd2e53b9d475a",
+      "0a62d8b1fbe956b2",
+      "0b1880c8b007613e",
+      "0c068a20d10c09c8",
+      "0c909061ea0e99e4",
+      "0cd71dab369caf72",
+      "0d6c85c93f1d4345",
+      "0dc5f609ac84a2ef",
+      "0f3c8ba4c85bd976",
+      "0f920f222c21eff3",
+      "0fac2c90a4d8029b",
+      "0fe7ac62515574c5",
+      "1199c0dcded6545f",
+      "120c67cb240347a3",
+      "12936d295bc6aac1",
+      "12e83a13fa7d8b7b",
+      "136fa1d67a80f85a",
+      "13f1e54b8770b1a1",
+      "1499c59e04d34b09",
+      "153299d12faf5e6e",
+      "15e5b3c7f885d376",
+      "16c045b52b28fb08",
+      "170bb12dd888237d",
+      "179bec2e62bce411",
+      "17a9eee2774581ce",
+      "17c90aff6a15b2cf",
+      "17e67c83d7970171",
+      "189635b278dab5d0",
+      "18d07b397057ff5f",
+      "18f6cec3218800fb",
+      "198b674055a6e4d4",
+      "19d45c6a03a9340e",
+      "1a3965c1047a5b59",
+      "1b6e4335ca3d90aa",
+      "1b8e40f6d9518934",
+      "1d15586baef70505",
+      "1da6e0d7f99d0fb3",
+      "1e62aa86735d0f53",
+      "1e99ef58e1994126",
+      "1ee4e1aaffd7e823",
+      "1f716075b8fcc9d7",
+      "1fd6b44d96d720c8",
+      "2065f8b2f5c3d780",
+      "2198a10789647ef9",
+      "24396eb33e2a9791",
+      "2501fafd1c048368",
+      "2588da7d78d4a9cf",
+      "26e20808e44bd1d1",
+      "27dea490261ca554",
+      "28410cf431111740",
+      "28ac121057a90e55",
+      "28d62adc3aa005a9",
+      "293685edcbbb6e11",
+      "29fc3f5a5824c3d0",
+      "2a0870e19fdbfb60",
+      "2a91005f1c5c54b3",
+      "2b7495e96cfee41f",
+      "2b7b12eb8ef007dd",
+      "2cf47c2e60db852f",
+      "2e3f30eef0215bb3",
+      "2ec14339216de399",
+      "2ed44f6364023174",
+      "2f1f07184ae2692c",
+      "2f9de2b12a675fc4",
+      "2fc3bab0f2379f01",
+      "304a97ce2d5c8089",
+      "304dc9cdeaa34a15",
+      "30857728f3dccd75",
+      "319e9e02b75cdca5",
+      "31d0cf52741e404a",
+      "3269b65969981778",
+      "32a944b7894ab49e",
+      "332d5a1a55380f7a",
+      "338721e528e547c9",
+      "33d74db2cfa5fc6b",
+      "340436f0f8076278",
+      "34566fdc01e12db3",
+      "352ec3af130998b2",
+      "35c06f16ec1dd1ba",
+      "37241f60b453f7c8",
+      "3758a748870049f8",
+      "3785dec851531489",
+      "38542f856b92f778",
+      "38a13f14557abdfc",
+      "38b999ea68d949f9",
+      "3a18402fd5ad6869",
+      "3a4b76a906fabb80",
+      "3b5b7e09c1f1ebe4",
+      "3bcaf593deb8d1e1",
+      "3cd8cf99bf925bc0",
+      "3d4dc6f679404b89",
+      "3f0c8a361bd3d4c5",
+      "3f2bb944e5f90e50",
+      "3ffdbf46b92783c6",
+      "4170726e50ac6fbe",
+      "41a9c7b28d66ce68",
+      "42a5eb2e89988291",
+      "437a0a354a7ab1dd",
+      "44154048cee35d31",
+      "45232a32414de97f",
+      "4528e4a63fa50ab7",
+      "454623592aab3423",
+      "45750f3fa9ec9604",
+      "46072b5ae45896d3",
+      "46bbd70314491f5c",
+      "47e7ef148f76b303",
+      "4864ba9c81002f45",
+      "4a21fa2f6f69e90a",
+      "4a81795cde349004",
+      "4a9918d1d2dfe220",
+      "4ac980b2b7ea861b",
+      "4aff4fc285226395",
+      "4bf55b91f03e8e92",
+      "4cac38798cbe8f40",
+      "4e1b46216712ef9d",
+      "4f60d6893ec70929",
+      "4f70406c64d47100",
+      "5166d9890f589ee1",
+      "5256e3b0e7a926a1",
+      "5292b628283d6879",
+      "52987136c38e46a9",
+      "53119d79d3ac497d",
+      "5318259f94a041f7",
+      "538aeb6411ae2897",
+      "5519c1dd23fd1ea4",
+      "558c2868bad3e186",
+      "55a3c91ea58f311b",
+      "55ddced7136ab033",
+      "5676dc740e7a3bfd",
+      "5684cf21c88ae94b",
+      "598c3a854343bca7",
+      "5a1356ccc47eed3a",
+      "5a27610a04b17b13",
+      "5a5154776b17f2c7",
+      "5adacb430fd07c6c",
+      "5adb90761c5fae62",
+      "5b32a6525c0f2f39",
+      "5bf5637149578d89",
+      "5c02b680a6a8d5de",
+      "5c33a27d0c8fc58a",
+      "5d178152f2aefac8",
+      "5d4d31f7a78a0c5f",
+      "5db02a8a37ff9bd4",
+      "5f8264f446d06d99",
+      "5fbc4c81a641f190",
+      "606a40142acd5346",
+      "60c23f8af209140a",
+      "6179c77d6d7f67b0",
+      "6194071e015ab873",
+      "61b7fb480c0e0e40",
+      "62e959b6217dad38",
+      "637b044da5467b5e",
+      "644aa65d6f9c15e2",
+      "6468f1ff6e232d92",
+      "647df5110e6f5af0",
+      "64a4f665658b0f06",
+      "64d26d54f75d739d",
+      "6519ec0b82b60438",
+      "6608b1e28ad7f37f",
+      "6621fc15b5d5ac1a",
+      "666b438523af9a50",
+      "668dc534acb5b299",
+      "685b920b5e1ecf68",
+      "68a9c341158ecd5e",
+      "6b1d957a5e476a91",
+      "6b72ebed49a410fa",
+      "6c539fe3e8d56328",
+      "6c5aa7f37a275958",
+      "6db5e0729160cfe6",
+      "6df3c3662a1160a2",
+      "6e2651216bba8969",
+      "6ebef787ff375093",
+      "709bb9a1c1fa5530",
+      "713ce4b7bfb980eb",
+      "71b99648090c3c58",
+      "72a020a1ebe6c8cb",
+      "72c536b2b02d047f",
+      "72d87df7aca4b348",
+      "736b3b976abc6393",
+      "7457cc0515892e9e",
+      "75aa26c5556fecc5",
+      "76106e269e039316",
+      "766e0ca15439d15e",
+      "76cf53a32bddb816",
+      "77548750d3d1022b",
+      "7859ffbd60ddee9e",
+      "788e9c76a310e4e8",
+      "78ebf51603286b62",
+      "796640d0eae6831c",
+      "799f614f34f64bf2",
+      "79f1ee8a1de0dfc1",
+      "7a5e329e67c782b2",
+      "7aecd63745a537db",
+      "7b40eebfb21cc3aa",
+      "7b41e73da478795c",
+      "7b7f90a1057d9df9",
+      "7b9c1b99bf1d9e70",
+      "7d47a18c7bd76b56",
+      "7d95f81d4e2023e8",
+      "7db433868cbb8439",
+      "7e774eb3d4c0b3ea",
+      "7f637a28702e2120",
+      "7fca80a6bf9b463b",
+      "80393bd4fd2fa210",
+      "809e37f8d79782be",
+      "82250111e52a0f05",
+      "824032e1c5930388",
+      "8273653994d61de9",
+      "8276be7c338dcf79",
+      "8467b398276dc276",
+      "84974d2d019c1c6e",
+      "85a75870f8770c41",
+      "85e42fc44ffa789b",
+      "868c344caf18774e",
+      "8712429052cb3a19",
+      "8742b42c63fe657e",
+      "87ba48c307ed9142",
+      "87e954803fed7d96",
+      "87f9207154d9bcdf",
+      "8874f849ab726f14",
+      "88a72bc3a43469fc",
+      "8ad19da12f5337d3",
+      "8b8f5101ac3980aa",
+      "8c1cb59868dcc806",
+      "8cb94276df032f90",
+      "8d31fa5624e2236a",
+      "8dcd19d3cf16b3c8",
+      "8de3b5b885bda8e2",
+      "8e376746fa270718",
+      "8e59b5b974545739",
+      "8f1e7644cbb72318",
+      "8f9aceedd5fbe2cb",
+      "8ff20b9351c69927",
+      "8ff68fffe7cc7310",
+      "90c03e346f838698",
+      "9176455f11e37ea1",
+      "936056463cde4f3c",
+      "939c586da872e813",
+      "93d1e65970e5d121",
+      "94d2bbe6f351260b",
+      "95f42e3194cb6787",
+      "96cce48d35abf962",
+      "96d4a6b9461f2a33",
+      "97d4556188bcac69",
+      "985029c4049ae0c0",
+      "992b30c79a9eecf1",
+      "9aa23d2aabf11c5c",
+      "9b491d8b4b600156",
+      "9c8fb99cb407f17a",
+      "9de750e456ed5e70",
+      "9ee69102b310fbb1",
+      "9f9fd9a08bedd769",
+      "9fb97cc09cbb1f9e",
+      "a04e74c8c3f7861f",
+      "a0a3ef79bb5a7604",
+      "a0b89fd152207fa3",
+      "a17ca7a6385134c8",
+      "a2e560f9f6f5e733",
+      "a385517851710268",
+      "a42ab633420f64a4",
+      "a51634dbb2f145f8",
+      "a5e8d51657b57fe7",
+      "a648997047c8e566",
+      "a65f9ff3fd47e007",
+      "a6a52eebb8a946ce",
+      "a6fb0af554ccc7fd",
+      "a763e9ef25c24184",
+      "a90f5bce6c34daaa",
+      "ab284092c384f30a",
+      "abd58f3d248021cf",
+      "ac1ca6273d9feb63",
+      "ad0ff419865e6765",
+      "adc61737e68c4438",
+      "ae46fe7c20f9d3ea",
+      "aeabc7a4d2e298c0",
+      "aed2311233753602",
+      "aef329487928d869",
+      "af3c4f1caebcb6fe",
+      "afc13a4cc64f8135",
+      "afd90525d414f4dc",
+      "b0313ee1e6cbf1f7",
+      "b10a2331f970f224",
+      "b15c3799a0d7c87f",
+      "b1651994a3ece56f",
+      "b2092778dd04c6ae",
+      "b255023181936a96",
+      "b2e8cf0a960acbf8",
+      "b396c77240a9a35d",
+      "b4ac59f73443867f",
+      "b54bd8750161e346",
+      "b61c2ad1b706946c",
+      "b66db86a58b2e8ed",
+      "b7229fd66ee2bfd2",
+      "b7c727a71e66b2ab",
+      "b82640db44b380dc",
+      "b85b96af69e03975",
+      "b85ffb714e4b0145",
+      "b8991699f41a1bee",
+      "b97841ad5d6fb26a",
+      "ba6966868aa54157",
+      "ba9b6d0b7041ad07",
+      "bc4fc527270284ef",
+      "bcfed8c09c61a007",
+      "bd97730961927194",
+      "bdffaedde66da5d7",
+      "be8cb27ce5a3989b",
+      "bef1aeb320578183",
+      "bf55559e9cc2f010",
+      "bf6ae48da544cfd2",
+      "bfde3d265158fa1b",
+      "c09065b2c6037610",
+      "c1406cb931bc4c31",
+      "c1523c1cc7d26883",
+      "c1dfc8f10ff60b51",
+      "c2dde8d84146299e",
+      "c3f679c8645f846f",
+      "c50a7901ef924cef",
+      "c513a48eae24c1f7",
+      "c57f84e771f3262d",
+      "c5dc2a3f228fc10b",
+      "c6865fe73e6e8877",
+      "c6b8363ecf18ac90",
+      "c6f4a48a8eb7affc",
+      "c7227fbf893c489c",
+      "c7b56dc1358fb3e4",
+      "c83454752670ed81",
+      "c8a3a0355f3a4add",
+      "c8bad63bc02124cc",
+      "ca558079d7fbea52",
+      "cd02cece87138ad0",
+      "cd381789126ee787",
+      "ceab8622ed5a9227",
+      "cf00dcd8b4711b45",
+      "d033023b282c3f20",
+      "d07fd79e6f6546fe",
+      "d0912ba7134cf268",
+      "d0b67c27e6f28eda",
+      "d0db927a860b6b5f",
+      "d2dc8ae72e67a696",
+      "d32f9c82a17919a4",
+      "d46e0e532d76a76d",
+      "d58325b32ef3f2b0",
+      "d6e5c15ee01dfd88",
+      "d7de3cfba96afd76",
+      "d84ad7e75bd7b496",
+      "d8b8c35bd4f07017",
+      "d9d30620a4c1aa2c",
+      "dabab6ecbb3b69e8",
+      "dd0420a3fcda2bce",
+      "de439c22b1fe66a7",
+      "de8367ec97cf48f1",
+      "df0700c4f92149cc",
+      "df6f96fe388e6e0c",
+      "df9cb6999bccb9bb",
+      "dfeb71e28946ee6c",
+      "e0dd455f1bea1656",
+      "e1d42e74b35e1acd",
+      "e224f2d75e19b663",
+      "e2643e467c7510e1",
+      "e2ad693e2ed16485",
+      "e396a5d2b817d106",
+      "e3ec99ebd89bbd42",
+      "e416ed5cca1cbd19",
+      "e4c2f1a437eafeee",
+      "e4e74dc2b0470ea3",
+      "e5515572ec9e9dfe",
+      "e5780385eb013e9a",
+      "e72ff9f956b740b1",
+      "e745264903b59185",
+      "e7a70d6472dd167f",
+      "e7f0a6a222830689",
+      "e812409eda5efa57",
+      "e888b39685e66d3c",
+      "e8afd2c487a9b8cd",
+      "e8d17543d2b8edf0",
+      "e8f8ac592335d541",
+      "e97b600e2b29529c",
+      "e981d88049608bb1",
+      "e9df91565f75c988",
+      "e9ebc3cf177b9f6b",
+      "ea50b8740ac5904e",
+      "eae66b77281b33b6",
+      "eb620f228da5c6c6",
+      "ec6e9c8e95d546fc",
+      "ed23c2b69b5bd0a3",
+      "edacaf8a447d8d9b",
+      "ee9d7bb8c55a73e6",
+      "eec9448bf2f980d2",
+      "eed48ae01e504ed8",
+      "f1903c125a401612",
+      "f1f1f0fb2d5b02fe",
+      "f2ea848b64836f27",
+      "f301d87a1d199cf9",
+      "f454736cd2765b23",
+      "f4a1e3784fda9614",
+      "f59f2a26bf655dd0",
+      "f5b741d753df6201",
+      "f6d1a2ecad81fa46",
+      "f6da629b1502fda8",
+      "f78b1f7bde60c04a",
+      "f82c8093b827ea20",
+      "f862b027bbf982ae",
+      "fa7db714d6a1a5b8",
+      "fada1d72d16ed8fe",
+      "fb0c578ee659d073",
+      "fb5bcb4cd0865df8",
+      "fe2d1370a4e7440e",
+      "fe4f6b21e0e74983",
+      "ff50abb6edfb3e22",
+      "ff5d423f483cbb55"
+    ],
+    "planner_observation_trust": null,
+    "authoritative_sources_unchanged": true
+  }
+}

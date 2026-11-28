@@ -1,0 +1,150 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-anchor" id="anchor-ANC-032">
+  <div class="section-head">
+    <h2>ANC-032 <span class="status status-locked">locked</span> <span class="small">bead agt-ws1i</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy anchor data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;bead&quot;: &quot;agt-ws1i&quot;,
+  &quot;bead_url&quot;: &quot;&quot;,
+  &quot;changes&quot;: [],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: false,
+      &quot;item&quot;: &quot;agt-m-0&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;m-0 adds no table definition and no schema version, and does not touch crates/sc-agent-py.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;item&quot;: &quot;agt-m-2&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;This sprint adds or changes no table definitions, schema versions, or wheel code; those changes are owned by agt-m-8.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;item&quot;: &quot;agt-m-6&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;item&quot;: &quot;agt-m-7&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;item&quot;: &quot;agt-m-11&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;This integration sprint changes no table or schema definition; agt-m-8 carries session schema work.&quot;
+    }
+  ],
+  &quot;fixtures_after&quot;: &quot;-&quot;,
+  &quot;fixtures_before&quot;: &quot;-&quot;,
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-28T09:08:56+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-m-2; reason: This sprint moves configuration code and does not change tool table definitions, schema versions, or the wheel crate.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T09:22:19+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-m-2&quot;,
+      &quot;event&quot;: &quot;exclusion_removed&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T09:22:19+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-m-2; reason: This sprint adds or changes no table definitions, schema versions, or wheel code; those changes are owned by agt-m-8.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T09:47:54+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-m-6; reason: m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T09:47:54+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-m-7; reason: m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T09:52:38+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-m-11; reason: This integration sprint changes no table or schema definition; agt-m-8 carries session schema work.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-032&quot;,
+  &quot;questions_default&quot;: &quot;-&quot;,
+  &quot;questions_tuned&quot;: &quot;-&quot;,
+  &quot;quote&quot;: &quot;Also schema is not encoded at individual wheel layer. Schema is versioned for app tables independently.&quot;,
+  &quot;removed_exclusions&quot;: [],
+  &quot;statement&quot;: &quot;Each tool&#x27;s tables carry their own schema version, independent of the core schema version; no table definition is in the wheel crate `sc-agent-py`.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;status_before&quot;: &quot;locked&quot;,
+  &quot;tuning&quot;: [],
+  &quot;version_before&quot;: &quot;2&quot;,
+  &quot;version_now&quot;: &quot;2&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Anchor ANC-032 (locked v2 -&gt; locked v2)
+Statement: Each tool&#x27;s tables carry their own schema version, independent of the core schema version; no table definition is in the wheel crate `sc-agent-py`.
+Quote: Also schema is not encoded at individual wheel layer. Schema is versioned for app tables independently.
+Fixture checks: - -&gt; -.
+Questions: default - -&gt; tuned - oracle cases.
+Excluded for agt-m-0: m-0 adds no table definition and no schema version, and does not touch crates/sc-agent-py.
+Excluded for agt-m-2: This sprint adds or changes no table definitions, schema versions, or wheel code; those changes are owned by agt-m-8.
+Excluded for agt-m-6: m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.
+Excluded for agt-m-7: m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.
+Excluded for agt-m-11: This integration sprint changes no table or schema definition; agt-m-8 carries session schema work.
+2026-11-28T09:08:56+00:00 excluded: item: agt-m-2; reason: This sprint moves configuration code and does not change tool table definitions, schema versions, or the wheel crate.; replaced: false
+2026-11-28T09:22:19+00:00 exclusion_removed: item: agt-m-2
+2026-11-28T09:22:19+00:00 excluded: item: agt-m-2; reason: This sprint adds or changes no table definitions, schema versions, or wheel code; those changes are owned by agt-m-8.; replaced: false
+2026-11-28T09:47:54+00:00 excluded: item: agt-m-6; reason: m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.; replaced: false
+2026-11-28T09:47:54+00:00 excluded: item: agt-m-7; reason: m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.; replaced: false
+2026-11-28T09:52:38+00:00 excluded: item: agt-m-11; reason: This integration sprint changes no table or schema definition; agt-m-8 carries session schema work.; replaced: false">&#x2398;</button>
+    </div>
+  </div>
+  <p class="statement">Each tool&#x27;s tables carry their own schema version, independent of the core schema version; no table definition is in the wheel crate `sc-agent-py`.</p>
+  <p class="quote">&#x201C;Also schema is not encoded at individual wheel layer. Schema is versioned for app tables independently.&#x201D;</p>
+
+  <table class="scores">
+    <thead><tr><th scope="col"></th><th scope="col">Before</th><th scope="col">Now</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Status</th><td>locked</td><td>locked</td></tr>
+      <tr><th scope="row">Version</th><td>2</td><td>2</td></tr>
+      <tr><th scope="row">Fixture checks (expected verdicts)</th><td>-</td><td>-</td></tr>
+      <tr><th scope="row">Questions: oracle cases matched (default, tuned)</th><td>-</td><td>-</td></tr>
+    </tbody>
+  </table>
+
+
+  <h3>Record changes</h3>
+  <p class="small">Text unchanged.</p>
+
+  <details>
+    <summary>History since the baseline (6)</summary>
+    <table>
+      <thead><tr><th scope="col">At</th><th scope="col">Event</th><th scope="col">Detail</th></tr></thead>
+      <tbody>
+        <tr><td>2026-11-28T09:08:56+00:00</td><td>excluded</td><td>item: agt-m-2; reason: This sprint moves configuration code and does not change tool table definitions, schema versions, or the wheel crate.; replaced: false</td></tr>
+        <tr><td>2026-11-28T09:22:19+00:00</td><td>exclusion_removed</td><td>item: agt-m-2</td></tr>
+        <tr><td>2026-11-28T09:22:19+00:00</td><td>excluded</td><td>item: agt-m-2; reason: This sprint adds or changes no table definitions, schema versions, or wheel code; those changes are owned by agt-m-8.; replaced: false</td></tr>
+        <tr><td>2026-11-28T09:47:54+00:00</td><td>excluded</td><td>item: agt-m-6; reason: m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.; replaced: false</td></tr>
+        <tr><td>2026-11-28T09:47:54+00:00</td><td>excluded</td><td>item: agt-m-7; reason: m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.; replaced: false</td></tr>
+        <tr><td>2026-11-28T09:52:38+00:00</td><td>excluded</td><td>item: agt-m-11; reason: This integration sprint changes no table or schema definition; agt-m-8 carries session schema work.; replaced: false</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <details open="open">
+    <summary>Exclusions (5)</summary>
+    <table>
+      <thead><tr><th scope="col">Item</th><th scope="col">Reason</th><th scope="col">Change</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">agt-m-0</th><td>m-0 adds no table definition and no schema version, and does not touch crates/sc-agent-py.</td><td>kept</td></tr>
+        <tr><th scope="row">agt-m-2</th><td>This sprint adds or changes no table definitions, schema versions, or wheel code; those changes are owned by agt-m-8.</td><td>added</td></tr>
+        <tr><th scope="row">agt-m-6</th><td>m-6 changes wheel imports only and defines no SQL tables or schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.</td><td>added</td></tr>
+        <tr><th scope="row">agt-m-7</th><td>m-7 repoints provider_keys and defines no wheel SQL tables or tool schema versions; agt-m-8 carries core-versus-tool schema ownership and versions.</td><td>added</td></tr>
+        <tr><th scope="row">agt-m-11</th><td>This integration sprint changes no table or schema definition; agt-m-8 carries session schema work.</td><td>added</td></tr>
+      </tbody>
+    </table>
+  </details>
+</section>

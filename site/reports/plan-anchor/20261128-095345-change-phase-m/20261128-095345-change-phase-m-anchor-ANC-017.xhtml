@@ -1,0 +1,91 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section unit unit-anchor" id="anchor-ANC-017">
+  <div class="section-head">
+    <h2>ANC-017 <span class="status status-locked">locked</span> <span class="small">bead agt-lnby</span></h2>
+    <div class="section-actions" role="group" aria-label="Copy anchor data">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;bead&quot;: &quot;agt-lnby&quot;,
+  &quot;bead_url&quot;: &quot;&quot;,
+  &quot;changes&quot;: [],
+  &quot;exclusions&quot;: [
+    {
+      &quot;added&quot;: false,
+      &quot;item&quot;: &quot;agt-m-0&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;m-0 adds empty crates, boundary records and a CI lint step; it adds or changes no test.&quot;
+    },
+    {
+      &quot;added&quot;: true,
+      &quot;item&quot;: &quot;agt-m-2&quot;,
+      &quot;item_url&quot;: &quot;&quot;,
+      &quot;reason&quot;: &quot;This sprint relocates the existing tests unchanged; deterministic test changes for the model configuration work are owned by agt-m-7.&quot;
+    }
+  ],
+  &quot;fixtures_after&quot;: &quot;-&quot;,
+  &quot;fixtures_before&quot;: &quot;-&quot;,
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-28T09:22:19+00:00&quot;,
+      &quot;detail&quot;: &quot;item: agt-m-2; reason: This sprint relocates the existing tests unchanged; deterministic test changes for the model configuration work are owned by agt-m-7.; replaced: false&quot;,
+      &quot;event&quot;: &quot;excluded&quot;
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-017&quot;,
+  &quot;questions_default&quot;: &quot;-&quot;,
+  &quot;questions_tuned&quot;: &quot;-&quot;,
+  &quot;quote&quot;: &quot;Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.&quot;,
+  &quot;removed_exclusions&quot;: [],
+  &quot;statement&quot;: &quot;sc-agent tests must not depend on races, wall-clock timing, sleeps, event-loop ordering or system load; a test found to depend on one must be redesigned to drive its logic with controlled inputs.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;status_before&quot;: &quot;locked&quot;,
+  &quot;tuning&quot;: [],
+  &quot;version_before&quot;: &quot;2&quot;,
+  &quot;version_now&quot;: &quot;2&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="Anchor ANC-017 (locked v2 -&gt; locked v2)
+Statement: sc-agent tests must not depend on races, wall-clock timing, sleeps, event-loop ordering or system load; a test found to depend on one must be redesigned to drive its logic with controlled inputs.
+Quote: Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.
+Fixture checks: - -&gt; -.
+Questions: default - -&gt; tuned - oracle cases.
+Excluded for agt-m-0: m-0 adds empty crates, boundary records and a CI lint step; it adds or changes no test.
+Excluded for agt-m-2: This sprint relocates the existing tests unchanged; deterministic test changes for the model configuration work are owned by agt-m-7.
+2026-11-28T09:22:19+00:00 excluded: item: agt-m-2; reason: This sprint relocates the existing tests unchanged; deterministic test changes for the model configuration work are owned by agt-m-7.; replaced: false">&#x2398;</button>
+    </div>
+  </div>
+  <p class="statement">sc-agent tests must not depend on races, wall-clock timing, sleeps, event-loop ordering or system load; a test found to depend on one must be redesigned to drive its logic with controlled inputs.</p>
+  <p class="quote">&#x201C;Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.&#x201D;</p>
+
+  <table class="scores">
+    <thead><tr><th scope="col"></th><th scope="col">Before</th><th scope="col">Now</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Status</th><td>locked</td><td>locked</td></tr>
+      <tr><th scope="row">Version</th><td>2</td><td>2</td></tr>
+      <tr><th scope="row">Fixture checks (expected verdicts)</th><td>-</td><td>-</td></tr>
+      <tr><th scope="row">Questions: oracle cases matched (default, tuned)</th><td>-</td><td>-</td></tr>
+    </tbody>
+  </table>
+
+
+  <h3>Record changes</h3>
+  <p class="small">Text unchanged.</p>
+
+  <details>
+    <summary>History since the baseline (1)</summary>
+    <table>
+      <thead><tr><th scope="col">At</th><th scope="col">Event</th><th scope="col">Detail</th></tr></thead>
+      <tbody>
+        <tr><td>2026-11-28T09:22:19+00:00</td><td>excluded</td><td>item: agt-m-2; reason: This sprint relocates the existing tests unchanged; deterministic test changes for the model configuration work are owned by agt-m-7.; replaced: false</td></tr>
+      </tbody>
+    </table>
+  </details>
+
+  <details open="open">
+    <summary>Exclusions (2)</summary>
+    <table>
+      <thead><tr><th scope="col">Item</th><th scope="col">Reason</th><th scope="col">Change</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">agt-m-0</th><td>m-0 adds empty crates, boundary records and a CI lint step; it adds or changes no test.</td><td>kept</td></tr>
+        <tr><th scope="row">agt-m-2</th><td>This sprint relocates the existing tests unchanged; deterministic test changes for the model configuration work are owned by agt-m-7.</td><td>added</td></tr>
+      </tbody>
+    </table>
+  </details>
+</section>

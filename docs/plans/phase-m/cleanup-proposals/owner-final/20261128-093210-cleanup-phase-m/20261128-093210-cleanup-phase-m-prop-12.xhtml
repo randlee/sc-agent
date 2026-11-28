@@ -1,0 +1,46 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-12">
+  <div class="section-head">
+    <h2>12. Replace the JSONL-first session-log decision (docs/sc-agent-sqlite/)</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="12. Replace the JSONL-first session-log decision (docs/sc-agent-sqlite/)
+Wave 1 · resolve conflict
+Records: ADR-SAG-0002
+Change:
+- Resolution: reconcile.
+- Reword ADR-SAG-0002: “For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.” → “Session logs are written to the repository&#x27;s SQLite database through `sc-agent-sqlite`. The local SQLite database syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are stored in that database; a project lasts under a day to several days.”
+Rewording (rare; justified): ADR-SAG-0002: The owner directed replacing the JSONL session-log design with SQLite. The row metadata can remain while the storage sequence and server-sync claim are removed.
+Clears:
+- ADR-SAG-0002 × ANC-023 (conflicts)
+- ADR-SAG-0002 × ANC-031 (conflicts)
+Justification: The owner replaced JSONL-first session storage with SQLite; independently stated long-term sync and grouping remain for review.
+Source of truth: ANC-023 — Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp” — commit 998015d2
+Expected improvement:
+- Uses SQLite for session logs while retaining the remaining ADR decisions.
+- Records 49 → 49; statements 205 → 205; duplicates cleared 0 of 32; conflicts resolved 2 of 16; exceeds cleared 0 of 52">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 1 · resolve conflict</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-ADR-SAG-0002" data-panel="rec-ADR-SAG-0002">ADR-SAG-0002</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Resolution: reconcile.</li>
+    <li>Reword ADR-SAG-0002: “For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.” → “Session logs are written to the repository&#x27;s SQLite database through `sc-agent-sqlite`. The local SQLite database syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are stored in that database; a project lasts under a day to several days.”</li>
+  </ul>
+  <h3>Rewording (rare; justified)</h3>
+  <p>ADR-SAG-0002: The owner directed replacing the JSONL session-log design with SQLite. The row metadata can remain while the storage sequence and server-sync claim are removed.</p>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-ADR-SAG-0002-ANC-023" data-panel="cell-ADR-SAG-0002-ANC-023">ADR-SAG-0002 × ANC-023 (conflicts)</a></li>
+    <li><a href="#cell-ADR-SAG-0002-ANC-031" data-panel="cell-ADR-SAG-0002-ANC-031">ADR-SAG-0002 × ANC-031 (conflicts)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>The owner replaced JSONL-first session storage with SQLite; independently stated long-term sync and grouping remain for review.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-023 — Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp” — commit 998015d2</p>
+  <h3>Expected improvement</h3>
+  <p>Uses SQLite for session logs while retaining the remaining ADR decisions.</p>
+  <p>Records 49 → 49; statements 205 → 205; duplicates cleared 0 of 32; conflicts resolved 2 of 16; exceeds cleared 0 of 52</p>
+</section>

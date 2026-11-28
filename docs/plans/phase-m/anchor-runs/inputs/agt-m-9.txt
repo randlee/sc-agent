@@ -1,0 +1,27 @@
+# m-9: retry and holdoff take their rules as parameters (change)
+
+## Description
+
+The resend loop stops knowing anything about providers. It is given its limits and the rules for "busy" and "out of quota" as data by whoever calls it, so a provider with different rules is a different value, not a different code path. The wait between resends comes from the reply's Retry-After or from configuration, and the fixed 1, 2, 4, 8 second ladder and the per-host table are deleted.
+
+### Deliverables
+1. M9-1 parameterized transport and holdoff: apply the corresponding verbatim inventory/change section in design.
+
+This sprint’s changes land in `sc-agent-http`, a planning-only layer-1 crate (working name; not in ADR-SAG-0004; placement open with Rand, 2026-11-28 00:15); it sits below the three API-shape crates that all use it.
+
+
+The planned Limits, Replies and Transport structs group related values passed through the send path rather than repeating parameters.
+
+The test drives the retry and holdoff logic with controlled inputs, not races, wall-clock timing, sleeps, event-loop ordering or system load.
+
+## Acceptance criteria
+
+### Acceptance Criteria
+The crate contains no status code, provider name or host string; the existing holdoff and cancellation tests pass with the rules passed in; a test gives one provider a different busy list and sees it honoured.
+
+
+### Validation
+- cargo test --workspace --all-features
+- cargo fmt --check --all
+- cargo clippy --workspace --all-targets --all-features -- -D warnings
+- sc-lint lint sc-boundary --config sc-lint.toml

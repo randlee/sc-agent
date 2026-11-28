@@ -1,0 +1,80 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-related" id="cell-REQ-SAG-0001-ANC-023">
+  <div class="section-head">
+    <h2>REQ-SAG-0001 × ANC-023 — related</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-023&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.83,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.89,
+        &quot;unclear&quot;: 0.07,
+        &quot;yes&quot;: 0.04
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.26,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.51,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.47
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.67,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.22,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.78
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.98,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.99,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.0
+      }
+    }
+  },
+  &quot;class&quot;: &quot;related&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.04,
+    &quot;exceeds&quot;: 0.47,
+    &quot;relates&quot;: 0.78,
+    &quot;serves&quot;: 0.0
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0001&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0001/ANC-023/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ65HJ7N1FJTDMEJR5VYF2&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0001 × ANC-023 — related
+Anchor
+sc-agent writes each session row to the repository&#x27;s SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.
+Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp”
+Scope: adds or changes code that writes or reads session rows
+Record statements
+Every id sc-agent generates MUST be a ULID.
+An id whose format an external API defines MUST use that API&#x27;s format, including UUID where the API defines a UUID.
+sc-agent MUST NOT generate a UUID for an id that no external API defines.
+Jev P(yes): relates 0.78 · serves 0.00 · exceeds 0.47 · conflicts 0.04">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>Anchor</h3>
+  <p>sc-agent writes each session row to the repository&#x27;s SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.</p>
+  <p>Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp”</p>
+  <p>Scope: adds or changes code that writes or reads session rows</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>Every id sc-agent generates MUST be a ULID.</li>
+    <li>An id whose format an external API defines MUST use that API&#x27;s format, including UUID where the API defines a UUID.</li>
+    <li>sc-agent MUST NOT generate a UUID for an id that no external API defines.</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.78 · serves 0.00 · exceeds 0.47 · conflicts 0.04</p>
+</section>

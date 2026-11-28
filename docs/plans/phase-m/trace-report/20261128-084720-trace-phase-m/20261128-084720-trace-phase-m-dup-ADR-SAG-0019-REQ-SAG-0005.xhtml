@@ -1,0 +1,105 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-duplicate" id="dup-ADR-SAG-0019-REQ-SAG-0005">
+  <div class="section-head">
+    <h2>ADR-SAG-0019 restates REQ-SAG-0005</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="[
+  {
+    &quot;action&quot;: &quot;correct&quot;,
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;duplicate&quot;,
+    &quot;confidence&quot;: 0.92,
+    &quot;item&quot;: &quot;ADR-SAG-0019&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0005&quot;,
+    &quot;session_id&quot;: &quot;01M8GNBTWW7Q2S7AX2D3AX9VRY&quot;,
+    &quot;statement&quot;: &quot;For every query whose model call succeeded, sc-agent MUST append a session row to the query&#x27;s session log.&quot;,
+    &quot;statement_index&quot;: 1
+  },
+  {
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;possible&quot;,
+    &quot;confidence&quot;: 0.48,
+    &quot;item&quot;: &quot;ADR-SAG-0019&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0005&quot;,
+    &quot;session_id&quot;: &quot;01M8GNBTWW7Q2S7AX2D3AX9VRY&quot;,
+    &quot;statement&quot;: &quot;sc-agent MUST NOT append more than one session row for one query.&quot;,
+    &quot;statement_index&quot;: 2
+  },
+  {
+    &quot;action&quot;: &quot;correct&quot;,
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;duplicate&quot;,
+    &quot;confidence&quot;: 1.0,
+    &quot;item&quot;: &quot;ADR-SAG-0019&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0005&quot;,
+    &quot;session_id&quot;: &quot;01M8GNBTWW7Q2S7AX2D3AX9VRY&quot;,
+    &quot;statement&quot;: &quot;sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.&quot;,
+    &quot;statement_index&quot;: 3
+  }
+]">{}</button>
+    </div>
+  </div>
+  <p class="small">sc-agent · sc-agent</p>
+  <h3>Duplicated statement</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+    <li>REQ-SAG-0005 statement 2 (0.92): For every query whose model call succeeded, sc-agent MUST append a session row to the query&#x27;s session log.</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+  </ul>
+  <h3>Duplicated statement</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+    <li>REQ-SAG-0005 statement 4 (1.00): sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+  </ul>
+  <h3>Possibly duplicated statement</h3>
+  <ul>
+    <li>REQ-SAG-0005 statement 3 (0.48): sc-agent MUST NOT append more than one session row for one query.</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>ADR-SAG-0019 statement 1: 2e54ef62 2026-11-24: phase-j plan v9: owner rulings (seed_session, config model rows, cache rule), records shortened</li>
+    <li>REQ-SAG-0005 statement 1: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0005 statement 2: 79a409b7 2026-11-27: records: session log written only on successful model calls (owner ruling 2026-11-27)</li>
+    <li>REQ-SAG-0005 statement 3: 8069260d 2026-11-24: REQ-SAG-0005: split on s1 (cut to 3 statements)</li>
+    <li>REQ-SAG-0005 statement 4: 79a409b7 2026-11-27: records: session log written only on successful model calls (owner ruling 2026-11-27)</li>
+  </ul>
+  <h3>ADR-SAG-0019 sc-decidr is the one Python decision harness</h3>
+  <h3>Decision</h3>
+  <p>The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.
+
+1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection, API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query whose model call succeeded (a failed call writes no row; its error goes to the general log), at the wheel&#x27;s default location, tagged with `project` and `agent_role`, written by sc-agent&#x27;s session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.
+
+   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`; the wheel moves to maturin&#x27;s mixed layout and `import sc_agent` is unchanged.
+
+   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping.
+   - model selectors are Run arguments.
+   - A result line holds only the generic result fields; session data stays in the session row. The module reads session rows only through `sc_agent.session_rows`, finding a run&#x27;s queries through its link records or the session_ids in its result lines, and never computes a session-log path.
+   - Python results are typed values, not dicts.
+   - sc-compose is an external render tool, not a wheel dependency; the template&#x27;s front matter declares its sc-compose minimum (`requires.cli`), declared, not enforced.
+
+   **The lower-level API stays the contract.** `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public, and the generated code uses only them and the standard library.
+
+2. **Typed fields: `attempts` and `category`.** An error value carries at least `id`, `message` and `action`, plus `attempts` (sends made, the first included) and `category` (decision 6) when they apply; unset fields are not written (REQ-SAG-0016). Retry-After is read as a Duration and used for the wait before a resend (REQ-SAG-0601).
+
+5. **Python errors.** Every wheel call returns ok with a value or an error with its id and message; nothing raises (REQ-SAG-0016).
+
+6. **The category is stored when the error is built.** The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`. Every error has a stable id and stores its category, which Python reads from the `category` field (REQ-SAG-0017). Retryable means worth resubmitting as a new call later, after the wheel&#x27;s own resends have run out; it is true for `busy` and `network` only, and a consumer that resubmits waits first rather than wrapping the wheel in an immediate retry loop.
+
+7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run&#x27;s calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout. The timeout defaults to 120 s; REQ-SAG-0702 holds the rules.
+
+8. **`send_batch` returns one result per request, each with its input position**, while `on_result` still receives each line as it finishes (REQ-SAG-0702).
+
+11. **sitr is an optional, separate section of the consumer template.** It uses `sc_agent.sitr` only (ADR-SAG-0005, ADR-SAG-0021) and is kept separate from the decision call: extraction runs outside the decision path, and its output feeds the consumer&#x27;s prompt authoring. In this phase one offline test shows extraction output reaching a dry-run request.
+
+14. **A run is a context object.** `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`); creating it mints the run&#x27;s ULID `run_id` in Rust (as are `session_id` ULIDs), readable as `run.run_id`.</p>
+  <h3>REQ-SAG-0005 Session log rows and run links</h3>
+  <h3>Statements</h3>
+  <ul>
+    <li>Session logs MUST be written as JSONL.</li>
+    <li>For every query whose model call succeeded, sc-agent MUST append a session row to the query&#x27;s session log.</li>
+    <li>sc-agent MUST NOT append more than one session row for one query.</li>
+    <li>sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.</li>
+  </ul>
+</section>

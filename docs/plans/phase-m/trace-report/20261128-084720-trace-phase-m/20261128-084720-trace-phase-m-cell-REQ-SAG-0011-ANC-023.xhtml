@@ -1,0 +1,112 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-conflicts" id="cell-REQ-SAG-0011-ANC-023">
+  <div class="section-head">
+    <h2>REQ-SAG-0011 × ANC-023 — conflicts</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-023&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.86,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.07,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.91
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.77,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.14,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.85
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.85,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.09,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.9
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.92,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.95,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.03
+      }
+    }
+  },
+  &quot;class&quot;: &quot;conflicts&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.91,
+    &quot;exceeds&quot;: 0.85,
+    &quot;relates&quot;: 0.9,
+    &quot;serves&quot;: 0.03
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0011&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0011/ANC-023/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GNAJCRG5G9PXZS73M5GQ9T&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0011 × ANC-023 — conflicts
+What conflicts
+Anchor
+sc-agent writes each session row to the repository&#x27;s SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.
+Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp”
+Scope: adds or changes code that writes or reads session rows
+Record statements
+When `decidr` receives an interrupt, it MUST cancel the batch.
+When a `KeyboardInterrupt` is raised in `sc-agent-py`, it MUST cancel the batch.
+After an interrupt, every unfinished request MUST end with `decision.cancelled`.
+The session log MUST hold the row of every request that finished before the interrupt when `decidr` exits or the Python call returns.
+A `KeyboardInterrupt` in `sc-agent-py` MUST be caught inside the Python call.
+After a `KeyboardInterrupt`, the Python call MUST return one result per request of the batch.
+`decidr` MUST exit non-zero after an interrupt.
+History (git)
+REQ-SAG-0011 statement 1: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0011 statement 2: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0011 statement 3: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0011 statement 4: 328dce28 2026-11-25: REQ-SAG-0011, REQ-SAG-0104: restore meaning per ai-qa
+REQ-SAG-0011 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0011 statement 6: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0011 statement 7: a8ad3042 2026-11-11: docs: name the decision CLI decidr and the treesitter binary sitr
+Jev P(yes): relates 0.90 · serves 0.03 · exceeds 0.85 · conflicts 0.91">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What conflicts</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+  </ul>
+  <h3>Anchor</h3>
+  <p>sc-agent writes each session row to the repository&#x27;s SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.</p>
+  <p>Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp”</p>
+  <p>Scope: adds or changes code that writes or reads session rows</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>When `decidr` receives an interrupt, it MUST cancel the batch.</li>
+    <li>When a `KeyboardInterrupt` is raised in `sc-agent-py`, it MUST cancel the batch.</li>
+    <li>After an interrupt, every unfinished request MUST end with `decision.cancelled`.</li>
+    <li>The session log MUST hold the row of every request that finished before the interrupt when `decidr` exits or the Python call returns.</li>
+    <li>A `KeyboardInterrupt` in `sc-agent-py` MUST be caught inside the Python call.</li>
+    <li>After a `KeyboardInterrupt`, the Python call MUST return one result per request of the batch.</li>
+    <li>`decidr` MUST exit non-zero after an interrupt.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0011 statement 1: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0011 statement 2: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0011 statement 3: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0011 statement 4: 328dce28 2026-11-25: REQ-SAG-0011, REQ-SAG-0104: restore meaning per ai-qa</li>
+    <li>REQ-SAG-0011 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0011 statement 6: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0011 statement 7: a8ad3042 2026-11-11: docs: name the decision CLI decidr and the treesitter binary sitr</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.90 · serves 0.03 · exceeds 0.85 · conflicts 0.91</p>
+</section>

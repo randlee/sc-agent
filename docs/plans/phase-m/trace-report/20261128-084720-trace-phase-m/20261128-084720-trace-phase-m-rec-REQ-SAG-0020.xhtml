@@ -1,0 +1,167 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0020">
+  <div class="section-head">
+    <h2>REQ-SAG-0020 Configuration environment variable names</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0020&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T084552Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When a CLI loads configuration, a value set by an environment variable MUST pass the same validation as the same value set in a configuration file.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When an environment value fails validation, the error MUST include the name of the environment variable that set the value.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When an environment value is valid JSON, it MUST be parsed as JSON.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When an environment value is not valid JSON, it MUST be taken as a string.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;A CLI MUST NOT read a setting from another CLI&#x27;s prefix.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-18&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0013&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0020&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0020&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-25&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;A per-CLI prefix keeps an override meant for one CLI from changing another.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When a CLI loads configuration, a value set by an environment variable MUST pass the same validation as the same value set in a configuration file.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When an environment value fails validation, the error MUST include the name of the environment variable that set the value.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When an environment value is valid JSON, it MUST be parsed as JSON.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When an environment value is not valid JSON, it MUST be taken as a string.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;A CLI MUST NOT read a setting from another CLI&#x27;s prefix.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: A CLI is one of sc-agent&#x27;s command-line programs that reads configuration, such as `decidr`.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;With `DECIDR_LOG_ROOT=/tmp/x` set, `decidr doctor` reports the fixed log root as the value `log_root: \&quot;/tmp/x\&quot;`, separately from configuration settings (ADR-SAG-0021).&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;With `DECIDR_WORKERS=0` set, decidr exits with an error naming `DECIDR_WORKERS`, and with `\&quot;workers\&quot;: 0` in the local `decidr.json` it exits with the same check&#x27;s error naming that file and `workers`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test sets `DECIDR_LAYA__HOST=1` and checks the load fails the string host validation, and sets `DECIDR_LAYA__HOST=\&quot;h\&quot;` and checks the host is `h`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test sets `workers` under another CLI&#x27;s prefix and checks decidr&#x27;s loaded `workers` keeps its default.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Configuration environment variable names&quot;,
+    &quot;version&quot;: &quot;0.7.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.7.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>When a CLI loads configuration, a value set by an environment variable MUST pass the same validation as the same value set in a configuration file.</li>
+    <li>When an environment value fails validation, the error MUST include the name of the environment variable that set the value.</li>
+    <li>When an environment value is valid JSON, it MUST be parsed as JSON.</li>
+    <li>When an environment value is not valid JSON, it MUST be taken as a string.</li>
+    <li>A CLI MUST NOT read a setting from another CLI&#x27;s prefix.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: A CLI is one of sc-agent&#x27;s command-line programs that reads configuration, such as `decidr`.</p>
+  <h3>Rationale</h3>
+  <p>A per-CLI prefix keeps an override meant for one CLI from changing another.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>With `DECIDR_LOG_ROOT=/tmp/x` set, `decidr doctor` reports the fixed log root as the value `log_root: &quot;/tmp/x&quot;`, separately from configuration settings (ADR-SAG-0021).</li>
+    <li>With `DECIDR_WORKERS=0` set, decidr exits with an error naming `DECIDR_WORKERS`, and with `&quot;workers&quot;: 0` in the local `decidr.json` it exits with the same check&#x27;s error naming that file and `workers`.</li>
+    <li>A unit test sets `DECIDR_LAYA__HOST=1` and checks the load fails the string host validation, and sets `DECIDR_LAYA__HOST=&quot;h&quot;` and checks the host is `h`.</li>
+    <li>A unit test sets `workers` under another CLI&#x27;s prefix and checks decidr&#x27;s loaded `workers` keeps its default.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>REQ-SAG-0013</li>
+    <li>REQ-SAG-0019</li>
+    <li>ADR-SAG-0020</li>
+  </ul>
+</section>

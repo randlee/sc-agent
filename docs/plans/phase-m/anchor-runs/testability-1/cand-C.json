@@ -1,0 +1,50 @@
+{
+ "digest": "a50dea7e80911d24042b9864ecd931a1c36b3647a57ddb1611d70054c5aed051",
+ "questions": {
+  "faithful": {
+   "criteria": {
+    "no": "The statement introduces a specific mechanism, algorithm, number, trigger or outcome absent from the quote, or alters its meaning.",
+    "unclear": "Whether the statement's details come from the quote cannot be settled.",
+    "yes": "The statement preserves the quote's meaning with only the allowed changes."
+   },
+   "instructions": "Is `anchor.statement` a meaning-preserving restatement of one directive in `anchor.quote`? Allowed: changing informal wording to must, print to emit on stdout, machine-readable JSON to JSON, keeping the quote's own phrasing, and selecting one directive from a quote that contains several. Not allowed: introducing a specific mechanism, algorithm, number, trigger or outcome the quote does not give. Do not judge vagueness or form.",
+   "type": "choice"
+  },
+  "observable": {
+   "criteria": {
+    "no": "The required outcome is only a subjective quality, an unexplained label, or an unrecorded approval.",
+    "unclear": "An outcome is named but the check that would settle it is ambiguous.",
+    "yes": "The required outcome is a concrete behavior or artifact that can be checked."
+   },
+   "instructions": "Is the outcome required by `anchor.statement` checkable by inspection with a determinate yes/no result? Named files, paths, output streams, formats, values and behaviors under stated conditions are checkable. A subjective adjective, an unexplained label, or a person's say-so without a recorded artifact is not. Judge observability only.",
+   "type": "choice"
+  },
+  "scoped": {
+   "criteria": {
+    "no": "No applicable area can be identified.",
+    "unclear": "An area is mentioned but its boundaries cannot be determined.",
+    "yes": "The applicable area is identifiable."
+   },
+   "instructions": "Do `anchor.statement` and `anchor.scope` together identify where the anchor applies: a component, command, activity, artifact, repository location, or an explicit all-items set? Judge identifiability of the area only, not the quality of the requirement.",
+   "type": "choice"
+  },
+  "self_contained": {
+   "criteria": {
+    "no": "A decisive term is an undefined quality or private label, or compliance needs an unrecorded approval.",
+    "unclear": "A term may rely on outside context but it is unclear whether it is decisive.",
+    "yes": "The statement is understandable and applicable from its own words."
+   },
+   "instructions": "Does `anchor.statement` avoid depending on context outside itself? It depends on outside context only when a decisive term is an undefined subjective quality (robust), a private code or label (R7), or an approval by a person with no identified record. Concrete values, paths, flags, environment variable names, prohibitions and conditions are self-contained. Judge only this property.",
+   "type": "choice"
+  },
+  "single_constraint": {
+   "criteria": {
+    "no": "Two or more separate obligations are joined, each enforceable on its own.",
+    "unclear": "The statement's clauses could be read as one obligation or as several.",
+    "yes": "One invariant: every clause supports a single obligation."
+   },
+   "instructions": "Does `anchor.statement` state one invariant? Treat the statement as bundled only when it joins separate obligations on different subjects or with different outcomes (for example 'the CLI must emit JSON and the daemon must write an audit log'). A trigger condition, several output channels, or a list of forbidden values all belong to one invariant. Do not judge any other property.",
+   "type": "choice"
+  }
+ }
+}

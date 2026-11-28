@@ -1,0 +1,167 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-NFR-SAG-0004">
+  <div class="section-head">
+    <h2>NFR-SAG-0004 One owner for every piece of logic and data; everything else calls it</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;NFR-SAG-0004&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T084552Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;NFR&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Every shared fact MUST have a single owner.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Code that needs a shared fact MUST obtain it by calling its owner.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;2712a7fb&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;NFR-SAG-0004: state single ownership as one obligation&quot;
+      },
+      &quot;statement&quot;: &quot;Every shared fact MUST have a single owner.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;a63c0a59&quot;,
+        &quot;date&quot;: &quot;2026-11-24&quot;,
+        &quot;summary&quot;: &quot;Amend phase-j records for the Run, one-owner and struct rules (plan review)&quot;
+      },
+      &quot;statement&quot;: &quot;Code that needs a shared fact MUST obtain it by calling its owner.&quot;,
+      &quot;statement_index&quot;: 1
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-24&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0021&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0018&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;NFR-SAG-0004&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Two consumers each rebuilt the wheel boundary and the copies diverged (ADR-SAG-0019, Context). The first phase-j plan copied the provider-key list into four places, re-implemented the session-log layout in template Python and minted ULIDs in both Rust and Python. One owner per fact keeps one place to change and removes divergence.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Every shared fact MUST have a single owner.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Code that needs a shared fact MUST obtain it by calling its owner.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions:\n\n- sc-agent is this repository: its Rust crates, the sc-decidr wheel and its scripts.\n- A shared fact is a piece of logic or data that more than one program needs, such as the provider table, the provider-key list, the model table, the session-log layout or ULID minting.\n- The owner of a shared fact is the one function, constant or table that holds it.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test in the sc-agent Rust crate asserts that each listed shared fact (provider table, provider-key list, model table, session-log layout, ULID minting) is defined by one owner.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test calls the sc-decidr wheel&#x27;s provider-key list, session-row reader and `run_id` minting and asserts each returns the value of its owner in the sc-agent Rust crate.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Inspection: `rg -n` over sc-agent for the provider-key names, the session-log path layout and ULID minting, outside test fixtures, returns matches only in their owners.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Inspection: `rg -n` over `sc_agent/templates/consumer.py.j2` for the provider-key names, the session-log path layout and ULID minting returns no match.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Inspection: `rg -n` over a consumer module rendered from `sc_agent/templates/consumer.py.j2` for the provider-key names, the session-log path layout and ULID minting returns no match.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;One owner for every piece of logic and data; everything else calls it&quot;,
+    &quot;version&quot;: &quot;0.1.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">NFR · sc-agent · Approved · version 0.1.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>Every shared fact MUST have a single owner.</li>
+    <li>Code that needs a shared fact MUST obtain it by calling its owner.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions:
+
+- sc-agent is this repository: its Rust crates, the sc-decidr wheel and its scripts.
+- A shared fact is a piece of logic or data that more than one program needs, such as the provider table, the provider-key list, the model table, the session-log layout or ULID minting.
+- The owner of a shared fact is the one function, constant or table that holds it.</p>
+  <h3>Rationale</h3>
+  <p>Two consumers each rebuilt the wheel boundary and the copies diverged (ADR-SAG-0019, Context). The first phase-j plan copied the provider-key list into four places, re-implemented the session-log layout in template Python and minted ULIDs in both Rust and Python. One owner per fact keeps one place to change and removes divergence.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A unit test in the sc-agent Rust crate asserts that each listed shared fact (provider table, provider-key list, model table, session-log layout, ULID minting) is defined by one owner.</li>
+    <li>A unit test calls the sc-decidr wheel&#x27;s provider-key list, session-row reader and `run_id` minting and asserts each returns the value of its owner in the sc-agent Rust crate.</li>
+    <li>Inspection: `rg -n` over sc-agent for the provider-key names, the session-log path layout and ULID minting, outside test fixtures, returns matches only in their owners.</li>
+    <li>Inspection: `rg -n` over `sc_agent/templates/consumer.py.j2` for the provider-key names, the session-log path layout and ULID minting returns no match.</li>
+    <li>Inspection: `rg -n` over a consumer module rendered from `sc_agent/templates/consumer.py.j2` for the provider-key names, the session-log path layout and ULID minting returns no match.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>ADR-SAG-0019</li>
+    <li>ADR-SAG-0021</li>
+    <li>REQ-SAG-0018</li>
+  </ul>
+</section>

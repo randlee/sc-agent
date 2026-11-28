@@ -1,0 +1,310 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0103">
+  <div class="section-head">
+    <h2>REQ-SAG-0103 Provider and model are separate</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0103&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T084552Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A model-table row MUST store its provider in a field separate from its model.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A request MUST carry the model id stored in the selected model-table row.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;sc-agent MUST be able to send requests through Together.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;sc-agent MUST be able to send requests through OpenRouter.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When configuration names a provider for a model, sc-agent MUST send that model&#x27;s requests to that provider.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When no provider is configured for a model, sc-agent MUST prefer a provider that needs no key over one that needs a key.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When no provider is configured for a model and every provider serving it needs a key, sc-agent MUST use the first of them whose key is found.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The provider that sends requests to the OpenAI API MUST have the name `openai`.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;A short name MUST NOT encode its provider.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;A request MUST NOT require the caller to name a provider.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;A model-table row MUST store its provider in a field separate from its model.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;A request MUST carry the model id stored in the selected model-table row.&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;sc-agent MUST be able to send requests through Together.&quot;,
+      &quot;statement_index&quot;: 2
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;sc-agent MUST be able to send requests through OpenRouter.&quot;,
+      &quot;statement_index&quot;: 3
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;When configuration names a provider for a model, sc-agent MUST send that model&#x27;s requests to that provider.&quot;,
+      &quot;statement_index&quot;: 4
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;When no provider is configured for a model, sc-agent MUST prefer a provider that needs no key over one that needs a key.&quot;,
+      &quot;statement_index&quot;: 5
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;When no provider is configured for a model and every provider serving it needs a key, sc-agent MUST use the first of them whose key is found.&quot;,
+      &quot;statement_index&quot;: 6
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;The provider that sends requests to the OpenAI API MUST have the name `openai`.&quot;,
+      &quot;statement_index&quot;: 7
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;22f4a5bd&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: fix ai-qa clean-up findings&quot;
+      },
+      &quot;statement&quot;: &quot;A short name MUST NOT encode its provider.&quot;,
+      &quot;statement_index&quot;: 8
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;A request MUST NOT require the caller to name a provider.&quot;,
+      &quot;statement_index&quot;: 9
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0103&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-25&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;The owner uses OpenRouter, Nous, Together, OpenAI and Anthropic today, and one model can be served by more than one provider. Making the caller pick a provider per call is poor UX and unreliable over time.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A model-table row MUST store its provider in a field separate from its model.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A request MUST carry the model id stored in the selected model-table row.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;sc-agent MUST be able to send requests through Together.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;sc-agent MUST be able to send requests through OpenRouter.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When configuration names a provider for a model, sc-agent MUST send that model&#x27;s requests to that provider.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When no provider is configured for a model, sc-agent MUST prefer a provider that needs no key over one that needs a key.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When no provider is configured for a model and every provider serving it needs a key, sc-agent MUST use the first of them whose key is found.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The provider that sends requests to the OpenAI API MUST have the name `openai`.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;A short name MUST NOT encode its provider.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;A request MUST NOT require the caller to name a provider.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: sc-agent is this project&#x27;s client library and command-line tool that sends model requests. A provider is the service a request is sent to, such as OpenRouter, Nous, Together, OpenAI or Anthropic. A model is what that provider runs. A model id is the name a provider uses for a model, such as `anthropic/claude-haiku-5.5` at OpenRouter. A short name is the name a caller uses for a model, such as `haiku`. The model table is the list of models sc-agent can send to, one row per model and provider (REQ-SAG-0102). A key is the secret credential a provider requires before it accepts a request; a keyless provider requires none. The OpenAI API is the request service run by OpenAI.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: every model-table row stores its provider in a field separate from its model.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: a short name served by two providers is the same string for both rows.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: the short name `haiku` selects the same model through two different providers, and each sends its own id: `claude-haiku-5-5` through `anthropic` and `anthropic/claude-haiku-5.5` through `openrouter`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: with `openrouter` configured for `haiku` and the `anthropic` key also found, a `haiku` request goes to `openrouter`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: with no provider configured, a model served by a keyless provider and a keyed provider goes to the keyless one.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: with no provider configured and only the `openrouter` key found, a `haiku` request goes to `openrouter`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: requests can be sent through `together` and through `openrouter`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: a request that names only a model, with no provider, is sent.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: the provider that sends to the OpenAI API is named `openai`.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Provider and model are separate&quot;,
+    &quot;version&quot;: &quot;0.5.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.5.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>A model-table row MUST store its provider in a field separate from its model.</li>
+    <li>A request MUST carry the model id stored in the selected model-table row.</li>
+    <li>sc-agent MUST be able to send requests through Together.</li>
+    <li>sc-agent MUST be able to send requests through OpenRouter.</li>
+    <li>When configuration names a provider for a model, sc-agent MUST send that model&#x27;s requests to that provider.</li>
+    <li>When no provider is configured for a model, sc-agent MUST prefer a provider that needs no key over one that needs a key.</li>
+    <li>When no provider is configured for a model and every provider serving it needs a key, sc-agent MUST use the first of them whose key is found.</li>
+    <li>The provider that sends requests to the OpenAI API MUST have the name `openai`.</li>
+    <li>A short name MUST NOT encode its provider.</li>
+    <li>A request MUST NOT require the caller to name a provider.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: sc-agent is this project&#x27;s client library and command-line tool that sends model requests. A provider is the service a request is sent to, such as OpenRouter, Nous, Together, OpenAI or Anthropic. A model is what that provider runs. A model id is the name a provider uses for a model, such as `anthropic/claude-haiku-5.5` at OpenRouter. A short name is the name a caller uses for a model, such as `haiku`. The model table is the list of models sc-agent can send to, one row per model and provider (REQ-SAG-0102). A key is the secret credential a provider requires before it accepts a request; a keyless provider requires none. The OpenAI API is the request service run by OpenAI.</p>
+  <h3>Rationale</h3>
+  <p>The owner uses OpenRouter, Nous, Together, OpenAI and Anthropic today, and one model can be served by more than one provider. Making the caller pick a provider per call is poor UX and unreliable over time.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>Unit test: every model-table row stores its provider in a field separate from its model.</li>
+    <li>Unit test: a short name served by two providers is the same string for both rows.</li>
+    <li>Unit test: the short name `haiku` selects the same model through two different providers, and each sends its own id: `claude-haiku-5-5` through `anthropic` and `anthropic/claude-haiku-5.5` through `openrouter`.</li>
+    <li>Unit test: with `openrouter` configured for `haiku` and the `anthropic` key also found, a `haiku` request goes to `openrouter`.</li>
+    <li>Unit test: with no provider configured, a model served by a keyless provider and a keyed provider goes to the keyless one.</li>
+    <li>Unit test: with no provider configured and only the `openrouter` key found, a `haiku` request goes to `openrouter`.</li>
+    <li>Unit test: requests can be sent through `together` and through `openrouter`.</li>
+    <li>Unit test: a request that names only a model, with no provider, is sent.</li>
+    <li>Unit test: the provider that sends to the OpenAI API is named `openai`.</li>
+  </ul>
+</section>

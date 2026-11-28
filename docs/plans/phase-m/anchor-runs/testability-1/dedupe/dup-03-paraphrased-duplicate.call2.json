@@ -1,0 +1,40 @@
+{
+  "success": true,
+  "data": {
+    "threshold": 0.0,
+    "confidence_threshold": 0.6,
+    "jev": true,
+    "dry_run": false,
+    "fixture": false,
+    "anchors": 2,
+    "pairs": [
+      {
+        "a": "ANC-001",
+        "b": "ANC-002",
+        "jaccard": 0.545,
+        "field_a": "statement",
+        "field_b": "statement",
+        "jev": {
+          "choice": "yes",
+          "confidence": 0.85,
+          "attempts": 1
+        }
+      }
+    ],
+    "likely_duplicates": [
+      {
+        "a": "ANC-001",
+        "b": "ANC-002",
+        "jaccard": 0.545,
+        "field_a": "statement",
+        "field_b": "statement",
+        "jev": {
+          "choice": "yes",
+          "confidence": 0.85,
+          "attempts": 1
+        }
+      }
+    ]
+  },
+  "error": null
+}

@@ -1,0 +1,150 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-ADR-SAG-0004">
+  <div class="section-head">
+    <h2>ADR-SAG-0004 Crate layering and error values</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;ADR-SAG-0004&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T091833Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;ADR&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: null,
+    &quot;note&quot;: &quot;No obligation statements.&quot;,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: null
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;31c8ee33&quot;,
+        &quot;date&quot;: &quot;2026-11-27&quot;,
+        &quot;summary&quot;: &quot;records: ADR-SAG-0004 0.5.0, four crate layers (owner-approved text)&quot;
+      },
+      &quot;statement&quot;: &quot;Crates are in four layers, and a crate depends only on crates in lower layers. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.&quot;,
+      &quot;statement_index&quot;: 0
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;alternatives&quot;: {
+      &quot;groups&quot;: [
+        {
+          &quot;cons&quot;: [
+            &quot;Adding a provider or a model needs a Rust change.&quot;,
+            &quot;Every concern is in one file, so no boundary can be checked.&quot;
+          ],
+          &quot;description&quot;: &quot;Five crates, with `sc-agent` as one core crate holding the provider tables, sending, resends, keys, configuration, errors, logging paths and session rows.&quot;,
+          &quot;name&quot;: &quot;One core crate&quot;,
+          &quot;pros&quot;: [
+            &quot;Fewer crates and fewer lines.&quot;
+          ],
+          &quot;why_rejected&quot;: &quot;Owner ruling (2026-11-27), Rand Lee: \&quot;if you need to change rust when a model/provider is added, the architecture = fail.\&quot;&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;consequences&quot;: {
+      &quot;negative&quot;: [
+        &quot;More crates to version and publish than one core crate.&quot;
+      ],
+      &quot;neutral&quot;: [],
+      &quot;positive&quot;: [
+        &quot;A new provider or model is a configuration row. A new API shape is one new layer 2 crate.&quot;
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;context&quot;: {
+      &quot;background&quot;: &quot;&quot;,
+      &quot;problem_statement&quot;: &quot;Crates must be layered so each launcher depends only on what it uses, and errors must keep every lower-layer id and message.&quot;,
+      &quot;text&quot;: &quot;sc-agent will launch decision models, LLMs, CLI agents and SDK agents. Each needs shared types, configuration, secrets, HTTP and logging, but not each other&#x27;s code.&quot;
+    },
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;decision&quot;: {
+      &quot;chosen_approach&quot;: &quot;&quot;,
+      &quot;key_principles&quot;: [
+        &quot;A crate depends only on lower layers.&quot;,
+        &quot;Shared behaviour moves down; differences move up.&quot;,
+        &quot;A provider is a configuration row, not code.&quot;
+      ],
+      &quot;text&quot;: &quot;Crates are in four layers, and a crate depends only on crates in lower layers. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.&quot;
+    },
+    &quot;decision_date&quot;: &quot;2026-11-09&quot;,
+    &quot;id&quot;: &quot;ADR-SAG-0004&quot;,
+    &quot;impact_analysis&quot;: {
+      &quot;affected_components&quot;: &quot;&quot;,
+      &quot;maintainability_impact&quot;: &quot;&quot;,
+      &quot;performance_impact&quot;: &quot;&quot;,
+      &quot;security_impact&quot;: &quot;&quot;,
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;implementation&quot;: {
+      &quot;code_examples&quot;: &quot;&quot;,
+      &quot;integration_points&quot;: [],
+      &quot;key_components&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-27&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;rationale&quot;: {
+      &quot;benefits&quot;: [],
+      &quot;text&quot;: &quot;Layers let behaviour that several crates share be written once in a lower layer, and let a new provider or model be added without a code change.\n\nOwner ruling (2026-11-27), Rand Lee: \&quot;You need to be able to push shared methods down and move differences up\&quot;\n\nOwner ruling (2026-11-27), Rand Lee: \&quot;How do you extent to an &#x27;unknown provider&#x27; or model&#x27; if you need to change rust when a model/provider is added, the architecture = fail. provider/model/url is just a string-tuple.\&quot;\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;Errors are discriminated unions Result&lt;t,e&gt; I don&#x27;t care about per crate\&quot;; \&quot;Extra fields are fine, make sure adr doesn&#x27;t limit too much. I don&#x27;t want findings for returning more.\&quot;\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;always return descriminated unions w/ error info\&quot;&quot;,
+      &quot;trade_offs&quot;: []
+    },
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0002&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0009&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0301&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;title&quot;: &quot;Crate layering and error values&quot;,
+    &quot;version&quot;: &quot;0.5.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">ADR · sc-agent · Approved · version 0.5.0</p>
+  <h3>Context</h3>
+  <p>sc-agent will launch decision models, LLMs, CLI agents and SDK agents. Each needs shared types, configuration, secrets, HTTP and logging, but not each other&#x27;s code.</p>
+  <h3>Problem</h3>
+  <p>Crates must be layered so each launcher depends only on what it uses, and errors must keep every lower-layer id and message.</p>
+  <h3>Decision</h3>
+  <p>Crates are in four layers, and a crate depends only on crates in lower layers. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.</p>
+  <h3>Key principles</h3>
+  <ul>
+    <li>A crate depends only on lower layers.</li>
+    <li>Shared behaviour moves down; differences move up.</li>
+    <li>A provider is a configuration row, not code.</li>
+  </ul>
+  <h3>Rationale</h3>
+  <p>Layers let behaviour that several crates share be written once in a lower layer, and let a new provider or model be added without a code change.
+
+Owner ruling (2026-11-27), Rand Lee: &quot;You need to be able to push shared methods down and move differences up&quot;
+
+Owner ruling (2026-11-27), Rand Lee: &quot;How do you extent to an &#x27;unknown provider&#x27; or model&#x27; if you need to change rust when a model/provider is added, the architecture = fail. provider/model/url is just a string-tuple.&quot;
+
+Owner ruling (2026-11-21), Rand Lee: &quot;Errors are discriminated unions Result&lt;t,e&gt; I don&#x27;t care about per crate&quot;; &quot;Extra fields are fine, make sure adr doesn&#x27;t limit too much. I don&#x27;t want findings for returning more.&quot;
+
+Owner ruling (2026-11-21), Rand Lee: &quot;always return descriminated unions w/ error info&quot;</p>
+  <h3>Positive consequences</h3>
+  <p>A new provider or model is a configuration row. A new API shape is one new layer 2 crate.</p>
+  <h3>Negative consequences</h3>
+  <p>More crates to version and publish than one core crate.</p>
+</section>

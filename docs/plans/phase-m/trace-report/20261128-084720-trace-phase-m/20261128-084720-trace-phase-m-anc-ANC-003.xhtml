@@ -1,0 +1,83 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="anc-ANC-003">
+  <div class="section-head">
+    <h2>ANC-003</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;beads&quot;: {
+    &quot;anchor&quot;: &quot;agt-tvqh&quot;,
+    &quot;dev_questions&quot;: &quot;agt-tvqh.2&quot;,
+    &quot;plan_questions&quot;: &quot;agt-tvqh.1&quot;
+  },
+  &quot;context&quot;: &quot;planning session; session, 2026-11-26&quot;,
+  &quot;deterministic_check&quot;: &quot;the sprint diff deletes the reader&#x27;s tests and fixtures; `rg` finds no skip/xfail/#[ignore] mentioning the removed reader&quot;,
+  &quot;fixtures&quot;: {
+    &quot;fail&quot;: [
+      &quot;The v1 reader is removed but its tests are kept and marked #[ignore].&quot;
+    ],
+    &quot;pass&quot;: [
+      &quot;The v1 run-record reader is deleted together with its tests and fixtures.&quot;
+    ]
+  },
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-26T18:51:01+00:00&quot;,
+      &quot;event&quot;: &quot;created&quot;,
+      &quot;status&quot;: &quot;locked&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:53:59+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;statement&quot;
+      ],
+      &quot;previous_statement&quot;: &quot;When phase j removes a backward-compatible reader, its code and its tests must both be deleted, because backward-compatible reads are baselined later in SQLite.&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:55:31+00:00&quot;,
+      &quot;beads&quot;: {
+        &quot;anchor&quot;: &quot;agt-tvqh&quot;,
+        &quot;dev_questions&quot;: &quot;agt-tvqh.2&quot;,
+        &quot;plan_questions&quot;: &quot;agt-tvqh.1&quot;
+      },
+      &quot;event&quot;: &quot;beads_set&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:58:03+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;fixtures&quot;
+      ]
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-003&quot;,
+  &quot;kind&quot;: &quot;directive&quot;,
+  &quot;promoted_to&quot;: null,
+  &quot;question_overrides&quot;: {},
+  &quot;quote&quot;: &quot;remove code &amp; tests, don&#x27;t just remove. We will baseline backward compatible reads in SQLite.&quot;,
+  &quot;scope&quot;: &quot;removes or changes a reader of an earlier record schema version, or its tests&quot;,
+  &quot;source_ref&quot;: null,
+  &quot;source_type&quot;: &quot;ANC&quot;,
+  &quot;stated_at&quot;: &quot;2026-11-26&quot;,
+  &quot;stated_by&quot;: &quot;Rand Lee&quot;,
+  &quot;statement&quot;: &quot;When a backward-compatible reader is removed, its code and its tests must both be deleted, because backward-compatible reads are baselined later in SQLite.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;summary&quot;: &quot;C03 When phase j removes a backward-compatible reader, its code &quot;,
+  &quot;version&quot;: 3
+}">{}</button>
+    </div>
+  </div>
+  <h3>Statement</h3>
+  <p class="statement">When a backward-compatible reader is removed, its code and its tests must both be deleted, because backward-compatible reads are baselined later in SQLite.</p>
+  <h3>Owner said</h3>
+  <p class="quote">remove code &amp; tests, don&#x27;t just remove. We will baseline backward compatible reads in SQLite.</p>
+  <h3>Scope</h3>
+  <p>removes or changes a reader of an earlier record schema version, or its tests</p>
+  <h3>Deterministic check</h3>
+  <p>the sprint diff deletes the reader&#x27;s tests and fixtures; `rg` finds no skip/xfail/#[ignore] mentioning the removed reader</p>
+  <h3>Kind</h3>
+  <p>directive</p>
+  <h3>Stated by</h3>
+  <p>Rand Lee</p>
+  <h3>Stated on</h3>
+  <p>2026-11-26</p>
+</section>

@@ -1,0 +1,35 @@
+# m-11: integration and landing
+
+## Description
+
+Nothing is built. The phase is proven against its two real consumers before it reaches develop.
+
+### Deliverables
+1. M11-1: Install judge-jev and plan-anchor against the phase-m wheel and run their own suites. Run sc-agent's tests against live agents, triggered manually.
+2. M11-2 landing and replacement closure: apply the corresponding verbatim inventory/change section in design.
+3. M11-3 sc-lint limits and rewrite-gate removal: apply the corresponding verbatim inventory/change section in design.
+4. M11-4 In the existing wheel job of .github/workflows/ci.yml, replace the rewrite.py invocation with the build/install prerequisites and direct execution of python -m unittest discover -s tests/contract -v and python crates/sc-agent-py/tests/loopback.py. Retain the still-required error, dependency and wheel-signature checks there without the deleted script or a new CI job (REQ-SAG-0008, REQ-SAG-0016, REQ-SAG-0018).
+
+This sprint’s wheel integration changes land at the layer-4 `sc-agent-py` consumer boundary (ADR-SAG-0004 v0.5.0), where consumers exercise the public wheel built from the lower layers; this sprint adds no crate.
+
+
+The manually triggered live-agent integration run uses sc-agent unit tests against live agents.
+
+
+Tests must be deterministic and must not rely on races, timing, sleeps, event-loop ordering or system load.
+
+
+
+A test found to depend on one of these must be redesigned to drive its logic with controlled inputs.
+
+## Acceptance criteria
+
+### Acceptance Criteria
+Both consumers' suites pass on the phase-m wheel; develop holds the phase-m crates; the gate script is gone and sc-lint carries the limits.
+
+
+### Validation
+- cargo test --workspace --all-features
+- cargo fmt --check --all
+- cargo clippy --workspace --all-targets --all-features -- -D warnings
+- sc-lint lint sc-boundary --config sc-lint.toml

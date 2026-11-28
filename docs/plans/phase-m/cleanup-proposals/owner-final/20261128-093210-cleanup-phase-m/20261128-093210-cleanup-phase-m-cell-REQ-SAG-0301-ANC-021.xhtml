@@ -1,0 +1,131 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-REQ-SAG-0301-ANC-021">
+  <div class="section-head">
+    <h2>REQ-SAG-0301 × ANC-021 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-021&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [
+      &quot;`sc-treesitter` MUST NOT depend on any sc-agent crate other than `sc-agent`, whose error and logging it shares.&quot;,
+      &quot;`sc-treesitter` MUST NOT contain agent or decision-model code.&quot;
+    ],
+    &quot;jev_disputed&quot;: false,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;66369ba0&quot;,
+        &quot;date&quot;: &quot;2026-11-21&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0301&quot;,
+        &quot;statement&quot;: &quot;`sc-treesitter` MUST NOT depend on any sc-agent crate other than `sc-agent`, whose error and logging it shares.&quot;,
+        &quot;summary&quot;: &quot;docs: records follow the reduction plan&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;1d855d0e&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0301&quot;,
+        &quot;statement&quot;: &quot;`sc-treesitter` MUST NOT contain agent or decision-model code.&quot;,
+        &quot;summary&quot;: &quot;Add requirements and architecture decisions as Raptor records&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;See the separately proposed layer-1 dependency correction; the corrected trace serves ADR-SAG-0004 v0.5.0.&quot;,
+    &quot;stale&quot;: null,
+    &quot;what&quot;: &quot;The dependency restriction relates to layer placement, but the trace&#x27;s anchor is a bead-placement rule and does not establish that this record is stale.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.7,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.8,
+        &quot;unclear&quot;: 0.07,
+        &quot;yes&quot;: 0.13
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.5,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.32,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.67
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.79,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.13,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.86
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.52,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.68,
+        &quot;unclear&quot;: 0.06,
+        &quot;yes&quot;: 0.26
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.13,
+    &quot;exceeds&quot;: 0.67,
+    &quot;relates&quot;: 0.86,
+    &quot;serves&quot;: 0.26
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0301&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0301/ANC-021/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ77M70PNMN8BD35STC76W&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0301 × ANC-021 — exceeds
+What exceeds
+“`sc-treesitter` MUST NOT depend on any sc-agent crate other than `sc-agent`, whose error and logging it shares.”
+“`sc-treesitter` MUST NOT contain agent or decision-model code.”
+The dependency restriction relates to layer placement, but the trace&#x27;s anchor is a bead-placement rule and does not establish that this record is stale.
+Proposed remedy
+See the separately proposed layer-1 dependency correction; the corrected trace serves ADR-SAG-0004 v0.5.0.
+Anchor
+Every phase-m sprint bead names the crate and layer each change lands in, and that layer is the lowest layer whose crates all use the change.
+Owner said: “You need to be able to push shared methods down and move differences up”
+Scope: adds or changes code in any crate under crates/
+Record statements
+`sc-treesitter` MUST NOT depend on any sc-agent crate other than `sc-agent`, whose error and logging it shares.
+`sc-treesitter` MUST NOT contain agent or decision-model code.
+History (git)
+REQ-SAG-0301 statement 1: 66369ba0 2026-11-21: docs: records follow the reduction plan
+REQ-SAG-0301 statement 2: 1d855d0e 2026-11-09: Add requirements and architecture decisions as Raptor records
+Jev P(yes): relates 0.86 · serves 0.26 · exceeds 0.67 · conflicts 0.13">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <ul>
+    <li>“`sc-treesitter` MUST NOT depend on any sc-agent crate other than `sc-agent`, whose error and logging it shares.”</li>
+    <li>“`sc-treesitter` MUST NOT contain agent or decision-model code.”</li>
+  </ul>
+  <p>The dependency restriction relates to layer placement, but the trace&#x27;s anchor is a bead-placement rule and does not establish that this record is stale.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>See the separately proposed layer-1 dependency correction; the corrected trace serves ADR-SAG-0004 v0.5.0.</p>
+  <h3>Anchor</h3>
+  <p>Every phase-m sprint bead names the crate and layer each change lands in, and that layer is the lowest layer whose crates all use the change.</p>
+  <p>Owner said: “You need to be able to push shared methods down and move differences up”</p>
+  <p>Scope: adds or changes code in any crate under crates/</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>`sc-treesitter` MUST NOT depend on any sc-agent crate other than `sc-agent`, whose error and logging it shares.</li>
+    <li>`sc-treesitter` MUST NOT contain agent or decision-model code.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0301 statement 1: 66369ba0 2026-11-21: docs: records follow the reduction plan</li>
+    <li>REQ-SAG-0301 statement 2: 1d855d0e 2026-11-09: Add requirements and architecture decisions as Raptor records</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.86 · serves 0.26 · exceeds 0.67 · conflicts 0.13</p>
+</section>

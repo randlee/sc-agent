@@ -1,0 +1,296 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-duplicate" id="dup-ADR-SAG-0020-REQ-SAG-0019">
+  <div class="section-head">
+    <h2>ADR-SAG-0020 restates REQ-SAG-0019</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="[
+  {
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;possible&quot;,
+    &quot;confidence&quot;: 0.48,
+    &quot;item&quot;: &quot;ADR-SAG-0020&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0019&quot;,
+    &quot;session_id&quot;: &quot;01M8GQ7NS9SSNNMCVK682DP9P4&quot;,
+    &quot;statement&quot;: &quot;Each configuration file MUST accept the shared settings.&quot;,
+    &quot;statement_index&quot;: 1
+  },
+  {
+    &quot;action&quot;: &quot;correct&quot;,
+    &quot;annotation&quot;: {
+      &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+      &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+      &quot;clauses&quot;: [
+        &quot;A CLI file MUST accept that CLI&#x27;s settings.&quot;
+      ],
+      &quot;jev_disputed&quot;: false,
+      &quot;no_provenance&quot;: &quot;&quot;,
+      &quot;provenance&quot;: [
+        {
+          &quot;commit&quot;: &quot;998015d2&quot;,
+          &quot;date&quot;: &quot;2026-11-18&quot;,
+          &quot;record&quot;: &quot;ADR-SAG-0020&quot;,
+          &quot;statement&quot;: &quot;Configuration has two kinds of scope and two locations.\n\n- The shared scope is the file `sc-agent.json`. It holds shared defaults for configuration-reading CLIs: the project/phase (ADR-SAG-0021), worker count, and optional local-runner settings. A CLI file may override those defaults.\n- Each CLI that reads configuration has its own scope, the file `&lt;cli&gt;.json` named after the CLI: `decidr.json`, and the same pattern for every CLI added later. `sitr` reads no configuration.\n- The global location is `~/.sc-agent/`, the user&#x27;s home directory joined with `.sc-agent` on every platform, or the folder named by nonempty `SC_AGENT_HOME`. An explicit configuration directory takes precedence.\n- The local location is `&lt;worktree&gt;/.sc/sc-agent/`, where `&lt;worktree&gt;` is the root of the git work tree the CLI runs in. It holds the same file names with the same keys.\n\nThe CLIs and the files each one reads are these:\n\n| CLI | Global files | Local files | Environment prefix |\n|---|---|---|---|\n| `decidr` | `~/.sc-agent/decidr.local.json`, `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `&lt;worktree&gt;/.sc/sc-agent/decidr.local.json`, `&lt;worktree&gt;/.sc/sc-agent/decidr.json`, `&lt;worktree&gt;/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |\n| `sitr` | none | none | none |\n\nEvery CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. The table is updated when a CLI is added.\n\nA setting is looked up in nine layers, and the first layer that sets it wins:\n\n1. the CLI flag;\n2. the environment variable;\n3. the local `&lt;cli&gt;.local.json`;\n4. the local `&lt;cli&gt;.json`;\n5. the local `sc-agent.json`;\n6. the global `&lt;cli&gt;.local.json`;\n7. the global `&lt;cli&gt;.json`;\n8. the global `sc-agent.json`;\n9. the built-in default.\n\nModel entries, `models.&lt;alias&gt;`, are set only in configuration files, layers 3 to 8: each is a structured row (`provider` and `id` strings, `released` a `YYYY-MM-DD` date) that a flag or flat environment variable cannot express. `&lt;alias&gt;` becomes the row&#x27;s short name. A row&#x27;s provider is one sc-agent already has.\n\nEnvironment variables are named after the CLI: `DECIDR_&lt;SETTING&gt;`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).\n\nConfiguration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152).&quot;,
+          &quot;summary&quot;: &quot;docs: ADR-SAG-0020/0021 config scopes and separate session-log tree&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;3afa4f9e&quot;,
+          &quot;date&quot;: &quot;2026-11-18&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.&quot;,
+          &quot;summary&quot;: &quot;Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;22f4a5bd&quot;,
+          &quot;date&quot;: &quot;2026-11-25&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;Each configuration file MUST accept the shared settings.&quot;,
+          &quot;summary&quot;: &quot;phase-j records: fix ai-qa clean-up findings&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;22f4a5bd&quot;,
+          &quot;date&quot;: &quot;2026-11-25&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;A CLI file MUST accept that CLI&#x27;s settings.&quot;,
+          &quot;summary&quot;: &quot;phase-j records: fix ai-qa clean-up findings&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;22f4a5bd&quot;,
+          &quot;date&quot;: &quot;2026-11-25&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;An unknown key in a configuration file MUST cause a typed load error.&quot;,
+          &quot;summary&quot;: &quot;phase-j records: fix ai-qa clean-up findings&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;67203e2f&quot;,
+          &quot;date&quot;: &quot;2026-11-25&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;The `cache` setting MUST default to `true`.&quot;,
+          &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;67203e2f&quot;,
+          &quot;date&quot;: &quot;2026-11-25&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;A model entry MUST add one row to the model table.&quot;,
+          &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;4354e4e1&quot;,
+          &quot;date&quot;: &quot;2026-11-25&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;A model entry MUST override the model its name selects.&quot;,
+          &quot;summary&quot;: &quot;REQ-SAG-0019: configuration overrides the model a name selects (owner ruling 2026-11-25)&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;b98b4112&quot;,
+          &quot;date&quot;: &quot;2026-11-25&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;A local endpoint&#x27;s address MUST be settable in configuration.&quot;,
+          &quot;summary&quot;: &quot;phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;1a9af55a&quot;,
+          &quot;date&quot;: &quot;2026-11-25&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;When the CLI does not run inside a git work tree, it MUST skip the local-folder layers.&quot;,
+          &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;b98b4112&quot;,
+          &quot;date&quot;: &quot;2026-11-25&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;Each CLI&#x27;s `&lt;cli&gt; doctor` command, such as `decidr doctor`, MUST report the settings table.&quot;,
+          &quot;summary&quot;: &quot;phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;3afa4f9e&quot;,
+          &quot;date&quot;: &quot;2026-11-18&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;In each row of the settings table, the `source` cell MUST show the source of that row&#x27;s value.&quot;,
+          &quot;summary&quot;: &quot;Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;87129dd2&quot;,
+          &quot;date&quot;: &quot;2026-11-22&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;`&lt;cli&gt; doctor` MUST report the path of every file in the nine layers.&quot;,
+          &quot;summary&quot;: &quot;feat: adopt the merged sc-config layered engine&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;87129dd2&quot;,
+          &quot;date&quot;: &quot;2026-11-22&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;For each file in the nine layers, `&lt;cli&gt; doctor` MUST report whether it exists.&quot;,
+          &quot;summary&quot;: &quot;feat: adopt the merged sc-config layered engine&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;3afa4f9e&quot;,
+          &quot;date&quot;: &quot;2026-11-18&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;When a CLI fails to load a configuration file, its error MUST name the failure location.&quot;,
+          &quot;summary&quot;: &quot;Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;998015d2&quot;,
+          &quot;date&quot;: &quot;2026-11-18&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;A CLI MUST NOT read another CLI&#x27;s `&lt;cli&gt;.json`.&quot;,
+          &quot;summary&quot;: &quot;docs: ADR-SAG-0020/0021 config scopes and separate session-log tree&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;3afa4f9e&quot;,
+          &quot;date&quot;: &quot;2026-11-18&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;While it loads configuration, a CLI MUST NOT write to any configuration file.&quot;,
+          &quot;summary&quot;: &quot;Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;3afa4f9e&quot;,
+          &quot;date&quot;: &quot;2026-11-18&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;`&lt;cli&gt; doctor` MUST NOT send a model request.&quot;,
+          &quot;summary&quot;: &quot;Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;3afa4f9e&quot;,
+          &quot;date&quot;: &quot;2026-11-18&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;`&lt;cli&gt; doctor` MUST NOT write a file.&quot;,
+          &quot;summary&quot;: &quot;Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008&quot;
+        },
+        {
+          &quot;commit&quot;: &quot;b98b4112&quot;,
+          &quot;date&quot;: &quot;2026-11-25&quot;,
+          &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;statement&quot;: &quot;Configuration MUST NOT change a paid API&#x27;s base address.&quot;,
+          &quot;summary&quot;: &quot;phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size&quot;
+        }
+      ],
+      &quot;remedy&quot;: &quot;Delete the ADR copy; keep the obligation in REQ-SAG-0019.&quot;,
+      &quot;stale&quot;: null,
+      &quot;what&quot;: &quot;The ADR repeats a CLI configuration file obligation in REQ-SAG-0019.&quot;
+    },
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;duplicate&quot;,
+    &quot;confidence&quot;: 0.7,
+    &quot;item&quot;: &quot;ADR-SAG-0020&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0019&quot;,
+    &quot;session_id&quot;: &quot;01M8GQ7NS9SSNNMCVK682DP9P4&quot;,
+    &quot;statement&quot;: &quot;A CLI file MUST accept that CLI&#x27;s settings.&quot;,
+    &quot;statement_index&quot;: 2
+  },
+  {
+    &quot;choice&quot;: &quot;yes&quot;,
+    &quot;class&quot;: &quot;possible&quot;,
+    &quot;confidence&quot;: 0.48,
+    &quot;item&quot;: &quot;ADR-SAG-0020&quot;,
+    &quot;partner&quot;: &quot;REQ-SAG-0019&quot;,
+    &quot;session_id&quot;: &quot;01M8GQ7NS9SSNNMCVK682DP9P4&quot;,
+    &quot;statement&quot;: &quot;A model entry MUST add one row to the model table.&quot;,
+    &quot;statement_index&quot;: 5
+  }
+]">{}</button>
+    </div>
+  </div>
+  <p class="small">sc-agent · sc-agent</p>
+  <h3>Duplicated statement</h3>
+  <ul>
+    <li>REQ-SAG-0019 statement 3 (0.70): A CLI file MUST accept that CLI&#x27;s settings.</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+    <li>The ADR repeats a CLI configuration file obligation in REQ-SAG-0019.</li>
+  </ul>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>Delete the ADR copy; keep the obligation in REQ-SAG-0019.</p>
+  <h3>Possibly duplicated statement</h3>
+  <ul>
+    <li>REQ-SAG-0019 statement 2 (0.48): Each configuration file MUST accept the shared settings.</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+  </ul>
+  <h3>Possibly duplicated statement</h3>
+  <ul>
+    <li>REQ-SAG-0019 statement 6 (0.48): A model entry MUST add one row to the model table.</li>
+    <li>The matching copy in the item is not identified: no consolidate proposal names it with keeps.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>ADR-SAG-0020 statement 1: 998015d2 2026-11-18: docs: ADR-SAG-0020/0021 config scopes and separate session-log tree</li>
+    <li>REQ-SAG-0019 statement 1: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0019 statement 2: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0019 statement 3: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0019 statement 4: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0019 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0019 statement 6: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0019 statement 7: 4354e4e1 2026-11-25: REQ-SAG-0019: configuration overrides the model a name selects (owner ruling 2026-11-25)</li>
+    <li>REQ-SAG-0019 statement 8: b98b4112 2026-11-25: phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size</li>
+    <li>REQ-SAG-0019 statement 9: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0019 statement 10: b98b4112 2026-11-25: phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size</li>
+    <li>REQ-SAG-0019 statement 11: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0019 statement 12: 87129dd2 2026-11-22: feat: adopt the merged sc-config layered engine</li>
+    <li>REQ-SAG-0019 statement 13: 87129dd2 2026-11-22: feat: adopt the merged sc-config layered engine</li>
+    <li>REQ-SAG-0019 statement 14: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0019 statement 15: 998015d2 2026-11-18: docs: ADR-SAG-0020/0021 config scopes and separate session-log tree</li>
+    <li>REQ-SAG-0019 statement 16: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0019 statement 17: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0019 statement 18: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0019 statement 19: b98b4112 2026-11-25: phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size</li>
+  </ul>
+  <h3>ADR-SAG-0020 Configuration has a shared scope and one scope per CLI, each global and per worktree</h3>
+  <h3>Decision</h3>
+  <p>Configuration has two kinds of scope and two locations.
+
+- The shared scope is the file `sc-agent.json`. It holds shared defaults for configuration-reading CLIs: the project/phase (ADR-SAG-0021), worker count, and optional local-runner settings. A CLI file may override those defaults.
+- Each CLI that reads configuration has its own scope, the file `&lt;cli&gt;.json` named after the CLI: `decidr.json`, and the same pattern for every CLI added later. `sitr` reads no configuration.
+- The global location is `~/.sc-agent/`, the user&#x27;s home directory joined with `.sc-agent` on every platform, or the folder named by nonempty `SC_AGENT_HOME`. An explicit configuration directory takes precedence.
+- The local location is `&lt;worktree&gt;/.sc/sc-agent/`, where `&lt;worktree&gt;` is the root of the git work tree the CLI runs in. It holds the same file names with the same keys.
+
+The CLIs and the files each one reads are these:
+
+| CLI | Global files | Local files | Environment prefix |
+|---|---|---|---|
+| `decidr` | `~/.sc-agent/decidr.local.json`, `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `&lt;worktree&gt;/.sc/sc-agent/decidr.local.json`, `&lt;worktree&gt;/.sc/sc-agent/decidr.json`, `&lt;worktree&gt;/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |
+| `sitr` | none | none | none |
+
+Every CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. The table is updated when a CLI is added.
+
+A setting is looked up in nine layers, and the first layer that sets it wins:
+
+1. the CLI flag;
+2. the environment variable;
+3. the local `&lt;cli&gt;.local.json`;
+4. the local `&lt;cli&gt;.json`;
+5. the local `sc-agent.json`;
+6. the global `&lt;cli&gt;.local.json`;
+7. the global `&lt;cli&gt;.json`;
+8. the global `sc-agent.json`;
+9. the built-in default.
+
+Model entries, `models.&lt;alias&gt;`, are set only in configuration files, layers 3 to 8: each is a structured row (`provider` and `id` strings, `released` a `YYYY-MM-DD` date) that a flag or flat environment variable cannot express. `&lt;alias&gt;` becomes the row&#x27;s short name. A row&#x27;s provider is one sc-agent already has.
+
+Environment variables are named after the CLI: `DECIDR_&lt;SETTING&gt;`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).
+
+Configuration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152).</p>
+  <h3>REQ-SAG-0019 Configuration file locations and lookup order</h3>
+  <h3>Statements</h3>
+  <ul>
+    <li>When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.</li>
+    <li>Each configuration file MUST accept the shared settings.</li>
+    <li>A CLI file MUST accept that CLI&#x27;s settings.</li>
+    <li>An unknown key in a configuration file MUST cause a typed load error.</li>
+    <li>The `cache` setting MUST default to `true`.</li>
+    <li>A model entry MUST add one row to the model table.</li>
+    <li>A model entry MUST override the model its name selects.</li>
+    <li>A local endpoint&#x27;s address MUST be settable in configuration.</li>
+    <li>When the CLI does not run inside a git work tree, it MUST skip the local-folder layers.</li>
+    <li>Each CLI&#x27;s `&lt;cli&gt; doctor` command, such as `decidr doctor`, MUST report the settings table.</li>
+    <li>In each row of the settings table, the `source` cell MUST show the source of that row&#x27;s value.</li>
+    <li>`&lt;cli&gt; doctor` MUST report the path of every file in the nine layers.</li>
+    <li>For each file in the nine layers, `&lt;cli&gt; doctor` MUST report whether it exists.</li>
+    <li>When a CLI fails to load a configuration file, its error MUST name the failure location.</li>
+    <li>A CLI MUST NOT read another CLI&#x27;s `&lt;cli&gt;.json`.</li>
+    <li>While it loads configuration, a CLI MUST NOT write to any configuration file.</li>
+    <li>`&lt;cli&gt; doctor` MUST NOT send a model request.</li>
+    <li>`&lt;cli&gt; doctor` MUST NOT write a file.</li>
+    <li>Configuration MUST NOT change a paid API&#x27;s base address.</li>
+  </ul>
+</section>

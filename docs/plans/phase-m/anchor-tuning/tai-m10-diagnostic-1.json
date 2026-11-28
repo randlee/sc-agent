@@ -1,0 +1,197 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261128T094636Z-agt-m-10",
+  "gate": "plan",
+  "created_at": "2026-11-28T09:46:36+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "agt-m-10",
+    "title": "",
+    "source": "scratchpad/agt-m-10.item.txt",
+    "chars": 1222
+  },
+  "model_requested": "jev",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [
+    {
+      "path": "scratchpad/agt-m-10.triage.jsonl",
+      "sha256": "c64a59f8133ade20daca24994b0b015ed4c730674f56195cad199167be254569",
+      "ids": [
+        "diagnose_specific"
+      ]
+    },
+    {
+      "path": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/.sc/plan-anchor/triage/plan-questions.jsonl",
+      "sha256": "68180fbd2de8a3dee2421351672f9a321506af1f4bb19531c2c26d7d21c2c521",
+      "ids": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "anchor_id": "ANC-013",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-agent must provide an LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider speaking that format, so callers reach any LLM through one interface.",
+      "quote": "we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26",
+      "anchor_version": 2,
+      "deterministic_check": "grep: one LLM trait with one impl per wire format; decision-over-LLM uses it; test sends JSON and receives schema-valid JSON for each wire format",
+      "kind": "directive",
+      "leaning": "underspecified",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "extra_questions_sha256": "8eff864043c223217f9949f7ed627f596fd1e6253e3fcb1e610b21243c093ac3",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.11,
+          "probabilities": {
+            "no": 0.2,
+            "unclear": 0.41,
+            "yes": 0.39
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.7,
+          "probabilities": {
+            "no": 0.8,
+            "unclear": 0.08,
+            "yes": 0.12
+          }
+        },
+        "diagnose_specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.86,
+          "probabilities": {
+            "no": 0.91,
+            "unclear": 0.08,
+            "yes": 0.01
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.61,
+          "probabilities": {
+            "no": 0.24,
+            "unclear": 0.02,
+            "yes": 0.74
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.28,
+          "probabilities": {
+            "no": 0.52,
+            "unclear": 0.27,
+            "yes": 0.21
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.73,
+          "probabilities": {
+            "no": 0.82,
+            "unclear": 0.01,
+            "yes": 0.17
+          }
+        }
+      },
+      "min_confidence": 0.11,
+      "explanation": "Jev was not confident (min confidence 0.11); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1434,
+        "output_tokens": 157
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "unclear",
+          "confidence": 0.11
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 1222
+    }
+  ],
+  "summary": {
+    "counts": {
+      "underspecified": 1
+    },
+    "failing": [
+      "ANC-013"
+    ],
+    "leaning_counts": {
+      "underspecified": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "excluded": [],
+    "pass": false
+  }
+}

@@ -1,0 +1,111 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-ADR-SAG-0019-ANC-023">
+  <div class="section-head">
+    <h2>ADR-SAG-0019 × ANC-023 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-023&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [],
+    &quot;jev_disputed&quot;: true,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;2e54ef62&quot;,
+        &quot;date&quot;: &quot;2026-11-24&quot;,
+        &quot;record&quot;: &quot;ADR-SAG-0019&quot;,
+        &quot;statement&quot;: &quot;The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.\n\n1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection, API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query whose model call succeeded (a failed call writes no row; its error goes to the general log), at the wheel&#x27;s default location, tagged with `project` and `agent_role`, written by sc-agent&#x27;s session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.\n\n   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`; the wheel moves to maturin&#x27;s mixed layout and `import sc_agent` is unchanged.\n\n   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping.\n   - model selectors are Run arguments.\n   - A result line holds only the generic result fields; session data stays in the session row. The module reads session rows only through `sc_agent.session_rows`, finding a run&#x27;s queries through its link records or the session_ids in its result lines, and never computes a session-log path.\n   - Python results are typed values, not dicts.\n   - sc-compose is an external render tool, not a wheel dependency; the template&#x27;s front matter declares its sc-compose minimum (`requires.cli`), declared, not enforced.\n\n   **The lower-level API stays the contract.** `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public, and the generated code uses only them and the standard library.\n\n2. **Typed fields: `attempts` and `category`.** An error value carries at least `id`, `message` and `action`, plus `attempts` (sends made, the first included) and `category` (decision 6) when they apply; unset fields are not written (REQ-SAG-0016). Retry-After is read as a Duration and used for the wait before a resend (REQ-SAG-0601).\n\n5. **Python errors.** Every wheel call returns ok with a value or an error with its id and message; nothing raises (REQ-SAG-0016).\n\n6. **The category is stored when the error is built.** The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`. Every error has a stable id and stores its category, which Python reads from the `category` field (REQ-SAG-0017). Retryable means worth resubmitting as a new call later, after the wheel&#x27;s own resends have run out; it is true for `busy` and `network` only, and a consumer that resubmits waits first rather than wrapping the wheel in an immediate retry loop.\n\n7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run&#x27;s calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout. The timeout defaults to 120 s; REQ-SAG-0702 holds the rules.\n\n8. **`send_batch` returns one result per request, each with its input position**, while `on_result` still receives each line as it finishes (REQ-SAG-0702).\n\n11. **sitr is an optional, separate section of the consumer template.** It uses `sc_agent.sitr` only (ADR-SAG-0005, ADR-SAG-0021) and is kept separate from the decision call: extraction runs outside the decision path, and its output feeds the consumer&#x27;s prompt authoring. In this phase one offline test shows extraction output reaching a dry-run request.\n\n14. **A run is a context object.** `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`); creating it mints the run&#x27;s ULID `run_id` in Rust (as are `session_id` ULIDs), readable as `run.run_id`.&quot;,
+        &quot;summary&quot;: &quot;phase-j plan v9: owner rulings (seed_session, config model rows, cache rule), records shortened&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;No proposal: the trace does not establish that ANC-023 requires removing the wheel&#x27;s consumer-boundary role.&quot;,
+    &quot;stale&quot;: null,
+    &quot;what&quot;: &quot;The ADR puts session logging under the wheel&#x27;s consumer boundary but says the session sink writes it in sc-agent. ANC-023 requires SQLite storage through `sc-agent-sqlite`; it does not by itself disallow the wheel as a consumer boundary. The trace does not show a specific conflict with the SQLite requirement. Proposer paraphrase omitted; inspect the served record text and provenance.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.68,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.79,
+        &quot;unclear&quot;: 0.11,
+        &quot;yes&quot;: 0.1
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.6,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.25,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.73
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.43,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.36,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.62
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.3,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.53,
+        &quot;unclear&quot;: 0.25,
+        &quot;yes&quot;: 0.22
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.1,
+    &quot;exceeds&quot;: 0.73,
+    &quot;relates&quot;: 0.62,
+    &quot;serves&quot;: 0.22
+  },
+  &quot;record&quot;: &quot;ADR-SAG-0019&quot;,
+  &quot;request_id&quot;: &quot;trace/ADR-SAG-0019/ANC-023/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ7JGY4FQWG25DF70E0M5P&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="ADR-SAG-0019 × ANC-023 — exceeds
+What exceeds
+Reviewer disputes Jev: The ADR puts session logging under the wheel&#x27;s consumer boundary but says the session sink writes it in sc-agent. ANC-023 requires SQLite storage through `sc-agent-sqlite`; it does not by itself disallow the wheel as a consumer boundary. The trace does not show a specific conflict with the SQLite requirement. Proposer paraphrase omitted; inspect the served record text and provenance.
+Proposed remedy
+No proposal: the trace does not establish that ANC-023 requires removing the wheel&#x27;s consumer-boundary role.
+Anchor
+sc-agent writes each session row to the repository&#x27;s SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.
+Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp”
+Scope: adds or changes code that writes or reads session rows
+Record statements
+No obligation statements.
+History (git)
+ADR-SAG-0019 statement 1: 2e54ef62 2026-11-24: phase-j plan v9: owner rulings (seed_session, config model rows, cache rule), records shortened
+Jev P(yes): relates 0.62 · serves 0.22 · exceeds 0.73 · conflicts 0.10">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <ul>
+  </ul>
+  <p>Reviewer disputes Jev: The ADR puts session logging under the wheel&#x27;s consumer boundary but says the session sink writes it in sc-agent. ANC-023 requires SQLite storage through `sc-agent-sqlite`; it does not by itself disallow the wheel as a consumer boundary. The trace does not show a specific conflict with the SQLite requirement. Proposer paraphrase omitted; inspect the served record text and provenance.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>No proposal: the trace does not establish that ANC-023 requires removing the wheel&#x27;s consumer-boundary role.</p>
+  <h3>Anchor</h3>
+  <p>sc-agent writes each session row to the repository&#x27;s SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.</p>
+  <p>Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp”</p>
+  <p>Scope: adds or changes code that writes or reads session rows</p>
+  <h3>Record statements</h3>
+  <p>No obligation statements.</p>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>ADR-SAG-0019 statement 1: 2e54ef62 2026-11-24: phase-j plan v9: owner rulings (seed_session, config model rows, cache rule), records shortened</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.62 · serves 0.22 · exceeds 0.73 · conflicts 0.10</p>
+</section>

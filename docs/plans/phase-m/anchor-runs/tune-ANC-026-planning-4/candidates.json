@@ -1,0 +1,177 @@
+{
+ "schema": "plan-anchor/tune-candidates/1",
+ "gate": "planning",
+ "anchor_id": "ANC-026",
+ "candidates": {
+  "relevant": {
+   "R1": {
+    "type": "choice",
+    "instructions": "Does `item.text` show any of these signals? (1) the item adds or edits CREATE TABLE, ALTER TABLE or CREATE INDEX SQL, or a migration file, in any crate; (2) the item adds or changes a core table (for example sessions or responses) or its SQL in crates/sc-agent-schema; (3) the item adds SQLite storage code (for example in sc-agent-sqlite) that creates or alters tables. Answer only whether a signal is present; do not judge where the SQL is or whether it is correct. Mentioning SQLite, sessions, a database file, or reading or querying an existing table, without creating or altering a table, is not a signal.",
+    "criteria": {
+     "yes": "The item text shows at least one of the three signals.",
+     "no": "The item text shows none of the three signals, including items that only mention SQLite, sessions or a database, or only read from tables.",
+     "unclear": "The item text describes table work so vaguely that whether it creates or alters a table cannot be told."
+    }
+   },
+   "R2": {
+    "type": "choice",
+    "instructions": "Does the work in `item.text` create, alter or index a database table, or define table SQL? It does when: (1) the item adds or edits CREATE TABLE, ALTER TABLE or CREATE INDEX SQL, or a migration file, in any crate; (2) the item adds or changes a core table (for example sessions or responses) or its SQL in crates/sc-agent-schema; (3) the item adds SQLite storage code (for example in sc-agent-sqlite) that creates or alters tables. Most items do not: CLI flags, dependency bumps, documentation, configuration, crate moves, and code that only reads or writes rows are not table definitions, even if they mention SQLite or the sessions table.",
+    "criteria": {
+     "yes": "The item creates, alters or indexes a table, adds a migration, or adds or changes table SQL or table-creating code.",
+     "no": "The item defines, alters and creates no table; it is about something else, or only mentions or uses SQLite or existing tables.",
+     "unclear": "The item says it will change a table's definition but gives too little to tell whether it does."
+    }
+   },
+   "R3": {
+    "type": "choice",
+    "instructions": "Does `item.text` change how any database table is defined? Look only for these bead-level signals: (1) the item adds or edits CREATE TABLE, ALTER TABLE or CREATE INDEX SQL, or a migration file, in any crate; (2) the item adds or changes a core table (for example sessions or responses) or its SQL in crates/sc-agent-schema; (3) the item adds SQLite storage code (for example in sc-agent-sqlite) that creates or alters tables. The answer is no for an item whose work defines no table, however much it talks about SQLite, session logs or storage.",
+    "criteria": {
+     "yes": "One of the listed signals is present in the item.",
+     "no": "None of the listed signals is present.",
+     "unclear": "A signal may be present but the text is too vague to tell."
+    }
+   },
+   "R4": {
+    "type": "choice",
+    "instructions": "Answer yes only if `item.text` itself touches table definitions: (1) the item adds or edits CREATE TABLE, ALTER TABLE or CREATE INDEX SQL, or a migration file, in any crate; (2) the item adds or changes a core table (for example sessions or responses) or its SQL in crates/sc-agent-schema; (3) the item adds SQLite storage code (for example in sc-agent-sqlite) that creates or alters tables. Answer no when the item plainly does other work (for example a CLI flag, a dependency, a README, a query that reads rows, a database path setting) even if it names SQLite or a table. Do not judge compliance here.",
+    "criteria": {
+     "yes": "The item adds or edits table-defining SQL, a migration, a core table in sc-agent-schema, or code that creates or alters tables.",
+     "no": "The item touches no table definition.",
+     "unclear": "The item mentions changing table structure without saying enough to decide."
+    }
+   }
+  },
+  "addressed": {
+   "A1": {
+    "type": "choice",
+    "instructions": "Does `item.text` place the table SQL it works on in sc-agent-schema? The requirement is that every core table's SQL (CREATE TABLE, ALTER TABLE, CREATE INDEX, migrations) is defined in sc-agent-schema and nowhere else. Present: the item adds that SQL in sc-agent-schema, or its other code uses SQL constants from sc-agent-schema instead of its own. Not present: the item does not say where the SQL is defined, or defines it elsewhere.",
+    "criteria": {
+     "yes": "The item says the table SQL is defined in sc-agent-schema, or used from there.",
+     "no": "The item does not say the SQL is in sc-agent-schema, or puts it elsewhere.",
+     "unclear": "The item hints at a location for the SQL that cannot be resolved."
+    }
+   },
+   "A2": {
+    "type": "choice",
+    "instructions": "Is the requirement 'every core table's SQL is defined in sc-agent-schema and nowhere else' present in `item.text`? Count it present when the item defines a core table's SQL in sc-agent-schema, or when other code executes SQL taken from sc-agent-schema. Silence about where the SQL lives is no. Defining the SQL in another crate is no.",
+    "criteria": {
+     "yes": "The item defines the table SQL in sc-agent-schema or uses sc-agent-schema's SQL.",
+     "no": "The item is silent about the SQL's location, or defines it outside sc-agent-schema.",
+     "unclear": "The item names a location ambiguously."
+    }
+   },
+   "A3": {
+    "type": "choice",
+    "instructions": "Does `item.text` state that the core table SQL it involves lives in sc-agent-schema? Example of yes: 'The responses table's CREATE TABLE text is added in sc-agent-schema and used from there.' Example of no: a migration with no location, or SQL written in sc-agent-sqlite.",
+    "criteria": {
+     "yes": "The SQL is stated to be defined in, or taken from, sc-agent-schema.",
+     "no": "No such statement, or the SQL is defined elsewhere.",
+     "unclear": "The text is ambiguous about where the SQL is defined."
+    }
+   }
+  },
+  "contradicted": {
+   "C4": {
+    "type": "choice",
+    "instructions": "Would doing what `item.text` describes define a core table's SQL (CREATE TABLE, ALTER TABLE, CREATE INDEX or a migration for a table such as sessions or responses) in a crate other than sc-agent-schema? Executing SQL that is defined in sc-agent-schema is not a violation. Not saying where the SQL lives is silence, not a violation. Silence is not a contradiction: an item that adds a migration, an index or a column but does not name the crate where the SQL goes, or never says where the SQL is defined, is no.",
+    "criteria": {
+     "yes": "The item writes core table SQL outside sc-agent-schema.",
+     "no": "The item writes no core table SQL outside sc-agent-schema, is silent on location, or is unrelated. Not naming the SQL's crate is silence and is no.",
+     "unclear": "The item names a crate for the SQL, but whether it is sc-agent-schema cannot be told."
+    }
+   },
+   "C5": {
+    "type": "choice",
+    "instructions": "Does `item.text` violate the rule that every core table's SQL is defined in sc-agent-schema and nowhere else? Violation: a crate other than sc-agent-schema (for example sc-agent-sqlite, including its migrations folder) contains its own CREATE TABLE, ALTER TABLE or CREATE INDEX for a core table. Silence and unrelated work are not violations; calling sc-agent-schema's SQL is not a violation. Silence is not a contradiction: an item that adds a migration, an index or a column but does not name the crate where the SQL goes, or never says where the SQL is defined, is no.",
+    "criteria": {
+     "yes": "Core table SQL is placed outside sc-agent-schema.",
+     "no": "No core table SQL is placed outside sc-agent-schema. Not naming the SQL's crate is silence and is no.",
+     "unclear": "The item names a crate for the SQL, but whether it is sc-agent-schema cannot be told."
+    }
+   },
+   "C6": {
+    "type": "choice",
+    "instructions": "Would the described work put SQL for a core table anywhere except sc-agent-schema? Examples of yes: 'sc-agent-sqlite defines its own CREATE TABLE for sessions'; an ALTER TABLE migration under sc-agent-sqlite. Examples of no: SQL added in sc-agent-schema; code that runs sc-agent-schema's SQL; a migration whose location is not stated; work unrelated to tables. Silence is not a contradiction: an item that adds a migration, an index or a column but does not name the crate where the SQL goes, or never says where the SQL is defined, is no.",
+    "criteria": {
+     "yes": "Core table SQL would exist outside sc-agent-schema.",
+     "no": "It would not, or the item is silent or unrelated. Not naming the SQL's crate is silence and is no.",
+     "unclear": "The item names a crate for the SQL, but whether it is sc-agent-schema cannot be told."
+    }
+   }
+  }
+ },
+ "bundles": [
+  {
+   "bundle_id": "R4-A1-C4",
+   "roles": {
+    "relevant": "R4",
+    "addressed": "A1",
+    "contradicted": "C4"
+   }
+  },
+  {
+   "bundle_id": "R4-A1-C5",
+   "roles": {
+    "relevant": "R4",
+    "addressed": "A1",
+    "contradicted": "C5"
+   }
+  },
+  {
+   "bundle_id": "R4-A1-C6",
+   "roles": {
+    "relevant": "R4",
+    "addressed": "A1",
+    "contradicted": "C6"
+   }
+  },
+  {
+   "bundle_id": "R4-A2-C4",
+   "roles": {
+    "relevant": "R4",
+    "addressed": "A2",
+    "contradicted": "C4"
+   }
+  },
+  {
+   "bundle_id": "R4-A2-C5",
+   "roles": {
+    "relevant": "R4",
+    "addressed": "A2",
+    "contradicted": "C5"
+   }
+  },
+  {
+   "bundle_id": "R4-A2-C6",
+   "roles": {
+    "relevant": "R4",
+    "addressed": "A2",
+    "contradicted": "C6"
+   }
+  },
+  {
+   "bundle_id": "R4-A3-C4",
+   "roles": {
+    "relevant": "R4",
+    "addressed": "A3",
+    "contradicted": "C4"
+   }
+  },
+  {
+   "bundle_id": "R4-A3-C5",
+   "roles": {
+    "relevant": "R4",
+    "addressed": "A3",
+    "contradicted": "C5"
+   }
+  },
+  {
+   "bundle_id": "R4-A3-C6",
+   "roles": {
+    "relevant": "R4",
+    "addressed": "A3",
+    "contradicted": "C6"
+   }
+  }
+ ]
+}

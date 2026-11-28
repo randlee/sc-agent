@@ -1,0 +1,339 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0004">
+  <div class="section-head">
+    <h2>REQ-SAG-0004 Session log identity: repo, agent role, project and tool</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0004&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T091833Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Every session row MUST carry its identity.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;sc-agent MUST refuse every query whose identity is not valid.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;In a git repository, a query&#x27;s repository MUST be that repository&#x27;s origin name.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Outside a git repository, a query&#x27;s repository MUST be `local/&lt;host&gt;/&lt;folder-name&gt;`.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A query&#x27;s project MUST be the project that REQ-SAG-0021 resolves for it.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The `decidr` CLI MUST accept an agent role from its user.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The Python bindings of sc-agent MUST accept an agent role from their caller.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A generated consumer client MUST set the agent role to the client&#x27;s product name.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;A generated consumer client MUST NOT let its user set the agent role.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;e85693a8&quot;,
+        &quot;date&quot;: &quot;2026-11-24&quot;,
+        &quot;summary&quot;: &quot;REQ-SAG-0004: rewritten to two statements; define-term on s2&quot;
+      },
+      &quot;statement&quot;: &quot;Every session row MUST carry its identity.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;e85693a8&quot;,
+        &quot;date&quot;: &quot;2026-11-24&quot;,
+        &quot;summary&quot;: &quot;REQ-SAG-0004: rewritten to two statements; define-term on s2&quot;
+      },
+      &quot;statement&quot;: &quot;sc-agent MUST refuse every query whose identity is not valid.&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;e4f7828e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;REQ-SAG-0004: define a git repository&#x27;s origin name so s3 states one obligation&quot;
+      },
+      &quot;statement&quot;: &quot;In a git repository, a query&#x27;s repository MUST be that repository&#x27;s origin name.&quot;,
+      &quot;statement_index&quot;: 2
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1a9af55a&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+      },
+      &quot;statement&quot;: &quot;Outside a git repository, a query&#x27;s repository MUST be `local/&lt;host&gt;/&lt;folder-name&gt;`.&quot;,
+      &quot;statement_index&quot;: 3
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1a9af55a&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+      },
+      &quot;statement&quot;: &quot;A query&#x27;s project MUST be the project that REQ-SAG-0021 resolves for it.&quot;,
+      &quot;statement_index&quot;: 4
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;22f4a5bd&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: fix ai-qa clean-up findings&quot;
+      },
+      &quot;statement&quot;: &quot;The `decidr` CLI MUST accept an agent role from its user.&quot;,
+      &quot;statement_index&quot;: 5
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;22f4a5bd&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: fix ai-qa clean-up findings&quot;
+      },
+      &quot;statement&quot;: &quot;The Python bindings of sc-agent MUST accept an agent role from their caller.&quot;,
+      &quot;statement_index&quot;: 6
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;A generated consumer client MUST set the agent role to the client&#x27;s product name.&quot;,
+      &quot;statement_index&quot;: 7
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;A generated consumer client MUST NOT let its user set the agent role.&quot;,
+      &quot;statement_index&quot;: 8
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0005&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0021&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0002&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0021&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0004&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Session logs are separated and analysed by repository, by type of work and by project or phase, and each row traces back to the program and version that sent it. Who sets each part, and where a refusal is raised, is carried by ADR-SAG-0021 (Session identity) and ADR-SAG-0019 decision 14.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Every session row MUST carry its identity.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;sc-agent MUST refuse every query whose identity is not valid.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;In a git repository, a query&#x27;s repository MUST be that repository&#x27;s origin name.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Outside a git repository, a query&#x27;s repository MUST be `local/&lt;host&gt;/&lt;folder-name&gt;`.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A query&#x27;s project MUST be the project that REQ-SAG-0021 resolves for it.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The `decidr` CLI MUST accept an agent role from its user.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The Python bindings of sc-agent MUST accept an agent role from their caller.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A generated consumer client MUST set the agent role to the client&#x27;s product name.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;A generated consumer client MUST NOT let its user set the agent role.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: sc-agent is the Rust core that sends decision requests and writes session logs. A session row is a row of a session log (REQ-SAG-0005). A query&#x27;s identity is the repository it ran in, its project (REQ-SAG-0021), its agent role, and the name and released version of the program that sent it (ADR-SAG-0021, Session identity). A session row&#x27;s identity is its `session_id`, which identifies the session, and the identity of the query it records. An identity is valid when every part is present and the project and agent role are slugs. A git repository&#x27;s origin name is `&lt;host&gt;/&lt;owner&gt;/&lt;repo&gt;` taken from its `origin` URL, with no URL scheme and no `.git` suffix. An agent role is the agent or app making the request (ADR-SAG-0021). A generated consumer client is the Python module a consumer renders from the sc-decidr wheel&#x27;s template, and its product name is the client-name constant it carries, such as `plan-anchor`. In `local/&lt;host&gt;/&lt;folder-name&gt;`, `&lt;host&gt;` is the output of `hostname` and `&lt;folder-name&gt;` is the name of the working directory. A slug is lowercase text using only `a-z`, `0-9`, `.`, `_` and `-`. To refuse a query is to return an error for it without making a model call or writing a session row.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: a written session row carries `session_id`, repository, project, agent role, program name and program version.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: a query with a missing part or a non-slug project or agent role returns an error, makes no model call and writes no row.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: origin `https://github.com/randlee/sc-agent.git` gives repository `github.com/randlee/sc-agent`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: folder `work` on host `m5` outside git gives repository `local/m5/work`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test of project resolution: the project a row carries is the one REQ-SAG-0021 resolves.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;CLI run: `decidr send --agent-role sanity` writes a row with agent role `sanity`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: a Python bindings call with agent role `sanity` writes a row with that agent role.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test of the generated plan-anchor client: its rows carry agent role `plan-anchor`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: a `project` of `Phase B` is refused and no row is written.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: `decidr send` with no agent role is refused and no row is written.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: a CLI call and a Python bindings call with the same `project` and `agent_role` write rows with the same values in those fields.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test of the generated judge-jev client: its rows carry agent role `judge-jev`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test of the generated plan-anchor client: its call signature has no agent role parameter.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Session log identity: repo, agent role, project and tool&quot;,
+    &quot;version&quot;: &quot;0.6.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.6.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>Every session row MUST carry its identity.</li>
+    <li>sc-agent MUST refuse every query whose identity is not valid.</li>
+    <li>In a git repository, a query&#x27;s repository MUST be that repository&#x27;s origin name.</li>
+    <li>Outside a git repository, a query&#x27;s repository MUST be `local/&lt;host&gt;/&lt;folder-name&gt;`.</li>
+    <li>A query&#x27;s project MUST be the project that REQ-SAG-0021 resolves for it.</li>
+    <li>The `decidr` CLI MUST accept an agent role from its user.</li>
+    <li>The Python bindings of sc-agent MUST accept an agent role from their caller.</li>
+    <li>A generated consumer client MUST set the agent role to the client&#x27;s product name.</li>
+    <li>A generated consumer client MUST NOT let its user set the agent role.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: sc-agent is the Rust core that sends decision requests and writes session logs. A session row is a row of a session log (REQ-SAG-0005). A query&#x27;s identity is the repository it ran in, its project (REQ-SAG-0021), its agent role, and the name and released version of the program that sent it (ADR-SAG-0021, Session identity). A session row&#x27;s identity is its `session_id`, which identifies the session, and the identity of the query it records. An identity is valid when every part is present and the project and agent role are slugs. A git repository&#x27;s origin name is `&lt;host&gt;/&lt;owner&gt;/&lt;repo&gt;` taken from its `origin` URL, with no URL scheme and no `.git` suffix. An agent role is the agent or app making the request (ADR-SAG-0021). A generated consumer client is the Python module a consumer renders from the sc-decidr wheel&#x27;s template, and its product name is the client-name constant it carries, such as `plan-anchor`. In `local/&lt;host&gt;/&lt;folder-name&gt;`, `&lt;host&gt;` is the output of `hostname` and `&lt;folder-name&gt;` is the name of the working directory. A slug is lowercase text using only `a-z`, `0-9`, `.`, `_` and `-`. To refuse a query is to return an error for it without making a model call or writing a session row.</p>
+  <h3>Rationale</h3>
+  <p>Session logs are separated and analysed by repository, by type of work and by project or phase, and each row traces back to the program and version that sent it. Who sets each part, and where a refusal is raised, is carried by ADR-SAG-0021 (Session identity) and ADR-SAG-0019 decision 14.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>Unit test: a written session row carries `session_id`, repository, project, agent role, program name and program version.</li>
+    <li>Unit test: a query with a missing part or a non-slug project or agent role returns an error, makes no model call and writes no row.</li>
+    <li>Unit test: origin `https://github.com/randlee/sc-agent.git` gives repository `github.com/randlee/sc-agent`.</li>
+    <li>Unit test: folder `work` on host `m5` outside git gives repository `local/m5/work`.</li>
+    <li>Unit test of project resolution: the project a row carries is the one REQ-SAG-0021 resolves.</li>
+    <li>CLI run: `decidr send --agent-role sanity` writes a row with agent role `sanity`.</li>
+    <li>Unit test: a Python bindings call with agent role `sanity` writes a row with that agent role.</li>
+    <li>Unit test of the generated plan-anchor client: its rows carry agent role `plan-anchor`.</li>
+    <li>Unit test: a `project` of `Phase B` is refused and no row is written.</li>
+    <li>Unit test: `decidr send` with no agent role is refused and no row is written.</li>
+    <li>Unit test: a CLI call and a Python bindings call with the same `project` and `agent_role` write rows with the same values in those fields.</li>
+    <li>Unit test of the generated judge-jev client: its rows carry agent role `judge-jev`.</li>
+    <li>Unit test of the generated plan-anchor client: its call signature has no agent role parameter.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>REQ-SAG-0005</li>
+    <li>REQ-SAG-0021</li>
+    <li>ADR-SAG-0002</li>
+    <li>ADR-SAG-0019</li>
+    <li>ADR-SAG-0021</li>
+  </ul>
+</section>

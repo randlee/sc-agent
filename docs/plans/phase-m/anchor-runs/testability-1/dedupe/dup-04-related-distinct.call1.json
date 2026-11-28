@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "data": {
+    "threshold": 0.0,
+    "confidence_threshold": 0.6,
+    "jev": true,
+    "dry_run": false,
+    "fixture": false,
+    "anchors": 2,
+    "pairs": [
+      {
+        "a": "ANC-001",
+        "b": "ANC-002",
+        "jaccard": 0.6,
+        "field_a": "statement",
+        "field_b": "statement",
+        "jev": {
+          "choice": "no",
+          "confidence": 1.0,
+          "attempts": 1
+        }
+      }
+    ],
+    "likely_duplicates": []
+  },
+  "error": null
+}

@@ -1,0 +1,115 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-related" id="cell-REQ-SAG-0004-ANC-011">
+  <div class="section-head">
+    <h2>REQ-SAG-0004 × ANC-011 — related</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-011&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.82,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.88,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.09
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.62,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.75,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.24
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.67,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.22,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.78
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.79,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.86,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.12
+      }
+    }
+  },
+  &quot;class&quot;: &quot;related&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.09,
+    &quot;exceeds&quot;: 0.24,
+    &quot;relates&quot;: 0.78,
+    &quot;serves&quot;: 0.12
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0004&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0004/ANC-011/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GNA9TENWZ22R2QW81JGBMP&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0004 × ANC-011 — related
+Anchor
+Every operation the decidr CLI offers must also be callable from the sc-agent Python API, so the Python API is never less flexible than the CLI.
+Owner said: “I expect the python api may allow more flexibility than cli, NOT less.”
+Scope: adds or changes a decidr subcommand or a function in the sc-agent Python bindings
+Record statements
+Every session row MUST carry its identity.
+sc-agent MUST refuse every query whose identity is not valid.
+In a git repository, a query&#x27;s repository MUST be that repository&#x27;s origin name.
+Outside a git repository, a query&#x27;s repository MUST be `local/&lt;host&gt;/&lt;folder-name&gt;`.
+A query&#x27;s project MUST be the project that REQ-SAG-0021 resolves for it.
+The `decidr` CLI MUST accept an agent role from its user.
+The Python bindings of sc-agent MUST accept an agent role from their caller.
+A generated consumer client MUST set the agent role to the client&#x27;s product name.
+A generated consumer client MUST NOT let its user set the agent role.
+History (git)
+REQ-SAG-0004 statement 1: e85693a8 2026-11-24: REQ-SAG-0004: rewritten to two statements; define-term on s2
+REQ-SAG-0004 statement 2: e85693a8 2026-11-24: REQ-SAG-0004: rewritten to two statements; define-term on s2
+REQ-SAG-0004 statement 3: e4f7828e 2026-11-25: REQ-SAG-0004: define a git repository&#x27;s origin name so s3 states one obligation
+REQ-SAG-0004 statement 4: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0004 statement 5: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0004 statement 6: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings
+REQ-SAG-0004 statement 7: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings
+REQ-SAG-0004 statement 8: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0004 statement 9: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+Jev P(yes): relates 0.78 · serves 0.12 · exceeds 0.24 · conflicts 0.09">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>Anchor</h3>
+  <p>Every operation the decidr CLI offers must also be callable from the sc-agent Python API, so the Python API is never less flexible than the CLI.</p>
+  <p>Owner said: “I expect the python api may allow more flexibility than cli, NOT less.”</p>
+  <p>Scope: adds or changes a decidr subcommand or a function in the sc-agent Python bindings</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>Every session row MUST carry its identity.</li>
+    <li>sc-agent MUST refuse every query whose identity is not valid.</li>
+    <li>In a git repository, a query&#x27;s repository MUST be that repository&#x27;s origin name.</li>
+    <li>Outside a git repository, a query&#x27;s repository MUST be `local/&lt;host&gt;/&lt;folder-name&gt;`.</li>
+    <li>A query&#x27;s project MUST be the project that REQ-SAG-0021 resolves for it.</li>
+    <li>The `decidr` CLI MUST accept an agent role from its user.</li>
+    <li>The Python bindings of sc-agent MUST accept an agent role from their caller.</li>
+    <li>A generated consumer client MUST set the agent role to the client&#x27;s product name.</li>
+    <li>A generated consumer client MUST NOT let its user set the agent role.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0004 statement 1: e85693a8 2026-11-24: REQ-SAG-0004: rewritten to two statements; define-term on s2</li>
+    <li>REQ-SAG-0004 statement 2: e85693a8 2026-11-24: REQ-SAG-0004: rewritten to two statements; define-term on s2</li>
+    <li>REQ-SAG-0004 statement 3: e4f7828e 2026-11-25: REQ-SAG-0004: define a git repository&#x27;s origin name so s3 states one obligation</li>
+    <li>REQ-SAG-0004 statement 4: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0004 statement 5: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0004 statement 6: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0004 statement 7: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0004 statement 8: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0004 statement 9: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.78 · serves 0.12 · exceeds 0.24 · conflicts 0.09</p>
+</section>

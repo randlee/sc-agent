@@ -1,0 +1,216 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-conflicts" id="cell-REQ-SAG-0003-ANC-024">
+  <div class="section-head">
+    <h2>REQ-SAG-0003 × ANC-024 — conflicts</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-024&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [
+      &quot;sc-agent MUST NOT contain code that removes a general log.&quot;
+    ],
+    &quot;jev_disputed&quot;: false,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;f023c0d1&quot;,
+        &quot;date&quot;: &quot;2026-11-19&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0003&quot;,
+        &quot;statement&quot;: &quot;With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/&lt;cli&gt;.log.jsonl`.&quot;,
+        &quot;summary&quot;: &quot;Records: one sc-observability Logger per process, one wheel, fixed log paths&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;f023c0d1&quot;,
+        &quot;date&quot;: &quot;2026-11-19&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0003&quot;,
+        &quot;statement&quot;: &quot;When `&lt;CLI&gt;_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`.&quot;,
+        &quot;summary&quot;: &quot;Records: one sc-observability Logger per process, one wheel, fixed log paths&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;22f4a5bd&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0003&quot;,
+        &quot;statement&quot;: &quot;When `&lt;CLIENT&gt;_LOG_ROOT` is set and not empty, the generated client MUST use that folder in place of `~/.sc-agent/` for its logs.&quot;,
+        &quot;summary&quot;: &quot;phase-j records: fix ai-qa clean-up findings&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;f023c0d1&quot;,
+        &quot;date&quot;: &quot;2026-11-19&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0003&quot;,
+        &quot;statement&quot;: &quot;Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).&quot;,
+        &quot;summary&quot;: &quot;Records: one sc-observability Logger per process, one wheel, fixed log paths&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;f023c0d1&quot;,
+        &quot;date&quot;: &quot;2026-11-19&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0003&quot;,
+        &quot;statement&quot;: &quot;A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.&quot;,
+        &quot;summary&quot;: &quot;Records: one sc-observability Logger per process, one wheel, fixed log paths&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;13c45130&quot;,
+        &quot;date&quot;: &quot;2026-11-24&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0003&quot;,
+        &quot;statement&quot;: &quot;A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.&quot;,
+        &quot;summary&quot;: &quot;docs(phase-j): round-3 rulings: runs.jsonl link table, haiku/luna keyless&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;1a9af55a&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0003&quot;,
+        &quot;statement&quot;: &quot;sc-agent MUST NOT contain code that removes a general log.&quot;,
+        &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0003&quot;,
+        &quot;statement&quot;: &quot;sc-agent MUST NOT remove a session log.&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0003&quot;,
+        &quot;statement&quot;: &quot;sc-agent MUST NOT remove a run log.&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;Delete the general log retention ban.&quot;,
+    &quot;stale&quot;: {
+      &quot;reason&quot;: &quot;Its 2026-11-25 provenance predates the 2026-11-27 ANC-024 ruling.&quot;,
+      &quot;record&quot;: &quot;REQ-SAG-0003&quot;,
+      &quot;statement&quot;: &quot;sc-agent MUST NOT contain code that removes a general log.&quot;
+    },
+    &quot;what&quot;: &quot;The absolute ban conflicts with the owner&#x27;s direction that general logs follow sc-observability&#x27;s rotation and deletion policy.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.3,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.44,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.53
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.68,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.21,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.79
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.89,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.07,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.93
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.28,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.44,
+        &quot;unclear&quot;: 0.04,
+        &quot;yes&quot;: 0.52
+      }
+    }
+  },
+  &quot;class&quot;: &quot;conflicts&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.53,
+    &quot;exceeds&quot;: 0.79,
+    &quot;relates&quot;: 0.93,
+    &quot;serves&quot;: 0.52
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0003&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0003/ANC-024/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ67SAK91G3ZT3798T8BE1&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0003 × ANC-024 — conflicts
+Proposals: 8
+What conflicts
+“sc-agent MUST NOT contain code that removes a general log.”
+The absolute ban conflicts with the owner&#x27;s direction that general logs follow sc-observability&#x27;s rotation and deletion policy.
+Proposed remedy
+Delete the general log retention ban.
+Stale
+REQ-SAG-0003 “sc-agent MUST NOT contain code that removes a general log.”: Its 2026-11-25 provenance predates the 2026-11-27 ANC-024 ruling.
+Anchor
+The general log is written through sc-observability under its rotation and deletion policy; sc-agent adds no retention rule of its own.
+Owner said: “general logs follow sc-obs rotation/deletion guidelines”
+Scope: adds or changes general-log writing, rotation or deletion
+Record statements
+With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/&lt;cli&gt;.log.jsonl`.
+When `&lt;CLI&gt;_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`.
+When `&lt;CLIENT&gt;_LOG_ROOT` is set and not empty, the generated client MUST use that folder in place of `~/.sc-agent/` for its logs.
+Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).
+A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.
+A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.
+sc-agent MUST NOT contain code that removes a general log.
+sc-agent MUST NOT remove a session log.
+sc-agent MUST NOT remove a run log.
+History (git)
+REQ-SAG-0003 statement 1: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths
+REQ-SAG-0003 statement 2: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths
+REQ-SAG-0003 statement 3: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings
+REQ-SAG-0003 statement 4: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths
+REQ-SAG-0003 statement 5: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths
+REQ-SAG-0003 statement 6: 13c45130 2026-11-24: docs(phase-j): round-3 rulings: runs.jsonl link table, haiku/luna keyless
+REQ-SAG-0003 statement 7: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0003 statement 8: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0003 statement 9: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+Jev P(yes): relates 0.93 · serves 0.52 · exceeds 0.79 · conflicts 0.53">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <p>Proposals: 8</p>
+  <h3>What conflicts</h3>
+  <ul>
+    <li>“sc-agent MUST NOT contain code that removes a general log.”</li>
+  </ul>
+  <p>The absolute ban conflicts with the owner&#x27;s direction that general logs follow sc-observability&#x27;s rotation and deletion policy.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>Delete the general log retention ban.</p>
+  <h3>Stale</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>REQ-SAG-0003 “sc-agent MUST NOT contain code that removes a general log.”: Its 2026-11-25 provenance predates the 2026-11-27 ANC-024 ruling.</p>
+  <h3>Anchor</h3>
+  <p>The general log is written through sc-observability under its rotation and deletion policy; sc-agent adds no retention rule of its own.</p>
+  <p>Owner said: “general logs follow sc-obs rotation/deletion guidelines”</p>
+  <p>Scope: adds or changes general-log writing, rotation or deletion</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/&lt;cli&gt;.log.jsonl`.</li>
+    <li>When `&lt;CLI&gt;_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`.</li>
+    <li>When `&lt;CLIENT&gt;_LOG_ROOT` is set and not empty, the generated client MUST use that folder in place of `~/.sc-agent/` for its logs.</li>
+    <li>Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).</li>
+    <li>A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.</li>
+    <li>A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.</li>
+    <li>sc-agent MUST NOT contain code that removes a general log.</li>
+    <li>sc-agent MUST NOT remove a session log.</li>
+    <li>sc-agent MUST NOT remove a run log.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0003 statement 1: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 2: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 3: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0003 statement 4: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 5: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 6: 13c45130 2026-11-24: docs(phase-j): round-3 rulings: runs.jsonl link table, haiku/luna keyless</li>
+    <li>REQ-SAG-0003 statement 7: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0003 statement 8: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0003 statement 9: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.93 · serves 0.52 · exceeds 0.79 · conflicts 0.53</p>
+</section>

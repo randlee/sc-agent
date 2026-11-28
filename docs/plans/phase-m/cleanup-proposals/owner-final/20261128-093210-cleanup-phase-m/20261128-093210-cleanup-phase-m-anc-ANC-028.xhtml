@@ -1,0 +1,73 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="anc-ANC-028">
+  <div class="section-head">
+    <h2>ANC-028</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;beads&quot;: {
+    &quot;anchor&quot;: &quot;agt-0fau&quot;,
+    &quot;dev_questions&quot;: &quot;agt-0fau.2&quot;,
+    &quot;plan_questions&quot;: &quot;agt-0fau.1&quot;
+  },
+  &quot;context&quot;: &quot;phase-m planning session, 2026-11-27&quot;,
+  &quot;deterministic_check&quot;: &quot;&quot;,
+  &quot;fixtures&quot;: {
+    &quot;fail&quot;: [
+      &quot;The cache key includes run_id, so a new run never hits the cache.&quot;
+    ],
+    &quot;pass&quot;: [
+      &quot;The cache is looked up by (request_sha256, model) only.&quot;
+    ]
+  },
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:54:56+00:00&quot;,
+      &quot;event&quot;: &quot;created&quot;,
+      &quot;status&quot;: &quot;locked&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:56:24+00:00&quot;,
+      &quot;beads&quot;: {
+        &quot;anchor&quot;: &quot;agt-0fau&quot;,
+        &quot;dev_questions&quot;: &quot;agt-0fau.2&quot;,
+        &quot;plan_questions&quot;: &quot;agt-0fau.1&quot;
+      },
+      &quot;event&quot;: &quot;beads_set&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:58:04+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;fixtures&quot;
+      ]
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-028&quot;,
+  &quot;kind&quot;: &quot;directive&quot;,
+  &quot;promoted_to&quot;: null,
+  &quot;question_overrides&quot;: {},
+  &quot;quote&quot;: &quot;run-id has nothing to do with caching. run is a collection of queries of which some may be cached (if caching enabled)&quot;,
+  &quot;scope&quot;: &quot;adds or changes the result cache, cache keys or run ids&quot;,
+  &quot;source_ref&quot;: null,
+  &quot;source_type&quot;: &quot;ANC&quot;,
+  &quot;stated_at&quot;: &quot;2026-11-27&quot;,
+  &quot;stated_by&quot;: &quot;Rand Lee&quot;,
+  &quot;statement&quot;: &quot;A cache hit is decided by the request sha256 and the model alone; `run_id` is not part of the cache key.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;summary&quot;: &quot;Cache key is request sha256 and model, not run_id&quot;,
+  &quot;version&quot;: 2
+}">{}</button>
+    </div>
+  </div>
+  <h3>Statement</h3>
+  <p class="statement">A cache hit is decided by the request sha256 and the model alone; `run_id` is not part of the cache key.</p>
+  <h3>Owner said</h3>
+  <p class="quote">run-id has nothing to do with caching. run is a collection of queries of which some may be cached (if caching enabled)</p>
+  <h3>Scope</h3>
+  <p>adds or changes the result cache, cache keys or run ids</p>
+  <h3>Kind</h3>
+  <p>directive</p>
+  <h3>Stated by</h3>
+  <p>Rand Lee</p>
+  <h3>Stated on</h3>
+  <p>2026-11-27</p>
+</section>

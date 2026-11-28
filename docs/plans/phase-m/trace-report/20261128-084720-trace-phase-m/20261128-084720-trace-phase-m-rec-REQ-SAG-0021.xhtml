@@ -1,0 +1,255 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0021">
+  <div class="section-head">
+    <h2>REQ-SAG-0021 The project/phase setting is required and shared</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0021&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T084552Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The `project` setting MUST be resolved through every project layer.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The PyO3 bindings MUST take `project` from the first project layer that sets it.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;In the PyO3 bindings, a `project` argument MUST take the place of the `--project` flag layer.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A session with no project/phase MUST be refused with an error.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;When no project layer sets `project`, a session write MUST NOT send a session.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;When no project layer sets `project`, a session write MUST NOT write a session.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;`project` MUST NOT have a built-in default.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;3afa4f9e&quot;,
+        &quot;date&quot;: &quot;2026-11-18&quot;,
+        &quot;summary&quot;: &quot;Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008&quot;
+      },
+      &quot;statement&quot;: &quot;The `project` setting MUST be resolved through every project layer.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;3afa4f9e&quot;,
+        &quot;date&quot;: &quot;2026-11-18&quot;,
+        &quot;summary&quot;: &quot;Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008&quot;
+      },
+      &quot;statement&quot;: &quot;The PyO3 bindings MUST take `project` from the first project layer that sets it.&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;3afa4f9e&quot;,
+        &quot;date&quot;: &quot;2026-11-18&quot;,
+        &quot;summary&quot;: &quot;Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008&quot;
+      },
+      &quot;statement&quot;: &quot;In the PyO3 bindings, a `project` argument MUST take the place of the `--project` flag layer.&quot;,
+      &quot;statement_index&quot;: 2
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;8d06323d&quot;,
+        &quot;date&quot;: &quot;2026-11-21&quot;,
+        &quot;summary&quot;: &quot;docs: simplify requirements and ADRs to the owner&#x27;s words&quot;
+      },
+      &quot;statement&quot;: &quot;A session with no project/phase MUST be refused with an error.&quot;,
+      &quot;statement_index&quot;: 3
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;3afa4f9e&quot;,
+        &quot;date&quot;: &quot;2026-11-18&quot;,
+        &quot;summary&quot;: &quot;Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008&quot;
+      },
+      &quot;statement&quot;: &quot;When no project layer sets `project`, a session write MUST NOT send a session.&quot;,
+      &quot;statement_index&quot;: 4
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;3afa4f9e&quot;,
+        &quot;date&quot;: &quot;2026-11-18&quot;,
+        &quot;summary&quot;: &quot;Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008&quot;
+      },
+      &quot;statement&quot;: &quot;When no project layer sets `project`, a session write MUST NOT write a session.&quot;,
+      &quot;statement_index&quot;: 5
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;998015d2&quot;,
+        &quot;date&quot;: &quot;2026-11-18&quot;,
+        &quot;summary&quot;: &quot;docs: ADR-SAG-0020/0021 config scopes and separate session-log tree&quot;
+      },
+      &quot;statement&quot;: &quot;`project` MUST NOT have a built-in default.&quot;,
+      &quot;statement_index&quot;: 6
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-18&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0004&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0020&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0021&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0021&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-22&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Agents work by phase, so sessions are grouped by project/phase. A default would merge sessions of different phases into one file.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The `project` setting MUST be resolved through every project layer.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The PyO3 bindings MUST take `project` from the first project layer that sets it.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;In the PyO3 bindings, a `project` argument MUST take the place of the `--project` flag layer.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A session with no project/phase MUST be refused with an error.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;When no project layer sets `project`, a session write MUST NOT send a session.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;When no project layer sets `project`, a session write MUST NOT write a session.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;`project` MUST NOT have a built-in default.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: The project/phase is the name of the project or phase a session belongs to, a block of time related to major changes. Its setting is named `project`. The layers are those of REQ-SAG-0019. The project layers are the layers of REQ-SAG-0019 that can set `project`. The PyO3 bindings are the `sc_agent` Python module of `sc-agent-py`. A typed error is an error value (REQ-SAG-0016). A session write is a call that would write a session. A built-in default is the value that layer 7 of REQ-SAG-0019 gives a setting that no other layer sets.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;With `\&quot;project\&quot;: \&quot;phase-c\&quot;` in the global `sc-agent.json` and nothing else, decidr sessions are filed under project `phase-c`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;With `SC_PROJECT=phase-d` and `\&quot;project\&quot;: \&quot;phase-c\&quot;` in the local `sc-agent.json`, sessions are filed under `phase-d`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;With `--project phase-e`, sessions are filed under `phase-e` whatever the environment and files set.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;With no layer setting it, a decidr request fails with the typed error, nothing is sent, and no session row is written.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;The project/phase setting is required and shared&quot;,
+    &quot;version&quot;: &quot;0.3.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.3.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>The `project` setting MUST be resolved through every project layer.</li>
+    <li>The PyO3 bindings MUST take `project` from the first project layer that sets it.</li>
+    <li>In the PyO3 bindings, a `project` argument MUST take the place of the `--project` flag layer.</li>
+    <li>A session with no project/phase MUST be refused with an error.</li>
+    <li>When no project layer sets `project`, a session write MUST NOT send a session.</li>
+    <li>When no project layer sets `project`, a session write MUST NOT write a session.</li>
+    <li>`project` MUST NOT have a built-in default.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: The project/phase is the name of the project or phase a session belongs to, a block of time related to major changes. Its setting is named `project`. The layers are those of REQ-SAG-0019. The project layers are the layers of REQ-SAG-0019 that can set `project`. The PyO3 bindings are the `sc_agent` Python module of `sc-agent-py`. A typed error is an error value (REQ-SAG-0016). A session write is a call that would write a session. A built-in default is the value that layer 7 of REQ-SAG-0019 gives a setting that no other layer sets.</p>
+  <h3>Rationale</h3>
+  <p>Agents work by phase, so sessions are grouped by project/phase. A default would merge sessions of different phases into one file.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>With `&quot;project&quot;: &quot;phase-c&quot;` in the global `sc-agent.json` and nothing else, decidr sessions are filed under project `phase-c`.</li>
+    <li>With `SC_PROJECT=phase-d` and `&quot;project&quot;: &quot;phase-c&quot;` in the local `sc-agent.json`, sessions are filed under `phase-d`.</li>
+    <li>With `--project phase-e`, sessions are filed under `phase-e` whatever the environment and files set.</li>
+    <li>With no layer setting it, a decidr request fails with the typed error, nothing is sent, and no session row is written.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>REQ-SAG-0004</li>
+    <li>REQ-SAG-0019</li>
+    <li>REQ-SAG-0020</li>
+    <li>ADR-SAG-0021</li>
+  </ul>
+</section>
