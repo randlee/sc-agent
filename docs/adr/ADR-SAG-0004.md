@@ -1,9 +1,9 @@
 # Decision: Crate layering and error values
 
 **Status:** Approved  
-**Version:** 0.4.0  
+**Version:** 0.5.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-21  
+**Last Updated:** 2026-11-27  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
 
@@ -31,18 +31,21 @@ Crates must be layered so each launcher depends only on what it uses, and errors
 
 ### Decision
 
-There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.
+Crates are in four layers, and a crate depends only on crates in lower layers. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.
 
 **Key Principles:**
 
 - A crate depends only on lower layers.
-- The provider is chosen in one place, `sc-agent`.
+- Shared behaviour moves down; differences move up.
+- A provider is a configuration row, not code.
 
 ### Rationale
 
-One core crate keeps the code small: ureq, keyring, dotenvy and sc-observability are called directly, with no traits or wrappers between them.
+Layers let behaviour that several crates share be written once in a lower layer, and let a new provider or model be added without a code change.
 
-Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+Owner ruling (2026-11-27), Rand Lee: "You need to be able to push shared methods down and move differences up"
+
+Owner ruling (2026-11-27), Rand Lee: "How do you extent to an 'unknown provider' or model' if you need to change rust when a model/provider is added, the architecture = fail. provider/model/url is just a string-tuple."
 
 Owner ruling (2026-11-21), Rand Lee: "Errors are discriminated unions Result<t,e> I don't care about per crate"; "Extra fields are fine, make sure adr doesn't limit too much. I don't want findings for returning more."
 
@@ -52,28 +55,29 @@ Owner ruling (2026-11-21), Rand Lee: "always return descriminated unions w/ erro
 
 **Positive:**
 
-- A new launcher reuses `sc-agent` without touching the other launchers.
+- A new provider or model is a configuration row. A new API shape is one new layer 2 crate.
 
 **Negative:**
 
-- A program that wants only HTTP or logging still links the whole core.
+- More crates to version and publish than one core crate.
 
 ### Alternatives Considered
 
-#### Alternative 1: One crate per layer
+#### Alternative 1: One core crate
 
 **Description:**
 
-Split types, configuration, secrets, logging, HTTP, schema, each backend and the runner into their own crates.
+Five crates, with `sc-agent` as one core crate holding the provider tables, sending, resends, keys, configuration, errors, logging paths and session rows.
 
 **Pros:**
 
-- A program can depend on one layer alone.
+- Fewer crates and fewer lines.
 
 **Cons:**
 
-- Seventeen crates, with traits and wrappers between them, for what about 300 lines of Python did.
+- Adding a provider or a model needs a Rust change.
+- Every concern is in one file, so no boundary can be checked.
 
 **Why Rejected:**
 
-The reduction plan replaces it with one core crate written fresh to the spec.
+Owner ruling (2026-11-27), Rand Lee: "if you need to change rust when a model/provider is added, the architecture = fail."
