@@ -18,7 +18,7 @@ roots = []
 
 [dependencies]
 allowed_dependencies = ["sc-agent-schema"]
-allowed_dependents = ["sc-agent-config", "sc-agent-log", "sc-agent-sqlite", "sc-anthropic", "sc-decision-runner", "sc-decision-systemone", "sc-llm", "sc-openai"]
+allowed_dependents = ["sc-agent-config", "sc-agent-http", "sc-agent-log", "sc-agent-sqlite", "sc-anthropic", "sc-decision-runner", "sc-decision-systemone", "sc-llm", "sc-openai"]
 allowed_dev_dependencies = []
 allowed_dev_dependents = []
 forbidden_edges = []
