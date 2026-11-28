@@ -35,7 +35,7 @@ Crates are in four layers.
 
 | Layer | Crates |
 |---|---|
-| 1, core types and traits | `sc-agent-schema`, `sc-agent-types`, `sc-agent-config`, `sc-agent-sqlite`, `sc-agent-log` |
+| 1, core types and traits | `sc-agent-schema`, `sc-agent-types`, `sc-agent-config`, `sc-agent-sqlite`, `sc-agent-log`, `sc-agent-http` |
 | 2, one crate per API shape | `sc-decision-systemone`, `sc-anthropic`, `sc-openai` |
 | 3, shared behaviour and the API | `sc-decision-runner`, `sc-llm` |
 | 4, thin public surface | the `decidr` CLI, the Python wheel |
@@ -49,6 +49,7 @@ A crate depends only on crates in lower layers. Inside layer 1 a crate depends o
 | `sc-agent-config` | `sc-agent-types` |
 | `sc-agent-sqlite` | `sc-agent-schema`, `sc-agent-types` |
 | `sc-agent-log` | `sc-agent-schema`, `sc-agent-types`, `sc-agent-config`, `sc-agent-sqlite` |
+| `sc-agent-http` | `sc-agent-types` |
 
 `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.
 
