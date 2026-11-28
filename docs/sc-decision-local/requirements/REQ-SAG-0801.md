@@ -22,13 +22,11 @@ Definitions: The Jev API is the request and reply format of TypeSafe's Jev decis
 - Each local decision runner's model MUST have a fixed model id in the model table.
 - A selection of `decider` MUST resolve to the 4b decider model.
 - Each local decision runner MUST be selectable by its name wherever a decision model is selected.
-- `sc-agent` MUST send requests to a local decision runner in the Jev API format.
 - Configuration MUST be able to add a local model that runs on another computer.
 
 **MUST NOT statements:**
 
 - `sc-agent` MUST NOT hard-code the network address of any local decision runner.
-- Configuration MUST NOT change where a paid API's key is sent.
 
 ### Rationale
 

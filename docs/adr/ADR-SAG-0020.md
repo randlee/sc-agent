@@ -64,9 +64,9 @@ A setting is looked up in nine layers, and the first layer that sets it wins:
 6. the global `<cli>.local.json`;
 7. the global `<cli>.json`;
 8. the global `sc-agent.json`;
-9. the built-in default, or a typed error when the setting is required and has no default.
+9. the built-in default.
 
-Model entries, `models.<alias>`, are set only in configuration files, layers 3 to 8: each is a structured row (`provider` and `id` strings, `released` a `YYYY-MM-DD` date) that a flag or flat environment variable cannot express. `<alias>` becomes the row's short name. A row's provider is one sc-agent already has, so configuration can add a model, including a local model on another computer, but cannot change where a paid API's key is sent. A local endpoint (laya and the two decider endpoints) is configured by `<endpoint>.host` and `<endpoint>.port`, such as `laya.host` and `laya.port`.
+Model entries, `models.<alias>`, are set only in configuration files, layers 3 to 8: each is a structured row (`provider` and `id` strings, `released` a `YYYY-MM-DD` date) that a flag or flat environment variable cannot express. `<alias>` becomes the row's short name. A row's provider is one sc-agent already has.
 
 Environment variables are named after the CLI: `DECIDR_<SETTING>`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).
 

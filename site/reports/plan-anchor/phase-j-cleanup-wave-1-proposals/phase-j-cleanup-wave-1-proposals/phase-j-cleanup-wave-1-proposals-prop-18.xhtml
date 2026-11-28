@@ -4,6 +4,7 @@
     <div class="section-actions" role="group" aria-label="Copy">
       <button type="button" class="icon-button" title="Copy Context" data-copy-text="18. Keep REQ-SAG-0601 (busy resend and holdoff)
 Wave 1 · keep with reason
+Owner decision: approved
 Records: REQ-SAG-0601
 Change: No change. Documents the code at crates/sc-agent/src/lib.rs:Route::post.
 Justification: Route::post resends 429/502/529 non-quota and network failures up to max_sends (default 5), honours Retry-After else 2^(attempt-1) s; Route::defer/holdoff share a per-host deadline; Cancel::wait ends holdoff on cancel; 401 and quota not resent. The text&#x27;s HttpClient name is a naming mismatch (Holdoffs owned by Run).
@@ -14,6 +15,8 @@ Expected improvement:
     </div>
   </div>
   <p class="small">Wave 1 · keep with reason</p>
+  <h3>Owner decision</h3>
+  <p>approved</p>
   <h3>Records</h3>
   <ul>
     <li><a href="#rec-REQ-SAG-0601" data-panel="rec-REQ-SAG-0601">REQ-SAG-0601</a></li>

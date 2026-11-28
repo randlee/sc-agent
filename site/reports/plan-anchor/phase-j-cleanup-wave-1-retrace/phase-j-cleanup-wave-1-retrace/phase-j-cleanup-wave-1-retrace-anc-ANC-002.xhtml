@@ -1,0 +1,55 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="anc-ANC-002">
+  <div class="section-head">
+    <h2>ANC-002</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;beads&quot;: {
+    &quot;anchor&quot;: null,
+    &quot;dev_questions&quot;: null,
+    &quot;plan_questions&quot;: null
+  },
+  &quot;context&quot;: &quot;planning session; session, 2026-11-26&quot;,
+  &quot;deterministic_check&quot;: &quot;`rg -n &#x27;jev-batch-result/1\\&quot;,
+  &quot;fixtures&quot;: {
+    &quot;fail&quot;: [],
+    &quot;pass&quot;: []
+  },
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-26T18:51:01+00:00&quot;,
+      &quot;event&quot;: &quot;created&quot;,
+      &quot;status&quot;: &quot;locked&quot;
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-002&quot;,
+  &quot;kind&quot;: &quot;prohibition&quot;,
+  &quot;promoted_to&quot;: null,
+  &quot;question_overrides&quot;: {},
+  &quot;quote&quot;: &quot;We need to read what we are writing, no back compat until SQLite 1.0&quot;,
+  &quot;scope&quot;: &quot;adds or changes code that reads batch result lines, session rows or run records&quot;,
+  &quot;source_ref&quot;: null,
+  &quot;source_type&quot;: &quot;ANC&quot;,
+  &quot;stated_at&quot;: &quot;2026-11-26&quot;,
+  &quot;stated_by&quot;: &quot;Rand Lee&quot;,
+  &quot;statement&quot;: &quot;Until SQLite schema 1.0, sc-agent, judge-jev and plan-anchor must read only the record schema version they write and contain no reader for an older version, so read and write stay in step.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;summary&quot;: &quot;C02 Until SQLite schema 1.0, sc-agent, judge-jev and plan-anchor&quot;,
+  &quot;version&quot;: 1
+}">{}</button>
+    </div>
+  </div>
+  <h3>Statement</h3>
+  <p class="statement">Until SQLite schema 1.0, sc-agent, judge-jev and plan-anchor must read only the record schema version they write and contain no reader for an older version, so read and write stay in step.</p>
+  <h3>Owner said</h3>
+  <p class="quote">We need to read what we are writing, no back compat until SQLite 1.0</p>
+  <h3>Scope</h3>
+  <p>adds or changes code that reads batch result lines, session rows or run records</p>
+  <h3>Deterministic check</h3>
+  <p>`rg -n &#x27;jev-batch-result/1\</p>
+  <h3>Kind</h3>
+  <p>prohibition</p>
+  <h3>Stated by</h3>
+  <p>Rand Lee</p>
+  <h3>Stated on</h3>
+  <p>2026-11-26</p>
+</section>

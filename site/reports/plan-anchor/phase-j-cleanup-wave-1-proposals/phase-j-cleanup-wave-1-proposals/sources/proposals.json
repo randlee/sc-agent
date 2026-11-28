@@ -714,5 +714,154 @@
     "ADR-SAG-0021/REQ-SAG-0008/2"
    ]
   }
- ]
+ ],
+ "approvals": {
+  "reply": "approve 1, 3-36; reject 2",
+  "decisions": [
+   {
+    "panel": 1,
+    "status": "approved"
+   },
+   {
+    "panel": 2,
+    "status": "rejected"
+   },
+   {
+    "panel": 3,
+    "status": "approved"
+   },
+   {
+    "panel": 4,
+    "status": "approved"
+   },
+   {
+    "panel": 5,
+    "status": "approved"
+   },
+   {
+    "panel": 6,
+    "status": "approved"
+   },
+   {
+    "panel": 7,
+    "status": "approved"
+   },
+   {
+    "panel": 8,
+    "status": "approved"
+   },
+   {
+    "panel": 9,
+    "status": "approved"
+   },
+   {
+    "panel": 10,
+    "status": "approved"
+   },
+   {
+    "panel": 11,
+    "status": "approved"
+   },
+   {
+    "panel": 12,
+    "status": "approved"
+   },
+   {
+    "panel": 13,
+    "status": "approved"
+   },
+   {
+    "panel": 14,
+    "status": "approved"
+   },
+   {
+    "panel": 15,
+    "status": "approved"
+   },
+   {
+    "panel": 16,
+    "status": "approved"
+   },
+   {
+    "panel": 17,
+    "status": "approved"
+   },
+   {
+    "panel": 18,
+    "status": "approved"
+   },
+   {
+    "panel": 19,
+    "status": "approved"
+   },
+   {
+    "panel": 20,
+    "status": "approved"
+   },
+   {
+    "panel": 21,
+    "status": "approved"
+   },
+   {
+    "panel": 22,
+    "status": "approved"
+   },
+   {
+    "panel": 23,
+    "status": "approved"
+   },
+   {
+    "panel": 24,
+    "status": "approved"
+   },
+   {
+    "panel": 25,
+    "status": "approved"
+   },
+   {
+    "panel": 26,
+    "status": "approved"
+   },
+   {
+    "panel": 27,
+    "status": "approved"
+   },
+   {
+    "panel": 28,
+    "status": "approved"
+   },
+   {
+    "panel": 29,
+    "status": "approved"
+   },
+   {
+    "panel": 30,
+    "status": "approved"
+   },
+   {
+    "panel": 31,
+    "status": "approved"
+   },
+   {
+    "panel": 32,
+    "status": "approved"
+   },
+   {
+    "panel": 33,
+    "status": "approved"
+   },
+   {
+    "panel": 34,
+    "status": "approved"
+   },
+   {
+    "panel": 35,
+    "status": "approved"
+   },
+   {
+    "panel": 36,
+    "status": "approved"
+   }
+  ]
+ }
 }
