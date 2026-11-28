@@ -1,0 +1,123 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-serves" id="cell-REQ-SAG-0702-ANC-004">
+  <div class="section-head">
+    <h2>REQ-SAG-0702 × ANC-004 — serves</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-004&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.96,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.97,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.02
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.58,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.72,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.27
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.6,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.26,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.73
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.68,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.19,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.79
+      }
+    }
+  },
+  &quot;class&quot;: &quot;serves&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.02,
+    &quot;exceeds&quot;: 0.27,
+    &quot;relates&quot;: 0.73,
+    &quot;serves&quot;: 0.79
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0702&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0702/ANC-004/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8FMAJ3AKHRTHY2T2DFP0QM1&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0702 × ANC-004 — serves
+Anchor
+sc-agent must impose no request input size limit of its own beyond the selected model&#x27;s context, so input limits are not over-specified.
+Owner said: “These limits are clearly over-specified. Input is limited by model context.”
+Scope: adds or changes a request size check, a record size check or handling of an sc-observability size error
+Record statements
+A Run MUST accept an optional send timeout.
+A Run MUST accept an optional worker count.
+A Run&#x27;s `timeout_secs` MUST replace the 120 s default send timeout for that Run.
+When a Run has an override, every call through that Run MUST use the override in place of the configured value.
+When a Run has no override, every call through that Run MUST use the configured value.
+When a Run is given an invalid send timeout, it MUST return an error.
+When a Run is given an invalid worker count, it MUST return an error.
+When a provider rejects a request as too large for the model&#x27;s context, the call MUST return the provider&#x27;s error.
+A Run MUST NOT clamp an override.
+An override MUST NOT change the configuration.
+A single call through a Run MUST NOT accept an override.
+History (git)
+REQ-SAG-0702 statement 1: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0702 statement 2: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0702 statement 3: 644bbb1f 2026-11-25: phase-j records: restore last develop obligations from ai-qa re-check
+REQ-SAG-0702 statement 4: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0702 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0702 statement 6: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings
+REQ-SAG-0702 statement 7: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings
+REQ-SAG-0702 statement 8: 3ea97a7c 2026-11-25: REQ-SAG-0702 s8, 0008 s3, 0104 s3: apply owner rulings 2026-11-25
+REQ-SAG-0702 statement 9: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0702 statement 10: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0702 statement 11: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+Jev P(yes): relates 0.73 · serves 0.79 · exceeds 0.27 · conflicts 0.02">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>Anchor</h3>
+  <p>sc-agent must impose no request input size limit of its own beyond the selected model&#x27;s context, so input limits are not over-specified.</p>
+  <p>Owner said: “These limits are clearly over-specified. Input is limited by model context.”</p>
+  <p>Scope: adds or changes a request size check, a record size check or handling of an sc-observability size error</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>A Run MUST accept an optional send timeout.</li>
+    <li>A Run MUST accept an optional worker count.</li>
+    <li>A Run&#x27;s `timeout_secs` MUST replace the 120 s default send timeout for that Run.</li>
+    <li>When a Run has an override, every call through that Run MUST use the override in place of the configured value.</li>
+    <li>When a Run has no override, every call through that Run MUST use the configured value.</li>
+    <li>When a Run is given an invalid send timeout, it MUST return an error.</li>
+    <li>When a Run is given an invalid worker count, it MUST return an error.</li>
+    <li>When a provider rejects a request as too large for the model&#x27;s context, the call MUST return the provider&#x27;s error.</li>
+    <li>A Run MUST NOT clamp an override.</li>
+    <li>An override MUST NOT change the configuration.</li>
+    <li>A single call through a Run MUST NOT accept an override.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0702 statement 1: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0702 statement 2: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0702 statement 3: 644bbb1f 2026-11-25: phase-j records: restore last develop obligations from ai-qa re-check</li>
+    <li>REQ-SAG-0702 statement 4: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0702 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0702 statement 6: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0702 statement 7: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0702 statement 8: 3ea97a7c 2026-11-25: REQ-SAG-0702 s8, 0008 s3, 0104 s3: apply owner rulings 2026-11-25</li>
+    <li>REQ-SAG-0702 statement 9: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0702 statement 10: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0702 statement 11: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.73 · serves 0.79 · exceeds 0.27 · conflicts 0.02</p>
+</section>

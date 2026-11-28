@@ -1,5 +1,5 @@
 ---
-version: 0.13.0
+version: 0.16.1
 ---
 
 # Reference catalog
@@ -11,6 +11,9 @@ version: 0.13.0
 - `references/planning-review-workflow.md` - source-neutral planning gate and quality loop
 - `references/development-review-workflow.md` - delivered-work review and reporting workflow
 - `references/change-report.md` - the owner's HTML report of a planning round's changes, scores before and after, and the drift review
+- `references/record-trace.md` - `jev_judge.py trace`: records (read through Raptor) x locked anchors classified serves, related, exceeds, conflicts or none, record overlap (restated statements, deletion candidates), and its HTML report
+- `references/html-reporting-guidelines.md` - the shared rules for every HTML report: `reports_dir`, stamped names, sources saved beside the page, the reports index, the shared wording
+- `references/record-cleanup.md` - record cleanup in planned waves: trace, `anchor-cleanup-proposer` proposals on the Proposed fixes tab (`change_report.py --trace --proposals`), owner approval, repair by background agents, one stacked PR per wave
 - `references/agent-delegation-workflow.md` - runner boundary, harness-specific agents, and parallel execution
 
 ## References
@@ -32,6 +35,7 @@ version: 0.13.0
 - `references/installation-and-troubleshooting.md` - installing the plugin (`install.py`), python3, bd, and the API key; tracker selection and switching; PATH; Codex
 - `references/agent-runner-contract.md` - one trusted agent resolution, strict fenced envelopes, and redacted attestation
 - `scripts/change_report.py`, `templates/change-report.html.j2`, `templates/sprint-panel.xhtml.j2`, `templates/anchor-panel.xhtml.j2`, `templates/drift-panel.xhtml.j2`, `assets/schemas/drift-review.schema.json` - the change report and the drift review it renders
+- `templates/trace-report.html.j2`, `templates/trace-panel.xhtml.j2` - the record trace report (`change_report.py --trace`)
 - `assets/questions/plan.json`, `assets/questions/dev.json`, `assets/questions/testability.json`, `assets/questions/dedupe.json` - the question wording of record
 - `assets/templates/intent.md`, `assets/templates/anchor-questions-bead.md`, `assets/examples/` - starting points and a worked example
 - `<repository root>/tests/sc-plan-anchor/` - maintainer-only offline test suite; intentionally excluded from the redistributed plugin

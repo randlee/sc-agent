@@ -1,0 +1,232 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0016">
+  <div class="section-head">
+    <h2>REQ-SAG-0016 Error values carry the send count and category as typed fields</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0016&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;An error value MUST have the typed fields that apply to it.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A typed field that is not set MUST be omitted from serialized JSON.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Every busy error MUST carry its number of sends in `attempts`.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;If a request fails, the `sc-decidr` Python wheel MUST return an error value carrying the typed fields.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;An exception raised in Python while a wheel call runs MUST be caught.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;An exception raised in Python while a wheel call runs MUST be returned as an error value.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;For a failed request, the `sc-decidr` Python wheel MUST NOT raise an exception.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;A consumer MUST NOT need to parse message text to obtain a send count.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;A consumer MUST NOT need to parse message text to obtain an error category.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-14&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0002&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0007&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0017&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0602&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0016&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Consumers decide whether to resubmit from the category and the send count. Without typed fields these values exist only in English message text.\n\nThe 0.1.0 error-JSON compatibility rule is withdrawn (2026-11-20), Rand Lee: \&quot;We are still using python, schema isn&#x27;t locked yet. I haven&#x27;t mentioned locking schema yet. I have tools to do this that aren&#x27;t on this repo. No hand built checks.\&quot;\n\nOwner ruling (2026-11-20), Rand Lee: nothing raises; throwing exceptions is prohibited on the repo.\n\nOwner ruling (2026-11-20), Rand Lee: \&quot;Python exceptions need to be caught (return error) so app doesn&#x27;t crash.\&quot;\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;I would never create a requirement requiring subnanosecond rounding for a http call.\&quot; \&quot;Use time structs for time.\&quot; \&quot;always return descriminated unions w/ error info\&quot;\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;Extra fields are fine, make sure adr doesn&#x27;t limit too much. I don&#x27;t want findings for returning more.\&quot;&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;An error value MUST have the typed fields that apply to it.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A typed field that is not set MUST be omitted from serialized JSON.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Every busy error MUST carry its number of sends in `attempts`.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;If a request fails, the `sc-decidr` Python wheel MUST return an error value carrying the typed fields.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;An exception raised in Python while a wheel call runs MUST be caught.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;An exception raised in Python while a wheel call runs MUST be returned as an error value.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;For a failed request, the `sc-decidr` Python wheel MUST NOT raise an exception.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;A consumer MUST NOT need to parse message text to obtain a send count.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;A consumer MUST NOT need to parse message text to obtain an error category.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions:\n\n- The `sc-decidr` Python wheel contains the decidr and sitr Python APIs (REQ-SAG-0018).\n- A busy error has the category `busy` (REQ-SAG-0017).\n- A Python exception raised while a wheel call runs includes an exception raised by a caller&#x27;s `on_result` callback.\n\n- An error value is the `error` object that the CLI, the Python binding, session rows and result lines carry. It has at least an `id`, a `message` and an `action`, and may carry more fields.\n- The typed fields of an error value are:\n  - `category`, the error category that REQ-SAG-0017 assigns, always set;\n  - `attempts`, the sends made with the first included, set when the error follows a send.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test verifies that a busy error read in Rust and in Python, through the returned error value or the result line&#x27;s `error`, carries the send count.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test verifies that each error value reports its own `category`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test verifies that `decision.cancelled` carries `attempts` equal to its sends.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Error values carry the send count and category as typed fields&quot;,
+    &quot;version&quot;: &quot;0.9.1&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.9.1</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>An error value MUST have the typed fields that apply to it.</li>
+    <li>A typed field that is not set MUST be omitted from serialized JSON.</li>
+    <li>Every busy error MUST carry its number of sends in `attempts`.</li>
+    <li>If a request fails, the `sc-decidr` Python wheel MUST return an error value carrying the typed fields.</li>
+    <li>An exception raised in Python while a wheel call runs MUST be caught.</li>
+    <li>An exception raised in Python while a wheel call runs MUST be returned as an error value.</li>
+    <li>For a failed request, the `sc-decidr` Python wheel MUST NOT raise an exception.</li>
+    <li>A consumer MUST NOT need to parse message text to obtain a send count.</li>
+    <li>A consumer MUST NOT need to parse message text to obtain an error category.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions:
+
+- The `sc-decidr` Python wheel contains the decidr and sitr Python APIs (REQ-SAG-0018).
+- A busy error has the category `busy` (REQ-SAG-0017).
+- A Python exception raised while a wheel call runs includes an exception raised by a caller&#x27;s `on_result` callback.
+
+- An error value is the `error` object that the CLI, the Python binding, session rows and result lines carry. It has at least an `id`, a `message` and an `action`, and may carry more fields.
+- The typed fields of an error value are:
+  - `category`, the error category that REQ-SAG-0017 assigns, always set;
+  - `attempts`, the sends made with the first included, set when the error follows a send.</p>
+  <h3>Rationale</h3>
+  <p>Consumers decide whether to resubmit from the category and the send count. Without typed fields these values exist only in English message text.
+
+The 0.1.0 error-JSON compatibility rule is withdrawn (2026-11-20), Rand Lee: &quot;We are still using python, schema isn&#x27;t locked yet. I haven&#x27;t mentioned locking schema yet. I have tools to do this that aren&#x27;t on this repo. No hand built checks.&quot;
+
+Owner ruling (2026-11-20), Rand Lee: nothing raises; throwing exceptions is prohibited on the repo.
+
+Owner ruling (2026-11-20), Rand Lee: &quot;Python exceptions need to be caught (return error) so app doesn&#x27;t crash.&quot;
+
+Owner ruling (2026-11-21), Rand Lee: &quot;I would never create a requirement requiring subnanosecond rounding for a http call.&quot; &quot;Use time structs for time.&quot; &quot;always return descriminated unions w/ error info&quot;
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
+Owner ruling (2026-11-21), Rand Lee: &quot;Extra fields are fine, make sure adr doesn&#x27;t limit too much. I don&#x27;t want findings for returning more.&quot;</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A unit test verifies that a busy error read in Rust and in Python, through the returned error value or the result line&#x27;s `error`, carries the send count.</li>
+    <li>A unit test verifies that each error value reports its own `category`.</li>
+    <li>A unit test verifies that `decision.cancelled` carries `attempts` equal to its sends.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>ADR-SAG-0019</li>
+    <li>REQ-SAG-0002</li>
+    <li>REQ-SAG-0007</li>
+    <li>REQ-SAG-0017</li>
+    <li>REQ-SAG-0601</li>
+    <li>REQ-SAG-0602</li>
+  </ul>
+</section>

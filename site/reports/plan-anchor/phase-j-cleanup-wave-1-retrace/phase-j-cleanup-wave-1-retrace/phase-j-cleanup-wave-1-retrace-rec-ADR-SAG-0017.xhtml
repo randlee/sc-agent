@@ -1,0 +1,121 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-ADR-SAG-0017">
+  <div class="section-head">
+    <h2>ADR-SAG-0017 First release surfaces</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;ADR-SAG-0017&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/retrace2/trace-20261128T011234Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;ADR&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: null,
+    &quot;note&quot;: &quot;No obligation statements.&quot;,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: null
+  },
+  &quot;raptor&quot;: {
+    &quot;alternatives&quot;: {
+      &quot;groups&quot;: [
+        {
+          &quot;cons&quot;: [],
+          &quot;description&quot;: &quot;Each channel&#x27;s workflow writes its own crate list and binary names as literals.&quot;,
+          &quot;name&quot;: &quot;Per-channel workflow literals&quot;,
+          &quot;pros&quot;: [],
+          &quot;why_rejected&quot;: &quot;The Key Principles of this record forbid ad-hoc per-channel workflow literals for crate lists or binary names.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;consequences&quot;: {
+      &quot;negative&quot;: [
+        &quot;Workspace `Cargo.toml` must list members literally for kit validation.&quot;
+      ],
+      &quot;neutral&quot;: [],
+      &quot;positive&quot;: [
+        &quot;One tag drives every channel from `release/publish-artifacts.toml`.&quot;
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;context&quot;: {
+      &quot;background&quot;: &quot;&quot;,
+      &quot;problem_statement&quot;: &quot;&quot;,
+      &quot;text&quot;: &quot;Phase A ships libraries, the **decidr** decision CLI, the **sitr** tree-sitter CLI, and one Python wheel. Release must use one manifest-driven kit across five consumer channels.\n\nThe problem is that every channel must release from the same tag, and per-channel workflow literals for crate lists or binary names would let the channels list different crates or binaries.&quot;
+    },
+    &quot;created&quot;: &quot;2026-11-11&quot;,
+    &quot;decision&quot;: {
+      &quot;chosen_approach&quot;: &quot;&quot;,
+      &quot;key_principles&quot;: [
+        &quot;Customer-facing CLI names on channels are **decidr** and **sitr**.&quot;,
+        &quot;The PyPI distribution name is **sc-decidr**.&quot;,
+        &quot;No ad-hoc per-channel workflow literals for crate lists or binary names.&quot;
+      ],
+      &quot;text&quot;: &quot;Phase A first release surfaces are **crates.io** (the crates listed in `release/publish-artifacts.toml`), **PyPI** (the `sc-decidr` wheel, holding the decidr and sitr APIs), **Homebrew**, **Scoop**, and **WinGet** (archives containing **decidr** and **sitr**), plus GitHub Release assets from the same tag. Sprints **a-11** (kit install) and **a-12** (dry-run) close the publish requirements; production uploads wait for owner dispatch.&quot;
+    },
+    &quot;decision_date&quot;: &quot;2026-11-11&quot;,
+    &quot;id&quot;: &quot;ADR-SAG-0017&quot;,
+    &quot;impact_analysis&quot;: {
+      &quot;affected_components&quot;: &quot;&quot;,
+      &quot;maintainability_impact&quot;: &quot;&quot;,
+      &quot;performance_impact&quot;: &quot;&quot;,
+      &quot;security_impact&quot;: &quot;&quot;,
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;implementation&quot;: {
+      &quot;code_examples&quot;: &quot;&quot;,
+      &quot;integration_points&quot;: [],
+      &quot;key_components&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-21&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;rationale&quot;: {
+      &quot;benefits&quot;: [],
+      &quot;text&quot;: &quot;- One manifest-driven kit drives all five consumer channels from the same tag.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+      &quot;trade_offs&quot;: []
+    },
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [
+        {
+          &quot;href&quot;: &quot;https://github.com/randlee/sc-agent/commit/a6fca6409d46900541c46fbb9d1fbfbff968770e&quot;,
+          &quot;note&quot;: &quot;the PyPI rename; version 0.3.0 (2026-11-14, owner-approved) records fourteen published crates including decidr under owner decision `agt-ln6` (OPEN-B-007, ruling 2026-11-14T11:48:19Z).&quot;,
+          &quot;text&quot;: &quot;owner commit a6fca64&quot;
+        }
+      ],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;title&quot;: &quot;First release surfaces&quot;,
+    &quot;version&quot;: &quot;0.4.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">ADR · sc-agent · Approved · version 0.4.0</p>
+  <h3>Context</h3>
+  <p>Phase A ships libraries, the **decidr** decision CLI, the **sitr** tree-sitter CLI, and one Python wheel. Release must use one manifest-driven kit across five consumer channels.
+
+The problem is that every channel must release from the same tag, and per-channel workflow literals for crate lists or binary names would let the channels list different crates or binaries.</p>
+  <h3>Decision</h3>
+  <p>Phase A first release surfaces are **crates.io** (the crates listed in `release/publish-artifacts.toml`), **PyPI** (the `sc-decidr` wheel, holding the decidr and sitr APIs), **Homebrew**, **Scoop**, and **WinGet** (archives containing **decidr** and **sitr**), plus GitHub Release assets from the same tag. Sprints **a-11** (kit install) and **a-12** (dry-run) close the publish requirements; production uploads wait for owner dispatch.</p>
+  <h3>Key principles</h3>
+  <ul>
+    <li>Customer-facing CLI names on channels are **decidr** and **sitr**.</li>
+    <li>The PyPI distribution name is **sc-decidr**.</li>
+    <li>No ad-hoc per-channel workflow literals for crate lists or binary names.</li>
+  </ul>
+  <h3>Rationale</h3>
+  <p>- One manifest-driven kit drives all five consumer channels from the same tag.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Positive consequences</h3>
+  <p>One tag drives every channel from `release/publish-artifacts.toml`.</p>
+  <h3>Negative consequences</h3>
+  <p>Workspace `Cargo.toml` must list members literally for kit validation.</p>
+</section>

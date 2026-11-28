@@ -1,0 +1,56 @@
+---
+metadata:
+  name: trace-panel
+  description: One cell, record or anchor panel of the plan-anchoring trace report, as headed blocks of plain text.
+required_variables:
+  - dom
+  - title
+  - blocks
+defaults:
+  copy_json: ""
+  copy_label: "Copy Context"
+  cls: ""
+  subtitle: ""
+  context_text: ""
+---
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel{% if cls %} c-{{ cls | e }}{% endif %}" id="{{ dom | e }}">
+  <div class="section-head">
+    <h2>{{ title | e }}</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+{% if copy_json %}
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{{ copy_json | e }}">{}</button>
+{% endif %}
+{% if context_text %}
+      <button type="button" class="icon-button" title="{{ copy_label | e }}" data-copy-text="{{ context_text | e }}">&#x2398;</button>
+{% endif %}
+    </div>
+  </div>
+{% if subtitle %}
+  <p class="small">{{ subtitle | e }}</p>
+{% endif %}
+{% for b in blocks %}
+{% if b.heading %}
+  <h3>{{ b.heading | e }}</h3>
+{% endif %}
+{% if b.note %}
+  <p class="small">{{ b.note | e }}</p>
+{% endif %}
+{% if b.links %}
+  <ul>
+{% for x in b.links %}
+    <li>{% if x.panel %}<a href="#{{ x.panel | e }}" data-panel="{{ x.panel | e }}">{{ x.text | e }}</a>{% else %}{{ x.text | e }}{% endif %}</li>
+{% endfor %}
+  </ul>
+{% elif b.list %}
+  <ul>
+{% for x in b.items %}
+    <li>{{ x | e }}</li>
+{% endfor %}
+  </ul>
+{% else %}
+{% for x in b.items %}
+  <p{% if b.style %} class="{{ b.style | e }}"{% endif %}>{{ x | e }}</p>
+{% endfor %}
+{% endif %}
+{% endfor %}
+</section>

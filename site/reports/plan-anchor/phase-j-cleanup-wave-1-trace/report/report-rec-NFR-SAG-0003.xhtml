@@ -1,0 +1,114 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-NFR-SAG-0003">
+  <div class="section-head">
+    <h2>NFR-SAG-0003 One Python floor for sc-agent&#x27;s wheel and its consumers</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;NFR-SAG-0003&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;NFR&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The sc-decidr wheel MUST declare Python 3.11 or newer.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-14&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0018&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;NFR-SAG-0003&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;The declared Python floor and the pyo3 abi3 tag disagreed, so the wheel tag claimed support the package metadata refused. One floor value, written down in `floors.toml`, removes that mismatch and makes raising the floor a one-line change. `floors.toml` records the value; nothing in sc-agent checks it.\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;No hand built checks.\&quot;\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The sc-decidr wheel MUST declare Python 3.11 or newer.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions:\n\n- `floors.toml` is the file at the repository root that writes down the workspace&#x27;s floor values for sc-compose templates to read.\n- The Python floor is `[python].floor` in `floors.toml`.\n- The abi3 feature is the `abi3-py3NN` feature of pyo3 that sets a wheel&#x27;s stable-ABI tag.\n- The Python binding crate is `crates/sc-agent-py`, which builds the sc-decidr wheel.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;An inspection of the built sc-decidr wheel package metadata confirms it declares Python 3.11 or newer.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;One Python floor for sc-agent&#x27;s wheel and its consumers&quot;,
+    &quot;version&quot;: &quot;0.4.1&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">NFR · sc-agent · Approved · version 0.4.1</p>
+  <h3>Statements</h3>
+  <p>The sc-decidr wheel MUST declare Python 3.11 or newer.</p>
+  <h3>Requirement</h3>
+  <p>Definitions:
+
+- `floors.toml` is the file at the repository root that writes down the workspace&#x27;s floor values for sc-compose templates to read.
+- The Python floor is `[python].floor` in `floors.toml`.
+- The abi3 feature is the `abi3-py3NN` feature of pyo3 that sets a wheel&#x27;s stable-ABI tag.
+- The Python binding crate is `crates/sc-agent-py`, which builds the sc-decidr wheel.</p>
+  <h3>Rationale</h3>
+  <p>The declared Python floor and the pyo3 abi3 tag disagreed, so the wheel tag claimed support the package metadata refused. One floor value, written down in `floors.toml`, removes that mismatch and makes raising the floor a one-line change. `floors.toml` records the value; nothing in sc-agent checks it.
+
+Owner ruling (2026-11-21), Rand Lee: &quot;No hand built checks.&quot;
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <p>An inspection of the built sc-decidr wheel package metadata confirms it declares Python 3.11 or newer.</p>
+  <h3>Related</h3>
+  <ul>
+    <li>ADR-SAG-0019</li>
+    <li>REQ-SAG-0018</li>
+  </ul>
+</section>

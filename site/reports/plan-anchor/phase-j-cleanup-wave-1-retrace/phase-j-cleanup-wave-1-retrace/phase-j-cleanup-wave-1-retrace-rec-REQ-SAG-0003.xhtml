@@ -1,0 +1,329 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0003">
+  <div class="section-head">
+    <h2>REQ-SAG-0003 Log locations and retention</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0003&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/retrace2/trace-20261128T011234Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/&lt;cli&gt;.log.jsonl`.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When `&lt;CLI&gt;_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When `&lt;CLIENT&gt;_LOG_ROOT` is set and not empty, the generated client MUST use that folder in place of `~/.sc-agent/` for its logs.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;sc-agent MUST NOT contain code that removes a general log.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;sc-agent MUST NOT remove a session log.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;sc-agent MUST NOT remove a run log.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;f023c0d1&quot;,
+        &quot;date&quot;: &quot;2026-11-19&quot;,
+        &quot;summary&quot;: &quot;Records: one sc-observability Logger per process, one wheel, fixed log paths&quot;
+      },
+      &quot;statement&quot;: &quot;With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/&lt;cli&gt;.log.jsonl`.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;f023c0d1&quot;,
+        &quot;date&quot;: &quot;2026-11-19&quot;,
+        &quot;summary&quot;: &quot;Records: one sc-observability Logger per process, one wheel, fixed log paths&quot;
+      },
+      &quot;statement&quot;: &quot;When `&lt;CLI&gt;_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`.&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;22f4a5bd&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: fix ai-qa clean-up findings&quot;
+      },
+      &quot;statement&quot;: &quot;When `&lt;CLIENT&gt;_LOG_ROOT` is set and not empty, the generated client MUST use that folder in place of `~/.sc-agent/` for its logs.&quot;,
+      &quot;statement_index&quot;: 2
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;f023c0d1&quot;,
+        &quot;date&quot;: &quot;2026-11-19&quot;,
+        &quot;summary&quot;: &quot;Records: one sc-observability Logger per process, one wheel, fixed log paths&quot;
+      },
+      &quot;statement&quot;: &quot;Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).&quot;,
+      &quot;statement_index&quot;: 3
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;f023c0d1&quot;,
+        &quot;date&quot;: &quot;2026-11-19&quot;,
+        &quot;summary&quot;: &quot;Records: one sc-observability Logger per process, one wheel, fixed log paths&quot;
+      },
+      &quot;statement&quot;: &quot;A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.&quot;,
+      &quot;statement_index&quot;: 4
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;13c45130&quot;,
+        &quot;date&quot;: &quot;2026-11-24&quot;,
+        &quot;summary&quot;: &quot;docs(phase-j): round-3 rulings: runs.jsonl link table, haiku/luna keyless&quot;
+      },
+      &quot;statement&quot;: &quot;A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.&quot;,
+      &quot;statement_index&quot;: 5
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1a9af55a&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+      },
+      &quot;statement&quot;: &quot;sc-agent MUST NOT contain code that removes a general log.&quot;,
+      &quot;statement_index&quot;: 6
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;sc-agent MUST NOT remove a session log.&quot;,
+      &quot;statement_index&quot;: 7
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;sc-agent MUST NOT remove a run log.&quot;,
+      &quot;statement_index&quot;: 8
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0002&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0021&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0005&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0003&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Session logs are the long-term record used to analyse tens of thousands of decisions, so losing any of them loses data. Link records are append-only and immutable, so the run log is kept the same way.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/&lt;cli&gt;.log.jsonl`.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When `&lt;CLI&gt;_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When `&lt;CLIENT&gt;_LOG_ROOT` is set and not empty, the generated client MUST use that folder in place of `~/.sc-agent/` for its logs.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;sc-agent MUST NOT contain code that removes a general log.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;sc-agent MUST NOT remove a session log.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;sc-agent MUST NOT remove a run log.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: sc-agent is the crates and CLIs of this repository. A CLI is one of the command-line programs decidr or sitr; `&lt;cli&gt;` is its name in lower case and `&lt;CLI&gt;` in upper case. A Logger is an sc-observability logger that a caller passes to a CLI&#x27;s library entry point. The general log is the diagnostic log of one entry point (ADR-SAG-0021); decidr&#x27;s is `decidr.log.jsonl` and sitr&#x27;s is `sitr.log.jsonl`. A session log is the record of every session; a session is one model request with its own ULID `session_id`, and every send of that request, including busy resends, belongs to it. A link record ties one run to one session (REQ-SAG-0005). A run log is the file of link records that sits beside a session log in the same directory. To remove a log is to rotate, prune or delete it. The generated client is the Python module a consumer renders from the sc-decidr wheel&#x27;s sc-compose template (REQ-SAG-0018). The client name is the consumer&#x27;s product name, a constant in the generated client, and equals its `agent_role` (REQ-SAG-0004), such as `plan-anchor` or `judge-jev`. The client Logger is the Logger the generated client obtains from the wheel under the client name (REQ-SAG-0008). `&lt;CLIENT&gt;_LOG_ROOT` is the environment variable named by the client name uppercased with hyphens replaced by underscores. The default session files are the session files REQ-SAG-0005 names for an agent role. The client&#x27;s logs are the general log the client Logger writes and the default session files.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A CLI run of decidr with nothing configured writes `~/.sc-agent/logs/decidr.log.jsonl`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A CLI run of sitr with nothing configured writes `~/.sc-agent/logs/sitr.log.jsonl`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A CLI run of decidr with `DECIDR_LOG_ROOT` set to `&lt;dir&gt;` writes `&lt;dir&gt;/logs/decidr.log.jsonl`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A CLI run of decidr with `DECIDR_LOG_ROOT` set to `&lt;dir&gt;` writes its session log under `&lt;dir&gt;/sessions/`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test sets `&lt;CLIENT&gt;_LOG_ROOT` to a test folder, makes one sc-decidr call, and finds the general log and session rows under that folder and nothing under `~/.sc-agent/`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A CLI run of decidr with nothing configured writes its session log under `~/.sc-agent/sessions/`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test shows a session log older than the sc-observability retention age is still present after a new session.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test shows a run log older than the sc-observability retention age is still present after a new session.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Inspection of `rg -n &#x27;rotat|prune|retention&#x27; crates/` shows no code that removes a general log.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test shows a session log is unchanged and present after decidr runs a new session.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test shows a run log&#x27;s earlier lines are unchanged after decidr runs a new session.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test shows a session log past the sc-observability rotation size has no rotated copy after a new session.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A Rust unit test shows a run log past the sc-observability rotation size has no rotated copy after a new session.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Log locations and retention&quot;,
+    &quot;version&quot;: &quot;0.9.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.9.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/&lt;cli&gt;.log.jsonl`.</li>
+    <li>When `&lt;CLI&gt;_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`.</li>
+    <li>When `&lt;CLIENT&gt;_LOG_ROOT` is set and not empty, the generated client MUST use that folder in place of `~/.sc-agent/` for its logs.</li>
+    <li>Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).</li>
+    <li>A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.</li>
+    <li>A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.</li>
+    <li>sc-agent MUST NOT contain code that removes a general log.</li>
+    <li>sc-agent MUST NOT remove a session log.</li>
+    <li>sc-agent MUST NOT remove a run log.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: sc-agent is the crates and CLIs of this repository. A CLI is one of the command-line programs decidr or sitr; `&lt;cli&gt;` is its name in lower case and `&lt;CLI&gt;` in upper case. A Logger is an sc-observability logger that a caller passes to a CLI&#x27;s library entry point. The general log is the diagnostic log of one entry point (ADR-SAG-0021); decidr&#x27;s is `decidr.log.jsonl` and sitr&#x27;s is `sitr.log.jsonl`. A session log is the record of every session; a session is one model request with its own ULID `session_id`, and every send of that request, including busy resends, belongs to it. A link record ties one run to one session (REQ-SAG-0005). A run log is the file of link records that sits beside a session log in the same directory. To remove a log is to rotate, prune or delete it. The generated client is the Python module a consumer renders from the sc-decidr wheel&#x27;s sc-compose template (REQ-SAG-0018). The client name is the consumer&#x27;s product name, a constant in the generated client, and equals its `agent_role` (REQ-SAG-0004), such as `plan-anchor` or `judge-jev`. The client Logger is the Logger the generated client obtains from the wheel under the client name (REQ-SAG-0008). `&lt;CLIENT&gt;_LOG_ROOT` is the environment variable named by the client name uppercased with hyphens replaced by underscores. The default session files are the session files REQ-SAG-0005 names for an agent role. The client&#x27;s logs are the general log the client Logger writes and the default session files.</p>
+  <h3>Rationale</h3>
+  <p>Session logs are the long-term record used to analyse tens of thousands of decisions, so losing any of them loses data. Link records are append-only and immutable, so the run log is kept the same way.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A CLI run of decidr with nothing configured writes `~/.sc-agent/logs/decidr.log.jsonl`.</li>
+    <li>A CLI run of sitr with nothing configured writes `~/.sc-agent/logs/sitr.log.jsonl`.</li>
+    <li>A CLI run of decidr with `DECIDR_LOG_ROOT` set to `&lt;dir&gt;` writes `&lt;dir&gt;/logs/decidr.log.jsonl`.</li>
+    <li>A CLI run of decidr with `DECIDR_LOG_ROOT` set to `&lt;dir&gt;` writes its session log under `&lt;dir&gt;/sessions/`.</li>
+    <li>A unit test sets `&lt;CLIENT&gt;_LOG_ROOT` to a test folder, makes one sc-decidr call, and finds the general log and session rows under that folder and nothing under `~/.sc-agent/`.</li>
+    <li>A CLI run of decidr with nothing configured writes its session log under `~/.sc-agent/sessions/`.</li>
+    <li>A Rust unit test shows a session log older than the sc-observability retention age is still present after a new session.</li>
+    <li>A Rust unit test shows a run log older than the sc-observability retention age is still present after a new session.</li>
+    <li>Inspection of `rg -n &#x27;rotat|prune|retention&#x27; crates/` shows no code that removes a general log.</li>
+    <li>A Rust unit test shows a session log is unchanged and present after decidr runs a new session.</li>
+    <li>A Rust unit test shows a run log&#x27;s earlier lines are unchanged after decidr runs a new session.</li>
+    <li>A Rust unit test shows a session log past the sc-observability rotation size has no rotated copy after a new session.</li>
+    <li>A Rust unit test shows a run log past the sc-observability rotation size has no rotated copy after a new session.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>ADR-SAG-0002</li>
+    <li>ADR-SAG-0021</li>
+    <li>REQ-SAG-0005</li>
+  </ul>
+</section>

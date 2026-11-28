@@ -1,0 +1,160 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-REQ-SAG-0019-ANC-009">
+  <div class="section-head">
+    <h2>REQ-SAG-0019 × ANC-009 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-009&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.97,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.98,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.01
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.8,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.13,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.87
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.96,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.03,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.97
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.98,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.01,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.99
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.01,
+    &quot;exceeds&quot;: 0.87,
+    &quot;relates&quot;: 0.97,
+    &quot;serves&quot;: 0.99
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0019&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0019/ANC-009/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8FMAMBWY2RMZ58YR3PY97H9&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0019 × ANC-009 — exceeds
+What exceeds
+Anchor
+The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.
+Owner said: “hard-coded rows will get stale quickly and often”
+Scope: adds or changes the model table or model configuration in sc-agent
+Record statements
+When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.
+Each configuration file MUST accept the shared settings.
+A CLI file MUST accept that CLI&#x27;s settings.
+An unknown key in a configuration file MUST cause a typed load error.
+The `cache` setting MUST default to `true`.
+A model entry MUST add one row to the model table.
+A model entry MUST override the model its name selects.
+A local endpoint&#x27;s address MUST be settable in configuration.
+When the CLI does not run inside a git work tree, it MUST skip the local-folder layers.
+Each CLI&#x27;s `&lt;cli&gt; doctor` command, such as `decidr doctor`, MUST report the settings table.
+In each row of the settings table, the `source` cell MUST show the source of that row&#x27;s value.
+`&lt;cli&gt; doctor` MUST report the path of every file in the nine layers.
+For each file in the nine layers, `&lt;cli&gt; doctor` MUST report whether it exists.
+When a CLI fails to load a configuration file, its error MUST name the failure location.
+A CLI MUST NOT read another CLI&#x27;s `&lt;cli&gt;.json`.
+While it loads configuration, a CLI MUST NOT write to any configuration file.
+`&lt;cli&gt; doctor` MUST NOT send a model request.
+`&lt;cli&gt; doctor` MUST NOT write a file.
+Configuration MUST NOT change a paid API&#x27;s base address.
+History (git)
+REQ-SAG-0019 statement 1: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008
+REQ-SAG-0019 statement 2: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings
+REQ-SAG-0019 statement 3: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings
+REQ-SAG-0019 statement 4: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings
+REQ-SAG-0019 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0019 statement 6: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0019 statement 7: 4354e4e1 2026-11-25: REQ-SAG-0019: configuration overrides the model a name selects (owner ruling 2026-11-25)
+REQ-SAG-0019 statement 8: b98b4112 2026-11-25: phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size
+REQ-SAG-0019 statement 9: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0019 statement 10: b98b4112 2026-11-25: phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size
+REQ-SAG-0019 statement 11: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008
+REQ-SAG-0019 statement 12: 87129dd2 2026-11-22: feat: adopt the merged sc-config layered engine
+REQ-SAG-0019 statement 13: 87129dd2 2026-11-22: feat: adopt the merged sc-config layered engine
+REQ-SAG-0019 statement 14: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008
+REQ-SAG-0019 statement 15: 998015d2 2026-11-18: docs: ADR-SAG-0020/0021 config scopes and separate session-log tree
+REQ-SAG-0019 statement 16: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008
+REQ-SAG-0019 statement 17: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008
+REQ-SAG-0019 statement 18: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008
+REQ-SAG-0019 statement 19: b98b4112 2026-11-25: phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size
+Jev P(yes): relates 0.97 · serves 0.99 · exceeds 0.87 · conflicts 0.01">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+  </ul>
+  <h3>Anchor</h3>
+  <p>The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.</p>
+  <p>Owner said: “hard-coded rows will get stale quickly and often”</p>
+  <p>Scope: adds or changes the model table or model configuration in sc-agent</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.</li>
+    <li>Each configuration file MUST accept the shared settings.</li>
+    <li>A CLI file MUST accept that CLI&#x27;s settings.</li>
+    <li>An unknown key in a configuration file MUST cause a typed load error.</li>
+    <li>The `cache` setting MUST default to `true`.</li>
+    <li>A model entry MUST add one row to the model table.</li>
+    <li>A model entry MUST override the model its name selects.</li>
+    <li>A local endpoint&#x27;s address MUST be settable in configuration.</li>
+    <li>When the CLI does not run inside a git work tree, it MUST skip the local-folder layers.</li>
+    <li>Each CLI&#x27;s `&lt;cli&gt; doctor` command, such as `decidr doctor`, MUST report the settings table.</li>
+    <li>In each row of the settings table, the `source` cell MUST show the source of that row&#x27;s value.</li>
+    <li>`&lt;cli&gt; doctor` MUST report the path of every file in the nine layers.</li>
+    <li>For each file in the nine layers, `&lt;cli&gt; doctor` MUST report whether it exists.</li>
+    <li>When a CLI fails to load a configuration file, its error MUST name the failure location.</li>
+    <li>A CLI MUST NOT read another CLI&#x27;s `&lt;cli&gt;.json`.</li>
+    <li>While it loads configuration, a CLI MUST NOT write to any configuration file.</li>
+    <li>`&lt;cli&gt; doctor` MUST NOT send a model request.</li>
+    <li>`&lt;cli&gt; doctor` MUST NOT write a file.</li>
+    <li>Configuration MUST NOT change a paid API&#x27;s base address.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0019 statement 1: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0019 statement 2: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0019 statement 3: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0019 statement 4: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0019 statement 5: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0019 statement 6: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0019 statement 7: 4354e4e1 2026-11-25: REQ-SAG-0019: configuration overrides the model a name selects (owner ruling 2026-11-25)</li>
+    <li>REQ-SAG-0019 statement 8: b98b4112 2026-11-25: phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size</li>
+    <li>REQ-SAG-0019 statement 9: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0019 statement 10: b98b4112 2026-11-25: phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size</li>
+    <li>REQ-SAG-0019 statement 11: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0019 statement 12: 87129dd2 2026-11-22: feat: adopt the merged sc-config layered engine</li>
+    <li>REQ-SAG-0019 statement 13: 87129dd2 2026-11-22: feat: adopt the merged sc-config layered engine</li>
+    <li>REQ-SAG-0019 statement 14: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0019 statement 15: 998015d2 2026-11-18: docs: ADR-SAG-0020/0021 config scopes and separate session-log tree</li>
+    <li>REQ-SAG-0019 statement 16: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0019 statement 17: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0019 statement 18: 3afa4f9e 2026-11-18: Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008</li>
+    <li>REQ-SAG-0019 statement 19: b98b4112 2026-11-25: phase-j records: REQ-SAG-0018 is the owner&#x27;s consumer statement; REQ-SAG-0019 and 0102 cut to develop size</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.97 · serves 0.99 · exceeds 0.87 · conflicts 0.01</p>
+</section>

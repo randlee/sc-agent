@@ -1,0 +1,203 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0011">
+  <div class="section-head">
+    <h2>REQ-SAG-0011 Interrupt cancels cleanly</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0011&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/trace-20261127T230909Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When `decidr` receives an interrupt, it MUST cancel the batch.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;When a `KeyboardInterrupt` is raised in `sc-agent-py`, it MUST cancel the batch.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;After an interrupt, every unfinished request MUST end with `decision.cancelled`.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The session log MUST hold the row of every request that finished before the interrupt when `decidr` exits or the Python call returns.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A `KeyboardInterrupt` in `sc-agent-py` MUST be caught inside the Python call.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;After a `KeyboardInterrupt`, the Python call MUST return one result per request of the batch.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;`decidr` MUST exit non-zero after an interrupt.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0701&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0005&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0011&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;An interrupted batch must leave a complete, readable session log and a clear failure status instead of lost rows and a silent exit.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When `decidr` receives an interrupt, it MUST cancel the batch.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;When a `KeyboardInterrupt` is raised in `sc-agent-py`, it MUST cancel the batch.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;After an interrupt, every unfinished request MUST end with `decision.cancelled`.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The session log MUST hold the row of every request that finished before the interrupt when `decidr` exits or the Python call returns.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A `KeyboardInterrupt` in `sc-agent-py` MUST be caught inside the Python call.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;After a `KeyboardInterrupt`, the Python call MUST return one result per request of the batch.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;`decidr` MUST exit non-zero after an interrupt.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: `decidr` is the decision CLI, and `sc-agent-py` is the Python wheel that holds the decidr API. An interrupt is Ctrl-C, SIGINT or SIGTERM delivered to `decidr`, or a `KeyboardInterrupt` raised in Python while `sc-agent-py` is running. The session log is the JSONL file `sessions.jsonl` that holds one row for each request sent to a model (REQ-SAG-0005). A batch is the set of requests sent by one `decidr` command or one `sc-agent-py` call. The Python call is the `sc-agent-py` call that sent the batch. An unfinished request is a request of the batch that has no result when the interrupt arrives. `decision.cancelled` is the error id given to a cancelled request.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;CLI run: sending SIGINT to `decidr` during a batch stops the in-flight requests.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;CLI run: sending SIGTERM to `decidr` during a batch stops the in-flight requests.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;CLI run: after SIGINT, and in a separate run after SIGTERM, during a batch, every unfinished request in the output ends with `decision.cancelled`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;CLI run: after SIGINT, and in a separate run after SIGTERM, during a batch, the session log holds a row for every request that finished before the signal.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: raising `KeyboardInterrupt` during an `sc-agent-py` batch stops the in-flight requests.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: raising `KeyboardInterrupt` during an `sc-agent-py` batch does not raise out of the call.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: after `KeyboardInterrupt` during an `sc-agent-py` batch, the session log holds a row for every request that finished before the interrupt.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Unit test: after `KeyboardInterrupt` during an `sc-agent-py` batch, the call returns one result per request, each unfinished one a `decision.cancelled` error value.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;CLI run: `decidr` exits non-zero after SIGINT, and in a separate run after SIGTERM, during a batch.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Interrupt cancels cleanly&quot;,
+    &quot;version&quot;: &quot;0.5.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.5.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>When `decidr` receives an interrupt, it MUST cancel the batch.</li>
+    <li>When a `KeyboardInterrupt` is raised in `sc-agent-py`, it MUST cancel the batch.</li>
+    <li>After an interrupt, every unfinished request MUST end with `decision.cancelled`.</li>
+    <li>The session log MUST hold the row of every request that finished before the interrupt when `decidr` exits or the Python call returns.</li>
+    <li>A `KeyboardInterrupt` in `sc-agent-py` MUST be caught inside the Python call.</li>
+    <li>After a `KeyboardInterrupt`, the Python call MUST return one result per request of the batch.</li>
+    <li>`decidr` MUST exit non-zero after an interrupt.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: `decidr` is the decision CLI, and `sc-agent-py` is the Python wheel that holds the decidr API. An interrupt is Ctrl-C, SIGINT or SIGTERM delivered to `decidr`, or a `KeyboardInterrupt` raised in Python while `sc-agent-py` is running. The session log is the JSONL file `sessions.jsonl` that holds one row for each request sent to a model (REQ-SAG-0005). A batch is the set of requests sent by one `decidr` command or one `sc-agent-py` call. The Python call is the `sc-agent-py` call that sent the batch. An unfinished request is a request of the batch that has no result when the interrupt arrives. `decision.cancelled` is the error id given to a cancelled request.</p>
+  <h3>Rationale</h3>
+  <p>An interrupted batch must leave a complete, readable session log and a clear failure status instead of lost rows and a silent exit.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>CLI run: sending SIGINT to `decidr` during a batch stops the in-flight requests.</li>
+    <li>CLI run: sending SIGTERM to `decidr` during a batch stops the in-flight requests.</li>
+    <li>CLI run: after SIGINT, and in a separate run after SIGTERM, during a batch, every unfinished request in the output ends with `decision.cancelled`.</li>
+    <li>CLI run: after SIGINT, and in a separate run after SIGTERM, during a batch, the session log holds a row for every request that finished before the signal.</li>
+    <li>Unit test: raising `KeyboardInterrupt` during an `sc-agent-py` batch stops the in-flight requests.</li>
+    <li>Unit test: raising `KeyboardInterrupt` during an `sc-agent-py` batch does not raise out of the call.</li>
+    <li>Unit test: after `KeyboardInterrupt` during an `sc-agent-py` batch, the session log holds a row for every request that finished before the interrupt.</li>
+    <li>Unit test: after `KeyboardInterrupt` during an `sc-agent-py` batch, the call returns one result per request, each unfinished one a `decision.cancelled` error value.</li>
+    <li>CLI run: `decidr` exits non-zero after SIGINT, and in a separate run after SIGTERM, during a batch.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>REQ-SAG-0701</li>
+    <li>REQ-SAG-0005</li>
+  </ul>
+</section>

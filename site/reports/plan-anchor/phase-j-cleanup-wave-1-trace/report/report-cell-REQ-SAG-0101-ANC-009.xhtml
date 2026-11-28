@@ -1,0 +1,92 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-REQ-SAG-0101-ANC-009">
+  <div class="section-head">
+    <h2>REQ-SAG-0101 × ANC-009 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-009&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.42,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.61,
+        &quot;unclear&quot;: 0.24,
+        &quot;yes&quot;: 0.15
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.64,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.23,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.76
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.86,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.07,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.91
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.55,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.7,
+        &quot;unclear&quot;: 0.19,
+        &quot;yes&quot;: 0.11
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.15,
+    &quot;exceeds&quot;: 0.76,
+    &quot;relates&quot;: 0.91,
+    &quot;serves&quot;: 0.11
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0101&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0101/ANC-009/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8FMARHHC7TGQYRE4NB7JW28&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0101 × ANC-009 — exceeds
+What exceeds
+Anchor
+The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.
+Owner said: “hard-coded rows will get stale quickly and often”
+Scope: adds or changes the model table or model configuration in sc-agent
+Record statements
+Each cloud short name MUST resolve to a model in the `sc-agent` model table.
+Each local short name MUST resolve to a local model in the model table.
+History (git)
+REQ-SAG-0101 statement 1: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0101 statement 2: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+Jev P(yes): relates 0.91 · serves 0.11 · exceeds 0.76 · conflicts 0.15">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <p class="small">No reviewer annotation yet.</p>
+  <ul>
+  </ul>
+  <h3>Anchor</h3>
+  <p>The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.</p>
+  <p>Owner said: “hard-coded rows will get stale quickly and often”</p>
+  <p>Scope: adds or changes the model table or model configuration in sc-agent</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>Each cloud short name MUST resolve to a model in the `sc-agent` model table.</li>
+    <li>Each local short name MUST resolve to a local model in the model table.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0101 statement 1: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0101 statement 2: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.91 · serves 0.11 · exceeds 0.76 · conflicts 0.15</p>
+</section>

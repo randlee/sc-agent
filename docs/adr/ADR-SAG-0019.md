@@ -31,7 +31,6 @@ New with this ADR: REQ-SAG-0016 (typed error fields), REQ-SAG-0017 (categories),
 - REQ-SAG-0701
 - REQ-SAG-0013
 - REQ-SAG-0005
-- REQ-SAG-0703
 - REQ-SAG-0101
 - REQ-SAG-0102
 - REQ-SAG-0103
@@ -54,9 +53,9 @@ The two existing consumers each rebuilt the wheel boundary, and the copies diver
 
 The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.
 
-1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection, API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query sent to a model, at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.
+1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection, API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query whose model call succeeded (a failed call writes no row; its error goes to the general log), at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.
 
-   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`, shipped as package data; the wheel moves to maturin's mixed layout and `import sc_agent` is unchanged.
+   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`; the wheel moves to maturin's mixed layout and `import sc_agent` is unchanged.
 
    - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping.
    - model selectors are Run arguments.

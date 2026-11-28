@@ -1,6 +1,6 @@
 ---
 name: plan-anchor-questions
-version: 0.13.0
+version: 0.16.1
 description: The planning-gate Jev question set, what each question isolates, why the set is orthogonal, and how to word overrides.
 ---
 
@@ -19,7 +19,7 @@ One anchor and one planning bead, nothing else. The bead text is its title, desc
 }
 ```
 
-Unrelated material degrades accuracy, so the agent never sends several beads, the intent document, or other anchors. A bead is never shortened at this gate; one that does not fit is refused with `PLAN.TOO_LARGE` (`jev-api.md`, `plan-size-and-shape.md`).
+Unrelated material degrades accuracy, so the agent never sends several beads, the intent document, or other anchors.
 
 ## The three questions
 

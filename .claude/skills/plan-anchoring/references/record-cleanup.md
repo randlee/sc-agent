@@ -1,0 +1,73 @@
+---
+name: record-cleanup
+version: 0.16.1
+description: Clean up REQ, ADR and NFR records against the locked anchors in planned waves - trace with git provenance, parallel proposers, harmonized proposals on a Proposed fixes tab the owner approves, then repair checked against the approvals and one stacked PR per wave.
+---
+
+# Record cleanup
+
+The lead runs this, judging changes, slicing and wave count; tools report and push toward fixes, deciding nothing, editing no records. `$S` is `scripts/jev_judge.py`; `$R` is `scripts/change_report.py`.
+
+## Levels
+
+The owner sets level by argument (`--aggressive`, `--standard`, `--conservative`, `level=<level>`); absent one, the lead asks once before Diagnose, defaulting `standard`, never picks or softens it, writes it as proposals-file `level` and passes it to every proposer; the tab header shows it.
+
+Every level: delete duplicates; deletion default; rewording rare, justified; resolve every conflict, never by automatic cut, stating resolution (cut the record, reconcile the wording, or have the owner change the anchor) and source of truth.
+
+| | aggressive | standard | conservative
+---|---|---|---
+Excess beyond anchor | deleted unless owner anchors it | deleted unless documenting existing code behaviour, citing `file:symbol` | kept if accurate to code; deleted if wrong or valueless
+Unanchored records | kept only with evidence: code documented, or owner's words quoted exactly from an anchor | judged on product value | kept unless wrong, duplicated or valueless
+
+Remedies: `references/record-trace.md` "Correcting duplicates" (duplicates) and "Interpretation" (cells, unanchored), at the owner's level. Duplicates need proposals and owner approval; `references/record-trace.md` "Correcting duplicates" (agent decides alone) applies only outside cleanup.
+
+## Preflight
+
+1. Never start broken: first `python3 "$S" validate --anchors "$A"` reports `valid: true` and Raptor imports every record diagnostic-free.
+
+## Diagnose
+
+2. Trace with overlap (`references/record-trace.md`), recording git provenance of red, yellow and duplicated statements: `python3 "$S" trace --anchors "$A" --source <repo> ... --raptor "$RAPTOR"`; render: `python3 "$R" --trace <trace.json>`. Reports follow `references/html-reporting-guidelines.md`. Before editing, plan waves (several normal): record sets repairable and reviewable in one pass, each one `/sc-gh-stack` PR stacked on the previous.
+3. During owner trace review, launch background `anchor-cleanup-proposer` agents directly via Agent tool (Cursor: Task), no runner envelope: one per ~10-item slice (red/yellow cells, duplicates, or unanchored records), max 4 concurrent, 600 s each, given `trace_path`, `slice`, `repositories` (read-only local code checkouts), `wave`, `level`, `references`, slice-naming `correlation_id`. Reading trace provenance and code, running and editing nothing, they return proposals plus one annotation per red cell, yellow cell and duplicate: provenance relied on, copied from trace, and stale side.
+4. Collect: each red cell, yellow cell, duplicate and unanchored record ends in a proposal or `not_proposed` entry (`{slice, reason, items}`); nothing kept by omission. A failed or timed-out proposer's slice is listed there with reason and keys in `items`; rerun it before sending. Merge all `annotations` into one `--annotations` file (`references/record-trace.md`).
+5. Harmonize after proposers return, before the owner sees anything: cross-reference proposals touching one record, statement or obligation; merge, rewrite or drop until one outcome, each statement kept once, dependent justifications updated. Log drops/merges in `dropped` (`{title, correlation_id, reason}`, reason naming absorbing proposal); `harmonized_with` lists reconciled proposals; keep annotation `remedy` matching its item's kept proposal. For a large set the lead may hand harmonizing to a background agent.
+6. Render third tab from the same trace (annotations merged, no re-trace): `python3 "$R" --trace <trace.json> --proposals <proposals.json> --annotations <annotations.json>`. Fix every `PROPOSALS.INVALID`, including inexact `source.quote`. Owners see only non-`--draft` renders (`--draft`: bannered, lead-only); the non-`--draft` run exits `PROPOSALS.NOT_READY`, its banner listing the gaps, until `data.unannotated_cells` is empty (each red cell, yellow cell, duplicate annotated with trace `provenance`, or `no_provenance` with trace reason), `data.uncovered` is empty, and `data.warnings` lacks "proposals N and M disagree" (re-harmonize until so).
+7. Open it for the owner, who replies, e.g. "approve 1-5, reject 6, change 7 to: <text>". The lead reads it (no tool parses), writes verbatim reply and per-panel decisions (`approved`, `rejected`, `changed` with owner's text) as proposals-file `approvals`, re-renders showing decisions, commits the file with the wave's PR.
+
+Approving a proposed-anchor proposal applies its excess-deleting changes now; the anchor is added only if its text is also approved.
+
+## Repair, per wave
+
+Apply only approved changes, changed ones as owner-written; other needed edits become next-wave proposals.
+
+8. Apply; add approved anchors with `add`, locked normally (`references/capture-and-maintenance-workflow.md`).
+9. Raptor schema: background agent re-imports, fixing diagnostics until none.
+10. Anchors: background agent fixes until `validate` passes and wave re-trace shows no red cell and `duplicates_pass: true`. Schema/anchor fixes never change statement text; needing that makes a next-wave proposal.
+11. If judge-jev skill is installed, run judge-jev quality on every wave-modified record; each failure gets its own background agent and worktree running judge-jev's fix workflow (its `references/fix-strategy.md`, launching `jev-fix-proposer` per candidate edit). Quality fixes reword only wave-modified records, adding no statements or obligations. The lead never fixes, awaits or stops on them.
+12. Verify: `python3 "$R" --verify-repair --proposals <proposals.json> --before <Raptor index before the wave> --after <Raptor index after it> --quality-edits <quality edits.json>`. Each changed statement is approved or a listed quality edit (`[{record, before, after}]`) in a wave-modified record adding no statement; else `REPAIR.UNAPPROVED`: revert or propose next wave. Check `data.check_by_hand` (owner-changed) against owner text.
+13. Commit, push, open wave PR via `/sc-gh-stack`; body links committed proposals file with approvals, record/statement counts before and after (noting zero removals), each quality fix as before → after for owner review, each still-failing record as handed off. Send owner the URL.
+
+## Finish condition, per wave
+
+- All approved changes applied; `--verify-repair` (approved changes plus only schema, anchor, listed quality fixes), Raptor schema and anchors pass.
+- Wave re-trace: no red, `duplicates_pass: true`.
+- Wave record/statement counts don't rise, except owner-added anchors.
+
+judge-jev quality failures are excluded, listed in the PR as handed to the specialized agent. Then repair the next wave, re-diagnosing if earlier waves changed its records.
+
+## Proposals file
+
+```json
+{"schema": "plan-anchoring/record-cleanup-proposals/1", "level": "standard",
+ "not_proposed": [{"slice": "<slice>", "reason": "<why no proposal>", "items": ["REQ-3/ANC-002"]}],
+ "dropped": [{"title": "<title>", "correlation_id": "<proposer's slice>", "reason": "merged into 2"}],
+ "approvals": {"reply": "<the owner's reply, verbatim>", "decisions": [{"panel": 1, "status": "changed", "text": "<owner's text>"}]},
+ "proposals": [{"wave": 1, "kind": "consolidate", "title": "...", "records": ["REQ-1", "ADR-2"],
+                "changes": [{"record": "ADR-2", "before": "<statement>", "after": "<cut>", "reword_justification": "...", "keeps": "<kept statement>"}],
+                "resolution": "cut", "code": "<file>:<symbol>",
+                "justification": "...", "source": {"ref": "REQ-1", "quote": "<owner's words>", "commit": "<sha>"},
+                "improvement": "...", "cells": ["REQ-1/ANC-001"], "duplicates": ["ADR-2/REQ-1/0"], "proposed_anchor": "...",
+                "harmonized_with": [2]}]}
+```
+
+`level` required; panels number `proposals` positions; `kind`: `delete`, `consolidate`, `cut_excess`, `resolve_conflict`, `propose_anchor`, `keep_with_reason`. A change lacking `before` deletes the record; `before` alone deletes that statement; both replace `before` with `after`, and anything beyond deleting words (or adding a record id) is rewording needing `reword_justification`, panel-flagged. `keeps` quotes a consolidate's kept statement. `cells`/`duplicates` name cleared trace entries; duplicate keys may name possible duplicates. `resolve_conflict` needs `resolution` (`cut`, `reconcile`, or `propose_anchor` plus `proposed_anchor`); `propose_anchor` needs `proposed_anchor` and excess-deleting changes. `keep_with_reason` changes nothing; for anchored records it needs `code` and is refused at `aggressive`; at `aggressive`, unanchored records need `code` or owner words in `source.quote`. `source.quote` is copied exactly from an anchor's `quote` (provenance shows when text arrived, not who decided); `source.commit` cites the provenance commit showing the stale side. Trace-computed totals: an ADR decision is one statement, emptied records are deleted, cells or duplicates several proposals clear count once.

@@ -22,6 +22,10 @@ Intent: `docs/plans/phase-j/intent.md`
 | ANC-014 | locked | LLM-as-Jev system prompt; luna/haiku config overrides | 2026-11-26 |
 | ANC-015 | locked | decidr-wide rules live only in sc-agent | 2026-11-26 |
 | ANC-016 | locked | logger injection is test-only for derivative tools | 2026-11-26 |
+| ANC-017 | locked | no flaky tests | 2026-11-27 |
+| ANC-018 | locked | live integration = unit tests run live, manually | 2026-11-27 |
+| ANC-019 | locked | Python 3.11+ | 2026-11-27 |
+| ANC-020 | locked | no second logger when one is injected | 2026-11-27 |
 
 ## ANC-001
 
@@ -246,3 +250,75 @@ Summary: logger injection is test-only for derivative tools
 Scope: adds or changes logger construction or injection in sc-agent or a derivative tool
 
 Deterministic check to pair with the development gate: grep derivative tools' non-test code for logger injection: none; one sc-agent record defines the injection path
+
+## ANC-017
+
+Anchor: sc-agent tests must not depend on races, wall-clock timing, sleeps, event-loop ordering or system load; a test found to depend on one must be redesigned to drive its logic with controlled inputs.
+
+> Flaky tests are prohibited by design. Any flaky test identified (one that relies on a race, timing, sleeps, event-loop ordering or load) must be re-designed to be deterministic by driving the logic with controlled inputs.
+
+Said by Rand Lee, carried forward 2026-11-27 (record clean-up layer 1), 2026-11-27. Status: locked. Version 2.
+
+Summary: no flaky tests
+
+Scope: adds or changes a test under crates/*/tests, crates/*/src test modules, tests/ or crates/sc-agent-py/tests
+
+Deterministic check to pair with the development gate: review changed tests for sleep, wall-clock assertions, poll-until-timeout and unsynchronized thread ordering; a failure-only backstop that fails with captured output is allowed
+
+Fixtures:
+- pass: The new holdoff test drives its deadline with an injected clock and an explicit channel handshake.
+- fail: The test sleeps 200 ms and then asserts the worker has finished.
+
+## ANC-018
+
+Anchor: sc-agent's integration tests must be its unit tests run against live agents, triggered manually.
+
+> I expect integration tests to be build as unit tests (ideally tests that already exist using mocks).  they are simply run w/ live agents and triggered manually.
+
+Said by Rand Lee, carried forward 2026-11-27 (record clean-up layer 1), 2026-11-27. Status: locked. Version 4.
+
+Summary: live integration = unit tests run live, manually
+
+Scope: adds or changes a live-provider test, a test selection for live runs, or a CI workflow under .github/workflows
+
+Deterministic check to pair with the development gate: grep .github/workflows for live-provider test jobs triggered on push, pull_request or schedule; each live test name matches an existing mocked unit test
+
+Fixtures:
+- pass: The live job reruns the existing unit tests against real providers and is started with workflow_dispatch only.
+- fail: A new live_integration suite runs on every pull request.
+
+## ANC-019
+
+Anchor: sc-agent must require Python 3.11 or newer.
+
+> sc-agent, judge-jev, prompt-anchor all must be 3.11+
+
+Said by Rand Lee, carried forward 2026-11-27 (record clean-up layer 1), 2026-11-27. Status: locked. Version 3.
+
+Summary: Python 3.11+
+
+Scope: edits pyproject.toml requires-python, Python version checks, CI Python matrices or script interpreter guards
+
+Deterministic check to pair with the development gate: grep requires-python in every sc-agent pyproject.toml reads >=3.11
+
+Fixtures:
+- pass: pyproject.toml sets requires-python = ">=3.11".
+- fail: The wheel now supports Python 3.9.
+
+## ANC-020
+
+Anchor: When a caller passes its own sc_observability Logger into an sc-agent wheel call, sc-agent must not build a second Logger for that log.
+
+> we created a oversized set of sprints expressly to normalize config and logging around sc-observability logger (injected).  why do you keep adding more loggers to the design? ... add a new anchor banning python_logger ... lock this
+
+Said by Rand Lee, carried forward 2026-11-27 (record clean-up layer 1), 2026-11-27. Status: locked. Version 2.
+
+Summary: no second logger when one is injected
+
+Scope: touches crates/sc-agent-py or any code path that accepts an injected logger (general_log=, session_log=)
+
+Deterministic check to pair with the development gate: no LoggerBuilder call in crates/sc-agent-py runs on a path where the caller supplied a logger
+
+Fixtures:
+- pass: When general_log= is given, the wheel writes to that logger and builds no other.
+- fail: The wheel builds its own Logger with LoggerBuilder even when the caller passed session_log=.

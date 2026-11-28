@@ -1,0 +1,111 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-ADR-SAG-0020-ANC-009">
+  <div class="section-head">
+    <h2>ADR-SAG-0020 × ANC-009 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-009&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [],
+    &quot;jev_disputed&quot;: false,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;998015d2&quot;,
+        &quot;date&quot;: &quot;2026-11-18&quot;,
+        &quot;record&quot;: &quot;ADR-SAG-0020&quot;,
+        &quot;statement&quot;: &quot;Configuration has two kinds of scope and two locations.\n\n- The shared scope is the file `sc-agent.json`. It holds shared defaults for configuration-reading CLIs: the project/phase (ADR-SAG-0021), worker count, and optional local-runner settings. A CLI file may override those defaults.\n- Each CLI that reads configuration has its own scope, the file `&lt;cli&gt;.json` named after the CLI: `decidr.json`, and the same pattern for every CLI added later. `sitr` reads no configuration.\n- The global location is `~/.sc-agent/`, the user&#x27;s home directory joined with `.sc-agent` on every platform, or the folder named by nonempty `SC_AGENT_HOME`. An explicit configuration directory takes precedence.\n- The local location is `&lt;worktree&gt;/.sc/sc-agent/`, where `&lt;worktree&gt;` is the root of the git work tree the CLI runs in. It holds the same file names with the same keys.\n\nThe CLIs and the files each one reads are these:\n\n| CLI | Global files | Local files | Environment prefix |\n|---|---|---|---|\n| `decidr` | `~/.sc-agent/decidr.local.json`, `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `&lt;worktree&gt;/.sc/sc-agent/decidr.local.json`, `&lt;worktree&gt;/.sc/sc-agent/decidr.json`, `&lt;worktree&gt;/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |\n| `sitr` | none | none | none |\n\nEvery CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. The table is updated when a CLI is added.\n\nA setting is looked up in nine layers, and the first layer that sets it wins:\n\n1. the CLI flag;\n2. the environment variable;\n3. the local `&lt;cli&gt;.local.json`;\n4. the local `&lt;cli&gt;.json`;\n5. the local `sc-agent.json`;\n6. the global `&lt;cli&gt;.local.json`;\n7. the global `&lt;cli&gt;.json`;\n8. the global `sc-agent.json`;\n9. the built-in default, or a typed error when the setting is required and has no default.\n\nModel entries, `models.&lt;alias&gt;`, are set only in configuration files, layers 3 to 8: each is a structured row (`provider` and `id` strings, `released` a `YYYY-MM-DD` date) that a flag or flat environment variable cannot express. `&lt;alias&gt;` becomes the row&#x27;s short name. A row&#x27;s provider is one sc-agent already has, so configuration can add a model, including a local model on another computer, but cannot change where a paid API&#x27;s key is sent. A local endpoint (laya and the two decider endpoints) is configured by `&lt;endpoint&gt;.host` and `&lt;endpoint&gt;.port`, such as `laya.host` and `laya.port`.\n\nEnvironment variables are named after the CLI: `DECIDR_&lt;SETTING&gt;`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).\n\nConfiguration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152).&quot;,
+        &quot;summary&quot;: &quot;docs: ADR-SAG-0020/0021 config scopes and separate session-log tree&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;Proposed in wave 2 after re-trace on wave 1&#x27;s result.&quot;,
+    &quot;stale&quot;: null,
+    &quot;what&quot;: &quot;exceeds cell deferred to wave 2; not yet reviewed by a proposer. Provenance below is every dated statement of ADR-SAG-0020, copied from the trace.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.86,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.91,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.06
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.58,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.27,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.72
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.26,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.51,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.48
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.7,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.18,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.8
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.06,
+    &quot;exceeds&quot;: 0.72,
+    &quot;relates&quot;: 0.48,
+    &quot;serves&quot;: 0.8
+  },
+  &quot;record&quot;: &quot;ADR-SAG-0020&quot;,
+  &quot;request_id&quot;: &quot;trace/ADR-SAG-0020/ANC-009/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8FMB6C558G6BFDXAEE1MXX9&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="ADR-SAG-0020 × ANC-009 — exceeds
+What exceeds
+exceeds cell deferred to wave 2; not yet reviewed by a proposer. Provenance below is every dated statement of ADR-SAG-0020, copied from the trace.
+Proposed remedy
+Proposed in wave 2 after re-trace on wave 1&#x27;s result.
+Anchor
+The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.
+Owner said: “hard-coded rows will get stale quickly and often”
+Scope: adds or changes the model table or model configuration in sc-agent
+Record statements
+No obligation statements.
+History (git)
+ADR-SAG-0020 statement 1: 998015d2 2026-11-18: docs: ADR-SAG-0020/0021 config scopes and separate session-log tree
+Jev P(yes): relates 0.48 · serves 0.80 · exceeds 0.72 · conflicts 0.06">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <ul>
+  </ul>
+  <p>exceeds cell deferred to wave 2; not yet reviewed by a proposer. Provenance below is every dated statement of ADR-SAG-0020, copied from the trace.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>Proposed in wave 2 after re-trace on wave 1&#x27;s result.</p>
+  <h3>Anchor</h3>
+  <p>The sc-agent model table must accept extra model rows from config in addition to its hard-coded rows, so a new model works without waiting for a release.</p>
+  <p>Owner said: “hard-coded rows will get stale quickly and often”</p>
+  <p>Scope: adds or changes the model table or model configuration in sc-agent</p>
+  <h3>Record statements</h3>
+  <p>No obligation statements.</p>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>ADR-SAG-0020 statement 1: 998015d2 2026-11-18: docs: ADR-SAG-0020/0021 config scopes and separate session-log tree</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.48 · serves 0.80 · exceeds 0.72 · conflicts 0.06</p>
+</section>

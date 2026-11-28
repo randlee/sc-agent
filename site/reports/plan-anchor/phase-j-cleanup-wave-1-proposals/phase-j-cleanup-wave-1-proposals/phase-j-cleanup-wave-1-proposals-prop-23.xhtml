@@ -1,0 +1,44 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-23">
+  <div class="section-head">
+    <h2>23. Delete the C# and Go grammar statements and the no-API-change statement from REQ-SAG-0302</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="23. Delete the C# and Go grammar statements and the no-API-change statement from REQ-SAG-0302
+Wave 1 · cut excess
+Owner decision: approved
+Records: REQ-SAG-0302
+Change:
+- Delete from REQ-SAG-0302: “The second release MUST add the C# grammar.”
+- Delete from REQ-SAG-0302: “The C# grammar MUST have language id `csharp`.”
+- Delete from REQ-SAG-0302: “The second release MUST add the Go grammar.”
+- Delete from REQ-SAG-0302: “The query API MUST NOT require changes when a grammar is added.”
+Justification: No anchor covers REQ-SAG-0302. sc-treesitter `language` matches only python and rust; Cargo.toml depends only on tree-sitter-python and tree-sitter-rust; nothing implements C#, csharp or Go. The no-API-change statement is a future constraint with no check.
+Source of truth: REQ-SAG-0302
+Expected improvement:
+- REQ-SAG-0302 states only the grammars the code supports.
+- Records 51 → 51; statements 224 → 220; duplicates cleared 0 of 18; conflicts resolved 0 of 1; exceeds cleared 0 of 30
+Other proposals changing these records: 24">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 1 · cut excess</p>
+  <h3>Owner decision</h3>
+  <p>approved</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0302" data-panel="rec-REQ-SAG-0302">REQ-SAG-0302</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Delete from REQ-SAG-0302: “The second release MUST add the C# grammar.”</li>
+    <li>Delete from REQ-SAG-0302: “The C# grammar MUST have language id `csharp`.”</li>
+    <li>Delete from REQ-SAG-0302: “The second release MUST add the Go grammar.”</li>
+    <li>Delete from REQ-SAG-0302: “The query API MUST NOT require changes when a grammar is added.”</li>
+  </ul>
+  <h3>Justification</h3>
+  <p>No anchor covers REQ-SAG-0302. sc-treesitter `language` matches only python and rust; Cargo.toml depends only on tree-sitter-python and tree-sitter-rust; nothing implements C#, csharp or Go. The no-API-change statement is a future constraint with no check.</p>
+  <h3>Source of truth</h3>
+  <p>REQ-SAG-0302</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0302 states only the grammars the code supports.</p>
+  <p>Records 51 → 51; statements 224 → 220; duplicates cleared 0 of 18; conflicts resolved 0 of 1; exceeds cleared 0 of 30</p>
+  <p>Other proposals changing these records: 24</p>
+</section>
