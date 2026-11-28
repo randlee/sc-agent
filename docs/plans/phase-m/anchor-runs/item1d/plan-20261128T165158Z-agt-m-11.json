@@ -1,0 +1,290 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261128T165158Z-agt-m-11",
+  "gate": "plan",
+  "created_at": "2026-11-28T16:51:58+00:00",
+  "anchors_path": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/docs/plans/phase-m/anchor-runs/item1d/anchors-1d-probe.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "agt-m-11",
+    "title": "",
+    "source": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/scratchpad/sai-item1d/agt-m-11.item.txt",
+    "chars": 1631
+  },
+  "model_requested": "jev",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [
+    {
+      "path": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/.sc/plan-anchor/triage/plan-questions.jsonl",
+      "sha256": "68180fbd2de8a3dee2421351672f9a321506af1f4bb19531c2c26d7d21c2c521",
+      "ids": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "anchor_id": "ANC-015",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A rule that applies to every decidr-based tool (logging, model resolution and the like) must be specified only in sc-agent's records; a derivative tool's records (judge-jev, plan-anchor and others) must not restate it and give only the tool name and the tool's own behaviour, so each rule has one source.",
+      "quote": "judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-26",
+      "context": "planning session; session, 2026-11-26; also: 'same thing for REQ-JEV-0009 (this is sc-agent requirement) and applies to all tools'",
+      "anchor_version": 3,
+      "deterministic_check": "no derivative-tool record states log placement, model resolution, consent, retries or result-line fields; each points to the sc-agent record",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "658818422e206493280b0b7964c54c38de3db058461e4759e88f935e2b244be4",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The item changes no REQ, NFR or ADR record text: it changes code, tests, dependencies or configuration, fixes a bug, or only reads or mentions records or logging.",
+            "unclear": "The item may change record text matching a signal, but the text does not say whether any record text is changed.",
+            "yes": "The item adds, edits, moves or rewords text in a record as described by signal (1), (2) or (3)."
+          },
+          "instructions": "Does `item.text` describe work that matches at least one of these signals: (1) it adds or edits a REQ, NFR or ADR record of judge-jev, plan-anchor or another decidr-based tool (for example REQ-JEV-*, or files under docs/requirements/, docs/nfr/, docs/adr/ or docs/<crate>/requirements/); (2) it adds, moves or rewords record text about log placement or log root, model resolution, consent, retries or result-line fields; (3) it adds or edits an sc-agent record that states a rule for all decidr-based tools. Judge only what the item says it will change. Code changes, tests, bug fixes and reading or reviewing records do not match, even when they mention logging, retries, model resolution or a tool's records.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "The item does none of these: it is silent on where shared rules live, describes only a tool's own behaviour, rewords text without moving or removing a restatement, restates a shared rule, or is about something else.",
+            "unclear": "The item touches shared rules and derivative tool records, but whether it makes them single-sourced in sc-agent cannot be told.",
+            "yes": "The item makes a derivative tool's record defer to sc-agent for a shared rule, removes a restated shared rule from such a record, or consolidates a shared rule in sc-agent's records."
+          },
+          "instructions": "Does `item.text` state, plan or carry out that a rule that applies to every decidr-based tool (logging, model resolution and the like) is specified only in sc-agent's records, and a derivative tool's records (judge-jev, plan-anchor and others) do not restate it and give only the tool name and the tool's own behaviour? Count it when the item makes a derivative tool's record point to sc-agent for a shared rule instead of stating it, removes a restated shared rule from a derivative tool's record, or moves a shared rule into sc-agent's records. Merely not restating a rule, describing a tool's own behaviour, rewording sc-agent's text, or mentioning records is not stating it.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "Doing the described work would not violate the requirement.",
+            "unclear": "Whether the described work would violate the requirement cannot be told from the text.",
+            "yes": "Doing the described work would violate the requirement."
+          },
+          "instructions": "Would doing what `item.text` describes violate the requirement that a rule that applies to every decidr-based tool is specified only in sc-agent's records; a derivative tool's records do not restate it and give only the tool name and the tool's own behaviour? Violations look like: restating, copying or redefining a shared decidr-tool rule (logging, model resolution and the like) in a derivative tool's records. Omitting the requirement, or describing unrelated work, is not a violation.",
+          "type": "choice"
+        },
+        "owns": {
+          "type": "choice",
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one requirement (`anchor.statement`). Is this item itself responsible for delivering the requirement, meaning the item's own work implements, changes or tests the specific behavior `anchor.statement` requires? Answer no if the item only depends on that behavior, consumes it, re-runs or audits it as final validation, defers it to another sprint or item, or does not touch it. Judge responsibility only, not whether the item states the requirement clearly or obeys it.",
+          "criteria": {
+            "yes": "The item's own deliverables implement, change or test the behavior the requirement is about.",
+            "no": "The item only depends on, consumes, re-validates or defers this behavior, or works on something else.",
+            "unclear": "The item text does not make it possible to tell whether it delivers this behavior itself."
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "instructions": "Imagine a developer who reads only `item.text` and has never seen `anchor.statement`. Working from `item.text` alone, would they know that they must deliver exactly what `anchor.statement` requires: the same condition (mode, command, input or artifact) and the same specific result (behavior, error, value, count or prohibition)? Answer no if they could follow `item.text` faithfully and still miss or get wrong any specific part of the requirement, for example because the item names only the topic, refers to it only through a test name, or covers it with a general phrase such as 'existing behavior remains'. Judge only whether the item text alone conveys the requirement, not whether the item is responsible for it.",
+          "criteria": {
+            "yes": "Reading only the item, a developer would know to deliver the requirement's condition and its specific result.",
+            "no": "A developer following only the item could miss or get wrong a specific part of the requirement.",
+            "unclear": "The item conveys part of the requirement, and it is not possible to tell whether the rest is implied."
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "instructions": "Does `item.text` state the specific requirement in `anchor.statement` as something the item must do or verify, in a sentence or clause of its own? Answer no when the requirement is only implied, appears only as a detail inside a test name or a list of other things, is covered only by a generic phrase (for example 'existing behavior remains'), or is absent. Judge how explicitly it is stated, not whether the item is responsible for it.",
+          "criteria": {
+            "yes": "A sentence or clause in the item states this requirement's specific content as a step, constraint or acceptance criterion.",
+            "no": "The requirement's specific content is only implied, buried in a test name or list, covered by a generic phrase, or absent.",
+            "unclear": "Some text may state the requirement, but it is not possible to tell whether it states this specific content."
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one requirement (`anchor.statement`, area in `anchor.scope`). Does `item.text` contain a passage that means the same thing as `anchor.statement` but uses different words, numbers or structure (for example a count instead of a list, a synonym, or a summary phrase that a domain reader would take as equivalent)? Judge equivalence of meaning, not wording.",
+          "criteria": {
+            "yes": "A passage in the item means the same as the requirement in different words.",
+            "no": "No passage in the item means the same as the requirement.",
+            "unclear": "A passage is close in meaning but it is not possible to tell whether a domain reader would take it as equivalent."
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one requirement (`anchor.statement`, area in `anchor.scope`). Split `anchor.statement` into its specific parts: the condition (mode, command, input or artifact) and each required result (behavior, error, value, count or prohibition). Does `item.text` state at least one of these parts but omit or blur at least one other? Judge completeness only.",
+          "criteria": {
+            "yes": "The item states some parts of the requirement and omits or blurs at least one other part.",
+            "no": "The item states every part, or states none of them.",
+            "unclear": "It is not possible to tell which parts the item covers."
+          }
+        }
+      },
+      "near_threshold": true,
+      "unstable": true,
+      "answers_second": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.01,
+            "yes": 0.02
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.02,
+            "yes": 0.01
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.6,
+          "probabilities": {
+            "no": 0.73,
+            "unclear": 0.09,
+            "yes": 0.18
+          }
+        }
+      },
+      "verdict_first": "underspecified",
+      "verdict_second": "not_applicable",
+      "verdict": "underspecified",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.94,
+          "probabilities": {
+            "no": 0.96,
+            "unclear": 0.03,
+            "yes": 0.01
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.58,
+          "probabilities": {
+            "no": 0.72,
+            "unclear": 0.11,
+            "yes": 0.17
+          }
+        },
+        "owns": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "no": 0.97,
+            "unclear": 0.01,
+            "yes": 0.02
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.83,
+          "probabilities": {
+            "no": 0.89,
+            "unclear": 0.0,
+            "yes": 0.11
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.0,
+            "yes": 0.02
+          }
+        }
+      },
+      "min_confidence": 0.58,
+      "explanation": "Jev was not confident (min confidence 0.58); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1706,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "relevance",
+          "question_id": "relevant",
+          "choice": "no",
+          "confidence": 0.58
+        }
+      ],
+      "triage_questions": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ],
+      "triage_attempts": 1,
+      "attempts": 2,
+      "item_chars_sent": 1631
+    }
+  ],
+  "summary": {
+    "counts": {
+      "underspecified": 1
+    },
+    "failing": [
+      "ANC-015"
+    ],
+    "leaning_counts": {
+      "not_applicable": 1
+    },
+    "unstable": [
+      "ANC-015"
+    ],
+    "errors": [],
+    "excluded": [],
+    "pass": false
+  }
+}

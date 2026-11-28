@@ -663,8 +663,8 @@
       "stated_by": "Rand Lee",
       "stated_at": "2026-11-26",
       "context": "planning session; PRD D20, owner 2026-11-24",
-      "summary": "C11 Phase-j code must not copy and paste logic between files or ",
-      "scope": "adds or changes code in judge-jev, plan-anchor or the client template that both tools use",
+      "summary": "scope rewritten as bead-level signals (arch-ai dec123, Decision 2-3; owner 08:02 item 1)",
+      "scope": "adds or changes source code in sc-agent crates (crates/sc-agent*, crates/decidr and the other crates/ members), judge-jev, plan-anchor, or the client template both tools use; adds a helper, parser or function that does the same job as one in another file or tool; copies, ports or vendors code from one file, crate or tool into another",
       "deterministic_check": "a duplicate-code scan (e.g. jscpd/`rg` of shared helper bodies) across judge-jev and plan-anchor shows no new duplicated block",
       "fixtures": {
         "pass": [
@@ -675,7 +675,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 4,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -740,21 +740,32 @@
           "item": "agt-m-11",
           "reason": "no sprint in phase m carries this anchor; listed for the owner.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T16:24:18+00:00",
+          "event": "updated",
+          "fields": [
+            "scope",
+            "summary"
+          ]
+        },
+        {
+          "at": "2026-11-28T16:36:53+00:00",
+          "event": "exclusion_removed",
+          "item": "agt-m-2"
+        },
+        {
+          "at": "2026-11-28T16:36:53+00:00",
+          "event": "exclusion_removed",
+          "item": "agt-m-7"
+        },
+        {
+          "at": "2026-11-28T16:36:53+00:00",
+          "event": "exclusion_removed",
+          "item": "agt-m-8"
         }
       ],
       "exclude": [
-        {
-          "item": "agt-m-2",
-          "reason": "This sprint changes sc-agent configuration code only and does not change judge-jev, plan-anchor, or their shared client template."
-        },
-        {
-          "item": "agt-m-7",
-          "reason": "m-7 changes Rust configuration rows and Settings, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
-        },
-        {
-          "item": "agt-m-8",
-          "reason": "m-8 changes sc-agent core session persistence, not code in judge-jev, plan-anchor or their client template; this consumer-code anchor has no carrying change in this sprint."
-        },
         {
           "item": "agt-m-11",
           "reason": "no sprint in phase m carries this anchor; listed for the owner."
@@ -1119,8 +1130,8 @@
       "stated_by": "Rand Lee",
       "stated_at": "2026-11-26",
       "context": "planning session; session, 2026-11-26; also: 'same thing for REQ-JEV-0009 (this is sc-agent requirement) and applies to all tools'",
-      "summary": "decidr-wide rules live only in sc-agent",
-      "scope": "adds or changes REQ/NFR/ADR records of judge-jev, plan-anchor or another sc-agent-based tool",
+      "summary": "scope rewritten as bead-level signals (arch-ai dec123, Decision 2-3; owner 08:02 item 1)",
+      "scope": "adds or edits a REQ, NFR or ADR record of judge-jev, plan-anchor or another decidr-based tool (e.g. REQ-JEV-*, files under docs/requirements/, docs/nfr/, docs/adr/ or docs/<crate>/requirements/); adds, moves or rewords text about log placement or log root, model resolution, consent, retries or result-line fields in any record; adds or edits an sc-agent record that states a rule for all decidr-based tools",
       "deterministic_check": "no derivative-tool record states log placement, model resolution, consent, retries or result-line fields; each points to the sc-agent record",
       "fixtures": {
         "pass": [
@@ -1131,7 +1142,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1256,17 +1267,47 @@
           "item": "agt-m-4",
           "reason": "agt-m-4 moves sc-agent transport, types, and provider implementations but changes no REQ, NFR, or ADR records for derivative tools; derivative-record edits are not assigned to agt-m-4.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T16:24:18+00:00",
+          "event": "updated",
+          "fields": [
+            "scope",
+            "summary"
+          ]
+        },
+        {
+          "at": "2026-11-28T16:53:24+00:00",
+          "event": "exclusion_removed",
+          "item": "agt-m-0"
+        },
+        {
+          "at": "2026-11-28T16:53:24+00:00",
+          "event": "exclusion_removed",
+          "item": "agt-m-1"
+        },
+        {
+          "at": "2026-11-28T16:53:24+00:00",
+          "event": "exclusion_removed",
+          "item": "agt-m-2"
+        },
+        {
+          "at": "2026-11-28T16:53:24+00:00",
+          "event": "exclusion_removed",
+          "item": "agt-m-4"
+        },
+        {
+          "at": "2026-11-28T16:53:24+00:00",
+          "event": "exclusion_removed",
+          "item": "agt-m-9"
+        },
+        {
+          "at": "2026-11-28T16:53:25+00:00",
+          "event": "exclusion_removed",
+          "item": "agt-m-10"
         }
       ],
       "exclude": [
-        {
-          "item": "agt-m-0",
-          "reason": "m-0 adds or changes no REQ, NFR or ADR record of sc-agent, judge-jev, plan-anchor or any other tool; it only cites existing records."
-        },
-        {
-          "item": "agt-m-2",
-          "reason": "This sprint moves configuration code and adds or changes no REQ, NFR, or ADR records for derivative tools."
-        },
         {
           "item": "agt-m-5",
           "reason": "m-5 changes Rust runner code, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this move."
@@ -1284,28 +1325,12 @@
           "reason": "m-8 changes core session persistence, not derivative-tool REQ/NFR/ADR records; no record-editing sprint is carried by this change."
         },
         {
-          "item": "agt-m-1",
-          "reason": "This sprint changes crate code and a CLI test import, not requirement, NFR, or ADR records for derivative tools."
-        },
-        {
-          "item": "agt-m-9",
-          "reason": "This transport sprint changes no cross-tool requirements or derivative-tool records."
-        },
-        {
-          "item": "agt-m-10",
-          "reason": "This LLM runtime sprint changes no cross-tool requirements or derivative-tool records."
-        },
-        {
           "item": "agt-m-11",
           "reason": "This integration sprint changes no cross-tool requirements or derivative-tool records."
         },
         {
           "item": "agt-m-3",
           "reason": "agt-m-3 moves only sc-agent logging and digest code and changes no REQ, NFR, or ADR records for derivative tools; derivative-record edits are not assigned to agt-m-3."
-        },
-        {
-          "item": "agt-m-4",
-          "reason": "agt-m-4 moves sc-agent transport, types, and provider implementations but changes no REQ, NFR, or ADR records for derivative tools; derivative-record edits are not assigned to agt-m-4."
         }
       ]
     },
@@ -2086,8 +2111,8 @@
       "stated_by": "Rand Lee",
       "stated_at": "2026-11-27",
       "context": "phase-m planning session, 2026-11-27",
-      "summary": "Core table SQL defined only in sc-agent-schema",
-      "scope": "adds or changes SQL table definitions anywhere in the workspace",
+      "summary": "scope rewritten as bead-level signals (arch-ai dec123, Decision 2-3; owner 08:02 item 1)",
+      "scope": "adds or edits CREATE TABLE, ALTER TABLE or CREATE INDEX SQL, or a migration file, in any crate; adds or changes a core table (e.g. sessions, responses) or its SQL in crates/sc-agent-schema; adds SQLite storage code (e.g. sc-agent-sqlite) that creates or alters tables",
       "deterministic_check": "",
       "fixtures": {
         "pass": [
@@ -2098,7 +2123,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -2174,13 +2199,22 @@
           "item": "agt-m-3",
           "reason": "agt-m-3 moves logging and digest code but adds or changes no table SQL; agt-m-8 owns the schema definitions.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T16:24:18+00:00",
+          "event": "updated",
+          "fields": [
+            "scope",
+            "summary"
+          ]
+        },
+        {
+          "at": "2026-11-28T16:53:24+00:00",
+          "event": "exclusion_removed",
+          "item": "agt-m-0"
         }
       ],
       "exclude": [
-        {
-          "item": "agt-m-0",
-          "reason": "m-0 adds no SQL table definition anywhere; sc-agent-schema is an empty crate in this sprint."
-        },
         {
           "item": "agt-m-2",
           "reason": "This sprint adds or changes no SQL table definitions; the table-definition work is owned by agt-m-8."
@@ -2615,8 +2649,8 @@
       "stated_by": "Rand Lee",
       "stated_at": "2026-11-27",
       "context": "phase-m planning session, 2026-11-27",
-      "summary": "Tool tables versioned apart; none in sc-agent-py",
-      "scope": "adds or changes a tool's table definitions, schema versions, or crates/sc-agent-py",
+      "summary": "fix stray backslash in scope text",
+      "scope": "adds or edits CREATE TABLE or ALTER TABLE SQL, a migration, or a schema-version constant or column for a tool's tables (judge-jev, plan-anchor or another tool); states or changes how a tool's tables are versioned relative to the core schema version; adds or edits SQL, table definitions or schema-version code in crates/sc-agent-py",
       "deterministic_check": "",
       "fixtures": {
         "pass": [
@@ -2627,7 +2661,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 5,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -2724,13 +2758,38 @@
           "item": "agt-m-3",
           "reason": "m-3 defines no table and no schema version and does not touch crates/sc-agent-py; agt-m-8 carries tool schema ownership and versions.",
           "replaced": false
+        },
+        {
+          "at": "2026-11-28T16:24:18+00:00",
+          "event": "updated",
+          "fields": [
+            "scope",
+            "summary"
+          ]
+        },
+        {
+          "at": "2026-11-28T16:28:50+00:00",
+          "event": "updated",
+          "fields": [
+            "scope",
+            "summary"
+          ]
+        },
+        {
+          "at": "2026-11-28T16:28:57+00:00",
+          "event": "updated",
+          "fields": [
+            "scope",
+            "summary"
+          ]
+        },
+        {
+          "at": "2026-11-28T16:53:24+00:00",
+          "event": "exclusion_removed",
+          "item": "agt-m-0"
         }
       ],
       "exclude": [
-        {
-          "item": "agt-m-0",
-          "reason": "m-0 adds no table definition and no schema version, and does not touch crates/sc-agent-py."
-        },
         {
           "item": "agt-m-2",
           "reason": "This sprint adds or changes no table definitions, schema versions, or wheel code; those changes are owned by agt-m-8."

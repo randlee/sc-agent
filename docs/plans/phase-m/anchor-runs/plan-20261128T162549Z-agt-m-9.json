@@ -1,0 +1,183 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261128T162549Z-agt-m-9",
+  "gate": "plan",
+  "created_at": "2026-11-28T16:25:49+00:00",
+  "anchors_path": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "agt-m-9",
+    "title": "m-9: retry and holdoff take their rules as parameters (change)",
+    "source": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/agt-m-9-anc030-input.txt",
+    "chars": 1566
+  },
+  "model_requested": "jev",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [
+    {
+      "path": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/.sc/plan-anchor/triage/plan-questions.jsonl",
+      "sha256": "68180fbd2de8a3dee2421351672f9a321506af1f4bb19531c2c26d7d21c2c521",
+      "ids": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "anchor_id": "ANC-030",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Retry and holdoff code must take its waits, limits and busy and quota rules as parameters from the calling layer and contain no provider name, host or status-code table.",
+      "quote": "retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 4,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "162df7b99e873a2dd8cc0d5a6276ccfa624c627aa9f9aae3504d8d48ec47e736",
+      "extra_questions_sha256": "2c336ccce283f2c51d6ae8000e7531cc7f44a06907bc0a28a13ead14170d7fb6",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The item plans other work; retry, resend, backoff or holdoff code is not part of it.",
+            "unclear": "It cannot be told from the item text what part of the system it changes.",
+            "yes": "The item plans or changes retry, resend, backoff or holdoff code."
+          },
+          "instructions": "`anchor.scope` names the work this anchor governs: retry, resend, backoff or holdoff code. Decide whether the planning item in `item.text` plans or changes that work, directly or as a stated prerequisite. Do not judge compliance or conflict.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "The item does not say this, including items that only mention retries or that hard-code rules.",
+            "unclear": "The item mentions parameters or rules but it cannot be told whether they come from the calling layer.",
+            "yes": "The item says the rules are supplied as parameters by the calling layer, in any wording."
+          },
+          "instructions": "Does `item.text` state that the retry or holdoff code receives its waits, limits and busy and quota rules as parameters from the calling layer (for example a provider crate), rather than containing provider names, hosts or status codes itself? Mentioning retries, or describing retry behaviour without saying where these rules come from, is not stating it. Planning a hard-coded table is not stating it.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "Nothing in the item breaks the requirement, whether or not the item mentions it.",
+            "unclear": "The item plans something that might break the requirement, but the text does not settle it.",
+            "yes": "The item plans something that breaks the requirement, for example: hard-coding provider names, hosts, status codes (such as 429 or 529) or wait values inside the retry or holdoff code."
+          },
+          "instructions": "Does `item.text` plan something that breaks `anchor.statement` (retry and holdoff code takes its waits, limits and busy and quota rules as parameters from the calling layer and contains no provider name, host or status-code table)? Breaking it means, for example: hard-coding provider names, hosts, status codes (such as 429 or 529) or wait values inside the retry or holdoff code. Silence about the requirement is not a conflict, and an item that merely does not mention it answers no. Judge conflict only.",
+          "type": "choice"
+        },
+        "owns": {
+          "type": "choice",
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one requirement (`anchor.statement`). Is this item itself responsible for delivering the requirement, meaning the item's own work implements, changes or tests the specific behavior `anchor.statement` requires? Answer no if the item only depends on that behavior, consumes it, re-runs or audits it as final validation, defers it to another sprint or item, or does not touch it. Judge responsibility only, not whether the item states the requirement clearly or obeys it.",
+          "criteria": {
+            "yes": "The item's own deliverables implement, change or test the behavior the requirement is about.",
+            "no": "The item only depends on, consumes, re-validates or defers this behavior, or works on something else.",
+            "unclear": "The item text does not make it possible to tell whether it delivers this behavior itself."
+          }
+        },
+        "specific": {
+          "type": "choice",
+          "instructions": "Imagine a developer who reads only `item.text` and has never seen `anchor.statement`. Working from `item.text` alone, would they know that they must deliver exactly what `anchor.statement` requires: the same condition (mode, command, input or artifact) and the same specific result (behavior, error, value, count or prohibition)? Answer no if they could follow `item.text` faithfully and still miss or get wrong any specific part of the requirement, for example because the item names only the topic, refers to it only through a test name, or covers it with a general phrase such as 'existing behavior remains'. Judge only whether the item text alone conveys the requirement, not whether the item is responsible for it.",
+          "criteria": {
+            "yes": "Reading only the item, a developer would know to deliver the requirement's condition and its specific result.",
+            "no": "A developer following only the item could miss or get wrong a specific part of the requirement.",
+            "unclear": "The item conveys part of the requirement, and it is not possible to tell whether the rest is implied."
+          }
+        },
+        "stated": {
+          "type": "choice",
+          "instructions": "Does `item.text` state the specific requirement in `anchor.statement` as something the item must do or verify, in a sentence or clause of its own? Answer no when the requirement is only implied, appears only as a detail inside a test name or a list of other things, is covered only by a generic phrase (for example 'existing behavior remains'), or is absent. Judge how explicitly it is stated, not whether the item is responsible for it.",
+          "criteria": {
+            "yes": "A sentence or clause in the item states this requirement's specific content as a step, constraint or acceptance criterion.",
+            "no": "The requirement's specific content is only implied, buried in a test name or list, covered by a generic phrase, or absent.",
+            "unclear": "Some text may state the requirement, but it is not possible to tell whether it states this specific content."
+          }
+        },
+        "paraphrase": {
+          "type": "choice",
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one requirement (`anchor.statement`, area in `anchor.scope`). Does `item.text` contain a passage that means the same thing as `anchor.statement` but uses different words, numbers or structure (for example a count instead of a list, a synonym, or a summary phrase that a domain reader would take as equivalent)? Judge equivalence of meaning, not wording.",
+          "criteria": {
+            "yes": "A passage in the item means the same as the requirement in different words.",
+            "no": "No passage in the item means the same as the requirement.",
+            "unclear": "A passage is close in meaning but it is not possible to tell whether a domain reader would take it as equivalent."
+          }
+        },
+        "partial": {
+          "type": "choice",
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one requirement (`anchor.statement`, area in `anchor.scope`). Split `anchor.statement` into its specific parts: the condition (mode, command, input or artifact) and each required result (behavior, error, value, count or prohibition). Does `item.text` state at least one of these parts but omit or blur at least one other? Judge completeness only.",
+          "criteria": {
+            "yes": "The item states some parts of the requirement and omits or blurs at least one other part.",
+            "no": "The item states every part, or states none of them.",
+            "unclear": "It is not possible to tell which parts the item covers."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "no": 0.98,
+            "unclear": 0.01,
+            "yes": 0.01
+          }
+        },
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        }
+      },
+      "min_confidence": 0.97,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1357,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1566
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "excluded": [],
+    "pass": true
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261128T162551Z-agt-m-4",
+  "gate": "plan",
+  "created_at": "2026-11-28T16:25:51+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "agt-m-4",
+    "title": "m-4: `sc-agent-http` and the three API-shape crates",
+    "source": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/agt-m-4-anc030-input.txt",
+    "chars": 2551
+  },
+  "model_requested": "jev",
+  "model_answered": null,
+  "threshold": 0.6,
+  "dry_run": false,
+  "fixture": false,
+  "extra_questions": [
+    {
+      "path": "/Users/randlee/github/sc-agent-worktrees/integrate/phase-m/.sc/plan-anchor/triage/plan-questions.jsonl",
+      "sha256": "68180fbd2de8a3dee2421351672f9a321506af1f4bb19531c2c26d7d21c2c521",
+      "ids": [
+        "owns",
+        "specific",
+        "stated",
+        "paraphrase",
+        "partial"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "anchor_id": "ANC-030",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Retry and holdoff code must take its waits, limits and busy and quota rules as parameters from the calling layer and contain no provider name, host or status-code table.",
+      "quote": "retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27",
+      "anchor_version": 4,
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": null,
+      "verdict": "excluded",
+      "answers": null,
+      "min_confidence": null,
+      "exclusion": {
+        "item": "agt-m-4",
+        "reason": "agt-m-4 moves the existing resend and holdoff behavior unchanged; agt-m-9 owns parameterized waits, limits, and busy/quota rules."
+      },
+      "explanation": "Excluded from this bead by the anchor's exclude list: agt-m-4 moves the existing resend and holdoff behavior unchanged; agt-m-9 owns parameterized waits, limits, and busy/quota rules.",
+      "attempts": 0
+    }
+  ],
+  "summary": {
+    "counts": {
+      "excluded": 1
+    },
+    "failing": [],
+    "leaning_counts": {},
+    "unstable": [],
+    "errors": [],
+    "excluded": [
+      {
+        "anchor_id": "ANC-030",
+        "reason": "agt-m-4 moves the existing resend and holdoff behavior unchanged; agt-m-9 owns parameterized waits, limits, and busy/quota rules."
+      }
+    ],
+    "pass": true
+  }
+}

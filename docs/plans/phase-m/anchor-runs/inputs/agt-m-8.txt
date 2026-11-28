@@ -1,0 +1,28 @@
+# m-8: session log to SQLite (change)
+
+## Description
+
+Sessions go to one SQLite database per repository, written through one crate. A request is stored once and each model's reply is a row that points to it, so the same request sent to five models is one message and five responses, and the cache is one indexed read. Any tool adds its own tables by handing its SQL to the same `open` call; the core schema does not change when a tool is added. The JSONL writer and its global lock are deleted.
+
+### Deliverables
+1. M8-1 sc-agent-schema session records and SQL: apply the corresponding verbatim inventory/change section in design.
+2. M8-2 sc-agent-sqlite persistence and cache: apply the corresponding verbatim inventory/change section in design.
+3. M8-3 sc-agent-log writer replacement: apply the corresponding verbatim inventory/change section in design.
+4. M8-4 Update tests/contract/ and crates/sc-agent-py/tests/loopback.py session assertions to read the SQLite sessions and run links instead of sessions.jsonl/runs.jsonl, preserving their existing behavior checks (REQ-SAG-0004, REQ-SAG-0005, REQ-SAG-0701, ADR-SAG-0019).
+
+Architecture placement (ANC-021; ADR-SAG-0004 v0.5.0): these changes land in `sc-agent-schema`, `sc-agent-sqlite` and `sc-agent-log`, layer 1, the lowest shared layer for session records, SQL, persistence and writing because all tools store sessions through the same core crates rather than duplicating storage in their APIs.
+
+
+`sc-agent-schema` holds only record structs, literal SQL and their convenience methods, with no SQLite dependency or upgrade code, and defines all core table SQL exclusively (ANC-025, ANC-026). `messages` stores each request once by sha256 and `responses` references that request; cache lookup uses request sha256 and model alone, never run_id (ANC-027, ANC-028). Each tool supplies its own `Schema.owner`, `major` and `migrations` independently of the core version, and no table definition lives in `sc-agent-py` (ANC-032).
+
+## Acceptance criteria
+
+### Acceptance Criteria
+No code writes `sessions.jsonl`; a test sends one request to two models and reads one message row and two response rows; a second identical send with the cache on makes no API call; an UPDATE on a session table fails.
+
+
+### Validation
+- cargo test --workspace --all-features
+- cargo fmt --check --all
+- cargo clippy --workspace --all-targets --all-features -- -D warnings
+- sc-lint lint sc-boundary --config sc-lint.toml

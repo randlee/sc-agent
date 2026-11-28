@@ -1,0 +1,30 @@
+# m-10: `sc-llm` (new code)
+
+## Description
+
+The counterpart of the decider for plain LLM calls: JSON in, JSON out, through the same shapes, the same transport, the same log. It adds no second path to a provider. `--resume` lives here: it reads a stored response and continues the conversation, and a decision session resumed this way becomes an LLM session. The crate is small because everything it needs already exists below it.
+
+### Deliverables
+1. M10-1 sc-llm calls and resume: apply the corresponding verbatim inventory/change section in design.
+
+This sprint’s changes land in `sc-llm`, layer 3 (ADR-SAG-0004 v0.5.0), the lowest layer for LLM calls and resume built on the shared types, shapes, transport and log below it.
+
+
+sc-llm uses the LLM trait and the shared OpenAI-compatible and Anthropic-compatible wire-format implementations supplied by agt-m-4.
+
+
+`sc-llm` calls the `Llm` trait from `sc-agent-types` through its two implementations, `OpenAiCompat` in `sc-openai` and `AnthropicCompat` in `sc-anthropic`. Every provider that speaks a wire format uses that format's implementation. `sc-llm` contains no provider-specific code.
+
+`resume` reads only responses written under the current schema version; `sc-llm` contains no reader for an older version.
+
+## Acceptance criteria
+
+### Acceptance Criteria
+A test calls an LLM through each LLM shape with no decision request involved; a test resumes a stored decision session and gets a reply that sees the earlier request and answer; `sc-llm` and `sc-decision-runner` do not depend on each other.
+
+
+### Validation
+- cargo test --workspace --all-features
+- cargo fmt --check --all
+- cargo clippy --workspace --all-targets --all-features -- -D warnings
+- sc-lint lint sc-boundary --config sc-lint.toml
