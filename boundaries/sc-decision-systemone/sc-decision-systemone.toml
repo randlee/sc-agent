@@ -1,0 +1,35 @@
+# Layer 2. Allowed edges are the phase-m layer arrows (sprint m-0).
+boundary_id = "BOUNDARY-PHASE-M-sc-decision-systemone"
+owner_package = "sc-decision-systemone"
+owner_crate_path = "sc_decision_systemone"
+name = "sc-decision-systemone layer 2"
+
+[public]
+facade = "sc_decision_systemone"
+
+[implementation]
+type = "sc_decision_systemone"
+module = "sc_decision_systemone"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = []
+
+[dependencies]
+allowed_dependencies = ["sc-agent-types", "sc-agent-schema"]
+allowed_dependents = []
+allowed_dev_dependencies = []
+allowed_dev_dependents = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"

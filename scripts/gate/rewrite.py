@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT
 MANIFEST = SOURCE / "Cargo.toml"
 ALLOWED = set("ureq serde serde_json keyring dotenvy ulid sc-sha sc-config ctrlc sc-observability clap pyo3 thiserror tree-sitter tree-sitter-python tree-sitter-rust".split())
-LIMIT = 2580
-PACKAGES = {"sc-agent", "decidr", "sc-agent-py", "sc-treesitter", "sitr"}
+LIMIT = 2590
+PACKAGES = {"sc-agent", "decidr", "sc-agent-py", "sc-treesitter", "sitr", "sc-agent-schema", "sc-agent-sqlite", "sc-agent-types", "sc-agent-config", "sc-agent-log", "sc-decision-systemone", "sc-anthropic", "sc-openai", "sc-decision-runner", "sc-llm"}
 COMMAND_TIMEOUT_SECONDS = 900
 failed = []
 

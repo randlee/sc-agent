@@ -1,0 +1,35 @@
+# Layer 1. Allowed edges are the phase-m layer arrows (sprint m-0).
+boundary_id = "BOUNDARY-PHASE-M-sc-agent-config"
+owner_package = "sc-agent-config"
+owner_crate_path = "sc_agent_config"
+name = "sc-agent-config layer 1"
+
+[public]
+facade = "sc_agent_config"
+
+[implementation]
+type = "sc_agent_config"
+module = "sc_agent_config"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = []
+
+[dependencies]
+allowed_dependencies = ["sc-agent-types"]
+allowed_dependents = []
+allowed_dev_dependencies = []
+allowed_dev_dependents = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"

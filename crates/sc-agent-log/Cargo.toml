@@ -1,0 +1,18 @@
+[package]
+name = "sc-agent-log"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+authors.workspace = true
+homepage.workspace = true
+publish = false
+
+[dependencies]
+sc-agent-types = { path = "../sc-agent-types", version = "0.4.1" }
+sc-agent-sqlite = { path = "../sc-agent-sqlite", version = "0.4.1" }
+sc-agent-schema = { path = "../sc-agent-schema", version = "0.4.1" }
+
+[lints]
+workspace = true
