@@ -1,0 +1,156 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0602">
+  <div class="section-head">
+    <h2>REQ-SAG-0602 Quota exhaustion is not busy</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0602&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T091833Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A busy status whose body marks quota exhaustion MUST be returned at once as the error `http.quota_exhausted`.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A 429 with a body that does not mark quota exhaustion MUST be treated as busy.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;A quota-exhausted response MUST NOT be resent.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;3393585f&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;summary&quot;: &quot;Add doctor, busy resend and quota requirements&quot;
+      },
+      &quot;statement&quot;: &quot;A busy status whose body marks quota exhaustion MUST be returned at once as the error `http.quota_exhausted`.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;3393585f&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;summary&quot;: &quot;Add doctor, busy resend and quota requirements&quot;
+      },
+      &quot;statement&quot;: &quot;A 429 with a body that does not mark quota exhaustion MUST be treated as busy.&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;3393585f&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;summary&quot;: &quot;Add doctor, busy resend and quota requirements&quot;
+      },
+      &quot;statement&quot;: &quot;A quota-exhausted response MUST NOT be resent.&quot;,
+      &quot;statement_index&quot;: 2
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0601&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0602&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-21&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Resending cannot succeed until the account is topped up, so holding off only delays the error.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A busy status whose body marks quota exhaustion MUST be returned at once as the error `http.quota_exhausted`.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A 429 with a body that does not mark quota exhaustion MUST be treated as busy.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;A quota-exhausted response MUST NOT be resent.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: Quota exhaustion is a response whose body says the account&#x27;s quota, credit or spend limit is used up, in the documented Anthropic and OpenAI shapes.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A 429 carrying the documented Anthropic quota-exhausted body returns `http.quota_exhausted` after one send.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A 429 with an unrecognized body is resent under REQ-SAG-0601.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Quota exhaustion is not busy&quot;,
+    &quot;version&quot;: &quot;0.2.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.2.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>A busy status whose body marks quota exhaustion MUST be returned at once as the error `http.quota_exhausted`.</li>
+    <li>A 429 with a body that does not mark quota exhaustion MUST be treated as busy.</li>
+    <li>A quota-exhausted response MUST NOT be resent.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: Quota exhaustion is a response whose body says the account&#x27;s quota, credit or spend limit is used up, in the documented Anthropic and OpenAI shapes.</p>
+  <h3>Rationale</h3>
+  <p>Resending cannot succeed until the account is topped up, so holding off only delays the error.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A 429 carrying the documented Anthropic quota-exhausted body returns `http.quota_exhausted` after one send.</li>
+    <li>A 429 with an unrecognized body is resent under REQ-SAG-0601.</li>
+  </ul>
+  <h3>Related</h3>
+  <p>REQ-SAG-0601</p>
+</section>

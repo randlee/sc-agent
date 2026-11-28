@@ -1,0 +1,218 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-ADR-SAG-0021">
+  <div class="section-head">
+    <h2>ADR-SAG-0021 One sc-observability Logger per process, owned by the entry point; general logs and session logs in separate trees</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;ADR-SAG-0021&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T091833Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;ADR&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: null,
+    &quot;note&quot;: &quot;No obligation statements.&quot;,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: null
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;f023c0d1&quot;,
+        &quot;date&quot;: &quot;2026-11-19&quot;,
+        &quot;summary&quot;: &quot;Records: one sc-observability Logger per process, one wheel, fixed log paths&quot;
+      },
+      &quot;statement&quot;: &quot;**One Logger per process, owned by the entry point.** The entry point is the CLI&#x27;s `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate&#x27;s Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller&#x27;s responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI&#x27;s log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel&#x27;s `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/&lt;repo&gt;/plan-anchor/&lt;project&gt;/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/&lt;repo&gt;/judge-jev/&lt;project&gt;/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client&#x27;s name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \&quot;project/phase\&quot;.\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger&#x27;s failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.&quot;,
+      &quot;statement_index&quot;: 0
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;alternatives&quot;: {
+      &quot;groups&quot;: [
+        {
+          &quot;cons&quot;: [],
+          &quot;description&quot;: &quot;The client imports `sc_observability`, creates a Logger, and sc-agent calls its `log(LogEvent)` through Python.&quot;,
+          &quot;name&quot;: &quot;Python creates the Logger from the `sc-observability` Python package&quot;,
+          &quot;pros&quot;: [],
+          &quot;why_rejected&quot;: &quot;It adds a Python dependency for a crate the wheel already contains, a second copy of sc-observability in the process, and a bridge for every record.&quot;
+        },
+        {
+          &quot;cons&quot;: [],
+          &quot;description&quot;: &quot;Each layer opens and closes loggers as it needs them.&quot;,
+          &quot;name&quot;: &quot;The library opens its own Logger when none is injected, and the CLI opens another&quot;,
+          &quot;pros&quot;: [],
+          &quot;why_rejected&quot;: &quot;Several owners of one file handle; records are lost or duplicated on interrupt. The entry point owns the Logger.&quot;
+        },
+        {
+          &quot;cons&quot;: [],
+          &quot;description&quot;: &quot;Ship decidr and sitr as two Python wheels.&quot;,
+          &quot;name&quot;: &quot;A separate sitr wheel&quot;,
+          &quot;pros&quot;: [],
+          &quot;why_rejected&quot;: &quot;Each wheel carries its own copy of sc-observability, so a process loading both cannot inject one Logger into both without a bridge. One wheel gives one Logger.&quot;
+        },
+        {
+          &quot;cons&quot;: [],
+          &quot;description&quot;: &quot;`log_root` in the configuration files and on the command line.&quot;,
+          &quot;name&quot;: &quot;Log root as a configuration setting&quot;,
+          &quot;pros&quot;: [],
+          &quot;why_rejected&quot;: &quot;Not requested. Logs live in one known place; tests use `&lt;CLI&gt;_LOG_ROOT`.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;consequences&quot;: {
+      &quot;negative&quot;: [
+        &quot;Every caller must supply a project/phase before its first request.&quot;
+      ],
+      &quot;neutral&quot;: [],
+      &quot;positive&quot;: [
+        &quot;Libraries hold no logging policy: they take a Logger or use the default.&quot;,
+        &quot;`sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` selects one agent&#x27;s work in one phase with a path glob.&quot;
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;context&quot;: {
+      &quot;background&quot;: &quot;&quot;,
+      &quot;problem_statement&quot;: &quot;Every general-log record of a process must reach one Logger that the process&#x27;s entry point owns, and every log must land at a fixed, known path, with session logs never mixed with general logs.&quot;,
+      &quot;text&quot;: &quot;sc-agent logs through sc-observability. The `decidr` CLI, the `sitr` CLI and the sc-decidr wheel already link the sc-observability crate. Two kinds of log exist: the general log (diagnostics, searched for issues) and session logs (the long-term record of every successful model query and its response, analysed later and loaded into SQLite, ADR-SAG-0002).&quot;
+    },
+    &quot;created&quot;: &quot;2026-11-18&quot;,
+    &quot;decision&quot;: {
+      &quot;chosen_approach&quot;: &quot;&quot;,
+      &quot;key_principles&quot;: [
+        &quot;One process, one general Logger, one queue, owned by the entry point; session rows and link records go through sc-agent&#x27;s session sink, never the general Logger.&quot;,
+        &quot;Session logs and general logs are never written to the same folder tree.&quot;,
+        &quot;A session is never filed under a guessed project/phase.&quot;
+      ],
+      &quot;text&quot;: &quot;**One Logger per process, owned by the entry point.** The entry point is the CLI&#x27;s `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate&#x27;s Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller&#x27;s responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI&#x27;s log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel&#x27;s `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/&lt;repo&gt;/plan-anchor/&lt;project&gt;/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/&lt;repo&gt;/judge-jev/&lt;project&gt;/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client&#x27;s name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \&quot;project/phase\&quot;.\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger&#x27;s failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.&quot;
+    },
+    &quot;decision_date&quot;: &quot;2026-11-19&quot;,
+    &quot;id&quot;: &quot;ADR-SAG-0021&quot;,
+    &quot;impact_analysis&quot;: {
+      &quot;affected_components&quot;: &quot;&quot;,
+      &quot;maintainability_impact&quot;: &quot;&quot;,
+      &quot;performance_impact&quot;: &quot;&quot;,
+      &quot;security_impact&quot;: &quot;&quot;,
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;implementation&quot;: {
+      &quot;code_examples&quot;: &quot;&quot;,
+      &quot;integration_points&quot;: [],
+      &quot;key_components&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-25&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;rationale&quot;: {
+      &quot;benefits&quot;: [],
+      &quot;text&quot;: &quot;The entry point is the only code that knows the process&#x27;s lifetime, so it is the only correct owner of the Logger: it obtains the Logger before the first general-log record and flushes after each call. Exposing the crate&#x27;s own Logger from the wheel keeps one copy and one queue in the process and needs no Python package. Fixed paths keep every log in one known place for audit, and a separate `sessions/` tree lets tools and the later SQLite load read every session with a path glob. The session log is the record of every successful Jev query from every tool, so it cannot be turned off and is never rotated; it stays small enough because `project` changes over time.&quot;,
+      &quot;trade_offs&quot;: []
+    },
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0002&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0020&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0003&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0004&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0005&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0008&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;NFR-SAG-0004&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;title&quot;: &quot;One sc-observability Logger per process, owned by the entry point; general logs and session logs in separate trees&quot;,
+    &quot;version&quot;: &quot;0.9.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">ADR · sc-agent · Approved · version 0.9.0</p>
+  <h3>Context</h3>
+  <p>sc-agent logs through sc-observability. The `decidr` CLI, the `sitr` CLI and the sc-decidr wheel already link the sc-observability crate. Two kinds of log exist: the general log (diagnostics, searched for issues) and session logs (the long-term record of every successful model query and its response, analysed later and loaded into SQLite, ADR-SAG-0002).</p>
+  <h3>Problem</h3>
+  <p>Every general-log record of a process must reach one Logger that the process&#x27;s entry point owns, and every log must land at a fixed, known path, with session logs never mixed with general logs.</p>
+  <h3>Decision</h3>
+  <p>**One Logger per process, owned by the entry point.** The entry point is the CLI&#x27;s `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.
+
+**The wheel exposes the crate&#x27;s Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.
+
+**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.
+
+| Product | Contains |
+|---|---|
+| `decidr` CLI | decidr, sc-observability |
+| `sitr` CLI | sitr, sc-observability |
+| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |
+
+There is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.
+
+**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller&#x27;s responsibility.
+
+**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.
+
+**Paths.** The log root is `~/.sc-agent`. One function returns a CLI&#x27;s log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel&#x27;s `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).
+
+| Entry point | General log | Session logs |
+|---|---|---|
+| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/sessions.jsonl` |
+| `sitr` CLI | `logs/sitr.log.jsonl` | none |
+| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/&lt;repo&gt;/plan-anchor/&lt;project&gt;/sessions.jsonl` |
+| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/&lt;repo&gt;/judge-jev/&lt;project&gt;/sessions.jsonl` |
+
+A wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.
+
+**Session identity.**
+
+- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.
+- `tool` and `tool_version` name the program that sent the query and its version: the generated client&#x27;s name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).
+- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it &quot;project/phase&quot;.
+
+**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger&#x27;s failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.</p>
+  <h3>Key principles</h3>
+  <ul>
+    <li>One process, one general Logger, one queue, owned by the entry point; session rows and link records go through sc-agent&#x27;s session sink, never the general Logger.</li>
+    <li>Session logs and general logs are never written to the same folder tree.</li>
+    <li>A session is never filed under a guessed project/phase.</li>
+  </ul>
+  <h3>Rationale</h3>
+  <p>The entry point is the only code that knows the process&#x27;s lifetime, so it is the only correct owner of the Logger: it obtains the Logger before the first general-log record and flushes after each call. Exposing the crate&#x27;s own Logger from the wheel keeps one copy and one queue in the process and needs no Python package. Fixed paths keep every log in one known place for audit, and a separate `sessions/` tree lets tools and the later SQLite load read every session with a path glob. The session log is the record of every successful Jev query from every tool, so it cannot be turned off and is never rotated; it stays small enough because `project` changes over time.</p>
+  <h3>Positive consequences</h3>
+  <ul>
+    <li>Libraries hold no logging policy: they take a Logger or use the default.</li>
+    <li>`sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` selects one agent&#x27;s work in one phase with a path glob.</li>
+  </ul>
+  <h3>Negative consequences</h3>
+  <p>Every caller must supply a project/phase before its first request.</p>
+</section>

@@ -1,0 +1,38 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-3">
+  <div class="section-head">
+    <h2>3. Align sitr and sc-treesitter dependencies with layer 1 (docs/sc-agent-types/)</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="3. Align sitr and sc-treesitter dependencies with layer 1 (docs/sc-agent-types/)
+Wave 1 · resolve conflict
+Records: REQ-SAG-0301
+Change:
+- Resolution: reconcile.
+- Reword REQ-SAG-0301: “`sc-treesitter` MUST NOT depend on any sc-agent crate other than `sc-agent`, whose error and logging it shares.” → “`sitr` and `sc-treesitter` MUST depend on `sc-agent-types` and `sc-agent-log` only, and on nothing above layer 1.”
+Rewording (rare; justified): REQ-SAG-0301: Arch-ai explicitly supplied the replacement dependency constraint for theme b.
+Justification: Theme b: sitr and sc-treesitter depend on sc-agent-types and sc-agent-log only, and on nothing above layer 1. Acceptance criteria will need the corresponding update.
+Source of truth: ANC-021 — Owner said: “You need to be able to push shared methods down and move differences up” — commit 66369ba0
+Expected improvement:
+- Replaces the legacy monolithic sc-agent dependency with the directed crate boundary.
+- Records 49 → 49; statements 205 → 205; duplicates cleared 0 of 32; conflicts resolved 0 of 16; exceeds cleared 0 of 52">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 1 · resolve conflict</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0301" data-panel="rec-REQ-SAG-0301">REQ-SAG-0301</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Resolution: reconcile.</li>
+    <li>Reword REQ-SAG-0301: “`sc-treesitter` MUST NOT depend on any sc-agent crate other than `sc-agent`, whose error and logging it shares.” → “`sitr` and `sc-treesitter` MUST depend on `sc-agent-types` and `sc-agent-log` only, and on nothing above layer 1.”</li>
+  </ul>
+  <h3>Rewording (rare; justified)</h3>
+  <p>REQ-SAG-0301: Arch-ai explicitly supplied the replacement dependency constraint for theme b.</p>
+  <h3>Justification</h3>
+  <p>Theme b: sitr and sc-treesitter depend on sc-agent-types and sc-agent-log only, and on nothing above layer 1. Acceptance criteria will need the corresponding update.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-021 — Owner said: “You need to be able to push shared methods down and move differences up” — commit 66369ba0</p>
+  <h3>Expected improvement</h3>
+  <p>Replaces the legacy monolithic sc-agent dependency with the directed crate boundary.</p>
+  <p>Records 49 → 49; statements 205 → 205; duplicates cleared 0 of 32; conflicts resolved 0 of 16; exceeds cleared 0 of 52</p>
+</section>

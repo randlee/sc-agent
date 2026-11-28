@@ -1,0 +1,195 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-REQ-SAG-0901-ANC-013">
+  <div class="section-head">
+    <h2>REQ-SAG-0901 × ANC-013 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-013&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [
+      &quot;In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.&quot;,
+      &quot;In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.&quot;,
+      &quot;In decider mode, answers from each covered model MUST conform to the required schema.&quot;,
+      &quot;Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.&quot;,
+      &quot;If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.&quot;
+    ],
+    &quot;jev_disputed&quot;: false,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0901&quot;,
+        &quot;statement&quot;: &quot;In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0901&quot;,
+        &quot;statement&quot;: &quot;In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0901&quot;,
+        &quot;statement&quot;: &quot;In decider mode, answers from each covered model MUST conform to the required schema.&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0901&quot;,
+        &quot;statement&quot;: &quot;Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0901&quot;,
+        &quot;statement&quot;: &quot;If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0901&quot;,
+        &quot;statement&quot;: &quot;The covered model handling the decision request MUST pass the request&#x27;s inputs to the provider.&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;8f41793e&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;REQ-SAG-0901&quot;,
+        &quot;statement&quot;: &quot;If the provider rejects a request input, the decision backend MUST return the provider&#x27;s error.&quot;,
+        &quot;summary&quot;: &quot;Clarify configuration, release rehearsal, and decision requirements&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;No change proposed; the anchor&#x27;s omission of these details is not a basis for deletion.&quot;,
+    &quot;stale&quot;: null,
+    &quot;what&quot;: &quot;These requirements add specific schema and error behavior beyond the shared LLM trait anchor. The trace does not show that these obligations are stale.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.8,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.87,
+        &quot;unclear&quot;: 0.05,
+        &quot;yes&quot;: 0.08
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.5,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.32,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.67
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.79,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.13,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.86
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.89,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.93,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.04
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.08,
+    &quot;exceeds&quot;: 0.67,
+    &quot;relates&quot;: 0.86,
+    &quot;serves&quot;: 0.04
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0901&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0901/ANC-013/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ70ZNR846BXH7GZ26M2EQ&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0901 × ANC-013 — exceeds
+What exceeds
+“In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.”
+“In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.”
+“In decider mode, answers from each covered model MUST conform to the required schema.”
+“Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.”
+“If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.”
+These requirements add specific schema and error behavior beyond the shared LLM trait anchor. The trace does not show that these obligations are stale.
+Proposed remedy
+No change proposed; the anchor&#x27;s omission of these details is not a basis for deletion.
+Anchor
+sc-agent must provide an LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider speaking that format, so callers reach any LLM through one interface.
+Owner said: “we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”
+Scope: adds or changes LLM (non-Jev) calls in sc-agent
+Record statements
+In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.
+In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.
+In decider mode, answers from each covered model MUST conform to the required schema.
+Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.
+If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.
+The covered model handling the decision request MUST pass the request&#x27;s inputs to the provider.
+If the provider rejects a request input, the decision backend MUST return the provider&#x27;s error.
+History (git)
+REQ-SAG-0901 statement 1: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements
+REQ-SAG-0901 statement 2: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements
+REQ-SAG-0901 statement 3: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements
+REQ-SAG-0901 statement 4: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements
+REQ-SAG-0901 statement 5: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements
+REQ-SAG-0901 statement 6: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements
+REQ-SAG-0901 statement 7: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements
+Jev P(yes): relates 0.86 · serves 0.04 · exceeds 0.67 · conflicts 0.08">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <ul>
+    <li>“In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.”</li>
+    <li>“In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.”</li>
+    <li>“In decider mode, answers from each covered model MUST conform to the required schema.”</li>
+    <li>“Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.”</li>
+    <li>“If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.”</li>
+  </ul>
+  <p>These requirements add specific schema and error behavior beyond the shared LLM trait anchor. The trace does not show that these obligations are stale.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>No change proposed; the anchor&#x27;s omission of these details is not a basis for deletion.</p>
+  <h3>Anchor</h3>
+  <p>sc-agent must provide an LLM trait for JSON-in/JSON-out calls, with one implementation per wire format (OpenAI-compatible, Anthropic-compatible) shared by every provider speaking that format, so callers reach any LLM through one interface.</p>
+  <p>Owner said: “we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”</p>
+  <p>Scope: adds or changes LLM (non-Jev) calls in sc-agent</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.</li>
+    <li>In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.</li>
+    <li>In decider mode, answers from each covered model MUST conform to the required schema.</li>
+    <li>Each decision request MUST specify the required schema through the provider&#x27;s structured-output feature.</li>
+    <li>If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.</li>
+    <li>The covered model handling the decision request MUST pass the request&#x27;s inputs to the provider.</li>
+    <li>If the provider rejects a request input, the decision backend MUST return the provider&#x27;s error.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0901 statement 1: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+    <li>REQ-SAG-0901 statement 2: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+    <li>REQ-SAG-0901 statement 3: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+    <li>REQ-SAG-0901 statement 4: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+    <li>REQ-SAG-0901 statement 5: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+    <li>REQ-SAG-0901 statement 6: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+    <li>REQ-SAG-0901 statement 7: 8f41793e 2026-11-25: Clarify configuration, release rehearsal, and decision requirements</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.86 · serves 0.04 · exceeds 0.67 · conflicts 0.08</p>
+</section>

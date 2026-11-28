@@ -1,0 +1,80 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="anc-ANC-030">
+  <div class="section-head">
+    <h2>ANC-030</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;beads&quot;: {
+    &quot;anchor&quot;: &quot;agt-2sum&quot;,
+    &quot;dev_questions&quot;: &quot;agt-2sum.2&quot;,
+    &quot;plan_questions&quot;: &quot;agt-2sum.1&quot;
+  },
+  &quot;context&quot;: &quot;phase-m planning session, 2026-11-27&quot;,
+  &quot;deterministic_check&quot;: &quot;&quot;,
+  &quot;fixtures&quot;: {
+    &quot;fail&quot;: [
+      &quot;The retry helper hard-codes 429 and 529 handling for api.anthropic.com.&quot;
+    ],
+    &quot;pass&quot;: [
+      &quot;The retry helper takes its waits, limits and busy and quota rules as parameters from the provider crate and contains no provider name, host or status-code table.&quot;
+    ]
+  },
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:54:56+00:00&quot;,
+      &quot;event&quot;: &quot;created&quot;,
+      &quot;status&quot;: &quot;locked&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:56:28+00:00&quot;,
+      &quot;beads&quot;: {
+        &quot;anchor&quot;: &quot;agt-2sum&quot;,
+        &quot;dev_questions&quot;: &quot;agt-2sum.2&quot;,
+        &quot;plan_questions&quot;: &quot;agt-2sum.1&quot;
+      },
+      &quot;event&quot;: &quot;beads_set&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:58:04+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;fixtures&quot;
+      ]
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:58:56+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;fixtures&quot;
+      ]
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-030&quot;,
+  &quot;kind&quot;: &quot;directive&quot;,
+  &quot;promoted_to&quot;: null,
+  &quot;question_overrides&quot;: {},
+  &quot;quote&quot;: &quot;retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.&quot;,
+  &quot;scope&quot;: &quot;adds or changes retry, resend, backoff or holdoff code&quot;,
+  &quot;source_ref&quot;: null,
+  &quot;source_type&quot;: &quot;ANC&quot;,
+  &quot;stated_at&quot;: &quot;2026-11-27&quot;,
+  &quot;stated_by&quot;: &quot;Rand Lee&quot;,
+  &quot;statement&quot;: &quot;Retry and holdoff code takes its waits, limits and busy and quota rules as parameters from the calling layer, and contains no provider name, host or status-code table.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;summary&quot;: &quot;Retry and holdoff take provider rules as parameters&quot;,
+  &quot;version&quot;: 3
+}">{}</button>
+    </div>
+  </div>
+  <h3>Statement</h3>
+  <p class="statement">Retry and holdoff code takes its waits, limits and busy and quota rules as parameters from the calling layer, and contains no provider name, host or status-code table.</p>
+  <h3>Owner said</h3>
+  <p class="quote">retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.</p>
+  <h3>Scope</h3>
+  <p>adds or changes retry, resend, backoff or holdoff code</p>
+  <h3>Kind</h3>
+  <p>directive</p>
+  <h3>Stated by</h3>
+  <p>Rand Lee</p>
+  <h3>Stated on</h3>
+  <p>2026-11-27</p>
+</section>

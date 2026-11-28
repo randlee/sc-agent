@@ -1,0 +1,112 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-ADR-SAG-0003">
+  <div class="section-head">
+    <h2>ADR-SAG-0003 Requirements and decisions are Raptor records</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;ADR-SAG-0003&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T091833Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;ADR&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: null,
+    &quot;note&quot;: &quot;No obligation statements.&quot;,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: null
+  },
+  &quot;raptor&quot;: {
+    &quot;alternatives&quot;: {
+      &quot;groups&quot;: [
+        {
+          &quot;cons&quot;: [
+            &quot;Not parseable by Raptor.&quot;
+          ],
+          &quot;description&quot;: &quot;Keep requirements as table rows in one Markdown file.&quot;,
+          &quot;name&quot;: &quot;Free-form requirement tables&quot;,
+          &quot;pros&quot;: [
+            &quot;Compact.&quot;
+          ],
+          &quot;why_rejected&quot;: &quot;Records must be parseable by Raptor and changed only with owner approval.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;consequences&quot;: {
+      &quot;negative&quot;: [
+        &quot;Records are edited through templates, not by hand.&quot;
+      ],
+      &quot;neutral&quot;: [],
+      &quot;positive&quot;: [
+        &quot;Every record imports into Raptor and can be queried.&quot;
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;context&quot;: {
+      &quot;background&quot;: &quot;&quot;,
+      &quot;problem_statement&quot;: &quot;&quot;,
+      &quot;text&quot;: &quot;Requirements, non-functional requirements and architecture decisions are read by agents and by Raptor.\nThe problem is that free-form records cannot be reliably imported into Raptor for tools to query and judge.&quot;
+    },
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;decision&quot;: {
+      &quot;chosen_approach&quot;: &quot;&quot;,
+      &quot;key_principles&quot;: [],
+      &quot;text&quot;: &quot;Every REQ, NFR and ADR is one Markdown file written from the Raptor authoring templates (`req-new.md.j2`, `nfr-new.md.j2`, `adr-new.md.j2` in randlee/raptor). Repository-wide records are under `docs/requirements/`, `docs/nfr/` and `docs/adr/`; crate-specific records are under the same folders inside `docs/&lt;crate&gt;/`. Changes to any record are made only in plan review and approved by the owner.&quot;
+    },
+    &quot;decision_date&quot;: &quot;2026-11-09&quot;,
+    &quot;id&quot;: &quot;ADR-SAG-0003&quot;,
+    &quot;impact_analysis&quot;: {
+      &quot;affected_components&quot;: &quot;&quot;,
+      &quot;maintainability_impact&quot;: &quot;&quot;,
+      &quot;performance_impact&quot;: &quot;&quot;,
+      &quot;security_impact&quot;: &quot;&quot;,
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;implementation&quot;: {
+      &quot;code_examples&quot;: &quot;&quot;,
+      &quot;integration_points&quot;: [],
+      &quot;key_components&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;rationale&quot;: {
+      &quot;benefits&quot;: [],
+      &quot;text&quot;: &quot;Records that import into Raptor with no diagnostics can be queried and judged by tools, and owner approval in plan review keeps every change deliberate.&quot;,
+      &quot;trade_offs&quot;: []
+    },
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [
+        {
+          &quot;href&quot;: &quot;https://github.com/randlee/raptor&quot;,
+          &quot;note&quot;: &quot;authoring templates&quot;,
+          &quot;text&quot;: &quot;randlee/raptor&quot;
+        }
+      ],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;title&quot;: &quot;Requirements and decisions are Raptor records&quot;,
+    &quot;version&quot;: &quot;0.1.1&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">ADR · sc-agent · Approved · version 0.1.1</p>
+  <h3>Context</h3>
+  <p>Requirements, non-functional requirements and architecture decisions are read by agents and by Raptor.
+The problem is that free-form records cannot be reliably imported into Raptor for tools to query and judge.</p>
+  <h3>Decision</h3>
+  <p>Every REQ, NFR and ADR is one Markdown file written from the Raptor authoring templates (`req-new.md.j2`, `nfr-new.md.j2`, `adr-new.md.j2` in randlee/raptor). Repository-wide records are under `docs/requirements/`, `docs/nfr/` and `docs/adr/`; crate-specific records are under the same folders inside `docs/&lt;crate&gt;/`. Changes to any record are made only in plan review and approved by the owner.</p>
+  <h3>Rationale</h3>
+  <p>Records that import into Raptor with no diagnostics can be queried and judged by tools, and owner approval in plan review keeps every change deliberate.</p>
+  <h3>Positive consequences</h3>
+  <p>Every record imports into Raptor and can be queried.</p>
+  <h3>Negative consequences</h3>
+  <p>Records are edited through templates, not by hand.</p>
+</section>

@@ -1,0 +1,115 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-ADR-SAG-0004-ANC-012">
+  <div class="section-head">
+    <h2>ADR-SAG-0004 × ANC-012 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-012&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [
+      &quot;A provider, a model and a URL are data: adding one changes configuration and no Rust code.&quot;
+    ],
+    &quot;jev_disputed&quot;: true,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;31c8ee33&quot;,
+        &quot;date&quot;: &quot;2026-11-27&quot;,
+        &quot;record&quot;: &quot;ADR-SAG-0004&quot;,
+        &quot;statement&quot;: &quot;Crates are in four layers, and a crate depends only on crates in lower layers. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.&quot;,
+        &quot;summary&quot;: &quot;records: ADR-SAG-0004 0.5.0, four crate layers (owner-approved text)&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;No proposal: the trace does not identify a specific excess.&quot;,
+    &quot;stale&quot;: null,
+    &quot;what&quot;: &quot;ANC-012 requires a shared implementation for providers with the same wire format. This ADR&#x27;s statement is about adding providers, models and URLs as configuration data; it does not describe an additional provider implementation.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.82,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.88,
+        &quot;unclear&quot;: 0.05,
+        &quot;yes&quot;: 0.07
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.46,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.34,
+        &quot;unclear&quot;: 0.02,
+        &quot;yes&quot;: 0.64
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.82,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.11,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.88
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.28,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.32,
+        &quot;unclear&quot;: 0.16,
+        &quot;yes&quot;: 0.52
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.07,
+    &quot;exceeds&quot;: 0.64,
+    &quot;relates&quot;: 0.88,
+    &quot;serves&quot;: 0.52
+  },
+  &quot;record&quot;: &quot;ADR-SAG-0004&quot;,
+  &quot;request_id&quot;: &quot;trace/ADR-SAG-0004/ANC-012/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ7DP9S1TBCGWQ9C0HJZCC&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="ADR-SAG-0004 × ANC-012 — exceeds
+What exceeds
+“A provider, a model and a URL are data: adding one changes configuration and no Rust code.”
+Reviewer disputes Jev: ANC-012 requires a shared implementation for providers with the same wire format. This ADR&#x27;s statement is about adding providers, models and URLs as configuration data; it does not describe an additional provider implementation.
+Proposed remedy
+No proposal: the trace does not identify a specific excess.
+Anchor
+sc-agent&#x27;s decision providers must implement one decision trait, with one implementation per wire format (Jev TypeSafe systemone, OpenAI-compatible chat/completions, Anthropic-compatible Messages), and every provider that speaks a wire format must use that format&#x27;s implementation, so adding a provider needs no new code or hard-coding.
+Owner said: “there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”
+Scope: adds or changes decision providers, provider dispatch or the provider table in sc-agent
+Record statements
+No obligation statements.
+History (git)
+ADR-SAG-0004 statement 1: 31c8ee33 2026-11-27: records: ADR-SAG-0004 0.5.0, four crate layers (owner-approved text)
+Jev P(yes): relates 0.88 · serves 0.52 · exceeds 0.64 · conflicts 0.07">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <ul>
+    <li>“A provider, a model and a URL are data: adding one changes configuration and no Rust code.”</li>
+  </ul>
+  <p>Reviewer disputes Jev: ANC-012 requires a shared implementation for providers with the same wire format. This ADR&#x27;s statement is about adding providers, models and URLs as configuration data; it does not describe an additional provider implementation.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>No proposal: the trace does not identify a specific excess.</p>
+  <h3>Anchor</h3>
+  <p>sc-agent&#x27;s decision providers must implement one decision trait, with one implementation per wire format (Jev TypeSafe systemone, OpenAI-compatible chat/completions, Anthropic-compatible Messages), and every provider that speaks a wire format must use that format&#x27;s implementation, so adding a provider needs no new code or hard-coding.</p>
+  <p>Owner said: “there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”</p>
+  <p>Scope: adds or changes decision providers, provider dispatch or the provider table in sc-agent</p>
+  <h3>Record statements</h3>
+  <p>No obligation statements.</p>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>ADR-SAG-0004 statement 1: 31c8ee33 2026-11-27: records: ADR-SAG-0004 0.5.0, four crate layers (owner-approved text)</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.88 · serves 0.52 · exceeds 0.64 · conflicts 0.07</p>
+</section>

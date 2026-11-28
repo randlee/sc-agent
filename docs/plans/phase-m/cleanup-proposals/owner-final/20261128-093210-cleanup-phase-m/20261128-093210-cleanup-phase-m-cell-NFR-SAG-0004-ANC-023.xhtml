@@ -1,0 +1,131 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-NFR-SAG-0004-ANC-023">
+  <div class="section-head">
+    <h2>NFR-SAG-0004 × ANC-023 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-023&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [
+      &quot;Every shared fact MUST have a single owner.&quot;,
+      &quot;Code that needs a shared fact MUST obtain it by calling its owner.&quot;
+    ],
+    &quot;jev_disputed&quot;: false,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;2712a7fb&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;record&quot;: &quot;NFR-SAG-0004&quot;,
+        &quot;statement&quot;: &quot;Every shared fact MUST have a single owner.&quot;,
+        &quot;summary&quot;: &quot;NFR-SAG-0004: state single ownership as one obligation&quot;
+      },
+      {
+        &quot;commit&quot;: &quot;a63c0a59&quot;,
+        &quot;date&quot;: &quot;2026-11-24&quot;,
+        &quot;record&quot;: &quot;NFR-SAG-0004&quot;,
+        &quot;statement&quot;: &quot;Code that needs a shared fact MUST obtain it by calling its owner.&quot;,
+        &quot;summary&quot;: &quot;Amend phase-j records for the Run, one-owner and struct rules (plan review)&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;No change proposed; ANC-023 specifies the session storage destination and does not displace the general requirement.&quot;,
+    &quot;stale&quot;: null,
+    &quot;what&quot;: &quot;Session storage is one example of a shared fact, but the broader ownership requirements are not shown to conflict with SQLite storage.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.85,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.9,
+        &quot;unclear&quot;: 0.07,
+        &quot;yes&quot;: 0.03
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.92,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.05,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.95
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.96,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.03,
+        &quot;unclear&quot;: 0.0,
+        &quot;yes&quot;: 0.97
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.28,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.52,
+        &quot;unclear&quot;: 0.19,
+        &quot;yes&quot;: 0.29
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.03,
+    &quot;exceeds&quot;: 0.95,
+    &quot;relates&quot;: 0.97,
+    &quot;serves&quot;: 0.29
+  },
+  &quot;record&quot;: &quot;NFR-SAG-0004&quot;,
+  &quot;request_id&quot;: &quot;trace/NFR-SAG-0004/ANC-023/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ64EEF2AGXWMSBRJ0KJCN&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="NFR-SAG-0004 × ANC-023 — exceeds
+What exceeds
+“Every shared fact MUST have a single owner.”
+“Code that needs a shared fact MUST obtain it by calling its owner.”
+Session storage is one example of a shared fact, but the broader ownership requirements are not shown to conflict with SQLite storage.
+Proposed remedy
+No change proposed; ANC-023 specifies the session storage destination and does not displace the general requirement.
+Anchor
+sc-agent writes each session row to the repository&#x27;s SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.
+Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp”
+Scope: adds or changes code that writes or reads session rows
+Record statements
+Every shared fact MUST have a single owner.
+Code that needs a shared fact MUST obtain it by calling its owner.
+History (git)
+NFR-SAG-0004 statement 1: 2712a7fb 2026-11-25: NFR-SAG-0004: state single ownership as one obligation
+NFR-SAG-0004 statement 2: a63c0a59 2026-11-24: Amend phase-j records for the Run, one-owner and struct rules (plan review)
+Jev P(yes): relates 0.97 · serves 0.29 · exceeds 0.95 · conflicts 0.03">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>What exceeds</h3>
+  <ul>
+    <li>“Every shared fact MUST have a single owner.”</li>
+    <li>“Code that needs a shared fact MUST obtain it by calling its owner.”</li>
+  </ul>
+  <p>Session storage is one example of a shared fact, but the broader ownership requirements are not shown to conflict with SQLite storage.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>No change proposed; ANC-023 specifies the session storage destination and does not displace the general requirement.</p>
+  <h3>Anchor</h3>
+  <p>sc-agent writes each session row to the repository&#x27;s SQLite database through `sc-agent-sqlite`; no code writes `sessions.jsonl`.</p>
+  <p>Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp”</p>
+  <p>Scope: adds or changes code that writes or reads session rows</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>Every shared fact MUST have a single owner.</li>
+    <li>Code that needs a shared fact MUST obtain it by calling its owner.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>NFR-SAG-0004 statement 1: 2712a7fb 2026-11-25: NFR-SAG-0004: state single ownership as one obligation</li>
+    <li>NFR-SAG-0004 statement 2: a63c0a59 2026-11-24: Amend phase-j records for the Run, one-owner and struct rules (plan review)</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.97 · serves 0.29 · exceeds 0.95 · conflicts 0.03</p>
+</section>

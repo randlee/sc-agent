@@ -1,0 +1,46 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-9">
+  <div class="section-head">
+    <h2>9. Replace JSONL session storage with SQLite (docs/sc-agent-sqlite/)</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="9. Replace JSONL session storage with SQLite (docs/sc-agent-sqlite/)
+Wave 1 · resolve conflict
+Records: REQ-SAG-0005
+Change:
+- Resolution: reconcile.
+- Reword REQ-SAG-0005: “Session logs MUST be written as JSONL.” → “Session logs MUST be written to the repository&#x27;s SQLite database.”
+Rewording (rare; justified): REQ-SAG-0005: The owner explicitly replaced JSONL session storage with SQLite.
+Clears:
+- REQ-SAG-0005 × ANC-023 (conflicts)
+- REQ-SAG-0005 × ANC-031 (conflicts)
+Justification: The owner ruled: &quot;I want session logs written to SQLite, jsonl was just a quick item for mvp&quot;. This 2026-11-18 statement predates that ruling. The remaining session row behavior is unchanged.
+Source of truth: ANC-023 — Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp” — commit 3afa4f9e
+Expected improvement:
+- REQ-SAG-0005 no longer requires JSONL session logs.
+- Records 49 → 49; statements 205 → 205; duplicates cleared 0 of 32; conflicts resolved 2 of 16; exceeds cleared 0 of 52">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 1 · resolve conflict</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0005" data-panel="rec-REQ-SAG-0005">REQ-SAG-0005</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Resolution: reconcile.</li>
+    <li>Reword REQ-SAG-0005: “Session logs MUST be written as JSONL.” → “Session logs MUST be written to the repository&#x27;s SQLite database.”</li>
+  </ul>
+  <h3>Rewording (rare; justified)</h3>
+  <p>REQ-SAG-0005: The owner explicitly replaced JSONL session storage with SQLite.</p>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0005-ANC-023" data-panel="cell-REQ-SAG-0005-ANC-023">REQ-SAG-0005 × ANC-023 (conflicts)</a></li>
+    <li><a href="#cell-REQ-SAG-0005-ANC-031" data-panel="cell-REQ-SAG-0005-ANC-031">REQ-SAG-0005 × ANC-031 (conflicts)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>The owner ruled: &quot;I want session logs written to SQLite, jsonl was just a quick item for mvp&quot;. This 2026-11-18 statement predates that ruling. The remaining session row behavior is unchanged.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-023 — Owner said: “I want session logs written to SQLite, jsonl was just a quick item for mvp” — commit 3afa4f9e</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0005 no longer requires JSONL session logs.</p>
+  <p>Records 49 → 49; statements 205 → 205; duplicates cleared 0 of 32; conflicts resolved 2 of 16; exceeds cleared 0 of 52</p>
+</section>

@@ -1,0 +1,213 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-ADR-SAG-0020">
+  <div class="section-head">
+    <h2>ADR-SAG-0020 Configuration has a shared scope and one scope per CLI, each global and per worktree</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;ADR-SAG-0020&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T091833Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;ADR&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: null,
+    &quot;note&quot;: &quot;No obligation statements.&quot;,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: null
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;998015d2&quot;,
+        &quot;date&quot;: &quot;2026-11-18&quot;,
+        &quot;summary&quot;: &quot;docs: ADR-SAG-0020/0021 config scopes and separate session-log tree&quot;
+      },
+      &quot;statement&quot;: &quot;Configuration has two kinds of scope and two locations.\n\n- The shared scope is the file `sc-agent.json`. It holds shared defaults for configuration-reading CLIs: the project/phase (ADR-SAG-0021), worker count, and optional local-runner settings. A CLI file may override those defaults.\n- Each CLI that reads configuration has its own scope, the file `&lt;cli&gt;.json` named after the CLI: `decidr.json`, and the same pattern for every CLI added later. `sitr` reads no configuration.\n- The global location is `~/.sc-agent/`, the user&#x27;s home directory joined with `.sc-agent` on every platform, or the folder named by nonempty `SC_AGENT_HOME`. An explicit configuration directory takes precedence.\n- The local location is `&lt;worktree&gt;/.sc/sc-agent/`, where `&lt;worktree&gt;` is the root of the git work tree the CLI runs in. It holds the same file names with the same keys.\n\nThe CLIs and the files each one reads are these:\n\n| CLI | Global files | Local files | Environment prefix |\n|---|---|---|---|\n| `decidr` | `~/.sc-agent/decidr.local.json`, `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `&lt;worktree&gt;/.sc/sc-agent/decidr.local.json`, `&lt;worktree&gt;/.sc/sc-agent/decidr.json`, `&lt;worktree&gt;/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |\n| `sitr` | none | none | none |\n\nEvery CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. The table is updated when a CLI is added.\n\nA setting is looked up in nine layers, and the first layer that sets it wins:\n\n1. the CLI flag;\n2. the environment variable;\n3. the local `&lt;cli&gt;.local.json`;\n4. the local `&lt;cli&gt;.json`;\n5. the local `sc-agent.json`;\n6. the global `&lt;cli&gt;.local.json`;\n7. the global `&lt;cli&gt;.json`;\n8. the global `sc-agent.json`;\n9. the built-in default.\n\nModel entries, `models.&lt;alias&gt;`, are set only in configuration files, layers 3 to 8: each is a structured row (`provider` and `id` strings, `released` a `YYYY-MM-DD` date) that a flag or flat environment variable cannot express. `&lt;alias&gt;` becomes the row&#x27;s short name. A row&#x27;s provider is one sc-agent already has.\n\nEnvironment variables are named after the CLI: `DECIDR_&lt;SETTING&gt;`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).\n\nConfiguration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152).&quot;,
+      &quot;statement_index&quot;: 0
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;alternatives&quot;: {
+      &quot;groups&quot;: [
+        {
+          &quot;cons&quot;: [
+            &quot;Every CLI&#x27;s schema lives in one file, and adding a CLI changes it.&quot;,
+            &quot;`local.json` is a per-machine file in the same folder, not a repository layer.&quot;
+          ],
+          &quot;description&quot;: &quot;Keep `default.json` and `local.json` and give each CLI a section inside them.&quot;,
+          &quot;name&quot;: &quot;Keep one shared file pair with a section per CLI&quot;,
+          &quot;pros&quot;: [
+            &quot;One file to edit.&quot;
+          ],
+          &quot;why_rejected&quot;: &quot;It has no per-repository layer, and every CLI would share one file.&quot;
+        },
+        {
+          &quot;cons&quot;: [
+            &quot;Each sc tool would add its own dot folder at the repository root.&quot;
+          ],
+          &quot;description&quot;: &quot;Mirror the global folder name at the worktree root.&quot;,
+          &quot;name&quot;: &quot;Local files at `&lt;worktree&gt;/.sc-agent/`&quot;,
+          &quot;pros&quot;: [
+            &quot;The same folder name in both locations.&quot;
+          ],
+          &quot;why_rejected&quot;: &quot;sc ecosystem files are consolidated under `.sc/`.&quot;
+        },
+        {
+          &quot;cons&quot;: [
+            &quot;sc-config reads JSON only, and three formats need a rule for files that conflict.&quot;
+          ],
+          &quot;description&quot;: &quot;Read whichever of the three formats is present.&quot;,
+          &quot;name&quot;: &quot;Accept JSON, TOML and YAML&quot;,
+          &quot;pros&quot;: [
+            &quot;Users choose the format.&quot;
+          ],
+          &quot;why_rejected&quot;: &quot;One format now; TOML when sc-config supports it.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;consequences&quot;: {
+      &quot;negative&quot;: [
+        &quot;A setting can now come from nine places; `decidr doctor` reports a `path | value | source` table.&quot;
+      ],
+      &quot;neutral&quot;: [],
+      &quot;positive&quot;: [
+        &quot;A CLI added later gets its own global and local file without a schema change to any other file.&quot;,
+        &quot;A worktree can override any setting without editing the user&#x27;s global files.&quot;
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;context&quot;: {
+      &quot;background&quot;: &quot;&quot;,
+      &quot;problem_statement&quot;: &quot;Each CLI needs its own settings, shared defaults may be overridden by a CLI file, and a repository or worktree must be able to override both.&quot;,
+      &quot;text&quot;: &quot;sc-agent ships two CLIs today, `decidr` and `sitr`. CLI launchers for other agent harnesses, such as Claude Code, Codex CLI, Hermes and pi-agent, will be added as their peers. Apps such as plan-anchor and judge-jev wrap a CLI the way a named agent (`.claude/agents/&lt;agent&gt;.md`) wraps a harness. Agent-level settings, for agents such as `lai`, `sai`, `sanity`, `plan-anchor` and `judge-jev`, will later be provided by the CLI launchers.\n\nBefore this decision, every CLI read one shared file pair, `~/.sc-agent/default.json` and `~/.sc-agent/local.json`, with `SC_AGENT__&lt;KEY&gt;` environment overrides. That layout has no per-CLI settings and no per-repository layer: two worktrees of one repository cannot hold different settings, and a setting meant for one CLI applies to all of them.&quot;
+    },
+    &quot;created&quot;: &quot;2026-11-18&quot;,
+    &quot;decision&quot;: {
+      &quot;chosen_approach&quot;: &quot;&quot;,
+      &quot;key_principles&quot;: [
+        &quot;A narrower location beats a wider one: local beats global.&quot;,
+        &quot;Within one location, a CLI&#x27;s own file beats the shared file.&quot;,
+        &quot;sc ecosystem files in a repository live under `.sc/`, so a repository needs one `.gitignore` entry rather than one per tool.&quot;
+      ],
+      &quot;text&quot;: &quot;Configuration has two kinds of scope and two locations.\n\n- The shared scope is the file `sc-agent.json`. It holds shared defaults for configuration-reading CLIs: the project/phase (ADR-SAG-0021), worker count, and optional local-runner settings. A CLI file may override those defaults.\n- Each CLI that reads configuration has its own scope, the file `&lt;cli&gt;.json` named after the CLI: `decidr.json`, and the same pattern for every CLI added later. `sitr` reads no configuration.\n- The global location is `~/.sc-agent/`, the user&#x27;s home directory joined with `.sc-agent` on every platform, or the folder named by nonempty `SC_AGENT_HOME`. An explicit configuration directory takes precedence.\n- The local location is `&lt;worktree&gt;/.sc/sc-agent/`, where `&lt;worktree&gt;` is the root of the git work tree the CLI runs in. It holds the same file names with the same keys.\n\nThe CLIs and the files each one reads are these:\n\n| CLI | Global files | Local files | Environment prefix |\n|---|---|---|---|\n| `decidr` | `~/.sc-agent/decidr.local.json`, `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `&lt;worktree&gt;/.sc/sc-agent/decidr.local.json`, `&lt;worktree&gt;/.sc/sc-agent/decidr.json`, `&lt;worktree&gt;/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |\n| `sitr` | none | none | none |\n\nEvery CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. The table is updated when a CLI is added.\n\nA setting is looked up in nine layers, and the first layer that sets it wins:\n\n1. the CLI flag;\n2. the environment variable;\n3. the local `&lt;cli&gt;.local.json`;\n4. the local `&lt;cli&gt;.json`;\n5. the local `sc-agent.json`;\n6. the global `&lt;cli&gt;.local.json`;\n7. the global `&lt;cli&gt;.json`;\n8. the global `sc-agent.json`;\n9. the built-in default.\n\nModel entries, `models.&lt;alias&gt;`, are set only in configuration files, layers 3 to 8: each is a structured row (`provider` and `id` strings, `released` a `YYYY-MM-DD` date) that a flag or flat environment variable cannot express. `&lt;alias&gt;` becomes the row&#x27;s short name. A row&#x27;s provider is one sc-agent already has.\n\nEnvironment variables are named after the CLI: `DECIDR_&lt;SETTING&gt;`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).\n\nConfiguration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152).&quot;
+    },
+    &quot;decision_date&quot;: &quot;2026-11-18&quot;,
+    &quot;id&quot;: &quot;ADR-SAG-0020&quot;,
+    &quot;impact_analysis&quot;: {
+      &quot;affected_components&quot;: &quot;&quot;,
+      &quot;maintainability_impact&quot;: &quot;&quot;,
+      &quot;performance_impact&quot;: &quot;&quot;,
+      &quot;security_impact&quot;: &quot;&quot;,
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;implementation&quot;: {
+      &quot;code_examples&quot;: &quot;&quot;,
+      &quot;integration_points&quot;: [],
+      &quot;key_components&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-24&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;rationale&quot;: {
+      &quot;benefits&quot;: [],
+      &quot;text&quot;: &quot;One file per CLI keeps each CLI&#x27;s settings separate and lets a new CLI be added without touching another CLI&#x27;s file. The shared file gives one place for shared defaults that a CLI file may override. The local location under `.sc/` lets each worktree differ, which matters because worktrees of one repository often work on different phases at the same time. Env vars named after the CLI keep one CLI&#x27;s override from reaching another.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+      &quot;trade_offs&quot;: []
+    },
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0021&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0013&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0020&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0021&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;title&quot;: &quot;Configuration has a shared scope and one scope per CLI, each global and per worktree&quot;,
+    &quot;version&quot;: &quot;0.6.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">ADR · sc-agent · Approved · version 0.6.0</p>
+  <h3>Context</h3>
+  <p>sc-agent ships two CLIs today, `decidr` and `sitr`. CLI launchers for other agent harnesses, such as Claude Code, Codex CLI, Hermes and pi-agent, will be added as their peers. Apps such as plan-anchor and judge-jev wrap a CLI the way a named agent (`.claude/agents/&lt;agent&gt;.md`) wraps a harness. Agent-level settings, for agents such as `lai`, `sai`, `sanity`, `plan-anchor` and `judge-jev`, will later be provided by the CLI launchers.
+
+Before this decision, every CLI read one shared file pair, `~/.sc-agent/default.json` and `~/.sc-agent/local.json`, with `SC_AGENT__&lt;KEY&gt;` environment overrides. That layout has no per-CLI settings and no per-repository layer: two worktrees of one repository cannot hold different settings, and a setting meant for one CLI applies to all of them.</p>
+  <h3>Problem</h3>
+  <p>Each CLI needs its own settings, shared defaults may be overridden by a CLI file, and a repository or worktree must be able to override both.</p>
+  <h3>Decision</h3>
+  <p>Configuration has two kinds of scope and two locations.
+
+- The shared scope is the file `sc-agent.json`. It holds shared defaults for configuration-reading CLIs: the project/phase (ADR-SAG-0021), worker count, and optional local-runner settings. A CLI file may override those defaults.
+- Each CLI that reads configuration has its own scope, the file `&lt;cli&gt;.json` named after the CLI: `decidr.json`, and the same pattern for every CLI added later. `sitr` reads no configuration.
+- The global location is `~/.sc-agent/`, the user&#x27;s home directory joined with `.sc-agent` on every platform, or the folder named by nonempty `SC_AGENT_HOME`. An explicit configuration directory takes precedence.
+- The local location is `&lt;worktree&gt;/.sc/sc-agent/`, where `&lt;worktree&gt;` is the root of the git work tree the CLI runs in. It holds the same file names with the same keys.
+
+The CLIs and the files each one reads are these:
+
+| CLI | Global files | Local files | Environment prefix |
+|---|---|---|---|
+| `decidr` | `~/.sc-agent/decidr.local.json`, `~/.sc-agent/decidr.json`, `~/.sc-agent/sc-agent.json` | `&lt;worktree&gt;/.sc/sc-agent/decidr.local.json`, `&lt;worktree&gt;/.sc/sc-agent/decidr.json`, `&lt;worktree&gt;/.sc/sc-agent/sc-agent.json` | `DECIDR_`, plus `SC_PROJECT` |
+| `sitr` | none | none | none |
+
+Every CLI has a row, and every cell is filled; a CLI that reads no file of a kind says `none`. The table is updated when a CLI is added.
+
+A setting is looked up in nine layers, and the first layer that sets it wins:
+
+1. the CLI flag;
+2. the environment variable;
+3. the local `&lt;cli&gt;.local.json`;
+4. the local `&lt;cli&gt;.json`;
+5. the local `sc-agent.json`;
+6. the global `&lt;cli&gt;.local.json`;
+7. the global `&lt;cli&gt;.json`;
+8. the global `sc-agent.json`;
+9. the built-in default.
+
+Model entries, `models.&lt;alias&gt;`, are set only in configuration files, layers 3 to 8: each is a structured row (`provider` and `id` strings, `released` a `YYYY-MM-DD` date) that a flag or flat environment variable cannot express. `&lt;alias&gt;` becomes the row&#x27;s short name. A row&#x27;s provider is one sc-agent already has.
+
+Environment variables are named after the CLI: `DECIDR_&lt;SETTING&gt;`, with the parts of a nested key joined by a double underscore (`DECIDR_LAYA__PORT`). A setting with a wider audience than sc-agent may have its own name; the project/phase is `SC_PROJECT` (ADR-SAG-0021).
+
+Configuration files are JSON. TOML will be added when sc-config supports it (randlee/sc-runtime#152).</p>
+  <h3>Key principles</h3>
+  <ul>
+    <li>A narrower location beats a wider one: local beats global.</li>
+    <li>Within one location, a CLI&#x27;s own file beats the shared file.</li>
+    <li>sc ecosystem files in a repository live under `.sc/`, so a repository needs one `.gitignore` entry rather than one per tool.</li>
+  </ul>
+  <h3>Rationale</h3>
+  <p>One file per CLI keeps each CLI&#x27;s settings separate and lets a new CLI be added without touching another CLI&#x27;s file. The shared file gives one place for shared defaults that a CLI file may override. The local location under `.sc/` lets each worktree differ, which matters because worktrees of one repository often work on different phases at the same time. Env vars named after the CLI keep one CLI&#x27;s override from reaching another.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Positive consequences</h3>
+  <ul>
+    <li>A CLI added later gets its own global and local file without a schema change to any other file.</li>
+    <li>A worktree can override any setting without editing the user&#x27;s global files.</li>
+  </ul>
+  <h3>Negative consequences</h3>
+  <p>A setting can now come from nine places; `decidr doctor` reports a `path | value | source` table.</p>
+</section>

@@ -1,0 +1,159 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0013">
+  <div class="section-head">
+    <h2>REQ-SAG-0013 Config bounds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0013&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T091833Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The value of `workers` MUST be a positive count.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Timeouts MUST be represented as `Duration` values.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;An invalid setting value MUST result in an error.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;An error for an invalid setting value MUST identify the configuration setting with the invalid value.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;A request to a plain-http endpoint on a non-loopback host MUST NOT carry a key.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0801&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0401&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0002&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0013&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-21&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Detecting an invalid configuration value at load time tells the operator which setting to fix and avoids a mid-batch failure. Refusing keys on plain-http requests to non-loopback hosts prevents credentials from being sent in clear text.\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;Use time structs for time.\&quot;\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The value of `workers` MUST be a positive count.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Timeouts MUST be represented as `Duration` values.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;An invalid setting value MUST result in an error.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;An error for an invalid setting value MUST identify the configuration setting with the invalid value.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;A request to a plain-http endpoint on a non-loopback host MUST NOT carry a key.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: `workers` is the configuration setting for the worker count used to fan out a batch. Timeouts are time limits for operations, including individual requests. A `Duration` is a span of time represented by a time struct. A configuration setting is a named setting supplied by configuration, such as `workers`. An invalid setting value is a value that violates the applicable rules for the setting, such as `workers = 0`. A key is a secret used to authenticate a request. A positive count is a whole-number count greater than zero. Plain-http describes an endpoint using the `http` URL scheme. A loopback host is named or addressed through the requesting machine’s loopback interface.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Loading `workers = 0` fails with an error that identifies `workers`.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A request to a plain-http endpoint on a non-loopback host carries no key.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Config bounds&quot;,
+    &quot;version&quot;: &quot;0.3.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.3.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>The value of `workers` MUST be a positive count.</li>
+    <li>Timeouts MUST be represented as `Duration` values.</li>
+    <li>An invalid setting value MUST result in an error.</li>
+    <li>An error for an invalid setting value MUST identify the configuration setting with the invalid value.</li>
+    <li>A request to a plain-http endpoint on a non-loopback host MUST NOT carry a key.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: `workers` is the configuration setting for the worker count used to fan out a batch. Timeouts are time limits for operations, including individual requests. A `Duration` is a span of time represented by a time struct. A configuration setting is a named setting supplied by configuration, such as `workers`. An invalid setting value is a value that violates the applicable rules for the setting, such as `workers = 0`. A key is a secret used to authenticate a request. A positive count is a whole-number count greater than zero. Plain-http describes an endpoint using the `http` URL scheme. A loopback host is named or addressed through the requesting machine’s loopback interface.</p>
+  <h3>Rationale</h3>
+  <p>Detecting an invalid configuration value at load time tells the operator which setting to fix and avoids a mid-batch failure. Refusing keys on plain-http requests to non-loopback hosts prevents credentials from being sent in clear text.
+
+Owner ruling (2026-11-21), Rand Lee: &quot;Use time structs for time.&quot;
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>Loading `workers = 0` fails with an error that identifies `workers`.</li>
+    <li>A request to a plain-http endpoint on a non-loopback host carries no key.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>REQ-SAG-0801</li>
+    <li>REQ-SAG-0401</li>
+    <li>REQ-SAG-0002</li>
+  </ul>
+</section>

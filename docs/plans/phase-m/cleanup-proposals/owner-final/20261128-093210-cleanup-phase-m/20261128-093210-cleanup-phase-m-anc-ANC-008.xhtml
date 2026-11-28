@@ -1,0 +1,84 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="anc-ANC-008">
+  <div class="section-head">
+    <h2>ANC-008</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;beads&quot;: {
+    &quot;anchor&quot;: &quot;agt-jorx&quot;,
+    &quot;dev_questions&quot;: &quot;agt-jorx.2&quot;,
+    &quot;plan_questions&quot;: &quot;agt-jorx.1&quot;
+  },
+  &quot;context&quot;: &quot;planning session; session, 2026-11-26&quot;,
+  &quot;deterministic_check&quot;: &quot;review of changed pub fn signatures: no function takes run_id/tool/tool_version/cache/model/provider as separate params&quot;,
+  &quot;fixtures&quot;: {
+    &quot;fail&quot;: [
+      &quot;Each new method repeats the same endpoint, model, timeout and retry parameters.&quot;
+    ],
+    &quot;pass&quot;: [
+      &quot;The five methods that took endpoint, model and timeout now take one `ProviderTarget` struct.&quot;
+    ]
+  },
+  &quot;history&quot;: [
+    {
+      &quot;at&quot;: &quot;2026-11-26T18:51:01+00:00&quot;,
+      &quot;event&quot;: &quot;created&quot;,
+      &quot;status&quot;: &quot;locked&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:54:09+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;statement&quot;,
+        &quot;scope&quot;
+      ],
+      &quot;previous_statement&quot;: &quot;In phase-j code, related values passed to several methods must be grouped in one struct that replaces those repeated parameters, so encapsulation is efficient and repeated code stays minimal as the architecture scales.&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:55:41+00:00&quot;,
+      &quot;beads&quot;: {
+        &quot;anchor&quot;: &quot;agt-jorx&quot;,
+        &quot;dev_questions&quot;: &quot;agt-jorx.2&quot;,
+        &quot;plan_questions&quot;: &quot;agt-jorx.1&quot;
+      },
+      &quot;event&quot;: &quot;beads_set&quot;
+    },
+    {
+      &quot;at&quot;: &quot;2026-11-28T07:58:03+00:00&quot;,
+      &quot;event&quot;: &quot;updated&quot;,
+      &quot;fields&quot;: [
+        &quot;fixtures&quot;
+      ]
+    }
+  ],
+  &quot;id&quot;: &quot;ANC-008&quot;,
+  &quot;kind&quot;: &quot;directive&quot;,
+  &quot;promoted_to&quot;: null,
+  &quot;question_overrides&quot;: {},
+  &quot;quote&quot;: &quot;Related values are strategically grouped in one struct to remove repeated method parameters, for efficient encapsulation and to minimize repeated code as the architecture scales.&quot;,
+  &quot;scope&quot;: &quot;adds or changes function or method signatures in sc-agent code&quot;,
+  &quot;source_ref&quot;: null,
+  &quot;source_type&quot;: &quot;ANC&quot;,
+  &quot;stated_at&quot;: &quot;2026-11-26&quot;,
+  &quot;stated_by&quot;: &quot;Rand Lee&quot;,
+  &quot;statement&quot;: &quot;In sc-agent code, related values passed to several methods must be grouped in one struct that replaces those repeated parameters, so encapsulation is efficient and repeated code stays minimal as the architecture scales.&quot;,
+  &quot;status&quot;: &quot;locked&quot;,
+  &quot;summary&quot;: &quot;C08 In phase-j code, related values passed to several methods mu&quot;,
+  &quot;version&quot;: 3
+}">{}</button>
+    </div>
+  </div>
+  <h3>Statement</h3>
+  <p class="statement">In sc-agent code, related values passed to several methods must be grouped in one struct that replaces those repeated parameters, so encapsulation is efficient and repeated code stays minimal as the architecture scales.</p>
+  <h3>Owner said</h3>
+  <p class="quote">Related values are strategically grouped in one struct to remove repeated method parameters, for efficient encapsulation and to minimize repeated code as the architecture scales.</p>
+  <h3>Scope</h3>
+  <p>adds or changes function or method signatures in sc-agent code</p>
+  <h3>Deterministic check</h3>
+  <p>review of changed pub fn signatures: no function takes run_id/tool/tool_version/cache/model/provider as separate params</p>
+  <h3>Kind</h3>
+  <p>directive</p>
+  <h3>Stated by</h3>
+  <p>Rand Lee</p>
+  <h3>Stated on</h3>
+  <p>2026-11-26</p>
+</section>

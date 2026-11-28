@@ -1,0 +1,152 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0503">
+  <div class="section-head">
+    <h2>REQ-SAG-0503 doctor warns about models missing from the catalog</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0503&quot;,
+  &quot;index&quot;: &quot;docs/plans/phase-m/anchor-runs/trace-20261128T091833Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;`decidr doctor` MUST compare each configured provider&#x27;s model list with the catalog.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;`decidr doctor` MUST warn about every model a provider lists that is in no provider table, naming the provider and the model.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;`decidr doctor` MUST list every detected provider key in the order sc-agent would use it.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;For each detected key, `decidr doctor` MUST show the source it came from: the environment, the repository-root `.env`, or the platform keyring.&quot;
+      }
+    ]
+  },
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0101&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0102&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0503&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-21&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Short names run the latest model, so the catalog must keep up with what providers release.\n\nOwner ruling (2026-11-20), Rand Lee, on showing where a key came from: \&quot;I think this will help if there is key issue.\&quot;\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;No hand built checks.\&quot;\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;`decidr doctor` MUST compare each configured provider&#x27;s model list with the catalog.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;`decidr doctor` MUST warn about every model a provider lists that is in no provider table, naming the provider and the model.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;`decidr doctor` MUST list every detected provider key in the order sc-agent would use it.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;For each detected key, `decidr doctor` MUST show the source it came from: the environment, the repository-root `.env`, or the platform keyring.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: The catalog is the provider tables built into sc-agent. A provider&#x27;s model list is what the provider&#x27;s models endpoint returns.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;With a provider listing a model that is in no provider table, `decidr doctor` prints a warning naming that provider and model.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;When every listed model is in the catalog, `decidr doctor` prints no missing-model warning.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;With Anthropic and OpenRouter keys both set, `decidr doctor` lists both in the order sc-agent would use them.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;doctor warns about models missing from the catalog&quot;,
+    &quot;version&quot;: &quot;0.4.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.4.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>`decidr doctor` MUST compare each configured provider&#x27;s model list with the catalog.</li>
+    <li>`decidr doctor` MUST warn about every model a provider lists that is in no provider table, naming the provider and the model.</li>
+    <li>`decidr doctor` MUST list every detected provider key in the order sc-agent would use it.</li>
+    <li>For each detected key, `decidr doctor` MUST show the source it came from: the environment, the repository-root `.env`, or the platform keyring.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: The catalog is the provider tables built into sc-agent. A provider&#x27;s model list is what the provider&#x27;s models endpoint returns.</p>
+  <h3>Rationale</h3>
+  <p>Short names run the latest model, so the catalog must keep up with what providers release.
+
+Owner ruling (2026-11-20), Rand Lee, on showing where a key came from: &quot;I think this will help if there is key issue.&quot;
+
+Owner ruling (2026-11-21), Rand Lee: &quot;No hand built checks.&quot;
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>With a provider listing a model that is in no provider table, `decidr doctor` prints a warning naming that provider and model.</li>
+    <li>When every listed model is in the catalog, `decidr doctor` prints no missing-model warning.</li>
+    <li>With Anthropic and OpenRouter keys both set, `decidr doctor` lists both in the order sc-agent would use them.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>REQ-SAG-0101</li>
+    <li>REQ-SAG-0102</li>
+  </ul>
+</section>

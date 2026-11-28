@@ -1,0 +1,660 @@
+{
+  "schema": "plan-anchoring/record-cleanup-proposals/1",
+  "level": "aggressive",
+  "proposals": [
+    {
+      "wave": 1,
+      "kind": "resolve_conflict",
+      "resolution": "reconcile",
+      "title": "Clarify layer-1 dependency order in ADR-SAG-0004 (docs/sc-agent-schema/)",
+      "records": [
+        "ADR-SAG-0004"
+      ],
+      "target": "docs/sc-agent-schema/",
+      "changes": [
+        {
+          "record": "ADR-SAG-0004",
+          "before": "Crates are in four layers, and a crate depends only on crates in lower layers. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.",
+          "after": "Crates are in four layers. A crate depends only on crates in lower layers, except within layer 1: schema, then types, then config and sqlite, then log; a layer-1 crate depends only on layer-1 crates earlier in that order. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.",
+          "reword_justification": "R02 records the explicitly directed internal layer-1 dependency order while retaining the four-layer decision."
+        }
+      ],
+      "justification": "Review finding R02: schema, then types, then config and sqlite, then log; a layer-1 crate depends only on earlier layer-1 crates.",
+      "source": {
+        "ref": "ANC-021",
+        "quote": "You need to be able to push shared methods down and move differences up",
+        "commit": "31c8ee33"
+      },
+      "improvement": "Makes the layer-1 exception explicit.",
+      "cells": []
+    },
+    {
+      "wave": 1,
+      "kind": "resolve_conflict",
+      "resolution": "reconcile",
+      "title": "Place Jev API types in sc-agent-schema (docs/sc-agent-schema/)",
+      "records": [
+        "REQ-SAG-0201"
+      ],
+      "target": "docs/sc-agent-schema/",
+      "changes": [
+        {
+          "record": "REQ-SAG-0201",
+          "before": "`sc-agent` MUST define every type that maps to the Jev API.",
+          "after": "`sc-agent-schema` MUST define every type that maps to the Jev API.",
+          "reword_justification": "Arch-ai explicitly directed the schema crate as the owner of Jev API types."
+        }
+      ],
+      "justification": "Theme c: the Jev API types are defined in sc-agent-schema. The title and acceptance criteria will also need to reflect the approved owner and coverage. This record was not flagged in the trace and has no trace-provided provenance; the change is included by arch-ai direction.",
+      "source": {
+        "ref": "ANC-021",
+        "quote": "You need to be able to push shared methods down and move differences up",
+        "commit": ""
+      },
+      "improvement": "Places Jev schema types in the named layer-1 crate.",
+      "cells": []
+    },
+    {
+      "wave": 1,
+      "kind": "resolve_conflict",
+      "resolution": "reconcile",
+      "title": "Align sitr and sc-treesitter dependencies with layer 1 (docs/sc-agent-types/)",
+      "records": [
+        "REQ-SAG-0301"
+      ],
+      "target": "docs/sc-agent-types/",
+      "changes": [
+        {
+          "record": "REQ-SAG-0301",
+          "before": "`sc-treesitter` MUST NOT depend on any sc-agent crate other than `sc-agent`, whose error and logging it shares.",
+          "after": "`sitr` and `sc-treesitter` MUST depend on `sc-agent-types` and `sc-agent-log` only, and on nothing above layer 1.",
+          "reword_justification": "Arch-ai explicitly supplied the replacement dependency constraint for theme b."
+        }
+      ],
+      "justification": "Theme b: sitr and sc-treesitter depend on sc-agent-types and sc-agent-log only, and on nothing above layer 1. Acceptance criteria will need the corresponding update.",
+      "source": {
+        "ref": "ANC-021",
+        "quote": "You need to be able to push shared methods down and move differences up",
+        "commit": "66369ba0"
+      },
+      "improvement": "Replaces the legacy monolithic sc-agent dependency with the directed crate boundary.",
+      "cells": []
+    },
+    {
+      "wave": 1,
+      "kind": "resolve_conflict",
+      "resolution": "reconcile",
+      "title": "Align ADR-SAG-0019 wheel boundary with ADR-SAG-0004 (docs/sc-decision-runner/)",
+      "records": [
+        "ADR-SAG-0019"
+      ],
+      "changes": [
+        {
+          "record": "ADR-SAG-0019",
+          "before": "The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.\n\n1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection, API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query whose model call succeeded (a failed call writes no row; its error goes to the general log), at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.\n\n   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`; the wheel moves to maturin's mixed layout and `import sc_agent` is unchanged.\n\n   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping.\n   - model selectors are Run arguments.\n   - A result line holds only the generic result fields; session data stays in the session row. The module reads session rows only through `sc_agent.session_rows`, finding a run's queries through its link records or the session_ids in its result lines, and never computes a session-log path.\n   - Python results are typed values, not dicts.\n   - sc-compose is an external render tool, not a wheel dependency; the template's front matter declares its sc-compose minimum (`requires.cli`), declared, not enforced.\n\n   **The lower-level API stays the contract.** `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public, and the generated code uses only them and the standard library.\n\n2. **Typed fields: `attempts` and `category`.** An error value carries at least `id`, `message` and `action`, plus `attempts` (sends made, the first included) and `category` (decision 6) when they apply; unset fields are not written (REQ-SAG-0016). Retry-After is read as a Duration and used for the wait before a resend (REQ-SAG-0601).\n\n5. **Python errors.** Every wheel call returns ok with a value or an error with its id and message; nothing raises (REQ-SAG-0016).\n\n6. **The category is stored when the error is built.** The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`. Every error has a stable id and stores its category, which Python reads from the `category` field (REQ-SAG-0017). Retryable means worth resubmitting as a new call later, after the wheel's own resends have run out; it is true for `busy` and `network` only, and a consumer that resubmits waits first rather than wrapping the wheel in an immediate retry loop.\n\n7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run's calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout. The timeout defaults to 120 s; REQ-SAG-0702 holds the rules.\n\n8. **`send_batch` returns one result per request, each with its input position**, while `on_result` still receives each line as it finishes (REQ-SAG-0702).\n\n11. **sitr is an optional, separate section of the consumer template.** It uses `sc_agent.sitr` only (ADR-SAG-0005, ADR-SAG-0021) and is kept separate from the decision call: extraction runs outside the decision path, and its output feeds the consumer's prompt authoring. In this phase one offline test shows extraction output reaching a dry-run request.\n\n14. **A run is a context object.** `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`); creating it mints the run's ULID `run_id` in Rust (as are `session_id` ULIDs), readable as `run.run_id`.",
+          "after": "The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.\n\n1. **The wheel is the consumer boundary.** The wheel is a thin public surface over lower-layer implementation crates. Shared implementation concerns are owned in the appropriate lower layers, including: model selection, API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query whose model call succeeded (a failed call writes no row; its error goes to the general log), at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.\n\n   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`; the wheel moves to maturin's mixed layout and `import sc_agent` is unchanged.\n\n   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping.\n   - model selectors are Run arguments.\n   - A result line holds only the generic result fields; session data stays in the session row. The module reads session rows only through `sc_agent.session_rows`, finding a run's queries through its link records or the session_ids in its result lines, and never computes a session-log path.\n   - Python results are typed values, not dicts.\n   - sc-compose is an external render tool, not a wheel dependency; the template's front matter declares its sc-compose minimum (`requires.cli`), declared, not enforced.\n\n   **The lower-level API stays the contract.** `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public, and the generated code uses only them and the standard library.\n\n2. **Typed fields: `attempts` and `category`.** An error value carries at least `id`, `message` and `action`, plus `attempts` (sends made, the first included) and `category` (decision 6) when they apply; unset fields are not written (REQ-SAG-0016). Retry-After is read as a Duration and used for the wait before a resend (REQ-SAG-0601).\n\n5. **Python errors.** Every wheel call returns ok with a value or an error with its id and message; nothing raises (REQ-SAG-0016).\n\n6. **The category is stored when the error is built.** The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`. Every error has a stable id and stores its category, which Python reads from the `category` field (REQ-SAG-0017). Retryable means worth resubmitting as a new call later, after the wheel's own resends have run out; it is true for `busy` and `network` only, and a consumer that resubmits waits first rather than wrapping the wheel in an immediate retry loop.\n\n7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run's calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout. The timeout defaults to 120 s; REQ-SAG-0702 holds the rules.\n\n8. **`send_batch` returns one result per request, each with its input position**, while `on_result` still receives each line as it finishes (REQ-SAG-0702).\n\n11. **sitr is an optional, separate section of the consumer template.** It uses `sc_agent.sitr` only (ADR-SAG-0005, ADR-SAG-0021) and is kept separate from the decision call: extraction runs outside the decision path, and its output feeds the consumer's prompt authoring. In this phase one offline test shows extraction output reaching a dry-run request.\n\n14. **A run is a context object.** `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`); creating it mints the run's ULID `run_id` in Rust (as are `session_id` ULIDs), readable as `run.run_id`.",
+          "reword_justification": "The explicit architecture direction places the thin wheel in layer 4 and shared implementation in lower layers; the remaining decisions are retained for review."
+        }
+      ],
+      "justification": "Arch-ai directs resolving the claim that every consumer concern belongs in sc-decidr against ADR-SAG-0004 v0.5.0.",
+      "source": {
+        "ref": "ANC-021",
+        "quote": "You need to be able to push shared methods down and move differences up",
+        "commit": "2e54ef62"
+      },
+      "improvement": "Aligns the wheel boundary with the layer-4 architecture.",
+      "cells": [],
+      "target": "docs/sc-decision-runner/"
+    },
+    {
+      "wave": 1,
+      "kind": "resolve_conflict",
+      "resolution": "reconcile",
+      "title": "Make providers configuration rows in REQ-SAG-0103 (docs/sc-agent-config/)",
+      "records": [
+        "REQ-SAG-0103"
+      ],
+      "changes": [
+        {
+          "record": "REQ-SAG-0103",
+          "before": "sc-agent MUST be able to send requests through Together.",
+          "after": "A provider MUST be defined as a configuration row.",
+          "reword_justification": "Arch-ai directs replacing named providers with configurable provider rows."
+        },
+        {
+          "record": "REQ-SAG-0103",
+          "before": "sc-agent MUST be able to send requests through OpenRouter."
+        },
+        {
+          "record": "REQ-SAG-0103",
+          "before": "The provider that sends requests to the OpenAI API MUST have the name `openai`."
+        }
+      ],
+      "justification": "Arch-ai directs that a provider is a configuration row rather than a hard-coded named provider. ANC-012 owner quote: “there should be implementations of the decison trait for jev, openai-sdk, anthropic-sdk and compatible providers.  we will also need a llm-trait or similar to enable json-in/json-out llm behavior for open-ai-sdk, anthropic-sdk and compatible providers.  i.e. all providers w/ compatible api should use the same impelemntation.”",
+      "source": {
+        "ref": "ANC-009",
+        "quote": "hard-coded rows will get stale quickly and often",
+        "commit": "67203e2f"
+      },
+      "improvement": "Providers are configured rather than fixed as named source obligations.",
+      "cells": [],
+      "target": "docs/sc-agent-config/"
+    },
+    {
+      "wave": 1,
+      "kind": "resolve_conflict",
+      "title": "Update NFR-SAG-0001 to require SQLite session storage (docs/sc-agent-sqlite/)",
+      "records": [
+        "NFR-SAG-0001"
+      ],
+      "target": "docs/sc-agent-sqlite/",
+      "changes": [
+        {
+          "record": "NFR-SAG-0001",
+          "before": "All sessions of one repo, agent role and project MUST be written to one session log file.",
+          "after": "All sessions of one repo, agent role and project MUST be written to the repository's SQLite database through `sc-agent-sqlite`.",
+          "reword_justification": "ANC-023 replaces the session log file with the repository SQLite database. The prohibition on creating one log file per session remains unchanged."
+        }
+      ],
+      "resolution": "reconcile",
+      "justification": "Preserve the session grouping requirement while replacing its obsolete file destination with the owner-directed SQLite destination.",
+      "source": {
+        "ref": "ANC-023",
+        "quote": "I want session logs written to SQLite, jsonl was just a quick item for mvp",
+        "commit": "ad62941d"
+      },
+      "improvement": "NFR-SAG-0001 agrees with the SQLite storage direction while retaining its grouping rule.",
+      "cells": [
+        "NFR-SAG-0001/ANC-023",
+        "NFR-SAG-0001/ANC-031"
+      ]
+    },
+    {
+      "wave": 1,
+      "kind": "cut_excess",
+      "title": "Remove the obsolete session log path (docs/sc-agent-log/)",
+      "records": [
+        "REQ-SAG-0003"
+      ],
+      "changes": [
+        {
+          "record": "REQ-SAG-0003",
+          "before": "Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005)."
+        }
+      ],
+      "justification": "The owner ruled: \"I want session logs written to SQLite, jsonl was just a quick item for mvp\". This 2026-11-19 session path predates that ruling. Retention remains required: \"Session logs not deleted.\"",
+      "source": {
+        "ref": "ANC-023",
+        "quote": "I want session logs written to SQLite, jsonl was just a quick item for mvp",
+        "commit": "f023c0d1"
+      },
+      "improvement": "REQ-SAG-0003 no longer requires the obsolete session log file path.",
+      "cells": [
+        "REQ-SAG-0003/ANC-023"
+      ],
+      "target": "docs/sc-agent-log/"
+    },
+    {
+      "wave": 1,
+      "kind": "resolve_conflict",
+      "title": "Remove the general log retention ban (docs/sc-agent-log/)",
+      "records": [
+        "REQ-SAG-0003"
+      ],
+      "changes": [
+        {
+          "record": "REQ-SAG-0003",
+          "before": "sc-agent MUST NOT contain code that removes a general log."
+        }
+      ],
+      "resolution": "cut",
+      "justification": "The owner ruled: \"general logs follow sc-obs rotation/deletion guidelines\". The ban was added before that ruling.",
+      "source": {
+        "ref": "ANC-024",
+        "quote": "general logs follow sc-obs rotation/deletion guidelines",
+        "commit": "1a9af55a"
+      },
+      "improvement": "General log retention can follow sc-observability's rotation and deletion policy.",
+      "cells": [
+        "REQ-SAG-0003/ANC-024"
+      ],
+      "target": "docs/sc-agent-log/"
+    },
+    {
+      "wave": 1,
+      "kind": "resolve_conflict",
+      "title": "Replace JSONL session storage with SQLite (docs/sc-agent-sqlite/)",
+      "records": [
+        "REQ-SAG-0005"
+      ],
+      "changes": [
+        {
+          "record": "REQ-SAG-0005",
+          "before": "Session logs MUST be written as JSONL.",
+          "after": "Session logs MUST be written to the repository's SQLite database.",
+          "reword_justification": "The owner explicitly replaced JSONL session storage with SQLite."
+        }
+      ],
+      "resolution": "reconcile",
+      "justification": "The owner ruled: \"I want session logs written to SQLite, jsonl was just a quick item for mvp\". This 2026-11-18 statement predates that ruling. The remaining session row behavior is unchanged.",
+      "source": {
+        "ref": "ANC-023",
+        "quote": "I want session logs written to SQLite, jsonl was just a quick item for mvp",
+        "commit": "3afa4f9e"
+      },
+      "improvement": "REQ-SAG-0005 no longer requires JSONL session logs.",
+      "cells": [
+        "REQ-SAG-0005/ANC-023",
+        "REQ-SAG-0005/ANC-031"
+      ],
+      "target": "docs/sc-agent-sqlite/"
+    },
+    {
+      "wave": 1,
+      "kind": "resolve_conflict",
+      "title": "Remove client-specific holdoff mechanics (docs/sc-agent-types/)",
+      "target": "docs/sc-agent-types/",
+      "records": [
+        "REQ-SAG-0601"
+      ],
+      "changes": [
+        {
+          "record": "REQ-SAG-0601",
+          "before": "When an `HttpClient` receives a busy reply from a host, the `HttpClient` MUST set a not-before time shared by every send through that client to that host.",
+          "after": "Retry and holdoff MUST be pushed down as far as possible with policy inputs parameterized by the implementation.",
+          "reword_justification": "Arch-ai directed parameterized retry and holdoff while retaining externally visible retry and quota behavior."
+        }
+      ],
+      "justification": "These statements prescribe where shared, per-host holdoff state lives and how later endpoint sends wait. The owner directed retry and holdoff behavior to be pushed down and parameterized by the implementation. Both statements predate that ruling.",
+      "source": {
+        "ref": "ANC-030",
+        "quote": "retry and holdoff are pushed down as far as possible w/ info/data patameterized coming from implementation.",
+        "commit": "ad62941d"
+      },
+      "improvement": "Moves retry and holdoff mechanics down while preserving the other retry, quota and wait obligations.",
+      "cells": [
+        "REQ-SAG-0601/ANC-030"
+      ],
+      "resolution": "reconcile"
+    },
+    {
+      "wave": 1,
+      "kind": "resolve_conflict",
+      "title": "Remove fixed local model ids from REQ-SAG-0801 (docs/sc-agent-config/)",
+      "records": [
+        "REQ-SAG-0801"
+      ],
+      "target": "docs/sc-agent-config/",
+      "changes": [
+        {
+          "record": "REQ-SAG-0801",
+          "before": "Each local decision runner's model MUST have a fixed model id in the model table.",
+          "after": "Each local decision runner's model id MUST come from configuration.",
+          "reword_justification": "The owner requires both local model address and model string to come from configuration."
+        },
+        {
+          "record": "REQ-SAG-0801",
+          "before": "A selection of `decider` MUST resolve to the 4b decider model."
+        }
+      ],
+      "justification": "The owner directs that local model URLs and model ids come from configuration. Remove the fixed model id and fixed `decider` selection obligations while retaining the existing configuration requirements.",
+      "source": {
+        "ref": "ANC-022",
+        "quote": "local models come from config. Both ip & model string.",
+        "commit": "67203e2f"
+      },
+      "improvement": "The record no longer fixes a local model id or requires `decider` to resolve to one particular model.",
+      "cells": [
+        "REQ-SAG-0801/ANC-001",
+        "REQ-SAG-0801/ANC-009",
+        "REQ-SAG-0801/ANC-022"
+      ],
+      "resolution": "reconcile"
+    },
+    {
+      "wave": 1,
+      "kind": "resolve_conflict",
+      "title": "Replace the JSONL-first session-log decision (docs/sc-agent-sqlite/)",
+      "records": [
+        "ADR-SAG-0002"
+      ],
+      "changes": [
+        {
+          "record": "ADR-SAG-0002",
+          "before": "For the MVP, session logs are JSONL under `<log_root>/sessions/<repo>/<agent_role>/<project>/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.",
+          "after": "Session logs are written to the repository's SQLite database through `sc-agent-sqlite`. The local SQLite database syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are stored in that database; a project lasts under a day to several days.",
+          "reword_justification": "The owner directed replacing the JSONL session-log design with SQLite. The row metadata can remain while the storage sequence and server-sync claim are removed."
+        }
+      ],
+      "justification": "The owner replaced JSONL-first session storage with SQLite; independently stated long-term sync and grouping remain for review.",
+      "reword_justification": "The owner directed replacing the JSONL session-log design with SQLite. The row metadata can remain while the storage sequence and server-sync claim are removed.",
+      "source": {
+        "ref": "ANC-023",
+        "quote": "I want session logs written to SQLite, jsonl was just a quick item for mvp",
+        "commit": "998015d2"
+      },
+      "improvement": "Uses SQLite for session logs while retaining the remaining ADR decisions.",
+      "cells": [
+        "ADR-SAG-0002/ANC-023",
+        "ADR-SAG-0002/ANC-031"
+      ],
+      "target": "docs/sc-agent-sqlite/",
+      "resolution": "reconcile"
+    }
+  ],
+  "not_proposed": [
+    {
+      "slice": "cells",
+      "reason": "No owner-ready proposals for NFR-SAG-0004: broad shared-fact statements have no trace-established stale side, and deleting them solely because narrower anchors omit them is not justified. The trace does contain provenance for both statements.",
+      "items": [
+        "NFR-SAG-0004/ANC-009",
+        "NFR-SAG-0004/ANC-010",
+        "NFR-SAG-0004/ANC-015",
+        "NFR-SAG-0004/ANC-021",
+        "NFR-SAG-0004/ANC-022",
+        "NFR-SAG-0004/ANC-023",
+        "NFR-SAG-0004/ANC-026",
+        "NFR-SAG-0004/ANC-027"
+      ]
+    },
+    {
+      "slice": "cells",
+      "reason": "No owner-ready change is supported by the cell: its obligation is either within the anchor's scope, the anchor does not govern that obligation, or the trace does not establish a conflict or staleness.",
+      "items": [
+        "NFR-SAG-0004/ANC-032",
+        "REQ-SAG-0003/ANC-005",
+        "REQ-SAG-0003/ANC-015",
+        "REQ-SAG-0003/ANC-031",
+        "REQ-SAG-0005/ANC-027",
+        "REQ-SAG-0006/ANC-021"
+      ]
+    },
+    {
+      "slice": "correct-03",
+      "reason": "The cell's trace classification does not identify a specific conflict or excess suitable for a concrete correction, or the exact record text needed for a complete correction is not available as a traced statement.",
+      "items": [
+        "REQ-SAG-0006/ANC-032",
+        "REQ-SAG-0008/ANC-006",
+        "REQ-SAG-0008/ANC-016",
+        "REQ-SAG-0008/ANC-020",
+        "REQ-SAG-0011/ANC-023",
+        "REQ-SAG-0011/ANC-031",
+        "REQ-SAG-0018/ANC-010",
+        "REQ-SAG-0019/ANC-022"
+      ]
+    },
+    {
+      "slice": "correct-03",
+      "reason": "Proposer output rejected: the trace does not establish a safe change, provenance is incomplete, or it conflicts with the owner direction.",
+      "items": [
+        "REQ-SAG-0019/ANC-001"
+      ]
+    },
+    {
+      "slice": "correct-03",
+      "reason": "Proposer output rejected: the trace does not establish a safe change, provenance is incomplete, or it conflicts with the owner direction.",
+      "items": [
+        "REQ-SAG-0019/ANC-009"
+      ]
+    },
+    {
+      "slice": "correct-04",
+      "reason": "The remaining yellow and red cells do not identify a direct contradiction or demonstrably stale clause that can be safely removed. The other yellow model-table cells extend beyond the anchor, but lack of anchor coverage alone is insufficient grounds for deletion. The red local-model/catalog cell is ambiguous about whether configured rows satisfy the requirement.",
+      "items": [
+        "REQ-SAG-0602/ANC-030",
+        "REQ-SAG-0101/ANC-001",
+        "REQ-SAG-0101/ANC-009",
+        "REQ-SAG-0101/ANC-022",
+        "REQ-SAG-0102/ANC-001",
+        "REQ-SAG-0102/ANC-009",
+        "REQ-SAG-0102/ANC-022",
+        "REQ-SAG-0103/ANC-009",
+        "REQ-SAG-0103/ANC-026"
+      ]
+    },
+    {
+      "slice": "cells",
+      "reason": "Only REQ-SAG-0801 has a directly applicable owner ruling for the fixed local model id and fixed `decider` selection. The other yellow cells do not show a stale side, conflict, or exact owner ruling sufficient to justify changing their record text.",
+      "items": [
+        "REQ-SAG-0901/ANC-013",
+        "REQ-SAG-0701/ANC-028",
+        "REQ-SAG-0202/ANC-027",
+        "REQ-SAG-0502/ANC-009",
+        "REQ-SAG-0502/ANC-013",
+        "REQ-SAG-0301/ANC-021",
+        "ADR-SAG-0001/ANC-012"
+      ]
+    },
+    {
+      "slice": "correct-06",
+      "reason": "For the flagged cells without a proposal, the trace's class does not establish a specific excess or conflict against the anchor; no obligation is deleted solely because an anchor omits it.",
+      "items": [
+        "ADR-SAG-0002/ANC-005",
+        "ADR-SAG-0002/ANC-024",
+        "ADR-SAG-0004/ANC-009",
+        "ADR-SAG-0004/ANC-012",
+        "ADR-SAG-0004/ANC-013",
+        "ADR-SAG-0004/ANC-021",
+        "ADR-SAG-0004/ANC-022",
+        "ADR-SAG-0019/ANC-023"
+      ]
+    },
+    {
+      "slice": "cells",
+      "reason": "The cell concerns a multi-topic ADR decision. It does not identify a narrowly scoped, owner-ready change without risking deletion of unrelated logger or session requirements.",
+      "items": [
+        "ADR-SAG-0020/ANC-022",
+        "ADR-SAG-0021/ANC-005",
+        "ADR-SAG-0021/ANC-006",
+        "ADR-SAG-0021/ANC-016",
+        "ADR-SAG-0021/ANC-020",
+        "ADR-SAG-0021/ANC-023",
+        "ADR-SAG-0021/ANC-027",
+        "ADR-SAG-0021/ANC-031"
+      ]
+    },
+    {
+      "slice": "duplicates",
+      "reason": "The duplicate traces involve ADR-SAG-0002's single multi-topic statement and NFR-SAG-0001 statements that the owner has directed to replace with SQLite. A consolidating edit needs the revised NFR wording to determine the surviving statements; I did not infer that wording.",
+      "items": [
+        "ADR-SAG-0002/NFR-SAG-0001/0",
+        "ADR-SAG-0002/NFR-SAG-0001/1"
+      ]
+    },
+    {
+      "slice": "duplicates",
+      "reason": "The owner directed that ADR-SAG-0002 and NFR-SAG-0001 be updated for SQLite. A consolidating edit needs the revised NFR wording to identify the surviving obligations; that wording is not in this trace.",
+      "items": [
+        "ADR-SAG-0002/NFR-SAG-0001/0",
+        "ADR-SAG-0002/NFR-SAG-0001/1"
+      ]
+    },
+    {
+      "slice": "correct-08",
+      "reason": "All duplicate items are embedded in ADR decisions that Raptor serves as one large statement. Exact proposals would require replacing each full ADR decision statement while preserving its non-duplicate content; that rewrite is not safely expressible as a deletion here. The requirement-side records remain the home copies under the duplicate correction rules.",
+      "items": [
+        "ADR-SAG-0002/REQ-SAG-0004/0",
+        "ADR-SAG-0002/REQ-SAG-0005/0",
+        "ADR-SAG-0004/REQ-SAG-0002/0",
+        "ADR-SAG-0004/REQ-SAG-0002/2",
+        "ADR-SAG-0004/REQ-SAG-0002/3",
+        "ADR-SAG-0004/REQ-SAG-0002/8",
+        "ADR-SAG-0019/REQ-SAG-0002/0",
+        "ADR-SAG-0019/REQ-SAG-0002/6",
+        "ADR-SAG-0019/REQ-SAG-0005/1",
+        "ADR-SAG-0019/REQ-SAG-0005/3"
+      ]
+    },
+    {
+      "slice": "correct-09",
+      "reason": "Proposer output rejected: the trace does not establish a safe change, provenance is incomplete, or it conflicts with the owner direction.",
+      "items": [
+        "ADR-SAG-0019/REQ-SAG-0601/5",
+        "ADR-SAG-0019/REQ-SAG-0601/9",
+        "ADR-SAG-0019/REQ-SAG-0602/2"
+      ]
+    },
+    {
+      "slice": "correct-09",
+      "reason": "Proposer output rejected: the trace does not establish a safe change, provenance is incomplete, or it conflicts with the owner direction.",
+      "items": [
+        "ADR-SAG-0020/REQ-SAG-0019/2",
+        "ADR-SAG-0020/REQ-SAG-0103/0"
+      ]
+    },
+    {
+      "slice": "correct-09",
+      "reason": "Proposer output rejected: the trace does not establish a safe change, provenance is incomplete, or it conflicts with the owner direction.",
+      "items": [
+        "ADR-SAG-0021/NFR-SAG-0001/0",
+        "ADR-SAG-0021/NFR-SAG-0001/1"
+      ]
+    },
+    {
+      "slice": "correct-09",
+      "reason": "Proposer output rejected: the trace does not establish a safe change, provenance is incomplete, or it conflicts with the owner direction.",
+      "items": [
+        "ADR-SAG-0021/REQ-SAG-0003/0",
+        "ADR-SAG-0021/REQ-SAG-0003/3"
+      ]
+    },
+    {
+      "slice": "correct-09",
+      "reason": "Proposer output rejected: the trace does not establish a safe change, provenance is incomplete, or it conflicts with the owner direction.",
+      "items": [
+        "ADR-SAG-0021/REQ-SAG-0004/7"
+      ]
+    },
+    {
+      "slice": "correct-10",
+      "reason": "The ADR-SAG-0021 duplicates are embedded in a single Raptor-served decision block, so clause-level changes cannot be grounded in an exact traced before value. The REQ-SAG-0601 duplicate is part of a composite statement, and deleting it would also remove distinct authentication and remote-error obligations.",
+      "items": [
+        "ADR-SAG-0021/REQ-SAG-0004/8",
+        "ADR-SAG-0021/REQ-SAG-0005/0",
+        "ADR-SAG-0021/REQ-SAG-0005/1",
+        "ADR-SAG-0021/REQ-SAG-0008/0",
+        "ADR-SAG-0021/REQ-SAG-0021/0",
+        "ADR-SAG-0021/REQ-SAG-0021/3",
+        "ADR-SAG-0021/REQ-SAG-0021/4",
+        "ADR-SAG-0021/REQ-SAG-0021/5",
+        "ADR-SAG-0021/REQ-SAG-0021/6",
+        "REQ-SAG-0601/REQ-SAG-0602/2"
+      ]
+    },
+    {
+      "slice": "correct-11-12",
+      "reason": "Proposer output rejected pending verification: proposed keep citations and target folders do not establish every obligation or the requested phase-m crate ownership.",
+      "items": [
+        "REQ-SAG-0501",
+        "REQ-SAG-0503",
+        "NFR-SAG-0003",
+        "REQ-SAG-0009",
+        "REQ-SAG-0016",
+        "REQ-SAG-0017",
+        "REQ-SAG-0013",
+        "REQ-SAG-0401",
+        "REQ-SAG-0302",
+        "REQ-SAG-0303",
+        "ADR-SAG-0017",
+        "ADR-SAG-0018"
+      ]
+    }
+  ],
+  "dropped": [
+    {
+      "title": "Cut the generic model-entry override rule from docs/sc-agent-config/",
+      "correlation_id": "correct-03",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Cut the generic model-entry override rule from docs/sc-agent-config/",
+      "correlation_id": "correct-03",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Keep retry and quota obligations in their REQs",
+      "correlation_id": "correct-09",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Keep configuration obligations in their REQs",
+      "correlation_id": "correct-09",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Keep session logging obligations in their REQs",
+      "correlation_id": "correct-09",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Keep log location requirements in REQ-SAG-0003",
+      "correlation_id": "correct-09",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Keep agent role behavior in REQ-SAG-0004",
+      "correlation_id": "correct-09",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Retain TypeSafe CLI access in docs/decidr",
+      "correlation_id": "correct-11",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Retain doctor diagnostics in docs/decidr",
+      "correlation_id": "correct-11",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Retain the Python floor in docs/sc-agent-py",
+      "correlation_id": "correct-11",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Retain tokio-free low-level crates in docs/sc-agent",
+      "correlation_id": "correct-11",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Retain typed error values in docs/sc-agent",
+      "correlation_id": "correct-11",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Retain error categories in docs/sc-agent",
+      "correlation_id": "correct-11",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Retain configuration bounds in docs/sc-agent",
+      "correlation_id": "correct-11",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Retain credential resolution in docs/sc-agent",
+      "correlation_id": "correct-11",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Retain tree-sitter grammar support in docs/sc-treesitter",
+      "correlation_id": "correct-11",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Retain Python and CLI query surfaces in docs/sitr",
+      "correlation_id": "correct-11",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Keep ADR-SAG-0017's first release surfaces",
+      "correlation_id": "correct-12",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    },
+    {
+      "title": "Keep ADR-SAG-0018's sc-publish ownership decision",
+      "correlation_id": "correct-12",
+      "reason": "Rejected: not safely supported by corrected trace and owner directions; no owner-ready change inferred."
+    }
+  ]
+}

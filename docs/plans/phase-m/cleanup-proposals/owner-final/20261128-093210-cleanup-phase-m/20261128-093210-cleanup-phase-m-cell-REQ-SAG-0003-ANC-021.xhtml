@@ -1,0 +1,115 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-related" id="cell-REQ-SAG-0003-ANC-021">
+  <div class="section-head">
+    <h2>REQ-SAG-0003 × ANC-021 — related</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-021&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.83,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.89,
+        &quot;unclear&quot;: 0.07,
+        &quot;yes&quot;: 0.04
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.79,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.86,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.13
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.61,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.25,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.74
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.94,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.96,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.03
+      }
+    }
+  },
+  &quot;class&quot;: &quot;related&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.04,
+    &quot;exceeds&quot;: 0.13,
+    &quot;relates&quot;: 0.74,
+    &quot;serves&quot;: 0.03
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0003&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0003/ANC-021/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8GQ67Q7JSVYWB6R2WM7ZKVA&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0003 × ANC-021 — related
+Anchor
+Every phase-m sprint bead names the crate and layer each change lands in, and that layer is the lowest layer whose crates all use the change.
+Owner said: “You need to be able to push shared methods down and move differences up”
+Scope: adds or changes code in any crate under crates/
+Record statements
+With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/&lt;cli&gt;.log.jsonl`.
+When `&lt;CLI&gt;_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`.
+When `&lt;CLIENT&gt;_LOG_ROOT` is set and not empty, the generated client MUST use that folder in place of `~/.sc-agent/` for its logs.
+Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).
+A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.
+A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.
+sc-agent MUST NOT contain code that removes a general log.
+sc-agent MUST NOT remove a session log.
+sc-agent MUST NOT remove a run log.
+History (git)
+REQ-SAG-0003 statement 1: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths
+REQ-SAG-0003 statement 2: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths
+REQ-SAG-0003 statement 3: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings
+REQ-SAG-0003 statement 4: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths
+REQ-SAG-0003 statement 5: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths
+REQ-SAG-0003 statement 6: 13c45130 2026-11-24: docs(phase-j): round-3 rulings: runs.jsonl link table, haiku/luna keyless
+REQ-SAG-0003 statement 7: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass
+REQ-SAG-0003 statement 8: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+REQ-SAG-0003 statement 9: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)
+Jev P(yes): relates 0.74 · serves 0.03 · exceeds 0.13 · conflicts 0.04">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>Anchor</h3>
+  <p>Every phase-m sprint bead names the crate and layer each change lands in, and that layer is the lowest layer whose crates all use the change.</p>
+  <p>Owner said: “You need to be able to push shared methods down and move differences up”</p>
+  <p>Scope: adds or changes code in any crate under crates/</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/&lt;cli&gt;.log.jsonl`.</li>
+    <li>When `&lt;CLI&gt;_LOG_ROOT` is set and non-empty, that CLI MUST use its value in place of `~/.sc-agent`.</li>
+    <li>When `&lt;CLIENT&gt;_LOG_ROOT` is set and not empty, the generated client MUST use that folder in place of `~/.sc-agent/` for its logs.</li>
+    <li>Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).</li>
+    <li>A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.</li>
+    <li>A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.</li>
+    <li>sc-agent MUST NOT contain code that removes a general log.</li>
+    <li>sc-agent MUST NOT remove a session log.</li>
+    <li>sc-agent MUST NOT remove a run log.</li>
+  </ul>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>REQ-SAG-0003 statement 1: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 2: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 3: 22f4a5bd 2026-11-25: phase-j records: fix ai-qa clean-up findings</li>
+    <li>REQ-SAG-0003 statement 4: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 5: f023c0d1 2026-11-19: Records: one sc-observability Logger per process, one wheel, fixed log paths</li>
+    <li>REQ-SAG-0003 statement 6: 13c45130 2026-11-24: docs(phase-j): round-3 rulings: runs.jsonl link table, haiku/luna keyless</li>
+    <li>REQ-SAG-0003 statement 7: 1a9af55a 2026-11-25: phase-j records: D41 cache rule, D42 restores, D43 gate pass</li>
+    <li>REQ-SAG-0003 statement 8: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+    <li>REQ-SAG-0003 statement 9: 67203e2f 2026-11-25: phase-j records: clean-up to the owner decisions (D1-D40)</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.74 · serves 0.03 · exceeds 0.13 · conflicts 0.04</p>
+</section>
