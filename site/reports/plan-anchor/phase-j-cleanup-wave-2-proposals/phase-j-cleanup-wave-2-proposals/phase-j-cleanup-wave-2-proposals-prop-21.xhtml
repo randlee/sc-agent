@@ -1,0 +1,48 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-21">
+  <div class="section-head">
+    <h2>21. Cut local-runner address and selection rules from REQ-SAG-0801 and put them to the owner as an anchor</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="21. Cut local-runner address and selection rules from REQ-SAG-0801 and put them to the owner as an anchor
+Wave 2 · propose anchor
+Records: REQ-SAG-0801
+Change:
+- Delete from REQ-SAG-0801: “Each local decision runner&#x27;s network address MUST come from configuration.”
+- Delete from REQ-SAG-0801: “Each local decision runner MUST be selectable by its name wherever a decision model is selected.”
+- Delete from REQ-SAG-0801: “`sc-agent` MUST NOT hard-code the network address of any local decision runner.”
+- Proposed anchor for the owner: “REQ-SAG-0801: the host and port of a local decision runner (laya, decider) come from configuration and sc-agent hard-codes none. Each runner is selectable by its name wherever a decision model is selected. Needed because runners differ only in where they run.”
+- Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.
+Clears: REQ-SAG-0801 × ANC-009 (exceeds)
+Justification: ANC-009 is served by &quot;Configuration MUST be able to add a local model that runs on another computer.&quot;, which stays. The three statements cut here go beyond ANC-009: the runner address comes from config, runners are selectable by name, and no address is hard-coded. At aggressive, excess stays deleted until the owner anchors it. The address rule and the no-hard-code ban state one obligation twice, and the code documents it: laya and decider_4b carry an empty url in PROVIDERS in crates/sc-agent/src/lib.rs. They are proposed as one anchor. The statements date from 67203e2f, a63c0a59 and 1a9af55a (2026-11-24 and 2026-11-25), before ANC-009. The pinned-id statements are handled in the conflict proposal and are not repeated here.
+Source of truth: ANC-009 — Owner said: “hard-coded rows will get stale quickly and often” — commit 1a9af55a
+Expected improvement:
+- REQ-SAG-0801 keeps only the config-added local model statement ANC-009 asks for.
+- Records 49 → 49; statements 205 → 202; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28
+Other proposals changing these records: 20">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · propose anchor</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0801" data-panel="rec-REQ-SAG-0801">REQ-SAG-0801</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Delete from REQ-SAG-0801: “Each local decision runner&#x27;s network address MUST come from configuration.”</li>
+    <li>Delete from REQ-SAG-0801: “Each local decision runner MUST be selectable by its name wherever a decision model is selected.”</li>
+    <li>Delete from REQ-SAG-0801: “`sc-agent` MUST NOT hard-code the network address of any local decision runner.”</li>
+    <li>Proposed anchor for the owner: “REQ-SAG-0801: the host and port of a local decision runner (laya, decider) come from configuration and sc-agent hard-codes none. Each runner is selectable by its name wherever a decision model is selected. Needed because runners differ only in where they run.”</li>
+    <li>Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.</li>
+  </ul>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0801-ANC-009" data-panel="cell-REQ-SAG-0801-ANC-009">REQ-SAG-0801 × ANC-009 (exceeds)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>ANC-009 is served by &quot;Configuration MUST be able to add a local model that runs on another computer.&quot;, which stays. The three statements cut here go beyond ANC-009: the runner address comes from config, runners are selectable by name, and no address is hard-coded. At aggressive, excess stays deleted until the owner anchors it. The address rule and the no-hard-code ban state one obligation twice, and the code documents it: laya and decider_4b carry an empty url in PROVIDERS in crates/sc-agent/src/lib.rs. They are proposed as one anchor. The statements date from 67203e2f, a63c0a59 and 1a9af55a (2026-11-24 and 2026-11-25), before ANC-009. The pinned-id statements are handled in the conflict proposal and are not repeated here.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-009 — Owner said: “hard-coded rows will get stale quickly and often” — commit 1a9af55a</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0801 keeps only the config-added local model statement ANC-009 asks for.</p>
+  <p>Records 49 → 49; statements 205 → 202; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28</p>
+  <p>Other proposals changing these records: 20</p>
+</section>

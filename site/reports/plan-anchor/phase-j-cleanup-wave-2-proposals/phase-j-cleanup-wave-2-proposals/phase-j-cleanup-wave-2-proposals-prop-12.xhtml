@@ -1,0 +1,46 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-12">
+  <div class="section-head">
+    <h2>12. Propose an anchor for the shared consumer module&#x27;s common rules in REQ-SAG-0018, and delete three statements until it is approved</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="12. Propose an anchor for the shared consumer module&#x27;s common rules in REQ-SAG-0018, and delete three statements until it is approved
+Wave 2 · propose anchor
+Records: REQ-SAG-0018
+Change:
+- Delete from REQ-SAG-0018: “The consumer module MUST pass the model selector through unchanged.”
+- Delete from REQ-SAG-0018: “The consumer module MUST cancel its running Run on `KeyboardInterrupt`.”
+- Delete from REQ-SAG-0018: “The consent gate MUST ask for consent only when the Run&#x27;s provider is TypeSafe.”
+- Proposed anchor for the owner: “REQ-SAG-0018: the shared consumer module carries the rules every decidr-based tool follows (it passes the model selector through unchanged, cancels its running Run on KeyboardInterrupt, and asks for consent only when the Run&#x27;s provider is TypeSafe), so judge-jev and plan-anchor supply only a tool name.”
+- Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.
+Clears: REQ-SAG-0018 × ANC-010 (exceeds)
+Justification: ANC-010 bans copy-paste logic. It supports one shared template (statements 0, 2 and 5, which stay) but says nothing about selector pass-through, Ctrl-C cancellation or the consent rule. These statements are exactly the shared rules ANC-015&#x27;s quote describes: &#x27;judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools&#x27;. So they are proposed as an anchor, and deleted until the owner approves it. The selector rule dates from 2026-11-14 and the other two from 2026-11-25, before the anchors.
+Source of truth: ANC-015 — Owner said: “judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools” — commit e234112e
+Expected improvement:
+- REQ-SAG-0018 keeps only the obligations ANC-010 supports. The owner decides whether the shared behaviours become anchored.
+- Records 49 → 49; statements 205 → 202; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · propose anchor</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0018" data-panel="rec-REQ-SAG-0018">REQ-SAG-0018</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Delete from REQ-SAG-0018: “The consumer module MUST pass the model selector through unchanged.”</li>
+    <li>Delete from REQ-SAG-0018: “The consumer module MUST cancel its running Run on `KeyboardInterrupt`.”</li>
+    <li>Delete from REQ-SAG-0018: “The consent gate MUST ask for consent only when the Run&#x27;s provider is TypeSafe.”</li>
+    <li>Proposed anchor for the owner: “REQ-SAG-0018: the shared consumer module carries the rules every decidr-based tool follows (it passes the model selector through unchanged, cancels its running Run on KeyboardInterrupt, and asks for consent only when the Run&#x27;s provider is TypeSafe), so judge-jev and plan-anchor supply only a tool name.”</li>
+    <li>Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.</li>
+  </ul>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0018-ANC-010" data-panel="cell-REQ-SAG-0018-ANC-010">REQ-SAG-0018 × ANC-010 (exceeds)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>ANC-010 bans copy-paste logic. It supports one shared template (statements 0, 2 and 5, which stay) but says nothing about selector pass-through, Ctrl-C cancellation or the consent rule. These statements are exactly the shared rules ANC-015&#x27;s quote describes: &#x27;judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools&#x27;. So they are proposed as an anchor, and deleted until the owner approves it. The selector rule dates from 2026-11-14 and the other two from 2026-11-25, before the anchors.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-015 — Owner said: “judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools” — commit e234112e</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0018 keeps only the obligations ANC-010 supports. The owner decides whether the shared behaviours become anchored.</p>
+  <p>Records 49 → 49; statements 205 → 202; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28</p>
+</section>

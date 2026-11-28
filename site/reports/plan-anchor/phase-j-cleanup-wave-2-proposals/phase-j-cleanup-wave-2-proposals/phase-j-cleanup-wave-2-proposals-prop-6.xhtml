@@ -1,0 +1,35 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-6">
+  <div class="section-head">
+    <h2>6. Cut the Run and send description from ADR-SAG-0001</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="6. Cut the Run and send description from ADR-SAG-0001
+Wave 2 · cut excess
+Records: ADR-SAG-0001
+Change: Cut ADR-SAG-0001: “For decision requests, every decision provider receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, and LLM providers one LLM trait (JSON in, JSON out). Jev implements the decision trait over SystemOne. One type per wire format, OpenAI-compatible chat/completions and Anthropic-compatible Messages, implements both traits and is shared by every provider of that format. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them.” → “For decision requests, every decision provider receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, and LLM providers one LLM trait (JSON in, JSON out). Jev implements the decision trait over SystemOne. One type per wire format, OpenAI-compatible chat/completions and Anthropic-compatible Messages, implements both traits and is shared by every provider of that format. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response.”
+Clears: ADR-SAG-0001 × ANC-012 (exceeds)
+Justification: ANC-012 asks for one decision trait, one implementation per wire format and no per-provider code. The sentence on opening one Run per command, send and send_batch, worker threads, holdoff, cancellation and session logging is not asked for by the anchor, and ADR-SAG-0019 decisions 7, 8 and 14 already hold it. Cut clause: &quot;Callers open one `Run` per command ... session logging live behind them.&quot;
+Source of truth: ANC-012 — Owner said: “i.e. all providers w/ compatible api should use the same impelemntation.” — commit 057b8146
+Expected improvement:
+- ADR-SAG-0001 no longer exceeds ANC-012, and the Run and send description lives only in ADR-SAG-0019.
+- Records 49 → 49; statements 205 → 205; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · cut excess</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-ADR-SAG-0001" data-panel="rec-ADR-SAG-0001">ADR-SAG-0001</a></li>
+  </ul>
+  <h3>Change</h3>
+  <p>Cut ADR-SAG-0001: “For decision requests, every decision provider receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, and LLM providers one LLM trait (JSON in, JSON out). Jev implements the decision trait over SystemOne. One type per wire format, OpenAI-compatible chat/completions and Anthropic-compatible Messages, implements both traits and is shared by every provider of that format. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them.” → “For decision requests, every decision provider receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, and LLM providers one LLM trait (JSON in, JSON out). Jev implements the decision trait over SystemOne. One type per wire format, OpenAI-compatible chat/completions and Anthropic-compatible Messages, implements both traits and is shared by every provider of that format. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response.”</p>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-ADR-SAG-0001-ANC-012" data-panel="cell-ADR-SAG-0001-ANC-012">ADR-SAG-0001 × ANC-012 (exceeds)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>ANC-012 asks for one decision trait, one implementation per wire format and no per-provider code. The sentence on opening one Run per command, send and send_batch, worker threads, holdoff, cancellation and session logging is not asked for by the anchor, and ADR-SAG-0019 decisions 7, 8 and 14 already hold it. Cut clause: &quot;Callers open one `Run` per command ... session logging live behind them.&quot;</p>
+  <h3>Source of truth</h3>
+  <p>ANC-012 — Owner said: “i.e. all providers w/ compatible api should use the same impelemntation.” — commit 057b8146</p>
+  <h3>Expected improvement</h3>
+  <p>ADR-SAG-0001 no longer exceeds ANC-012, and the Run and send description lives only in ADR-SAG-0019.</p>
+  <p>Records 49 → 49; statements 205 → 205; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 1 of 28</p>
+</section>

@@ -1,0 +1,45 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-16">
+  <div class="section-head">
+    <h2>16. Propose an anchor for model short-name resolution, and delete REQ-SAG-0101 until it is approved</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="16. Propose an anchor for model short-name resolution, and delete REQ-SAG-0101 until it is approved
+Wave 2 · propose anchor
+Records: REQ-SAG-0101
+Change:
+- Delete record REQ-SAG-0101 (2 statements).
+- Proposed anchor for the owner: “Each cloud short name (jev, haiku, sonnet, opus, fable, luna, terra, sol, astra) and each local short name (laya, decider) resolves to a model in sc-agent&#x27;s model table, so callers select models by short name.”
+- Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.
+Clears:
+- REQ-SAG-0101 × ANC-001 (exceeds)
+- REQ-SAG-0101 × ANC-009 (exceeds)
+Justification: ANC-001 covers only the `jev` name. REQ-SAG-0101 specifies every other short name and the local models. The model code backs this (the table in crates/sc-agent/src/lib.rs has fable, astra and decider), but at aggressive existing code does not justify keeping text on an anchored record. Both statements date from 2026-11-25, before ANC-001 of 2026-11-26. The owner&#x27;s words (&#x27;I want jev to select latest&#x27;) support a short-name mechanism, so this is proposed as an anchor. Until it is approved, the record&#x27;s two statements are deleted and the empty record is deleted.
+Source of truth: ANC-001 — Owner said: “I want &#x27;jev&#x27; to select latest, config can override default.” — commit 1a9af55a
+Expected improvement:
+- Only owner-anchored model-name behaviour remains. The owner decides whether short-name resolution becomes anchored.
+- Records 49 → 48; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · propose anchor</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0101" data-panel="rec-REQ-SAG-0101">REQ-SAG-0101</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Delete record REQ-SAG-0101 (2 statements).</li>
+    <li>Proposed anchor for the owner: “Each cloud short name (jev, haiku, sonnet, opus, fable, luna, terra, sol, astra) and each local short name (laya, decider) resolves to a model in sc-agent&#x27;s model table, so callers select models by short name.”</li>
+    <li>Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.</li>
+  </ul>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0101-ANC-001" data-panel="cell-REQ-SAG-0101-ANC-001">REQ-SAG-0101 × ANC-001 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0101-ANC-009" data-panel="cell-REQ-SAG-0101-ANC-009">REQ-SAG-0101 × ANC-009 (exceeds)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>ANC-001 covers only the `jev` name. REQ-SAG-0101 specifies every other short name and the local models. The model code backs this (the table in crates/sc-agent/src/lib.rs has fable, astra and decider), but at aggressive existing code does not justify keeping text on an anchored record. Both statements date from 2026-11-25, before ANC-001 of 2026-11-26. The owner&#x27;s words (&#x27;I want jev to select latest&#x27;) support a short-name mechanism, so this is proposed as an anchor. Until it is approved, the record&#x27;s two statements are deleted and the empty record is deleted.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-001 — Owner said: “I want &#x27;jev&#x27; to select latest, config can override default.” — commit 1a9af55a</p>
+  <h3>Expected improvement</h3>
+  <p>Only owner-anchored model-name behaviour remains. The owner decides whether short-name resolution becomes anchored.</p>
+  <p>Records 49 → 48; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28</p>
+</section>

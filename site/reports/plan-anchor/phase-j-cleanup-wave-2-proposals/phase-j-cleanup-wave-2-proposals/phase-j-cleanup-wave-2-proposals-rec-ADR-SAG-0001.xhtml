@@ -1,0 +1,136 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-ADR-SAG-0001">
+  <div class="section-head">
+    <h2>ADR-SAG-0001 Every decision provider receives one request form</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;ADR-SAG-0001&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/retrace2/trace-20261128T011234Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;ADR&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: null,
+    &quot;note&quot;: &quot;No obligation statements.&quot;,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: null
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;057b8146&quot;,
+        &quot;date&quot;: &quot;2026-11-26&quot;,
+        &quot;summary&quot;: &quot;phase-j plan: decision and LLM traits are parallel; drop LlmDecision adapter (owner ruling 2026-11-26)&quot;
+      },
+      &quot;statement&quot;: &quot;For decision requests, every decision provider receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, and LLM providers one LLM trait (JSON in, JSON out). Jev implements the decision trait over SystemOne. One type per wire format, OpenAI-compatible chat/completions and Anthropic-compatible Messages, implements both traits and is shared by every provider of that format. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them.&quot;,
+      &quot;statement_index&quot;: 0
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;alternatives&quot;: {
+      &quot;groups&quot;: [
+        {
+          &quot;cons&quot;: [
+            &quot;Two forms of one request must be kept equal.&quot;,
+            &quot;Shared types learn backend detail.&quot;
+          ],
+          &quot;description&quot;: &quot;Build a backend-neutral payload and derive each backend&#x27;s request from it.&quot;,
+          &quot;name&quot;: &quot;Canonical payload beside the Jev request&quot;,
+          &quot;pros&quot;: [
+            &quot;Backends share one translation step.&quot;
+          ],
+          &quot;why_rejected&quot;: &quot;&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;consequences&quot;: {
+      &quot;negative&quot;: [],
+      &quot;neutral&quot;: [],
+      &quot;positive&quot;: [
+        &quot;A new provider is added as a table row, with no change to shared types.&quot;
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;context&quot;: {
+      &quot;background&quot;: &quot;&quot;,
+      &quot;problem_statement&quot;: &quot;Jev, local Jev-compatible runners, Haiku and Luna must answer the same decision so their answers can be compared, without shared crates knowing how any one backend adapts it.&quot;,
+      &quot;text&quot;: &quot;sc-agent sends decisions to Jev, to local runners that serve the Jev API, and to LLM backends such as Haiku and Luna.&quot;
+    },
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;decision&quot;: {
+      &quot;chosen_approach&quot;: &quot;&quot;,
+      &quot;key_principles&quot;: [
+        &quot;There is one decision request form: the Jev API request body.&quot;,
+        &quot;`send_batch` returns each result as it is ready, tagged with its session ULID and input position; a failed request is returned in its result and the batch continues.&quot;
+      ],
+      &quot;text&quot;: &quot;For decision requests, every decision provider receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, and LLM providers one LLM trait (JSON in, JSON out). Jev implements the decision trait over SystemOne. One type per wire format, OpenAI-compatible chat/completions and Anthropic-compatible Messages, implements both traits and is shared by every provider of that format. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them.&quot;
+    },
+    &quot;decision_date&quot;: &quot;2026-11-09&quot;,
+    &quot;id&quot;: &quot;ADR-SAG-0001&quot;,
+    &quot;impact_analysis&quot;: {
+      &quot;affected_components&quot;: &quot;&quot;,
+      &quot;maintainability_impact&quot;: &quot;&quot;,
+      &quot;performance_impact&quot;: &quot;&quot;,
+      &quot;security_impact&quot;: &quot;&quot;,
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;implementation&quot;: {
+      &quot;code_examples&quot;: &quot;&quot;,
+      &quot;integration_points&quot;: [],
+      &quot;key_components&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-26&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;rationale&quot;: {
+      &quot;benefits&quot;: [],
+      &quot;text&quot;: &quot;When every backend receives the same data, their answers are comparable by construction, and shared code stays free of provider-specific types.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;I do not require results in request order.\&quot;&quot;,
+      &quot;trade_offs&quot;: []
+    },
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0201&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0006&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;title&quot;: &quot;Every decision provider receives one request form&quot;,
+    &quot;version&quot;: &quot;0.6.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">ADR · sc-agent · Approved · version 0.6.0</p>
+  <h3>Context</h3>
+  <p>sc-agent sends decisions to Jev, to local runners that serve the Jev API, and to LLM backends such as Haiku and Luna.</p>
+  <h3>Problem</h3>
+  <p>Jev, local Jev-compatible runners, Haiku and Luna must answer the same decision so their answers can be compared, without shared crates knowing how any one backend adapts it.</p>
+  <h3>Decision</h3>
+  <p>For decision requests, every decision provider receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, and LLM providers one LLM trait (JSON in, JSON out). Jev implements the decision trait over SystemOne. One type per wire format, OpenAI-compatible chat/completions and Anthropic-compatible Messages, implements both traits and is shared by every provider of that format. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them.</p>
+  <h3>Key principles</h3>
+  <ul>
+    <li>There is one decision request form: the Jev API request body.</li>
+    <li>`send_batch` returns each result as it is ready, tagged with its session ULID and input position; a failed request is returned in its result and the batch continues.</li>
+  </ul>
+  <h3>Rationale</h3>
+  <p>When every backend receives the same data, their answers are comparable by construction, and shared code stays free of provider-specific types.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
+Owner ruling (2026-11-21), Rand Lee: &quot;I do not require results in request order.&quot;</p>
+  <h3>Positive consequences</h3>
+  <p>A new provider is added as a table row, with no change to shared types.</p>
+</section>

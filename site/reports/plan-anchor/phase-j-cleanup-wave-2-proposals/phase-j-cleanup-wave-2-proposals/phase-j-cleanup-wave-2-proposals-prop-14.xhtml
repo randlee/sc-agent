@@ -1,0 +1,53 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-14">
+  <div class="section-head">
+    <h2>14. Cut the `&lt;cli&gt; doctor` statements from REQ-SAG-0019</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="14. Cut the `&lt;cli&gt; doctor` statements from REQ-SAG-0019
+Wave 2 · cut excess
+Records: REQ-SAG-0019
+Change:
+- Delete from REQ-SAG-0019: “Each CLI&#x27;s `&lt;cli&gt; doctor` command, such as `decidr doctor`, MUST report the settings table.”
+- Delete from REQ-SAG-0019: “In each row of the settings table, the `source` cell MUST show the source of that row&#x27;s value.”
+- Delete from REQ-SAG-0019: “`&lt;cli&gt; doctor` MUST report the path of every file in the nine layers.”
+- Delete from REQ-SAG-0019: “For each file in the nine layers, `&lt;cli&gt; doctor` MUST report whether it exists.”
+- Delete from REQ-SAG-0019: “`&lt;cli&gt; doctor` MUST NOT send a model request.”
+- Delete from REQ-SAG-0019: “`&lt;cli&gt; doctor` MUST NOT write a file.”
+Clears:
+- REQ-SAG-0019 × ANC-001 (exceeds)
+- REQ-SAG-0019 × ANC-009 (exceeds)
+Justification: No anchor mentions a doctor command or a settings table. ANC-001 and ANC-009 cover only the model default and extra model rows from config. These statements date from 2026-11-18 to 2026-11-25, before the anchors, and are excess at aggressive. If the owner wants doctor reporting kept, the route is an anchor, not keeping the text unanchored.
+Source of truth: ANC-009 — Owner said: “hard-coded rows will get stale quickly and often” — commit b98b4112
+Expected improvement:
+- REQ-SAG-0019 no longer specifies diagnostics output that no anchor asks for.
+- Records 49 → 49; statements 205 → 199; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28
+Other proposals changing these records: 13, 15">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · cut excess</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0019" data-panel="rec-REQ-SAG-0019">REQ-SAG-0019</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Delete from REQ-SAG-0019: “Each CLI&#x27;s `&lt;cli&gt; doctor` command, such as `decidr doctor`, MUST report the settings table.”</li>
+    <li>Delete from REQ-SAG-0019: “In each row of the settings table, the `source` cell MUST show the source of that row&#x27;s value.”</li>
+    <li>Delete from REQ-SAG-0019: “`&lt;cli&gt; doctor` MUST report the path of every file in the nine layers.”</li>
+    <li>Delete from REQ-SAG-0019: “For each file in the nine layers, `&lt;cli&gt; doctor` MUST report whether it exists.”</li>
+    <li>Delete from REQ-SAG-0019: “`&lt;cli&gt; doctor` MUST NOT send a model request.”</li>
+    <li>Delete from REQ-SAG-0019: “`&lt;cli&gt; doctor` MUST NOT write a file.”</li>
+  </ul>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0019-ANC-001" data-panel="cell-REQ-SAG-0019-ANC-001">REQ-SAG-0019 × ANC-001 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0019-ANC-009" data-panel="cell-REQ-SAG-0019-ANC-009">REQ-SAG-0019 × ANC-009 (exceeds)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>No anchor mentions a doctor command or a settings table. ANC-001 and ANC-009 cover only the model default and extra model rows from config. These statements date from 2026-11-18 to 2026-11-25, before the anchors, and are excess at aggressive. If the owner wants doctor reporting kept, the route is an anchor, not keeping the text unanchored.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-009 — Owner said: “hard-coded rows will get stale quickly and often” — commit b98b4112</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0019 no longer specifies diagnostics output that no anchor asks for.</p>
+  <p>Records 49 → 49; statements 205 → 199; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28</p>
+  <p>Other proposals changing these records: 13, 15</p>
+</section>

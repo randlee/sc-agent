@@ -1,0 +1,1478 @@
+[
+ {
+  "record": "ADR-SAG-0001",
+  "anchor": "ANC-012",
+  "clauses": [
+   "Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them."
+  ],
+  "what": "Describes how callers open a Run and call send and send_batch, with workers, holdoff and cancellation. ANC-012 only asks for one decision trait and one implementation per wire format.",
+  "remedy": "Cut the sentence; ADR-SAG-0019 decisions 7, 8 and 14 hold it.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0001",
+    "statement": "For decision requests, every decision provider receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, and LLM providers one LLM trait (JSON in, JSON out). Jev implements the decision trait over SystemOne. One type per wire format, OpenAI-compatible chat/completions and Anthropic-compatible Messages, implements both traits and is shared by every provider of that format. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them.",
+    "commit": "057b8146",
+    "date": "2026-11-26",
+    "summary": "phase-j plan: decision and LLM traits are parallel; drop LlmDecision adapter (owner ruling 2026-11-26)"
+   }
+  ],
+  "stale": null
+ },
+ {
+  "record": "ADR-SAG-0002",
+  "anchor": "ANC-005",
+  "clauses": [
+   "that syncs to a server for long-term storage",
+   "Every row carries its own `session_id`, `repo`, `project` and `agent_role`.",
+   "; a project lasts under a day to several days"
+  ],
+  "what": "Adds server sync, the per-row field list and project duration. ANC-005 only fixes where default logs are written.",
+  "remedy": "Cut the three clauses.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0002",
+    "statement": "For the MVP, session logs are JSONL under `<log_root>/sessions/<repo>/<agent_role>/<project>/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.",
+    "commit": "998015d2",
+    "date": "2026-11-18",
+    "summary": "docs: ADR-SAG-0020/0021 config scopes and separate session-log tree"
+   }
+  ],
+  "stale": {
+   "record": "ADR-SAG-0002",
+   "statement": "For the MVP, session logs are JSONL under `<log_root>/sessions/<repo>/<agent_role>/<project>/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.",
+   "reason": "Written 2026-11-18, eight days before ANC-005 (2026-11-26)."
+  }
+ },
+ {
+  "record": "ADR-SAG-0019",
+  "anchor": "ANC-010",
+  "clauses": [
+   "11. **sitr is an optional, separate section of the consumer template.**",
+   "- Python results are typed values, not dicts.",
+   "- sc-compose is an external render tool, not a wheel dependency;",
+   " The timeout defaults to 120 s; REQ-SAG-0702 holds the rules."
+  ],
+  "what": "Specifies the sitr template section, result typing, sc-compose packaging and the timeout default. ANC-010 only bans copy-pasted logic.",
+  "remedy": "Cut decision 11, the two bullets and the timeout-default sentence.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0019",
+    "statement": "The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.\n\n1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection, API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query whose model call succeeded (a failed call writes no row; its error goes to the general log), at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.\n\n   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`; the wheel moves to maturin's mixed layout and `import sc_agent` is unchanged.\n\n   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping.\n   - model selectors are Run arguments.\n   - A result line holds only the generic result fields; session data stays in the session row. The module reads session rows only through `sc_agent.session_rows`, finding a run's queries through its link records or the session_ids in its result lines, and never computes a session-log path.\n   - Python results are typed values, not dicts.\n   - sc-compose is an external render tool, not a wheel dependency; the template's front matter declares its sc-compose minimum (`requires.cli`), declared, not enforced.\n\n   **The lower-level API stays the contract.** `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public, and the generated code uses only them and the standard library.\n\n2. **Typed fields: `attempts` and `category`.** An error value carries at least `id`, `message` and `action`, plus `attempts` (sends made, the first included) and `category` (decision 6) when they apply; unset fields are not written (REQ-SAG-0016). Retry-After is read as a Duration and used for the wait before a resend (REQ-SAG-0601).\n\n5. **Python errors.** Every wheel call returns ok with a value or an error with its id and message; nothing raises (REQ-SAG-0016).\n\n6. **The category is stored when the error is built.** The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`. Every error has a stable id and stores its category, which Python reads from the `category` field (REQ-SAG-0017). Retryable means worth resubmitting as a new call later, after the wheel's own resends have run out; it is true for `busy` and `network` only, and a consumer that resubmits waits first rather than wrapping the wheel in an immediate retry loop.\n\n7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run's calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout. The timeout defaults to 120 s; REQ-SAG-0702 holds the rules.\n\n8. **`send_batch` returns one result per request, each with its input position**, while `on_result` still receives each line as it finishes (REQ-SAG-0702).\n\n11. **sitr is an optional, separate section of the consumer template.** It uses `sc_agent.sitr` only (ADR-SAG-0005, ADR-SAG-0021) and is kept separate from the decision call: extraction runs outside the decision path, and its output feeds the consumer's prompt authoring. In this phase one offline test shows extraction output reaching a dry-run request.\n\n14. **A run is a context object.** `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`); creating it mints the run's ULID `run_id` in Rust (as are `session_id` ULIDs), readable as `run.run_id`.",
+    "commit": "2e54ef62",
+    "date": "2026-11-24",
+    "summary": "phase-j plan v9: owner rulings (seed_session, config model rows, cache rule), records shortened"
+   }
+  ],
+  "stale": {
+   "record": "ADR-SAG-0019",
+   "statement": "The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.\n\n1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection, API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query whose model call succeeded (a failed call writes no row; its error goes to the general log), at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.\n\n   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`; the wheel moves to maturin's mixed layout and `import sc_agent` is unchanged.\n\n   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping.\n   - model selectors are Run arguments.\n   - A result line holds only the generic result fields; session data stays in the session row. The module reads session rows only through `sc_agent.session_rows`, finding a run's queries through its link records or the session_ids in its result lines, and never computes a session-log path.\n   - Python results are typed values, not dicts.\n   - sc-compose is an external render tool, not a wheel dependency; the template's front matter declares its sc-compose minimum (`requires.cli`), declared, not enforced.\n\n   **The lower-level API stays the contract.** `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public, and the generated code uses only them and the standard library.\n\n2. **Typed fields: `attempts` and `category`.** An error value carries at least `id`, `message` and `action`, plus `attempts` (sends made, the first included) and `category` (decision 6) when they apply; unset fields are not written (REQ-SAG-0016). Retry-After is read as a Duration and used for the wait before a resend (REQ-SAG-0601).\n\n5. **Python errors.** Every wheel call returns ok with a value or an error with its id and message; nothing raises (REQ-SAG-0016).\n\n6. **The category is stored when the error is built.** The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`. Every error has a stable id and stores its category, which Python reads from the `category` field (REQ-SAG-0017). Retryable means worth resubmitting as a new call later, after the wheel's own resends have run out; it is true for `busy` and `network` only, and a consumer that resubmits waits first rather than wrapping the wheel in an immediate retry loop.\n\n7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run's calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout. The timeout defaults to 120 s; REQ-SAG-0702 holds the rules.\n\n8. **`send_batch` returns one result per request, each with its input position**, while `on_result` still receives each line as it finishes (REQ-SAG-0702).\n\n11. **sitr is an optional, separate section of the consumer template.** It uses `sc_agent.sitr` only (ADR-SAG-0005, ADR-SAG-0021) and is kept separate from the decision call: extraction runs outside the decision path, and its output feeds the consumer's prompt authoring. In this phase one offline test shows extraction output reaching a dry-run request.\n\n14. **A run is a context object.** `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`); creating it mints the run's ULID `run_id` in Rust (as are `session_id` ULIDs), readable as `run.run_id`.",
+   "reason": "Last changed 2026-11-24, before ANC-010 (2026-11-26); the sitr and template details were never asked for by the anchor."
+  }
+ },
+ {
+  "record": "ADR-SAG-0021",
+  "anchor": "ANC-005",
+  "clauses": [
+   "The generated client has no close operation.",
+   "**Products.** sc-agent ships three products.",
+   "A session sink of the same kind, opened on the run log",
+   "The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout",
+   "**Session identity.**",
+   "**Errors.** An error is logged once, in Rust"
+  ],
+  "what": "Adds a product list, run-log and session-row fields, a session-row reader, session identity and error-logging rules. ANC-005 only fixes where default loggers write.",
+  "remedy": "Cut the named clauses; keep the Logger, defaults, session sink and path table.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0021",
+    "statement": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   }
+  ],
+  "stale": {
+   "record": "ADR-SAG-0021",
+   "statement": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+   "reason": "Written 2026-11-19, before ANC-005 (2026-11-26) and ANC-020 (2026-11-27)."
+  }
+ },
+ {
+  "record": "ADR-SAG-0021",
+  "anchor": "ANC-006",
+  "clauses": [
+   "The generated client has no close operation.",
+   "**Products.** sc-agent ships three products.",
+   "A session sink of the same kind, opened on the run log",
+   "**Session identity.**",
+   "**Errors.** An error is logged once, in Rust"
+  ],
+  "what": "ANC-006 only says injected loggers are not changed. The same product list, run-log and row fields, session identity and error rules go beyond it.",
+  "remedy": "Cut the named clauses.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0021",
+    "statement": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   }
+  ],
+  "stale": {
+   "record": "ADR-SAG-0021",
+   "statement": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+   "reason": "Written 2026-11-19, before ANC-006 (2026-11-26)."
+  }
+ },
+ {
+  "record": "ADR-SAG-0021",
+  "anchor": "ANC-016",
+  "clauses": [
+   "**Products.** sc-agent ships three products.",
+   "A session sink of the same kind, opened on the run log",
+   "The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout",
+   "**Session identity.**",
+   "**Errors.** An error is logged once, in Rust"
+  ],
+  "what": "ANC-016 asks that sc-agent define the injection path and derivative tools use it only in tests. The product list, run-log and row fields, session-row reader, session identity and error rules go beyond it.",
+  "remedy": "Cut the named clauses.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0021",
+    "statement": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   }
+  ],
+  "stale": {
+   "record": "ADR-SAG-0021",
+   "statement": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+   "reason": "Written 2026-11-19, before ANC-016 (2026-11-26)."
+  }
+ },
+ {
+  "record": "ADR-SAG-0021",
+  "anchor": "ANC-020",
+  "clauses": [
+   "**Products.** sc-agent ships three products.",
+   "A session sink of the same kind, opened on the run log",
+   "The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout",
+   "**Session identity.**",
+   "**Errors.** An error is logged once, in Rust"
+  ],
+  "what": "ANC-020 only bans a second Logger when one is injected. The product list, run-log and row fields, session-row reader, session identity and error rules go beyond it.",
+  "remedy": "Cut the named clauses.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0021",
+    "statement": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   }
+  ],
+  "stale": {
+   "record": "ADR-SAG-0021",
+   "statement": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+   "reason": "Written 2026-11-19, before ANC-020 (2026-11-27)."
+  }
+ },
+ {
+  "record": "NFR-SAG-0004",
+  "anchor": "ANC-009",
+  "clauses": [
+   "Every shared fact MUST have a single owner.",
+   "Code that needs a shared fact MUST obtain it by calling its owner."
+  ],
+  "what": "Requires one owner for every shared fact in sc-agent. ANC-009 only asks that the model table accept config rows.",
+  "remedy": "Delete the record unless the owner anchors one owner per shared fact.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "NFR-SAG-0004",
+    "statement": "Every shared fact MUST have a single owner.",
+    "commit": "2712a7fb",
+    "date": "2026-11-25",
+    "summary": "NFR-SAG-0004: state single ownership as one obligation"
+   },
+   {
+    "record": "NFR-SAG-0004",
+    "statement": "Code that needs a shared fact MUST obtain it by calling its owner.",
+    "commit": "a63c0a59",
+    "date": "2026-11-24",
+    "summary": "Amend phase-j records for the Run, one-owner and struct rules (plan review)"
+   }
+  ],
+  "stale": {
+   "record": "NFR-SAG-0004",
+   "statement": "Code that needs a shared fact MUST obtain it by calling its owner.",
+   "reason": "Written 2026-11-24 and 2026-11-25, before the anchors of 2026-11-26."
+  }
+ },
+ {
+  "record": "NFR-SAG-0004",
+  "anchor": "ANC-010",
+  "clauses": [
+   "Every shared fact MUST have a single owner.",
+   "Code that needs a shared fact MUST obtain it by calling its owner."
+  ],
+  "what": "Extends the ban on copy-pasted phase-j logic to a single owner for every shared fact in all of sc-agent.",
+  "remedy": "Delete the record unless the owner anchors one owner per shared fact.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "NFR-SAG-0004",
+    "statement": "Every shared fact MUST have a single owner.",
+    "commit": "2712a7fb",
+    "date": "2026-11-25",
+    "summary": "NFR-SAG-0004: state single ownership as one obligation"
+   },
+   {
+    "record": "NFR-SAG-0004",
+    "statement": "Code that needs a shared fact MUST obtain it by calling its owner.",
+    "commit": "a63c0a59",
+    "date": "2026-11-24",
+    "summary": "Amend phase-j records for the Run, one-owner and struct rules (plan review)"
+   }
+  ],
+  "stale": {
+   "record": "NFR-SAG-0004",
+   "statement": "Code that needs a shared fact MUST obtain it by calling its owner.",
+   "reason": "Written 2026-11-24 and 2026-11-25, before ANC-010 (2026-11-26)."
+  }
+ },
+ {
+  "record": "NFR-SAG-0004",
+  "anchor": "ANC-015",
+  "clauses": [
+   "Every shared fact MUST have a single owner.",
+   "Code that needs a shared fact MUST obtain it by calling its owner."
+  ],
+  "what": "ANC-015 only says decidr-wide rules live in sc-agent's records. The NFR sets a single-owner rule for every shared fact in sc-agent's code.",
+  "remedy": "Delete the record unless the owner anchors one owner per shared fact.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "NFR-SAG-0004",
+    "statement": "Every shared fact MUST have a single owner.",
+    "commit": "2712a7fb",
+    "date": "2026-11-25",
+    "summary": "NFR-SAG-0004: state single ownership as one obligation"
+   },
+   {
+    "record": "NFR-SAG-0004",
+    "statement": "Code that needs a shared fact MUST obtain it by calling its owner.",
+    "commit": "a63c0a59",
+    "date": "2026-11-24",
+    "summary": "Amend phase-j records for the Run, one-owner and struct rules (plan review)"
+   }
+  ],
+  "stale": {
+   "record": "NFR-SAG-0004",
+   "statement": "Code that needs a shared fact MUST obtain it by calling its owner.",
+   "reason": "Written 2026-11-24 and 2026-11-25, before ANC-015 (2026-11-26)."
+  }
+ },
+ {
+  "record": "REQ-SAG-0003",
+  "anchor": "ANC-005",
+  "clauses": [
+   "A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+   "A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+   "sc-agent MUST NOT contain code that removes a general log.",
+   "sc-agent MUST NOT remove a session log.",
+   "sc-agent MUST NOT remove a run log."
+  ],
+  "what": "Excess: log retention and non-removal rules. ANC-005 asks only for the root, folder and file naming of default loggers.",
+  "remedy": "Cut the five retention statements.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+    "commit": "13c45130",
+    "date": "2026-11-24",
+    "summary": "docs(phase-j): round-3 rulings: runs.jsonl link table, haiku/luna keyless"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "sc-agent MUST NOT contain code that removes a general log.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "sc-agent MUST NOT remove a session log.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "sc-agent MUST NOT remove a run log.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0003",
+   "statement": "A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+   "reason": "Written 2026-11-19 to 2026-11-25, before ANC-005 (2026-11-26), and nothing the owner anchored asks for retention."
+  }
+ },
+ {
+  "record": "REQ-SAG-0003",
+  "anchor": "ANC-015",
+  "clauses": [
+   "A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+   "A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+   "sc-agent MUST NOT contain code that removes a general log.",
+   "sc-agent MUST NOT remove a session log.",
+   "sc-agent MUST NOT remove a run log."
+  ],
+  "what": "Excess: ANC-015 puts decidr-wide rules in sc-agent's records, and REQ-SAG-0003 is such a record. The only text no anchor covers is the retention group.",
+  "remedy": "Cut the five retention statements.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+    "commit": "13c45130",
+    "date": "2026-11-24",
+    "summary": "docs(phase-j): round-3 rulings: runs.jsonl link table, haiku/luna keyless"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "sc-agent MUST NOT contain code that removes a general log.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "sc-agent MUST NOT remove a session log.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "sc-agent MUST NOT remove a run log.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0003",
+   "statement": "A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+   "reason": "Older than ANC-015 (2026-11-26), and no anchor asks for retention."
+  }
+ },
+ {
+  "record": "REQ-SAG-0003",
+  "anchor": "ANC-016",
+  "clauses": [
+   "A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+   "A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+   "sc-agent MUST NOT contain code that removes a general log.",
+   "sc-agent MUST NOT remove a session log.",
+   "sc-agent MUST NOT remove a run log."
+  ],
+  "what": "Disputes Jev: ANC-016 is about the injection path. The record's mention of injection ('With no Logger injected') is consistent with it. The only unanchored text is the retention group, which is excess against ANC-005, not ANC-016.",
+  "remedy": "Cut the five retention statements.",
+  "jev_disputed": true,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "A run log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+    "commit": "13c45130",
+    "date": "2026-11-24",
+    "summary": "docs(phase-j): round-3 rulings: runs.jsonl link table, haiku/luna keyless"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "sc-agent MUST NOT contain code that removes a general log.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "sc-agent MUST NOT remove a session log.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "sc-agent MUST NOT remove a run log.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0003",
+   "statement": "A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+   "reason": "Older than ANC-016 (2026-11-26), and no anchor asks for retention."
+  }
+ },
+ {
+  "record": "REQ-SAG-0008",
+  "anchor": "ANC-006",
+  "clauses": [
+   "When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.",
+   "The wheel MUST NOT depend on the `sc-observability` Python package."
+  ],
+  "what": "Excess: rules for where a non-injected Python Logger comes from. ANC-006 covers only leaving injected loggers unchanged.",
+  "remedy": "Delete both statements and propose an anchor for the wheel-Logger rule.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0008",
+    "statement": "When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   },
+   {
+    "record": "REQ-SAG-0008",
+    "statement": "The wheel MUST NOT depend on the `sc-observability` Python package.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0008",
+   "statement": "The wheel MUST NOT depend on the `sc-observability` Python package.",
+   "reason": "Written 2026-11-19, before ANC-006 (2026-11-26); no anchor asks for it."
+  }
+ },
+ {
+  "record": "REQ-SAG-0008",
+  "anchor": "ANC-016",
+  "clauses": [
+   "When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.",
+   "The wheel MUST NOT depend on the `sc-observability` Python package."
+  ],
+  "what": "Excess: ANC-016 asks that sc-agent's records define the injection path and that derivative tools use it only in tests. The wheel's own Logger source is a separate rule.",
+  "remedy": "Delete both statements and propose an anchor for the wheel-Logger rule.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0008",
+    "statement": "When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   },
+   {
+    "record": "REQ-SAG-0008",
+    "statement": "The wheel MUST NOT depend on the `sc-observability` Python package.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0008",
+   "statement": "The wheel MUST NOT depend on the `sc-observability` Python package.",
+   "reason": "Written 2026-11-19, before ANC-016 (2026-11-26); no anchor asks for it."
+  }
+ },
+ {
+  "record": "REQ-SAG-0008",
+  "anchor": "ANC-020",
+  "clauses": [
+   "When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.",
+   "The wheel MUST NOT depend on the `sc-observability` Python package."
+  ],
+  "what": "Excess: ANC-020 bans a second Logger when one is injected. These statements add a rule for non-injected calls. ANC-020's quote hints at a python_logger ban, but the anchor statement does not state it.",
+  "remedy": "Delete both statements and propose an anchor for the wheel-Logger rule.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0008",
+    "statement": "When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   },
+   {
+    "record": "REQ-SAG-0008",
+    "statement": "The wheel MUST NOT depend on the `sc-observability` Python package.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0008",
+   "statement": "The wheel MUST NOT depend on the `sc-observability` Python package.",
+   "reason": "Written 2026-11-19, before ANC-020 (2026-11-27); no anchor states it."
+  }
+ },
+ {
+  "record": "REQ-SAG-0018",
+  "anchor": "ANC-010",
+  "clauses": [
+   "The consumer module MUST pass the model selector through unchanged.",
+   "The consumer module MUST cancel its running Run on `KeyboardInterrupt`.",
+   "The consent gate MUST ask for consent only when the Run's provider is TypeSafe."
+  ],
+  "what": "Excess: selector pass-through, Ctrl-C cancellation and the consent rule are not about avoiding copy-paste logic.",
+  "remedy": "Delete the three statements and propose an anchor for the shared consumer module's common rules.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0018",
+    "statement": "The consumer module MUST pass the model selector through unchanged.",
+    "commit": "e234112e",
+    "date": "2026-11-14",
+    "summary": "docs: ADR-SAG-0019 R5: no runtime version check, sc-compose external, sc-decidr and sitr version-locked on PyPI; judge-jev fixes to REQ-SAG-0018 and NFR-SAG-0003"
+   },
+   {
+    "record": "REQ-SAG-0018",
+    "statement": "The consumer module MUST cancel its running Run on `KeyboardInterrupt`.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   },
+   {
+    "record": "REQ-SAG-0018",
+    "statement": "The consent gate MUST ask for consent only when the Run's provider is TypeSafe.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0018",
+   "statement": "The consumer module MUST pass the model selector through unchanged.",
+   "reason": "Written 2026-11-14, before ANC-010 (2026-11-26); no anchor asks for it."
+  }
+ },
+ {
+  "record": "REQ-SAG-0019",
+  "anchor": "ANC-001",
+  "clauses": [
+   "When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.",
+   "An unknown key in a configuration file MUST cause a typed load error.",
+   "The `cache` setting MUST default to `true`.",
+   "A local endpoint's address MUST be settable in configuration.",
+   "When the CLI does not run inside a git work tree, it MUST skip the local-folder layers.",
+   "Each CLI's `<cli> doctor` command, such as `decidr doctor`, MUST report the settings table.",
+   "In each row of the settings table, the `source` cell MUST show the source of that row's value.",
+   "`<cli> doctor` MUST report the path of every file in the nine layers.",
+   "For each file in the nine layers, `<cli> doctor` MUST report whether it exists.",
+   "When a CLI fails to load a configuration file, its error MUST name the failure location.",
+   "A CLI MUST NOT read another CLI's `<cli>.json`.",
+   "While it loads configuration, a CLI MUST NOT write to any configuration file.",
+   "`<cli> doctor` MUST NOT send a model request.",
+   "`<cli> doctor` MUST NOT write a file.",
+   "Configuration MUST NOT change a paid API's base address."
+  ],
+  "what": "Excess: ANC-001 asks only that config can override the default `jev` model. Statements 1, 2, 5 and 6 serve it. The loading, error, cache, endpoint, layer and doctor rules go beyond it.",
+  "remedy": "Cut the 15 statements in three proposals: loading and error rules, doctor, and local endpoint and layers.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.",
+    "commit": "3afa4f9e",
+    "date": "2026-11-18",
+    "summary": "Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "An unknown key in a configuration file MUST cause a typed load error.",
+    "commit": "22f4a5bd",
+    "date": "2026-11-25",
+    "summary": "phase-j records: fix ai-qa clean-up findings"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "The `cache` setting MUST default to `true`.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "A local endpoint's address MUST be settable in configuration.",
+    "commit": "b98b4112",
+    "date": "2026-11-25",
+    "summary": "phase-j records: REQ-SAG-0018 is the owner's consumer statement; REQ-SAG-0019 and 0102 cut to develop size"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "When the CLI does not run inside a git work tree, it MUST skip the local-folder layers.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "Each CLI's `<cli> doctor` command, such as `decidr doctor`, MUST report the settings table.",
+    "commit": "b98b4112",
+    "date": "2026-11-25",
+    "summary": "phase-j records: REQ-SAG-0018 is the owner's consumer statement; REQ-SAG-0019 and 0102 cut to develop size"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "In each row of the settings table, the `source` cell MUST show the source of that row's value.",
+    "commit": "3afa4f9e",
+    "date": "2026-11-18",
+    "summary": "Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "`<cli> doctor` MUST report the path of every file in the nine layers.",
+    "commit": "87129dd2",
+    "date": "2026-11-22",
+    "summary": "feat: adopt the merged sc-config layered engine"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "For each file in the nine layers, `<cli> doctor` MUST report whether it exists.",
+    "commit": "87129dd2",
+    "date": "2026-11-22",
+    "summary": "feat: adopt the merged sc-config layered engine"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "When a CLI fails to load a configuration file, its error MUST name the failure location.",
+    "commit": "3afa4f9e",
+    "date": "2026-11-18",
+    "summary": "Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "A CLI MUST NOT read another CLI's `<cli>.json`.",
+    "commit": "998015d2",
+    "date": "2026-11-18",
+    "summary": "docs: ADR-SAG-0020/0021 config scopes and separate session-log tree"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "While it loads configuration, a CLI MUST NOT write to any configuration file.",
+    "commit": "3afa4f9e",
+    "date": "2026-11-18",
+    "summary": "Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "`<cli> doctor` MUST NOT send a model request.",
+    "commit": "3afa4f9e",
+    "date": "2026-11-18",
+    "summary": "Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "`<cli> doctor` MUST NOT write a file.",
+    "commit": "3afa4f9e",
+    "date": "2026-11-18",
+    "summary": "Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "Configuration MUST NOT change a paid API's base address.",
+    "commit": "b98b4112",
+    "date": "2026-11-25",
+    "summary": "phase-j records: REQ-SAG-0018 is the owner's consumer statement; REQ-SAG-0019 and 0102 cut to develop size"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0019",
+   "statement": "When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.",
+   "reason": "These statements were written 2026-11-18 to 2026-11-25, before ANC-001 (2026-11-26), and no anchor asks for them."
+  }
+ },
+ {
+  "record": "REQ-SAG-0019",
+  "anchor": "ANC-009",
+  "clauses": [
+   "When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.",
+   "An unknown key in a configuration file MUST cause a typed load error.",
+   "The `cache` setting MUST default to `true`.",
+   "A local endpoint's address MUST be settable in configuration.",
+   "When the CLI does not run inside a git work tree, it MUST skip the local-folder layers.",
+   "Each CLI's `<cli> doctor` command, such as `decidr doctor`, MUST report the settings table.",
+   "In each row of the settings table, the `source` cell MUST show the source of that row's value.",
+   "`<cli> doctor` MUST report the path of every file in the nine layers.",
+   "For each file in the nine layers, `<cli> doctor` MUST report whether it exists.",
+   "When a CLI fails to load a configuration file, its error MUST name the failure location.",
+   "A CLI MUST NOT read another CLI's `<cli>.json`.",
+   "While it loads configuration, a CLI MUST NOT write to any configuration file.",
+   "`<cli> doctor` MUST NOT send a model request.",
+   "`<cli> doctor` MUST NOT write a file.",
+   "Configuration MUST NOT change a paid API's base address."
+  ],
+  "what": "Excess: ANC-009 asks only that config can add model rows. 'A model entry MUST add one row to the model table.' serves it. The rest of the record goes beyond it.",
+  "remedy": "Cut the 15 statements in three proposals: loading and error rules, doctor, and local endpoint and layers.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.",
+    "commit": "3afa4f9e",
+    "date": "2026-11-18",
+    "summary": "Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "An unknown key in a configuration file MUST cause a typed load error.",
+    "commit": "22f4a5bd",
+    "date": "2026-11-25",
+    "summary": "phase-j records: fix ai-qa clean-up findings"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "The `cache` setting MUST default to `true`.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "A local endpoint's address MUST be settable in configuration.",
+    "commit": "b98b4112",
+    "date": "2026-11-25",
+    "summary": "phase-j records: REQ-SAG-0018 is the owner's consumer statement; REQ-SAG-0019 and 0102 cut to develop size"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "When the CLI does not run inside a git work tree, it MUST skip the local-folder layers.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "Each CLI's `<cli> doctor` command, such as `decidr doctor`, MUST report the settings table.",
+    "commit": "b98b4112",
+    "date": "2026-11-25",
+    "summary": "phase-j records: REQ-SAG-0018 is the owner's consumer statement; REQ-SAG-0019 and 0102 cut to develop size"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "In each row of the settings table, the `source` cell MUST show the source of that row's value.",
+    "commit": "3afa4f9e",
+    "date": "2026-11-18",
+    "summary": "Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "`<cli> doctor` MUST report the path of every file in the nine layers.",
+    "commit": "87129dd2",
+    "date": "2026-11-22",
+    "summary": "feat: adopt the merged sc-config layered engine"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "For each file in the nine layers, `<cli> doctor` MUST report whether it exists.",
+    "commit": "87129dd2",
+    "date": "2026-11-22",
+    "summary": "feat: adopt the merged sc-config layered engine"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "When a CLI fails to load a configuration file, its error MUST name the failure location.",
+    "commit": "3afa4f9e",
+    "date": "2026-11-18",
+    "summary": "Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "A CLI MUST NOT read another CLI's `<cli>.json`.",
+    "commit": "998015d2",
+    "date": "2026-11-18",
+    "summary": "docs: ADR-SAG-0020/0021 config scopes and separate session-log tree"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "While it loads configuration, a CLI MUST NOT write to any configuration file.",
+    "commit": "3afa4f9e",
+    "date": "2026-11-18",
+    "summary": "Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "`<cli> doctor` MUST NOT send a model request.",
+    "commit": "3afa4f9e",
+    "date": "2026-11-18",
+    "summary": "Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "`<cli> doctor` MUST NOT write a file.",
+    "commit": "3afa4f9e",
+    "date": "2026-11-18",
+    "summary": "Tighten records to pass judge-jev quality; split REQ-SAG-0022 from 0008"
+   },
+   {
+    "record": "REQ-SAG-0019",
+    "statement": "Configuration MUST NOT change a paid API's base address.",
+    "commit": "b98b4112",
+    "date": "2026-11-25",
+    "summary": "phase-j records: REQ-SAG-0018 is the owner's consumer statement; REQ-SAG-0019 and 0102 cut to develop size"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0019",
+   "statement": "When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.",
+   "reason": "These statements were written 2026-11-18 to 2026-11-25, before ANC-009 (2026-11-26), and no anchor asks for them."
+  }
+ },
+ {
+  "record": "REQ-SAG-0101",
+  "anchor": "ANC-001",
+  "clauses": [
+   "Each cloud short name MUST resolve to a model in the `sc-agent` model table.",
+   "Each local short name MUST resolve to a local model in the model table."
+  ],
+  "what": "Excess: ANC-001 covers only the `jev` name. These statements specify every other cloud and local short name.",
+  "remedy": "Delete both statements, delete the emptied record and propose an anchor for short-name resolution.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0101",
+    "statement": "Each cloud short name MUST resolve to a model in the `sc-agent` model table.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   },
+   {
+    "record": "REQ-SAG-0101",
+    "statement": "Each local short name MUST resolve to a local model in the model table.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0101",
+   "statement": "Each cloud short name MUST resolve to a model in the `sc-agent` model table.",
+   "reason": "Written 2026-11-25, before ANC-001 (2026-11-26), and the owner's words cover only `jev`."
+  }
+ },
+ {
+  "record": "REQ-SAG-0101",
+  "anchor": "ANC-009",
+  "clauses": [
+   "Each cloud short name MUST resolve to a model in the `sc-agent` model table.",
+   "Each local short name MUST resolve to a local model in the model table."
+  ],
+  "what": "Fixes how every short name resolves. ANC-009 asks only that config can add model rows.",
+  "remedy": "Delete the record and propose the short-name rule as an anchor.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0101",
+    "statement": "Each cloud short name MUST resolve to a model in the `sc-agent` model table.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   },
+   {
+    "record": "REQ-SAG-0101",
+    "statement": "Each local short name MUST resolve to a local model in the model table.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0101",
+   "statement": "Each cloud short name MUST resolve to a model in the `sc-agent` model table.",
+   "reason": "Written 2026-11-25, before ANC-009 was locked on 2026-11-26, and ANC-009 does not ask for it."
+  }
+ },
+ {
+  "record": "REQ-SAG-0102",
+  "anchor": "ANC-001",
+  "clauses": [
+   "A full model id MUST select its row exactly.",
+   "`sc-agent` MUST NOT branch on a catalog name."
+  ],
+  "what": "ANC-001 covers only `jev` resolving to the newest model with a config override. The full-model-id rule is served by ANC-009's check. The branching ban serves no anchor.",
+  "remedy": "Cut the branching ban.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0102",
+    "statement": "A full model id MUST select its row exactly.",
+    "commit": "66369ba0",
+    "date": "2026-11-21",
+    "summary": "docs: records follow the reduction plan"
+   },
+   {
+    "record": "REQ-SAG-0102",
+    "statement": "`sc-agent` MUST NOT branch on a catalog name.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0102",
+   "statement": "`sc-agent` MUST NOT branch on a catalog name.",
+   "reason": "Written 2026-11-25, before ANC-001 was locked on 2026-11-26, and no anchor asks for it."
+  }
+ },
+ {
+  "record": "REQ-SAG-0102",
+  "anchor": "ANC-009",
+  "clauses": [
+   "The built-in rows of the model table MUST be sorted by release date, newest first.",
+   "Each built-in model MUST carry the model's published release date.",
+   "`sc-agent` MUST NOT branch on a catalog name."
+  ],
+  "what": "ANC-009 asks only for config-added rows. The sorting and release-date statements serve ANC-001's date-sorted table. The branching ban serves no anchor.",
+  "remedy": "Cut the branching ban.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0102",
+    "statement": "The built-in rows of the model table MUST be sorted by release date, newest first.",
+    "commit": "f13fc3d8",
+    "date": "2026-11-25",
+    "summary": "ADR-SAG-0019 d13, REQ-SAG-0102: a configured model entry overrides the model its name selects"
+   },
+   {
+    "record": "REQ-SAG-0102",
+    "statement": "Each built-in model MUST carry the model's published release date.",
+    "commit": "c7a40068",
+    "date": "2026-11-09",
+    "summary": "Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema"
+   },
+   {
+    "record": "REQ-SAG-0102",
+    "statement": "`sc-agent` MUST NOT branch on a catalog name.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0102",
+   "statement": "`sc-agent` MUST NOT branch on a catalog name.",
+   "reason": "Written 2026-11-25, before ANC-009 was locked on 2026-11-26, and no anchor asks for it."
+  }
+ },
+ {
+  "record": "REQ-SAG-0103",
+  "anchor": "ANC-009",
+  "clauses": [
+   "A model-table row MUST store its provider in a field separate from its model.",
+   "A request MUST carry the model id stored in the selected model-table row.",
+   "sc-agent MUST be able to send requests through Together.",
+   "sc-agent MUST be able to send requests through OpenRouter.",
+   "When configuration names a provider for a model, sc-agent MUST send that model's requests to that provider.",
+   "When no provider is configured for a model, sc-agent MUST prefer a provider that needs no key over one that needs a key.",
+   "When no provider is configured for a model and every provider serving it needs a key, sc-agent MUST use the first of them whose key is found.",
+   "The provider that sends requests to the OpenAI API MUST have the name `openai`.",
+   "A short name MUST NOT encode its provider.",
+   "A request MUST NOT require the caller to name a provider."
+  ],
+  "what": "Specifies provider routing and provider names. ANC-009 asks only that config can add model rows.",
+  "remedy": "Delete the record, propose the routing rules as an anchor, and drop the provider-name statements.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0103",
+    "statement": "A model-table row MUST store its provider in a field separate from its model.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0103",
+    "statement": "A request MUST carry the model id stored in the selected model-table row.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0103",
+    "statement": "sc-agent MUST be able to send requests through Together.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0103",
+    "statement": "sc-agent MUST be able to send requests through OpenRouter.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0103",
+    "statement": "When configuration names a provider for a model, sc-agent MUST send that model's requests to that provider.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0103",
+    "statement": "When no provider is configured for a model, sc-agent MUST prefer a provider that needs no key over one that needs a key.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0103",
+    "statement": "When no provider is configured for a model and every provider serving it needs a key, sc-agent MUST use the first of them whose key is found.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0103",
+    "statement": "The provider that sends requests to the OpenAI API MUST have the name `openai`.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0103",
+    "statement": "A short name MUST NOT encode its provider.",
+    "commit": "22f4a5bd",
+    "date": "2026-11-25",
+    "summary": "phase-j records: fix ai-qa clean-up findings"
+   },
+   {
+    "record": "REQ-SAG-0103",
+    "statement": "A request MUST NOT require the caller to name a provider.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0103",
+   "statement": "sc-agent MUST be able to send requests through Together.",
+   "reason": "Written 2026-11-25, before ANC-009 was locked on 2026-11-26, and ANC-012 says adding a provider needs no hard-coding."
+  }
+ },
+ {
+  "record": "REQ-SAG-0502",
+  "anchor": "ANC-009",
+  "clauses": [
+   "sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models."
+  ],
+  "what": "Claims a launch-any-LLM capability. ANC-009 asks only that config can add model rows.",
+  "remedy": "Delete the record and propose the capability as an anchor.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0502",
+    "statement": "sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.",
+    "commit": "c7a40068",
+    "date": "2026-11-09",
+    "summary": "Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0502",
+   "statement": "sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.",
+   "reason": "Written 2026-11-09, well before ANC-009 was locked on 2026-11-26, and ANC-009 does not ask for it."
+  }
+ },
+ {
+  "record": "REQ-SAG-0502",
+  "anchor": "ANC-013",
+  "clauses": [
+   "sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models."
+  ],
+  "what": "Claims a launch-any-LLM capability. ANC-013 asks for an LLM trait with one implementation per wire format. Jev gives p_serves 0.03 and p_relates 0.9.",
+  "remedy": "Delete the record and propose the capability as an anchor.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0502",
+    "statement": "sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.",
+    "commit": "c7a40068",
+    "date": "2026-11-09",
+    "summary": "Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0502",
+   "statement": "sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.",
+   "reason": "Written 2026-11-09, well before ANC-013 was locked on 2026-11-26, and ANC-013 does not ask for it."
+  }
+ },
+ {
+  "record": "REQ-SAG-0801",
+  "anchor": "ANC-001",
+  "clauses": [
+   "Each local decision runner's model MUST have a fixed model id in the model table.",
+   "A selection of `decider` MUST resolve to the 4b decider model."
+  ],
+  "what": "Conflict: ANC-001 says \"I want 'jev' to select latest, config can override default.\" The record pins each runner's model to a fixed id and pins `decider` to the 4b model, leaving no room for newest-row selection or a config override. ANC-001 names `jev`, not local runners, so the conflict is arguable.",
+  "remedy": "Cut both pinned-model statements. The anchor is the source of truth.",
+  "jev_disputed": true,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0801",
+    "statement": "Each local decision runner's model MUST have a fixed model id in the model table.",
+    "commit": "aa1190ba",
+    "date": "2026-11-24",
+    "summary": "Amend phase-j records to match plan v4 and the fixed-model-id ruling"
+   },
+   {
+    "record": "REQ-SAG-0801",
+    "statement": "A selection of `decider` MUST resolve to the 4b decider model.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0801",
+   "statement": "Each local decision runner's model MUST have a fixed model id in the model table.",
+   "reason": "Written 2026-11-24 under the fixed-model-id ruling, two days before ANC-001 was locked on 2026-11-26."
+  }
+ },
+ {
+  "record": "REQ-SAG-0801",
+  "anchor": "ANC-009",
+  "clauses": [
+   "Each local decision runner's network address MUST come from configuration.",
+   "Each local decision runner MUST be selectable by its name wherever a decision model is selected.",
+   "`sc-agent` MUST NOT hard-code the network address of any local decision runner."
+  ],
+  "what": "Specifies where runner addresses come from and how runners are selected. ANC-009 asks only that config can add model rows, which \"Configuration MUST be able to add a local model that runs on another computer.\" covers. The two pinned-id statements are handled under the ANC-001 conflict.",
+  "remedy": "Cut these three statements and propose the address and selection rules as an anchor.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0801",
+    "statement": "Each local decision runner's network address MUST come from configuration.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   },
+   {
+    "record": "REQ-SAG-0801",
+    "statement": "Each local decision runner MUST be selectable by its name wherever a decision model is selected.",
+    "commit": "a63c0a59",
+    "date": "2026-11-24",
+    "summary": "Amend phase-j records for the Run, one-owner and struct rules (plan review)"
+   },
+   {
+    "record": "REQ-SAG-0801",
+    "statement": "`sc-agent` MUST NOT hard-code the network address of any local decision runner.",
+    "commit": "1a9af55a",
+    "date": "2026-11-25",
+    "summary": "phase-j records: D41 cache rule, D42 restores, D43 gate pass"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0801",
+   "statement": "Each local decision runner MUST be selectable by its name wherever a decision model is selected.",
+   "reason": "Written 2026-11-24, before ANC-009 was locked on 2026-11-26, and ANC-009 does not ask for it."
+  }
+ },
+ {
+  "record": "REQ-SAG-0901",
+  "anchor": "ANC-013",
+  "clauses": [
+   "In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.",
+   "In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.",
+   "Each decision request MUST specify the required schema through the provider's structured-output feature.",
+   "If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.",
+   "The covered model handling the decision request MUST pass the request's inputs to the provider.",
+   "If the provider rejects a request input, the decision backend MUST return the provider's error."
+  ],
+  "what": "ANC-013 asks for an LLM trait with one implementation per wire format. These statements add decider-mode generation rules, the structured-output request, error codes and provider pass-through. Only the schema-conformance statement serves ANC-013's schema-valid-JSON check.",
+  "remedy": "Cut the six statements. Propose the probabilities and confidence rule and the schema_mismatch error as an anchor. Delete the structured-output and provider pass-through statements outright.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "REQ-SAG-0901",
+    "statement": "In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field.",
+    "commit": "8f41793e",
+    "date": "2026-11-25",
+    "summary": "Clarify configuration, release rehearsal, and decision requirements"
+   },
+   {
+    "record": "REQ-SAG-0901",
+    "statement": "In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field.",
+    "commit": "8f41793e",
+    "date": "2026-11-25",
+    "summary": "Clarify configuration, release rehearsal, and decision requirements"
+   },
+   {
+    "record": "REQ-SAG-0901",
+    "statement": "Each decision request MUST specify the required schema through the provider's structured-output feature.",
+    "commit": "8f41793e",
+    "date": "2026-11-25",
+    "summary": "Clarify configuration, release rehearsal, and decision requirements"
+   },
+   {
+    "record": "REQ-SAG-0901",
+    "statement": "If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`.",
+    "commit": "8f41793e",
+    "date": "2026-11-25",
+    "summary": "Clarify configuration, release rehearsal, and decision requirements"
+   },
+   {
+    "record": "REQ-SAG-0901",
+    "statement": "The covered model handling the decision request MUST pass the request's inputs to the provider.",
+    "commit": "8f41793e",
+    "date": "2026-11-25",
+    "summary": "Clarify configuration, release rehearsal, and decision requirements"
+   },
+   {
+    "record": "REQ-SAG-0901",
+    "statement": "If the provider rejects a request input, the decision backend MUST return the provider's error.",
+    "commit": "8f41793e",
+    "date": "2026-11-25",
+    "summary": "Clarify configuration, release rehearsal, and decision requirements"
+   }
+  ],
+  "stale": {
+   "record": "REQ-SAG-0901",
+   "statement": "Each decision request MUST specify the required schema through the provider's structured-output feature.",
+   "reason": "Written 2026-11-25, before ANC-013 was locked on 2026-11-26, and ANC-013 does not ask for it."
+  }
+ },
+ {
+  "duplicate": "ADR-SAG-0004/REQ-SAG-0002/2",
+  "clauses": [
+   "A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002)."
+  ],
+  "what": "The ADR sentence restates REQ-SAG-0002 statement 2: \"An error MUST carry the error id and message of every lower-layer error that caused it.\"",
+  "remedy": "Cut the ADR sentence; REQ-SAG-0002 keeps it, and the ADR cites it.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0004",
+    "statement": "There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.",
+    "commit": "66369ba0",
+    "date": "2026-11-21",
+    "summary": "docs: records follow the reduction plan"
+   },
+   {
+    "record": "REQ-SAG-0002",
+    "statement": "An error MUST carry the error id and message of every lower-layer error that caused it.",
+    "commit": "1d855d0e",
+    "date": "2026-11-09",
+    "summary": "Add requirements and architecture decisions as Raptor records"
+   }
+  ],
+  "stale": null
+ },
+ {
+  "duplicate": "ADR-SAG-0004/REQ-SAG-0002/3",
+  "clauses": [
+   "A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002)."
+  ],
+  "what": "The ADR sentence restates REQ-SAG-0002 statement 3: \"A layer that changes an error MUST change it only by adding detail.\"",
+  "remedy": "Cut the ADR sentence; REQ-SAG-0002 keeps it, and the ADR cites it.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0004",
+    "statement": "There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.",
+    "commit": "66369ba0",
+    "date": "2026-11-21",
+    "summary": "docs: records follow the reduction plan"
+   },
+   {
+    "record": "REQ-SAG-0002",
+    "statement": "A layer that changes an error MUST change it only by adding detail.",
+    "commit": "1d855d0e",
+    "date": "2026-11-09",
+    "summary": "Add requirements and architecture decisions as Raptor records"
+   }
+  ],
+  "stale": null
+ },
+ {
+  "duplicate": "ADR-SAG-0004/REQ-SAG-0002/8",
+  "clauses": [
+   "A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002)."
+  ],
+  "what": "The ADR sentence restates REQ-SAG-0002 statement 8: \"A layer MUST NOT drop or replace a lower-layer error id or message.\"",
+  "remedy": "Cut the ADR sentence; REQ-SAG-0002 keeps it, and the ADR cites it.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0004",
+    "statement": "There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.",
+    "commit": "66369ba0",
+    "date": "2026-11-21",
+    "summary": "docs: records follow the reduction plan"
+   },
+   {
+    "record": "REQ-SAG-0002",
+    "statement": "A layer MUST NOT drop or replace a lower-layer error id or message.",
+    "commit": "1d855d0e",
+    "date": "2026-11-09",
+    "summary": "Add requirements and architecture decisions as Raptor records"
+   }
+  ],
+  "stale": null
+ },
+ {
+  "duplicate": "ADR-SAG-0004/REQ-SAG-0002/4",
+  "clauses": [],
+  "what": "Disputed. REQ-SAG-0002: \"Error text received from a provider MUST be kept whole.\" ADR-SAG-0004 says only \"A layer that changes an error keeps the lower error's id and message\" and \"E carries the error info: at least an id and a message\"; neither mentions provider text.",
+  "remedy": "Owner-conflict panel: rule it an owner conflict (no change) or name a cut.",
+  "jev_disputed": true,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0004",
+    "statement": "There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.",
+    "commit": "66369ba0",
+    "date": "2026-11-21",
+    "summary": "docs: records follow the reduction plan"
+   },
+   {
+    "record": "REQ-SAG-0002",
+    "statement": "Error text received from a provider MUST be kept whole.",
+    "commit": "c7a40068",
+    "date": "2026-11-09",
+    "summary": "Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema"
+   }
+  ],
+  "stale": null
+ },
+ {
+  "duplicate": "ADR-SAG-0021/REQ-SAG-0003/0",
+  "clauses": [
+   "which writes the general log to disk at the paths below"
+  ],
+  "what": "The Defaults sentence restates REQ-SAG-0003: \"With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/<cli>.log.jsonl`.\"",
+  "remedy": "Replace the clause with the citation (REQ-SAG-0003).",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0021",
+    "statement": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/<cli>.log.jsonl`.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   }
+  ],
+  "stale": null
+ },
+ {
+  "duplicate": "ADR-SAG-0021/REQ-SAG-0003/4",
+  "clauses": [
+   " and never rotated or pruned either"
+  ],
+  "what": "Restates REQ-SAG-0003's never-remove rule: \"A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.\"",
+  "remedy": "Cut; it is inside the run-log sentence the merged ADR-SAG-0021 cut removes.",
+  "jev_disputed": false,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0021",
+    "statement": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "A session log MUST remain in `~/.sc-agent/sessions/` whatever its age.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   }
+  ],
+  "stale": null
+ },
+ {
+  "duplicate": "ADR-SAG-0021/REQ-SAG-0003/3",
+  "clauses": [],
+  "what": "Disputed. REQ-SAG-0003: \"Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).\" ADR-SAG-0021's Paths table gives the per-entry-point layout, wider than the REQ's root folder.",
+  "remedy": "Owner-conflict panel: decision or duplicate.",
+  "jev_disputed": true,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0021",
+    "statement": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   },
+   {
+    "record": "REQ-SAG-0003",
+    "statement": "Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   }
+  ],
+  "stale": null
+ },
+ {
+  "duplicate": "ADR-SAG-0021/REQ-SAG-0008/0",
+  "clauses": [],
+  "what": "Disputed. REQ-SAG-0008: \"The Rust API MUST accept an injected general Logger.\" ADR-SAG-0021: \"gives it to each Run it creates ... the Run passes it to every decision call\" describes ownership, the decision.",
+  "remedy": "Owner-conflict panel: decision or duplicate.",
+  "jev_disputed": true,
+  "provenance": [
+   {
+    "record": "ADR-SAG-0021",
+    "statement": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+    "commit": "f023c0d1",
+    "date": "2026-11-19",
+    "summary": "Records: one sc-observability Logger per process, one wheel, fixed log paths"
+   },
+   {
+    "record": "REQ-SAG-0008",
+    "statement": "The Rust API MUST accept an injected general Logger.",
+    "commit": "67203e2f",
+    "date": "2026-11-25",
+    "summary": "phase-j records: clean-up to the owner decisions (D1-D40)"
+   }
+  ],
+  "stale": null
+ }
+]

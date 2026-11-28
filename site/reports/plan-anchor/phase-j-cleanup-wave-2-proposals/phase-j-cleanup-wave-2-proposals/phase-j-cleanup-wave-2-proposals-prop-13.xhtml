@@ -1,0 +1,55 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-13">
+  <div class="section-head">
+    <h2>13. Cut the configuration loading and error rules unrelated to model selection from REQ-SAG-0019</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="13. Cut the configuration loading and error rules unrelated to model selection from REQ-SAG-0019
+Wave 2 · cut excess
+Records: REQ-SAG-0019
+Change:
+- Delete from REQ-SAG-0019: “When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.”
+- Delete from REQ-SAG-0019: “An unknown key in a configuration file MUST cause a typed load error.”
+- Delete from REQ-SAG-0019: “The `cache` setting MUST default to `true`.”
+- Delete from REQ-SAG-0019: “When a CLI fails to load a configuration file, its error MUST name the failure location.”
+- Delete from REQ-SAG-0019: “A CLI MUST NOT read another CLI&#x27;s `&lt;cli&gt;.json`.”
+- Delete from REQ-SAG-0019: “While it loads configuration, a CLI MUST NOT write to any configuration file.”
+- Delete from REQ-SAG-0019: “Configuration MUST NOT change a paid API&#x27;s base address.”
+Clears:
+- REQ-SAG-0019 × ANC-001 (exceeds)
+- REQ-SAG-0019 × ANC-009 (exceeds)
+Justification: ANC-001 asks that config can override the default `jev` model, and ANC-009 asks that config can add model rows. The statements that let config files accept settings and add or override model rows (statements 1, 2, 5 and 6) serve them and stay. These seven are general loading and error rules, the cache default and the paid-API address rule. No anchor asks for them. All date from 2026-11-18 to 2026-11-25, before the anchors of 2026-11-26.
+Source of truth: ANC-001 — Owner said: “I want &#x27;jev&#x27; to select latest, config can override default.” — commit 3afa4f9e
+Expected improvement:
+- REQ-SAG-0019 no longer specifies loading and error behaviour beyond the model-config anchors.
+- Records 49 → 49; statements 205 → 198; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28
+Other proposals changing these records: 14, 15">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · cut excess</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0019" data-panel="rec-REQ-SAG-0019">REQ-SAG-0019</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Delete from REQ-SAG-0019: “When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error.”</li>
+    <li>Delete from REQ-SAG-0019: “An unknown key in a configuration file MUST cause a typed load error.”</li>
+    <li>Delete from REQ-SAG-0019: “The `cache` setting MUST default to `true`.”</li>
+    <li>Delete from REQ-SAG-0019: “When a CLI fails to load a configuration file, its error MUST name the failure location.”</li>
+    <li>Delete from REQ-SAG-0019: “A CLI MUST NOT read another CLI&#x27;s `&lt;cli&gt;.json`.”</li>
+    <li>Delete from REQ-SAG-0019: “While it loads configuration, a CLI MUST NOT write to any configuration file.”</li>
+    <li>Delete from REQ-SAG-0019: “Configuration MUST NOT change a paid API&#x27;s base address.”</li>
+  </ul>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0019-ANC-001" data-panel="cell-REQ-SAG-0019-ANC-001">REQ-SAG-0019 × ANC-001 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0019-ANC-009" data-panel="cell-REQ-SAG-0019-ANC-009">REQ-SAG-0019 × ANC-009 (exceeds)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>ANC-001 asks that config can override the default `jev` model, and ANC-009 asks that config can add model rows. The statements that let config files accept settings and add or override model rows (statements 1, 2, 5 and 6) serve them and stay. These seven are general loading and error rules, the cache default and the paid-API address rule. No anchor asks for them. All date from 2026-11-18 to 2026-11-25, before the anchors of 2026-11-26.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-001 — Owner said: “I want &#x27;jev&#x27; to select latest, config can override default.” — commit 3afa4f9e</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0019 no longer specifies loading and error behaviour beyond the model-config anchors.</p>
+  <p>Records 49 → 49; statements 205 → 198; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28</p>
+  <p>Other proposals changing these records: 14, 15</p>
+</section>

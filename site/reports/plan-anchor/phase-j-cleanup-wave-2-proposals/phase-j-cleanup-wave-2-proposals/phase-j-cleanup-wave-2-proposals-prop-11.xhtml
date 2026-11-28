@@ -1,0 +1,51 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-11">
+  <div class="section-head">
+    <h2>11. Propose an anchor for the wheel&#x27;s Logger source in REQ-SAG-0008, and delete both statements until it is approved</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="11. Propose an anchor for the wheel&#x27;s Logger source in REQ-SAG-0008, and delete both statements until it is approved
+Wave 2 · propose anchor
+Records: REQ-SAG-0008
+Change:
+- Delete from REQ-SAG-0008: “When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.”
+- Delete from REQ-SAG-0008: “The wheel MUST NOT depend on the `sc-observability` Python package.”
+- Proposed anchor for the owner: “REQ-SAG-0008: when a Python caller requests a named Logger, the wheel returns a Logger built from the linked sc-observability crate and does not depend on the sc-observability Python package, because the owner banned a second, Python-side logger.”
+- Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.
+Clears:
+- REQ-SAG-0008 × ANC-006 (exceeds)
+- REQ-SAG-0008 × ANC-016 (exceeds)
+- REQ-SAG-0008 × ANC-020 (exceeds)
+Justification: ANC-006, ANC-016 and ANC-020 cover only injected loggers: they must not be changed, injection is the test path, and no second Logger is built. Both statements are about where a non-injected Python Logger comes from, which none of those anchors asks for. They date from 2026-11-19 and 2026-11-25, before the anchors. The wheel code already has a `logger` function (crates/sc-agent-py/src/lib.rs:258), so the behaviour is real. ANC-020&#x27;s quote asks for &#x27;a new anchor banning python_logger&#x27;, which supports this one-line anchor. Until the owner approves it the statements are deleted. REQ-SAG-0003&#x27;s definition of the client Logger cites REQ-SAG-0008, so the lead should harmonize that definition with this outcome.
+Source of truth: ANC-020 — Owner said: “add a new anchor banning python_logger” — commit 1a9af55a
+Expected improvement:
+- REQ-SAG-0008 is limited to the injected Logger, as ANC-006, ANC-016 and ANC-020 say. The owner decides whether the wheel-Logger rule becomes an anchor.
+- Records 49 → 49; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 3 of 28
+Other proposals changing these records: 4">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · propose anchor</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0008" data-panel="rec-REQ-SAG-0008">REQ-SAG-0008</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Delete from REQ-SAG-0008: “When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate.”</li>
+    <li>Delete from REQ-SAG-0008: “The wheel MUST NOT depend on the `sc-observability` Python package.”</li>
+    <li>Proposed anchor for the owner: “REQ-SAG-0008: when a Python caller requests a named Logger, the wheel returns a Logger built from the linked sc-observability crate and does not depend on the sc-observability Python package, because the owner banned a second, Python-side logger.”</li>
+    <li>Approving applies the changes above now; the proposed anchor is added only if the owner also approves its text.</li>
+  </ul>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0008-ANC-006" data-panel="cell-REQ-SAG-0008-ANC-006">REQ-SAG-0008 × ANC-006 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0008-ANC-016" data-panel="cell-REQ-SAG-0008-ANC-016">REQ-SAG-0008 × ANC-016 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0008-ANC-020" data-panel="cell-REQ-SAG-0008-ANC-020">REQ-SAG-0008 × ANC-020 (exceeds)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>ANC-006, ANC-016 and ANC-020 cover only injected loggers: they must not be changed, injection is the test path, and no second Logger is built. Both statements are about where a non-injected Python Logger comes from, which none of those anchors asks for. They date from 2026-11-19 and 2026-11-25, before the anchors. The wheel code already has a `logger` function (crates/sc-agent-py/src/lib.rs:258), so the behaviour is real. ANC-020&#x27;s quote asks for &#x27;a new anchor banning python_logger&#x27;, which supports this one-line anchor. Until the owner approves it the statements are deleted. REQ-SAG-0003&#x27;s definition of the client Logger cites REQ-SAG-0008, so the lead should harmonize that definition with this outcome.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-020 — Owner said: “add a new anchor banning python_logger” — commit 1a9af55a</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0008 is limited to the injected Logger, as ANC-006, ANC-016 and ANC-020 say. The owner decides whether the wheel-Logger rule becomes an anchor.</p>
+  <p>Records 49 → 49; statements 205 → 203; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 3 of 28</p>
+  <p>Other proposals changing these records: 4</p>
+</section>

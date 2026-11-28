@@ -1,0 +1,48 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-1">
+  <div class="section-head">
+    <h2>1. Cut the lower-layer error rule from ADR-SAG-0004 and cite REQ-SAG-0002</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="1. Cut the lower-layer error rule from ADR-SAG-0004 and cite REQ-SAG-0002
+Wave 2 · consolidate
+Records: ADR-SAG-0004, REQ-SAG-0002
+Change:
+- Cut ADR-SAG-0004: “There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.” → “There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.”
+- Keeps: “A layer MUST NOT drop or replace a lower-layer error id or message.”
+Clears:
+- ADR-SAG-0004 restates REQ-SAG-0002 statement 3 (duplicate)
+- ADR-SAG-0004 restates REQ-SAG-0002 statement 4 (duplicate)
+- ADR-SAG-0004 restates REQ-SAG-0002 statement 9 (duplicate)
+Justification: REQ-SAG-0002 is the home for the error-propagation obligation (Correcting duplicates rule 2). The ADR sentence &#x27;A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002)&#x27; restates REQ-SAG-0002 statements 2, 3 and 8; it is deleted and the REQ-SAG-0002 citation moves onto the sentence that stays. The layering and discriminated-union decision is untouched.
+Source of truth: REQ-SAG-0002 — commit 66369ba0
+Expected improvement:
+- The lower-layer error rule is stated once, in REQ-SAG-0002.
+- Records 49 → 49; statements 205 → 205; duplicates cleared 3 of 8; conflicts resolved 0 of 1; exceeds cleared 0 of 28
+Other proposals changing these records: 3">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · consolidate</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-ADR-SAG-0004" data-panel="rec-ADR-SAG-0004">ADR-SAG-0004</a></li>
+    <li><a href="#rec-REQ-SAG-0002" data-panel="rec-REQ-SAG-0002">REQ-SAG-0002</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Cut ADR-SAG-0004: “There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.” → “There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.”</li>
+    <li>Keeps: “A layer MUST NOT drop or replace a lower-layer error id or message.”</li>
+  </ul>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#dup-ADR-SAG-0004-REQ-SAG-0002" data-panel="dup-ADR-SAG-0004-REQ-SAG-0002">ADR-SAG-0004 restates REQ-SAG-0002 statement 3 (duplicate)</a></li>
+    <li><a href="#dup-ADR-SAG-0004-REQ-SAG-0002" data-panel="dup-ADR-SAG-0004-REQ-SAG-0002">ADR-SAG-0004 restates REQ-SAG-0002 statement 4 (duplicate)</a></li>
+    <li><a href="#dup-ADR-SAG-0004-REQ-SAG-0002" data-panel="dup-ADR-SAG-0004-REQ-SAG-0002">ADR-SAG-0004 restates REQ-SAG-0002 statement 9 (duplicate)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>REQ-SAG-0002 is the home for the error-propagation obligation (Correcting duplicates rule 2). The ADR sentence &#x27;A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002)&#x27; restates REQ-SAG-0002 statements 2, 3 and 8; it is deleted and the REQ-SAG-0002 citation moves onto the sentence that stays. The layering and discriminated-union decision is untouched.</p>
+  <h3>Source of truth</h3>
+  <p>REQ-SAG-0002 — commit 66369ba0</p>
+  <h3>Expected improvement</h3>
+  <p>The lower-layer error rule is stated once, in REQ-SAG-0002.</p>
+  <p>Records 49 → 49; statements 205 → 205; duplicates cleared 3 of 8; conflicts resolved 0 of 1; exceeds cleared 0 of 28</p>
+  <p>Other proposals changing these records: 3</p>
+</section>

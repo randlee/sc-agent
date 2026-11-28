@@ -1,0 +1,38 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-17">
+  <div class="section-head">
+    <h2>17. Cut the catalog-name branching ban from REQ-SAG-0102</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="17. Cut the catalog-name branching ban from REQ-SAG-0102
+Wave 2 · cut excess
+Records: REQ-SAG-0102
+Change: Delete from REQ-SAG-0102: “`sc-agent` MUST NOT branch on a catalog name.”
+Clears:
+- REQ-SAG-0102 × ANC-001 (exceeds)
+- REQ-SAG-0102 × ANC-009 (exceeds)
+Justification: No anchor asks for a ban on branching on catalog names. ANC-001 covers `jev` resolving to the newest model with a config override. ANC-009 covers config-added rows. The other four statements each serve one of them. Sorting built-in rows by release date, and carrying the release date, give ANC-001 its date-sorted table. The short-name rule with a configured override matches ANC-001&#x27;s config override and ANC-009&#x27;s config rows. Selecting a row by full model id matches the ANC-009 check, which says a send with that id resolves. So only the ban is excess. It was added in 1a9af55a (2026-11-25), before both anchors were locked (2026-11-26). Lead: the definition of `branch on a catalog name` and the rationale sentence about typed data stay in the record text, which statement-level changes cannot edit.
+Source of truth: ANC-001 — Owner said: “I want &#x27;jev&#x27; to select latest, config can override default.” — commit 1a9af55a
+Expected improvement:
+- REQ-SAG-0102 keeps only statements that serve ANC-001 or ANC-009.
+- Records 49 → 49; statements 205 → 204; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · cut excess</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0102" data-panel="rec-REQ-SAG-0102">REQ-SAG-0102</a></li>
+  </ul>
+  <h3>Change</h3>
+  <p>Delete from REQ-SAG-0102: “`sc-agent` MUST NOT branch on a catalog name.”</p>
+  <h3>Clears</h3>
+  <ul>
+    <li><a href="#cell-REQ-SAG-0102-ANC-001" data-panel="cell-REQ-SAG-0102-ANC-001">REQ-SAG-0102 × ANC-001 (exceeds)</a></li>
+    <li><a href="#cell-REQ-SAG-0102-ANC-009" data-panel="cell-REQ-SAG-0102-ANC-009">REQ-SAG-0102 × ANC-009 (exceeds)</a></li>
+  </ul>
+  <h3>Justification</h3>
+  <p>No anchor asks for a ban on branching on catalog names. ANC-001 covers `jev` resolving to the newest model with a config override. ANC-009 covers config-added rows. The other four statements each serve one of them. Sorting built-in rows by release date, and carrying the release date, give ANC-001 its date-sorted table. The short-name rule with a configured override matches ANC-001&#x27;s config override and ANC-009&#x27;s config rows. Selecting a row by full model id matches the ANC-009 check, which says a send with that id resolves. So only the ban is excess. It was added in 1a9af55a (2026-11-25), before both anchors were locked (2026-11-26). Lead: the definition of `branch on a catalog name` and the rationale sentence about typed data stay in the record text, which statement-level changes cannot edit.</p>
+  <h3>Source of truth</h3>
+  <p>ANC-001 — Owner said: “I want &#x27;jev&#x27; to select latest, config can override default.” — commit 1a9af55a</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0102 keeps only statements that serve ANC-001 or ANC-009.</p>
+  <p>Records 49 → 49; statements 205 → 204; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 2 of 28</p>
+</section>

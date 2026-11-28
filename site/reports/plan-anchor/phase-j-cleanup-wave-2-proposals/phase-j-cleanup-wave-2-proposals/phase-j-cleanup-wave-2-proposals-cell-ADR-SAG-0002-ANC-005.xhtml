@@ -1,0 +1,132 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-exceeds" id="cell-ADR-SAG-0002-ANC-005">
+  <div class="section-head">
+    <h2>ADR-SAG-0002 × ANC-005 — exceeds</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-005&quot;,
+  &quot;annotation&quot;: {
+    &quot;author&quot;: &quot;anchor-cleanup-proposer&quot;,
+    &quot;author_label&quot;: &quot;written by the anchor-cleanup-proposer agent, not Jev&quot;,
+    &quot;clauses&quot;: [
+      &quot;that syncs to a server for long-term storage&quot;,
+      &quot;Every row carries its own `session_id`, `repo`, `project` and `agent_role`.&quot;,
+      &quot;; a project lasts under a day to several days&quot;
+    ],
+    &quot;jev_disputed&quot;: false,
+    &quot;no_provenance&quot;: &quot;&quot;,
+    &quot;provenance&quot;: [
+      {
+        &quot;commit&quot;: &quot;998015d2&quot;,
+        &quot;date&quot;: &quot;2026-11-18&quot;,
+        &quot;record&quot;: &quot;ADR-SAG-0002&quot;,
+        &quot;statement&quot;: &quot;For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.&quot;,
+        &quot;summary&quot;: &quot;docs: ADR-SAG-0020/0021 config scopes and separate session-log tree&quot;
+      }
+    ],
+    &quot;remedy&quot;: &quot;Cut the three clauses.&quot;,
+    &quot;stale&quot;: {
+      &quot;reason&quot;: &quot;Written 2026-11-18, eight days before ANC-005 (2026-11-26).&quot;,
+      &quot;record&quot;: &quot;ADR-SAG-0002&quot;,
+      &quot;statement&quot;: &quot;For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.&quot;
+    },
+    &quot;what&quot;: &quot;Adds server sync, the per-row field list and project duration. ANC-005 only fixes where default logs are written.&quot;
+  },
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.52,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.68,
+        &quot;unclear&quot;: 0.08,
+        &quot;yes&quot;: 0.24
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.53,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.3,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.69
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.46,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.33,
+        &quot;unclear&quot;: 0.03,
+        &quot;yes&quot;: 0.64
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.42,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.32,
+        &quot;unclear&quot;: 0.07,
+        &quot;yes&quot;: 0.61
+      }
+    }
+  },
+  &quot;class&quot;: &quot;exceeds&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.24,
+    &quot;exceeds&quot;: 0.69,
+    &quot;relates&quot;: 0.64,
+    &quot;serves&quot;: 0.61
+  },
+  &quot;record&quot;: &quot;ADR-SAG-0002&quot;,
+  &quot;request_id&quot;: &quot;trace/ADR-SAG-0002/ANC-005/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8FVCY3NEB9Q6GVCWMZQR6NN&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="ADR-SAG-0002 × ANC-005 — exceeds
+Proposals: 7
+What exceeds
+“that syncs to a server for long-term storage”
+“Every row carries its own `session_id`, `repo`, `project` and `agent_role`.”
+“; a project lasts under a day to several days”
+Adds server sync, the per-row field list and project duration. ANC-005 only fixes where default logs are written.
+Proposed remedy
+Cut the three clauses.
+Stale
+ADR-SAG-0002 “For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.”: Written 2026-11-18, eight days before ANC-005 (2026-11-26).
+Anchor
+In production runs, every logger sc-agent creates by default, not injected by a caller, must write under the configured log root with a fixed folder and file name, so tools can find the logs.
+Owner said: “I mandated - that all default loggers created in production have root/folder/file naming conventions specified.”
+Scope: adds or changes creation of a default sc-observability Logger in sc-agent, decidr or the client template
+Record statements
+No obligation statements.
+History (git)
+ADR-SAG-0002 statement 1: 998015d2 2026-11-18: docs: ADR-SAG-0020/0021 config scopes and separate session-log tree
+Jev P(yes): relates 0.64 · serves 0.61 · exceeds 0.69 · conflicts 0.24">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <p>Proposals: 7</p>
+  <h3>What exceeds</h3>
+  <ul>
+    <li>“that syncs to a server for long-term storage”</li>
+    <li>“Every row carries its own `session_id`, `repo`, `project` and `agent_role`.”</li>
+    <li>“; a project lasts under a day to several days”</li>
+  </ul>
+  <p>Adds server sync, the per-row field list and project duration. ANC-005 only fixes where default logs are written.</p>
+  <h3>Proposed remedy</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>Cut the three clauses.</p>
+  <h3>Stale</h3>
+  <p class="small">written by the anchor-cleanup-proposer agent, not Jev</p>
+  <p>ADR-SAG-0002 “For the MVP, session logs are JSONL under `&lt;log_root&gt;/sessions/&lt;repo&gt;/&lt;agent_role&gt;/&lt;project&gt;/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.”: Written 2026-11-18, eight days before ANC-005 (2026-11-26).</p>
+  <h3>Anchor</h3>
+  <p>In production runs, every logger sc-agent creates by default, not injected by a caller, must write under the configured log root with a fixed folder and file name, so tools can find the logs.</p>
+  <p>Owner said: “I mandated - that all default loggers created in production have root/folder/file naming conventions specified.”</p>
+  <p>Scope: adds or changes creation of a default sc-observability Logger in sc-agent, decidr or the client template</p>
+  <h3>Record statements</h3>
+  <p>No obligation statements.</p>
+  <h3>History (git)</h3>
+  <p class="small">found by jev_judge.py trace</p>
+  <ul>
+    <li>ADR-SAG-0002 statement 1: 998015d2 2026-11-18: docs: ADR-SAG-0020/0021 config scopes and separate session-log tree</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.64 · serves 0.61 · exceeds 0.69 · conflicts 0.24</p>
+</section>

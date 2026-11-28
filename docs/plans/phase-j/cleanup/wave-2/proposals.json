@@ -1,0 +1,731 @@
+{
+ "schema": "plan-anchoring/record-cleanup-proposals/1",
+ "level": "aggressive",
+ "not_proposed": [
+  {
+   "slice": "wave-1-decided",
+   "reason": "Unanchored records the owner already decided in wave 1 (reply \"approve 1, 3-36; reject 2\"): kept with code or owner words (keep_with_reason, panels 1, 4-14, 17-22, 24-27, 29-31) or cut there (ADR-SAG-0020, panel 35). They are outside wave 2's scope, which per arch-ai is the 8 duplicates, the exceeds cells, the REQ-SAG-0801/ANC-001 conflict and REQ-SAG-0503. They are listed again in the 'records with no anchor' section of this report.",
+   "items": [
+    "REQ-SAG-0501",
+    "NFR-SAG-0001",
+    "NFR-SAG-0003",
+    "REQ-SAG-0001",
+    "REQ-SAG-0005",
+    "REQ-SAG-0006",
+    "REQ-SAG-0007",
+    "REQ-SAG-0009",
+    "REQ-SAG-0011",
+    "REQ-SAG-0016",
+    "REQ-SAG-0017",
+    "REQ-SAG-0013",
+    "REQ-SAG-0020",
+    "REQ-SAG-0601",
+    "REQ-SAG-0602",
+    "REQ-SAG-0401",
+    "REQ-SAG-0701",
+    "REQ-SAG-0202",
+    "REQ-SAG-0301",
+    "REQ-SAG-0302",
+    "REQ-SAG-0303",
+    "ADR-SAG-0005",
+    "ADR-SAG-0017",
+    "ADR-SAG-0018",
+    "ADR-SAG-0020"
+   ]
+  }
+ ],
+ "dropped": [
+  {
+   "title": "Cut the general-log path clause and run-log retention clause from ADR-SAG-0021",
+   "correlation_id": "w2-duplicates",
+   "reason": "merged into the single ADR-SAG-0021 change with w2-cells-1; the run-log clause ' and never rotated or pruned either' is inside the run-log sentence that cut removes"
+  },
+  {
+   "title": "Delete REQ-SAG-0101 and put the short-name rule to the owner as an anchor",
+   "correlation_id": "w2-cells-3",
+   "reason": "merged into the REQ-SAG-0101 delete from w2-cells-2; same record deletion and proposed anchor, adds cell REQ-SAG-0101/ANC-009"
+  }
+ ],
+ "proposals": [
+  {
+   "kind": "consolidate",
+   "title": "Cut the lower-layer error rule from ADR-SAG-0004 and cite REQ-SAG-0002",
+   "records": [
+    "ADR-SAG-0004",
+    "REQ-SAG-0002"
+   ],
+   "changes": [
+    {
+     "record": "ADR-SAG-0004",
+     "before": "There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.",
+     "after": "There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.",
+     "keeps": "A layer MUST NOT drop or replace a lower-layer error id or message."
+    }
+   ],
+   "justification": "REQ-SAG-0002 is the home for the error-propagation obligation (Correcting duplicates rule 2). The ADR sentence 'A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002)' restates REQ-SAG-0002 statements 2, 3 and 8; it is deleted and the REQ-SAG-0002 citation moves onto the sentence that stays. The layering and discriminated-union decision is untouched.",
+   "reword_justification": "Only adds the record id (REQ-SAG-0002) to the remaining sentence so the ADR still cites the REQ.",
+   "source": {
+    "ref": "REQ-SAG-0002",
+    "commit": "66369ba0"
+   },
+   "improvement": "The lower-layer error rule is stated once, in REQ-SAG-0002.",
+   "duplicates": [
+    "ADR-SAG-0004/REQ-SAG-0002/2",
+    "ADR-SAG-0004/REQ-SAG-0002/3",
+    "ADR-SAG-0004/REQ-SAG-0002/8"
+   ],
+   "wave": 2
+  },
+  {
+   "kind": "cut_excess",
+   "title": "Cut ADR-SAG-0021 to what its anchors ask for, and its restatements of REQ-SAG-0003",
+   "records": [
+    "ADR-SAG-0021",
+    "REQ-SAG-0003"
+   ],
+   "changes": [
+    {
+     "record": "ADR-SAG-0021",
+     "before": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. The generated client has no close operation. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\n**Products.** sc-agent ships three products. sc-observability is a crate linked into each, not a product.\n\n| Product | Contains |\n|---|---|\n| `decidr` CLI | decidr, sc-observability |\n| `sitr` CLI | sitr, sc-observability |\n| sc-decidr wheel | the decidr and sitr Python APIs, sc-observability |\n\nThere is one Python wheel. A Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike. Installing the wheel always installs both APIs, whichever one the caller uses.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger, which writes the general log to disk at the paths below. Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. A session sink of the same kind, opened on the run log, appends one link record `{run_id, session_id, cached}` to the run log, `runs.jsonl` beside `sessions.jsonl`, for every query that writes a session row (`cached: false`) and for every cache hit (`cached: true`); the run log is always on and never rotated or pruned either. The session row carries no `run_id`: runs and sessions are many-to-many, because a cache hit serves a later run from an older session. Each session row carries `provider` and `usage` (`null` when the reply reports none), `model_requested` (the resolved model id) and `model_answered` (the model id the response reported, `null` when no response arrived), and has no start or end time. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path. The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader of the session-log layout: it finds the log root with the same function used to write session rows and returns, as an ok value, a map from each requested `session_id` to its row; a missing id returns `session.not_found` (category `validation`) naming the ids. A generated client reads session rows only through it and has no log-root argument (NFR-SAG-0004).\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.\n\n**Session identity.**\n\n- `agent_role` is the agent or app making the request. A generated client hardcodes it to its product name; it is not a user setting.\n- `tool` and `tool_version` name the program that sent the query and its version: the generated client's name, or `decidr` (REQ-SAG-0004). They are carried by the Run the query is sent through (ADR-SAG-0019 decision 14).\n- `project` is the project/phase, resolved by the configuration lookup of ADR-SAG-0020 (`--project`, `SC_PROJECT`, then the config files). It is required and has no default; a session without one is refused with a typed error naming every place it can be set. Usage, help and errors call it \"project/phase\".\n\n**Errors.** An error is logged once, in Rust, with the same id and fields whatever the harness, so the general logs can be searched with one set of terms. It is logged again only when an outer layer adds information that helps debugging. A failed `log.write` or `log.flush` returns the Logger's failure as an error value; nothing else handles it. A successful decision remains in its session row when general logging fails; the call returns the log error rather than that decision value.",
+     "after": "**One Logger per process, owned by the entry point.** The entry point is the CLI's `main`, or, for a Python app, its sc-compose generated client. The entry point obtains one sc-observability `Logger`, keeps it for the life of the process and gives it to each Run it creates (ADR-SAG-0019 decision 14); the Run passes it to every decision call, flushes it after each call and on exit, and never shuts down a Logger it borrowed. Library code never builds a Logger of its own while one is injected, and never forwards records to Python `logging`.\n\n**The wheel exposes the crate's Logger.** Python may write its own records to it and gives it to the Run of its sc-decidr calls; Rust receives its own Logger object back, so no record crosses a bridge and the process has one queue.\n\nA Python process that loads sc-agent has one copy of sc-observability and one Logger, which it injects into decidr and sitr calls alike.\n\n**Defaults.** With no Logger injected, sc-agent uses the default sc-observability Logger (REQ-SAG-0003). Every decision and sitr call is logged. A caller that wants another general-log sink (a database, nothing) changes the sink of the Logger it injects; that is the caller's responsibility.\n\n**Session log.** The session log is always on and is not configurable. sc-agent writes every session row in Rust through its session sink. No Logger sits between sc-agent and the session sink, and the session sink never receives a general-log record. Callers inject no session Logger and cannot replace the session sink.\n\n**Paths.** The log root is `~/.sc-agent`. One function returns a CLI's log root. The CLIs and the wheel call that function; nothing else computes a log path.\n\n| Entry point | General log | Session logs |\n|---|---|---|\n| `decidr` CLI | `logs/decidr.log.jsonl` | `sessions/<repo>/<agent_role>/<project>/sessions.jsonl` |\n| `sitr` CLI | `logs/sitr.log.jsonl` | none |\n| `plan-anchor` (generated client) | `logs/plan-anchor.log.jsonl` | `sessions/<repo>/plan-anchor/<project>/sessions.jsonl` |\n| `judge-jev` (generated client) | `logs/judge-jev.log.jsonl`, holding its decidr and sitr records | `sessions/<repo>/judge-jev/<project>/sessions.jsonl` |\n\nA wheel is not an entry point and has no row: it writes to the Logger its caller injects. Every entry point has a row and every cell is filled. The table is updated when an entry point is added.",
+     "keeps": "With no Logger injected, each CLI MUST write its general log to `~/.sc-agent/logs/<cli>.log.jsonl`."
+    }
+   ],
+   "justification": "ANC-005, ANC-006, ANC-016 and ANC-020 ask for fixed default log paths, injected loggers left unchanged, injection kept to tests for derivative tools, and no second Logger when one is injected. The decision's Logger ownership, injection, defaults, session sink and path table stay. Cut clauses, all deletions: (1) \"The generated client has no close operation.\"; (2) the \"**Products.**\" paragraph with its three-row table, \"There is one Python wheel.\" and \"Installing the wheel always installs both APIs, whichever one the caller uses.\"; (3) in Session log, \"A session sink of the same kind, opened on the run log, ...\" through \"... never rotated or pruned either.\", \"The session row carries no `run_id`: ...\" and \"Each session row carries `provider` and `usage` ... and has no start or end time.\"; (4) in Paths, \"The wheel's `sc_agent.session_rows(session_ids, *, agent_role, project=None)` is the one reader ... (NFR-SAG-0004).\"; (5) the whole \"**Session identity.**\" section; (6) the whole \"**Errors.**\" section. Cuts 3, 4 and 6 are also owned by REQ-SAG-0005 and 0703, ADR-SAG-0019 and ADR-SAG-0020, so the decision keeps one home for each. The statement dates from 2026-11-19, before the anchors of 2026-11-26 and 2026-11-27. Merged with the duplicate cut (w2-duplicates): REQ-SAG-0003 owns the default general-log path (statement 0) and the never-remove rule (statement 4). In Defaults, 'which writes the general log to disk at the paths below' repeats statement 0 and is replaced by the citation; in Session log, 'and never rotated or pruned either' repeats the never-remove rule and is cut. The entry-point table stays as the ADR's decision.",
+   "reword_justification": "Only adds the record id (REQ-SAG-0003) in place of the deleted clause.",
+   "source": {
+    "ref": "ANC-005",
+    "quote": "I mandated - that all default loggers created in production have root/folder/file naming conventions specified.",
+    "commit": "f023c0d1"
+   },
+   "improvement": "ADR-SAG-0021 keeps what the four anchors ask for and drops the product list, run-log and row fields, session-row reader, session identity and error-logging rules. The general-log path and never-remove rule are stated once, in REQ-SAG-0003.",
+   "cells": [
+    "ADR-SAG-0021/ANC-005",
+    "ADR-SAG-0021/ANC-006",
+    "ADR-SAG-0021/ANC-016",
+    "ADR-SAG-0021/ANC-020"
+   ],
+   "duplicates": [
+    "ADR-SAG-0021/REQ-SAG-0003/0",
+    "ADR-SAG-0021/REQ-SAG-0003/4"
+   ],
+   "wave": 2
+  },
+  {
+   "kind": "resolve_conflict",
+   "resolution": "propose_anchor",
+   "title": "Owner ruling: is provider error text kept whole duplicated in ADR-SAG-0004?",
+   "records": [
+    "ADR-SAG-0004",
+    "REQ-SAG-0002"
+   ],
+   "changes": [],
+   "proposed_anchor": "Provider error text is kept whole: REQ-SAG-0002 owns it, and ADR-SAG-0004 does not restate it.",
+   "justification": "Jev marks REQ-SAG-0002 statement 4 'Error text received from a provider MUST be kept whole.' as restated in ADR-SAG-0004. The proposer disputes it: the ADR says only 'A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002)' and 'E carries the error info: at least an id and a message'; neither mentions provider text. The only overlap is cut by the ADR-SAG-0004 consolidate. Owner decides: record as owner conflict (no change) or name a cut. Both texts are quoted on the panel; owner rules (record-trace.md, When to use).",
+   "source": {
+    "ref": "REQ-SAG-0002",
+    "commit": "c7a40068"
+   },
+   "improvement": "The duplicate flag is settled by the owner rather than left open.",
+   "duplicates": [
+    "ADR-SAG-0004/REQ-SAG-0002/4"
+   ],
+   "wave": 2
+  },
+  {
+   "kind": "resolve_conflict",
+   "resolution": "propose_anchor",
+   "title": "Owner ruling: are ADR-SAG-0021's path table and Logger-injection text decisions or duplicates?",
+   "records": [
+    "ADR-SAG-0021",
+    "REQ-SAG-0003",
+    "REQ-SAG-0008"
+   ],
+   "changes": [],
+   "proposed_anchor": "ADR-SAG-0021 keeps the per-entry-point log path table and the Logger-injection mechanism as its decision; REQ-SAG-0003 and REQ-SAG-0008 keep the testable obligations.",
+   "justification": "Jev flags REQ-SAG-0003 statement 3 'Session logs MUST be written under `~/.sc-agent/sessions/` (REQ-SAG-0005).' and REQ-SAG-0008 statement 0 'The Rust API MUST accept an injected general Logger.' as restated in ADR-SAG-0021. The proposer disputes both: the ADR's Paths table gives the per-entry-point layout (wider than the REQ's root folder, and ADR-only), and 'gives it to each Run it creates ... the Run passes it to every decision call' describes ownership, which is the decision. Owner decides: record as owner conflicts (no change) or name the cut. Both texts are quoted on the panel; owner rules (record-trace.md, When to use).",
+   "source": {
+    "ref": "ADR-SAG-0021",
+    "commit": "f023c0d1"
+   },
+   "improvement": "The duplicate flag is settled by the owner rather than left open.",
+   "duplicates": [
+    "ADR-SAG-0021/REQ-SAG-0003/3",
+    "ADR-SAG-0021/REQ-SAG-0008/0"
+   ],
+   "wave": 2
+  },
+  {
+   "kind": "cut_excess",
+   "title": "Cut REQ-SAG-0503's doctor statements and reword the first to what `decidr models` does",
+   "records": [
+    "REQ-SAG-0503"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0503",
+     "before": "`decidr doctor` MUST compare each configured provider's model list with the catalog.",
+     "after": "`decidr models` MUST list each provider table in the catalog with the models configured for that provider.",
+     "reword_justification": "No doctor comparison exists. The capability is `decidr models` -> sc_agent::model_catalog (crates/sc-agent/src/lib.rs:1786-1806, crates/decidr/src/main.rs Command::Models), returning every provider table with configured aliases. The reword states that behaviour."
+    },
+    {
+     "record": "REQ-SAG-0503",
+     "before": "`decidr doctor` MUST warn about every model a provider lists that is in no provider table, naming the provider and the model."
+    },
+    {
+     "record": "REQ-SAG-0503",
+     "before": "`decidr doctor` MUST list every detected provider key in the order sc-agent would use it."
+    },
+    {
+     "record": "REQ-SAG-0503",
+     "before": "For each detected key, `decidr doctor` MUST show the source it came from: the environment, the repository-root `.env`, or the platform keyring."
+    }
+   ],
+   "code": "crates/sc-agent/src/lib.rs:model_catalog",
+   "justification": "No anchor covers REQ-SAG-0503; at aggressive it stays only on code. sc_agent::doctor (lib.rs:1808-1815) returns only settings, files and log_root; it never fetches provider model lists, warns, lists keys or shows key sources. Statements 1-3 are cut. Statement 0 is reworded to the code-backed `decidr models` behaviour, keeping the record the owner declined to delete. Title, rationale and acceptance criteria still say doctor; they need the same correction in a later pass.",
+   "reword_justification": "No doctor comparison exists. The capability is `decidr models` -> sc_agent::model_catalog (crates/sc-agent/src/lib.rs:1786-1806, crates/decidr/src/main.rs Command::Models), returning every provider table with configured aliases. The reword states that behaviour.",
+   "source": {
+    "ref": "REQ-SAG-0503",
+    "commit": "1d855d0e"
+   },
+   "improvement": "REQ-SAG-0503 states only what `decidr models` does (sc_agent::model_catalog).",
+   "wave": 2
+  },
+  {
+   "wave": 2,
+   "kind": "cut_excess",
+   "title": "Cut the Run and send description from ADR-SAG-0001",
+   "records": [
+    "ADR-SAG-0001"
+   ],
+   "changes": [
+    {
+     "record": "ADR-SAG-0001",
+     "before": "For decision requests, every decision provider receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, and LLM providers one LLM trait (JSON in, JSON out). Jev implements the decision trait over SystemOne. One type per wire format, OpenAI-compatible chat/completions and Anthropic-compatible Messages, implements both traits and is shared by every provider of that format. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response. Callers open one `Run` per command (created, used for its calls, then disposed) and use its two methods, `send` for one request and `send_batch` for many; the worker threads, holdoff, cancellation and session logging live behind them.",
+     "after": "For decision requests, every decision provider receives the same Jev API request body. `sc-agent` holds one provider table and one model table; the model table is its built-in rows plus the rows configuration adds (REQ-SAG-0102), so a new model works without a release. Decision providers implement one decision trait, and LLM providers one LLM trait (JSON in, JSON out). Jev implements the decision trait over SystemOne. One type per wire format, OpenAI-compatible chat/completions and Anthropic-compatible Messages, implements both traits and is shared by every provider of that format. Before a send, the decision implementation adapts the request to its wire format; the reply is decoded back into a Jev API response."
+    }
+   ],
+   "justification": "ANC-012 asks for one decision trait, one implementation per wire format and no per-provider code. The sentence on opening one Run per command, send and send_batch, worker threads, holdoff, cancellation and session logging is not asked for by the anchor, and ADR-SAG-0019 decisions 7, 8 and 14 already hold it. Cut clause: \"Callers open one `Run` per command ... session logging live behind them.\"",
+   "source": {
+    "ref": "ANC-012",
+    "quote": "i.e. all providers w/ compatible api should use the same impelemntation.",
+    "commit": "057b8146"
+   },
+   "improvement": "ADR-SAG-0001 no longer exceeds ANC-012, and the Run and send description lives only in ADR-SAG-0019.",
+   "cells": [
+    "ADR-SAG-0001/ANC-012"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "cut_excess",
+   "title": "Cut row fields, server sync and project length from ADR-SAG-0002",
+   "records": [
+    "ADR-SAG-0002"
+   ],
+   "changes": [
+    {
+     "record": "ADR-SAG-0002",
+     "before": "For the MVP, session logs are JSONL under `<log_root>/sessions/<repo>/<agent_role>/<project>/` (ADR-SAG-0021). Later they load into a local SQLite database that syncs to a server for long-term storage. Every row carries its own `session_id`, `repo`, `project` and `agent_role`. All sessions of one repo, agent role and project are appended to one file in that directory; a project lasts under a day to several days.",
+     "after": "For the MVP, session logs are JSONL under `<log_root>/sessions/<repo>/<agent_role>/<project>/` (ADR-SAG-0021). Later they load into a local SQLite database. All sessions of one repo, agent role and project are appended to one file in that directory."
+    }
+   ],
+   "justification": "ANC-005 fixes where default logs and the session sink are written. It does not ask for the server sync, the list of fields on every row, or how long a project lasts. Cut clauses: \"that syncs to a server for long-term storage\", \"Every row carries its own `session_id`, `repo`, `project` and `agent_role`.\" and \"; a project lasts under a day to several days\". Each is a deletion of words, with no rewording. The statement dates from 2026-11-18, before the anchor of 2026-11-26.",
+   "source": {
+    "ref": "ANC-005",
+    "quote": "I mandated - that all default loggers created in production have root/folder/file naming conventions specified.",
+    "commit": "998015d2"
+   },
+   "improvement": "ADR-SAG-0002 keeps the session-log location and the one-file rule that ANC-005 covers.",
+   "cells": [
+    "ADR-SAG-0002/ANC-005"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "cut_excess",
+   "title": "Cut the sitr section, template details and timeout default from ADR-SAG-0019",
+   "records": [
+    "ADR-SAG-0019"
+   ],
+   "changes": [
+    {
+     "record": "ADR-SAG-0019",
+     "before": "The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.\n\n1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection, API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query whose model call succeeded (a failed call writes no row; its error goes to the general log), at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.\n\n   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`; the wheel moves to maturin's mixed layout and `import sc_agent` is unchanged.\n\n   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping.\n   - model selectors are Run arguments.\n   - A result line holds only the generic result fields; session data stays in the session row. The module reads session rows only through `sc_agent.session_rows`, finding a run's queries through its link records or the session_ids in its result lines, and never computes a session-log path.\n   - Python results are typed values, not dicts.\n   - sc-compose is an external render tool, not a wheel dependency; the template's front matter declares its sc-compose minimum (`requires.cli`), declared, not enforced.\n\n   **The lower-level API stays the contract.** `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public, and the generated code uses only them and the standard library.\n\n2. **Typed fields: `attempts` and `category`.** An error value carries at least `id`, `message` and `action`, plus `attempts` (sends made, the first included) and `category` (decision 6) when they apply; unset fields are not written (REQ-SAG-0016). Retry-After is read as a Duration and used for the wait before a resend (REQ-SAG-0601).\n\n5. **Python errors.** Every wheel call returns ok with a value or an error with its id and message; nothing raises (REQ-SAG-0016).\n\n6. **The category is stored when the error is built.** The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`. Every error has a stable id and stores its category, which Python reads from the `category` field (REQ-SAG-0017). Retryable means worth resubmitting as a new call later, after the wheel's own resends have run out; it is true for `busy` and `network` only, and a consumer that resubmits waits first rather than wrapping the wheel in an immediate retry loop.\n\n7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run's calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout. The timeout defaults to 120 s; REQ-SAG-0702 holds the rules.\n\n8. **`send_batch` returns one result per request, each with its input position**, while `on_result` still receives each line as it finishes (REQ-SAG-0702).\n\n11. **sitr is an optional, separate section of the consumer template.** It uses `sc_agent.sitr` only (ADR-SAG-0005, ADR-SAG-0021) and is kept separate from the decision call: extraction runs outside the decision path, and its output feeds the consumer's prompt authoring. In this phase one offline test shows extraction output reaching a dry-run request.\n\n14. **A run is a context object.** `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`); creating it mints the run's ULID `run_id` in Rust (as are `session_id` ULIDs), readable as `run.run_id`.",
+     "after": "The wheel is the one consumer boundary. Decision numbers are stable; there is no decision 3.\n\n1. **The wheel is the consumer boundary.** Every consumer concern except prompt authoring and result interpretation belongs in sc-decidr: model selection, API keys (environment, repo-root `.env`, OS keyring), session logging, the general Logger, errors with a stored category (decisions 2, 5 and 6), limits and cancellation (decisions 7 and 14) and position-tagged batch results (decision 8). Session logging is always on: one row per query whose model call succeeded (a failed call writes no row; its error goes to the general log), at the wheel's default location, tagged with `project` and `agent_role`, written by sc-agent's session sink (ADR-SAG-0021); a cache hit writes no row and one link record (REQ-SAG-0005, REQ-SAG-0703). All Jev queries and responses therefore take one path.\n\n   **The integration artifact is a generated module** (REQ-SAG-0018), rendered by each consumer from the sc-compose template `sc_agent/templates/consumer.py.j2`; the wheel moves to maturin's mixed layout and `import sc_agent` is unchanged.\n\n   - The template covers the decision call, model pass-through, logging wiring, cancellation and the error-to-category-to-code mapping.\n   - model selectors are Run arguments.\n   - A result line holds only the generic result fields; session data stays in the session row. The module reads session rows only through `sc_agent.session_rows`, finding a run's queries through its link records or the session_ids in its result lines, and never computes a session-log path.\n\n   **The lower-level API stays the contract.** `Run` (with `send` and `send_batch`), `session_rows`, `provider_keys`, `TYPESAFE`, `digest`, `logger`, `log`, `flush` and `sc_agent.sitr` are public, and the generated code uses only them and the standard library.\n\n2. **Typed fields: `attempts` and `category`.** An error value carries at least `id`, `message` and `action`, plus `attempts` (sends made, the first included) and `category` (decision 6) when they apply; unset fields are not written (REQ-SAG-0016). Retry-After is read as a Duration and used for the wait before a resend (REQ-SAG-0601).\n\n5. **Python errors.** Every wheel call returns ok with a value or an error with its id and message; nothing raises (REQ-SAG-0016).\n\n6. **The category is stored when the error is built.** The categories are `busy`, `quota`, `auth`, `network`, `response_invalid`, `validation`, `cancelled`, `config`, `log` and `other`. Every error has a stable id and stores its category, which Python reads from the `category` field (REQ-SAG-0017). Retryable means worth resubmitting as a new call later, after the wheel's own resends have run out; it is true for `busy` and `network` only, and a consumer that resubmits waits first rather than wrapping the wheel in an immediate retry loop.\n\n7. **Per-run limits: `timeout_secs` and `workers`.** A Run takes an optional timeout (a Duration) and worker count, for that Run's calls only (`--timeout-secs` and `--workers` on the CLI); `None` means the configured value, and every send, resends included, gets the full timeout.\n\n8. **`send_batch` returns one result per request, each with its input position**, while `on_result` still receives each line as it finishes (REQ-SAG-0702).\n\n14. **A run is a context object.** `sc_agent.Run(tool=, tool_version=, cache=, ...)` is created once per tool command and closed when its calls are done (`with sc_agent.Run(...) as run:`); creating it mints the run's ULID `run_id` in Rust (as are `session_id` ULIDs), readable as `run.run_id`."
+    }
+   ],
+   "justification": "ANC-010 bans copy-pasted logic between tools. The generated consumer module from one template already serves it. The cut clauses ask for nothing the anchor states, and the REQs own them: decision 11 (the optional sitr section of the template and its offline test), the bullets \"Python results are typed values, not dicts.\" and \"sc-compose is an external render tool ... declared, not enforced.\", and the sentence \"The timeout defaults to 120 s; REQ-SAG-0702 holds the rules.\" Decisions 1, 2, 5, 6, 7, 8 and 14 stay, so references to them from ADR-SAG-0001 and ADR-SAG-0021 still resolve. The statement dates from 2026-11-24, before the anchor of 2026-11-26.",
+   "source": {
+    "ref": "ANC-010",
+    "quote": "For years any copy/paste was a big red flag that I was growing the code base unnecessarily.",
+    "commit": "2e54ef62"
+   },
+   "improvement": "ADR-SAG-0019 no longer exceeds ANC-010 with sitr and template detail.",
+   "cells": [
+    "ADR-SAG-0019/ANC-010"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "propose_anchor",
+   "title": "Delete NFR-SAG-0004 unless the owner anchors one owner per shared fact",
+   "records": [
+    "NFR-SAG-0004"
+   ],
+   "changes": [
+    {
+     "record": "NFR-SAG-0004"
+    }
+   ],
+   "justification": "ANC-010 bans copy-pasted logic in phase-j code across judge-jev, plan-anchor and the client template. ANC-009 and ANC-015 cover the model table and decidr-wide rules. NFR-SAG-0004 requires a single owner for every shared fact in all of sc-agent (provider table, provider-key list, model table, session-log layout, ULID minting), and requires all code to call that owner. No anchor says that. Both statements date from 2026-11-24 and 2026-11-25, before the anchors of 2026-11-26. The record is deleted unless the owner anchors the rule. Both statements are the excess, so the whole record goes.",
+   "source": {
+    "ref": "ANC-010",
+    "quote": "For years any copy/paste was a big red flag that I was growing the code base unnecessarily.",
+    "commit": "a63c0a59"
+   },
+   "proposed_anchor": "NFR-SAG-0004, \"Every shared fact MUST have a single owner\" and \"Code that needs a shared fact MUST obtain it by calling its owner\": needed because the first phase-j plan copied the provider-key list into four places, re-implemented the session-log layout in template Python and minted ULIDs in Rust and Python.",
+   "improvement": "No record exceeds ANC-009, ANC-010 or ANC-015 on one-owner-per-fact. If the owner anchors the rule, it can be restored.",
+   "cells": [
+    "NFR-SAG-0004/ANC-009",
+    "NFR-SAG-0004/ANC-010",
+    "NFR-SAG-0004/ANC-015"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "cut_excess",
+   "title": "Cut the log-retention statements from REQ-SAG-0003",
+   "records": [
+    "REQ-SAG-0003"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0003",
+     "before": "A session log MUST remain in `~/.sc-agent/sessions/` whatever its age."
+    },
+    {
+     "record": "REQ-SAG-0003",
+     "before": "A run log MUST remain in `~/.sc-agent/sessions/` whatever its age."
+    },
+    {
+     "record": "REQ-SAG-0003",
+     "before": "sc-agent MUST NOT contain code that removes a general log."
+    },
+    {
+     "record": "REQ-SAG-0003",
+     "before": "sc-agent MUST NOT remove a session log."
+    },
+    {
+     "record": "REQ-SAG-0003",
+     "before": "sc-agent MUST NOT remove a run log."
+    }
+   ],
+   "justification": "ANC-005 fixes where default loggers write (log root, folder, file name). It says nothing about keeping or removing logs. No anchor covers retention, and each of these statements was written between 2026-11-19 and 2026-11-25, before the anchors of 2026-11-26. REQ-SAG-0005's rationale says the never-rotated, never-pruned rule is held in ADR-SAG-0021 (Session log). The path, root-variable and session-folder statements stay. At aggressive, anchored records do not get keep_with_reason. The same cut clears the ANC-015 and ANC-016 cells, because retention is the only text in this record that no anchor covers.",
+   "source": {
+    "ref": "ANC-005",
+    "quote": "I mandated - that all default loggers created in production have root/folder/file naming conventions specified.",
+    "commit": "67203e2f"
+   },
+   "improvement": "REQ-SAG-0003 keeps only placement and log-root obligations, which ANC-005 asks for.",
+   "cells": [
+    "REQ-SAG-0003/ANC-005",
+    "REQ-SAG-0003/ANC-015",
+    "REQ-SAG-0003/ANC-016"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "propose_anchor",
+   "title": "Propose an anchor for the wheel's Logger source in REQ-SAG-0008, and delete both statements until it is approved",
+   "records": [
+    "REQ-SAG-0008"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0008",
+     "before": "When a Python caller requests a named Logger, the wheel MUST return a Logger built from the linked crate."
+    },
+    {
+     "record": "REQ-SAG-0008",
+     "before": "The wheel MUST NOT depend on the `sc-observability` Python package."
+    }
+   ],
+   "proposed_anchor": "REQ-SAG-0008: when a Python caller requests a named Logger, the wheel returns a Logger built from the linked sc-observability crate and does not depend on the sc-observability Python package, because the owner banned a second, Python-side logger.",
+   "justification": "ANC-006, ANC-016 and ANC-020 cover only injected loggers: they must not be changed, injection is the test path, and no second Logger is built. Both statements are about where a non-injected Python Logger comes from, which none of those anchors asks for. They date from 2026-11-19 and 2026-11-25, before the anchors. The wheel code already has a `logger` function (crates/sc-agent-py/src/lib.rs:258), so the behaviour is real. ANC-020's quote asks for 'a new anchor banning python_logger', which supports this one-line anchor. Until the owner approves it the statements are deleted. REQ-SAG-0003's definition of the client Logger cites REQ-SAG-0008, so the lead should harmonize that definition with this outcome.",
+   "source": {
+    "ref": "ANC-020",
+    "quote": "add a new anchor banning python_logger",
+    "commit": "1a9af55a"
+   },
+   "improvement": "REQ-SAG-0008 is limited to the injected Logger, as ANC-006, ANC-016 and ANC-020 say. The owner decides whether the wheel-Logger rule becomes an anchor.",
+   "cells": [
+    "REQ-SAG-0008/ANC-006",
+    "REQ-SAG-0008/ANC-016",
+    "REQ-SAG-0008/ANC-020"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "propose_anchor",
+   "title": "Propose an anchor for the shared consumer module's common rules in REQ-SAG-0018, and delete three statements until it is approved",
+   "records": [
+    "REQ-SAG-0018"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0018",
+     "before": "The consumer module MUST pass the model selector through unchanged."
+    },
+    {
+     "record": "REQ-SAG-0018",
+     "before": "The consumer module MUST cancel its running Run on `KeyboardInterrupt`."
+    },
+    {
+     "record": "REQ-SAG-0018",
+     "before": "The consent gate MUST ask for consent only when the Run's provider is TypeSafe."
+    }
+   ],
+   "proposed_anchor": "REQ-SAG-0018: the shared consumer module carries the rules every decidr-based tool follows (it passes the model selector through unchanged, cancels its running Run on KeyboardInterrupt, and asks for consent only when the Run's provider is TypeSafe), so judge-jev and plan-anchor supply only a tool name.",
+   "justification": "ANC-010 bans copy-paste logic. It supports one shared template (statements 0, 2 and 5, which stay) but says nothing about selector pass-through, Ctrl-C cancellation or the consent rule. These statements are exactly the shared rules ANC-015's quote describes: 'judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools'. So they are proposed as an anchor, and deleted until the owner approves it. The selector rule dates from 2026-11-14 and the other two from 2026-11-25, before the anchors.",
+   "source": {
+    "ref": "ANC-015",
+    "quote": "judge-jev and plan-anchor simply supply tool name and follow the rules established for all decidr based tools",
+    "commit": "e234112e"
+   },
+   "improvement": "REQ-SAG-0018 keeps only the obligations ANC-010 supports. The owner decides whether the shared behaviours become anchored.",
+   "cells": [
+    "REQ-SAG-0018/ANC-010"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "cut_excess",
+   "title": "Cut the configuration loading and error rules unrelated to model selection from REQ-SAG-0019",
+   "records": [
+    "REQ-SAG-0019"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0019",
+     "before": "When a required setting has no built-in default and no layer sets it, the CLI MUST return a missing-setting error."
+    },
+    {
+     "record": "REQ-SAG-0019",
+     "before": "An unknown key in a configuration file MUST cause a typed load error."
+    },
+    {
+     "record": "REQ-SAG-0019",
+     "before": "The `cache` setting MUST default to `true`."
+    },
+    {
+     "record": "REQ-SAG-0019",
+     "before": "When a CLI fails to load a configuration file, its error MUST name the failure location."
+    },
+    {
+     "record": "REQ-SAG-0019",
+     "before": "A CLI MUST NOT read another CLI's `<cli>.json`."
+    },
+    {
+     "record": "REQ-SAG-0019",
+     "before": "While it loads configuration, a CLI MUST NOT write to any configuration file."
+    },
+    {
+     "record": "REQ-SAG-0019",
+     "before": "Configuration MUST NOT change a paid API's base address."
+    }
+   ],
+   "justification": "ANC-001 asks that config can override the default `jev` model, and ANC-009 asks that config can add model rows. The statements that let config files accept settings and add or override model rows (statements 1, 2, 5 and 6) serve them and stay. These seven are general loading and error rules, the cache default and the paid-API address rule. No anchor asks for them. All date from 2026-11-18 to 2026-11-25, before the anchors of 2026-11-26.",
+   "source": {
+    "ref": "ANC-001",
+    "quote": "I want 'jev' to select latest, config can override default.",
+    "commit": "3afa4f9e"
+   },
+   "improvement": "REQ-SAG-0019 no longer specifies loading and error behaviour beyond the model-config anchors.",
+   "cells": [
+    "REQ-SAG-0019/ANC-001",
+    "REQ-SAG-0019/ANC-009"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "cut_excess",
+   "title": "Cut the `<cli> doctor` statements from REQ-SAG-0019",
+   "records": [
+    "REQ-SAG-0019"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0019",
+     "before": "Each CLI's `<cli> doctor` command, such as `decidr doctor`, MUST report the settings table."
+    },
+    {
+     "record": "REQ-SAG-0019",
+     "before": "In each row of the settings table, the `source` cell MUST show the source of that row's value."
+    },
+    {
+     "record": "REQ-SAG-0019",
+     "before": "`<cli> doctor` MUST report the path of every file in the nine layers."
+    },
+    {
+     "record": "REQ-SAG-0019",
+     "before": "For each file in the nine layers, `<cli> doctor` MUST report whether it exists."
+    },
+    {
+     "record": "REQ-SAG-0019",
+     "before": "`<cli> doctor` MUST NOT send a model request."
+    },
+    {
+     "record": "REQ-SAG-0019",
+     "before": "`<cli> doctor` MUST NOT write a file."
+    }
+   ],
+   "justification": "No anchor mentions a doctor command or a settings table. ANC-001 and ANC-009 cover only the model default and extra model rows from config. These statements date from 2026-11-18 to 2026-11-25, before the anchors, and are excess at aggressive. If the owner wants doctor reporting kept, the route is an anchor, not keeping the text unanchored.",
+   "source": {
+    "ref": "ANC-009",
+    "quote": "hard-coded rows will get stale quickly and often",
+    "commit": "b98b4112"
+   },
+   "improvement": "REQ-SAG-0019 no longer specifies diagnostics output that no anchor asks for.",
+   "cells": [
+    "REQ-SAG-0019/ANC-001",
+    "REQ-SAG-0019/ANC-009"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "cut_excess",
+   "title": "Cut the local-endpoint address and local-folder layer statements from REQ-SAG-0019",
+   "records": [
+    "REQ-SAG-0019"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0019",
+     "before": "A local endpoint's address MUST be settable in configuration."
+    },
+    {
+     "record": "REQ-SAG-0019",
+     "before": "When the CLI does not run inside a git work tree, it MUST skip the local-folder layers."
+    }
+   ],
+   "justification": "ANC-009 asks for extra model rows from config, not for settable local endpoint addresses or work-tree layer skipping. Both statements date from 2026-11-25, before the anchors, and no anchor asks for them.",
+   "source": {
+    "ref": "ANC-009",
+    "quote": "hard-coded rows will get stale quickly and often",
+    "commit": "b98b4112"
+   },
+   "improvement": "REQ-SAG-0019 keeps only the config statements that serve ANC-001 and ANC-009.",
+   "cells": [
+    "REQ-SAG-0019/ANC-001",
+    "REQ-SAG-0019/ANC-009"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "propose_anchor",
+   "title": "Propose an anchor for model short-name resolution, and delete REQ-SAG-0101 until it is approved",
+   "records": [
+    "REQ-SAG-0101"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0101"
+    }
+   ],
+   "proposed_anchor": "Each cloud short name (jev, haiku, sonnet, opus, fable, luna, terra, sol, astra) and each local short name (laya, decider) resolves to a model in sc-agent's model table, so callers select models by short name.",
+   "justification": "ANC-001 covers only the `jev` name. REQ-SAG-0101 specifies every other short name and the local models. The model code backs this (the table in crates/sc-agent/src/lib.rs has fable, astra and decider), but at aggressive existing code does not justify keeping text on an anchored record. Both statements date from 2026-11-25, before ANC-001 of 2026-11-26. The owner's words ('I want jev to select latest') support a short-name mechanism, so this is proposed as an anchor. Until it is approved, the record's two statements are deleted and the empty record is deleted.",
+   "source": {
+    "ref": "ANC-001",
+    "quote": "I want 'jev' to select latest, config can override default.",
+    "commit": "1a9af55a"
+   },
+   "improvement": "Only owner-anchored model-name behaviour remains. The owner decides whether short-name resolution becomes anchored.",
+   "cells": [
+    "REQ-SAG-0101/ANC-001",
+    "REQ-SAG-0101/ANC-009"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "cut_excess",
+   "title": "Cut the catalog-name branching ban from REQ-SAG-0102",
+   "records": [
+    "REQ-SAG-0102"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0102",
+     "before": "`sc-agent` MUST NOT branch on a catalog name."
+    }
+   ],
+   "justification": "No anchor asks for a ban on branching on catalog names. ANC-001 covers `jev` resolving to the newest model with a config override. ANC-009 covers config-added rows. The other four statements each serve one of them. Sorting built-in rows by release date, and carrying the release date, give ANC-001 its date-sorted table. The short-name rule with a configured override matches ANC-001's config override and ANC-009's config rows. Selecting a row by full model id matches the ANC-009 check, which says a send with that id resolves. So only the ban is excess. It was added in 1a9af55a (2026-11-25), before both anchors were locked (2026-11-26). Lead: the definition of `branch on a catalog name` and the rationale sentence about typed data stay in the record text, which statement-level changes cannot edit.",
+   "source": {
+    "ref": "ANC-001",
+    "quote": "I want 'jev' to select latest, config can override default.",
+    "commit": "1a9af55a"
+   },
+   "improvement": "REQ-SAG-0102 keeps only statements that serve ANC-001 or ANC-009.",
+   "cells": [
+    "REQ-SAG-0102/ANC-001",
+    "REQ-SAG-0102/ANC-009"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "propose_anchor",
+   "title": "Delete REQ-SAG-0103 and put provider routing to the owner as an anchor",
+   "records": [
+    "REQ-SAG-0103"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0103"
+    }
+   ],
+   "justification": "All ten statements are provider and routing rules: separate provider field, model id carried, Together, OpenRouter, configured provider, keyless-first, first found key, the `openai` name, no provider in short names, no provider required of the caller. ANC-009 asks only that config can add model rows. The only anchor cells for this record are this yellow one and two `related` ones (ANC-012, ANC-013), and none serves. At aggressive, excess stays deleted until the owner anchors it. The routing rules are needed: crates/sc-agent/src/lib.rs candidates() honours a configured provider, and resolve() prefers a keyless provider and then the first held key. They are proposed as one anchor. The Together, OpenRouter and `openai`-name statements are provider data in the provider table, and ANC-012 says adding a provider needs no hard-coding, so they are deleted without an anchor. The statements date from 67203e2f and 22f4a5bd (2026-11-25), before ANC-009. Lead: REQ-SAG-0102's rationale and REQ-SAG-0502's related list cite REQ-SAG-0103.",
+   "source": {
+    "ref": "ANC-009",
+    "quote": "hard-coded rows will get stale quickly and often",
+    "commit": "67203e2f"
+   },
+   "improvement": "REQ-SAG-0103 no longer exceeds ANC-009. Provider routing returns only if the owner anchors it.",
+   "cells": [
+    "REQ-SAG-0103/ANC-009"
+   ],
+   "proposed_anchor": "REQ-SAG-0103: a model-table row stores its provider apart from its model, and a request carries that row's model id. When config names a provider for a model, requests go to it. Otherwise a provider needing no key is preferred, then the first provider whose key is found. The caller never names a provider and a short name never encodes one. Needed because one model can be served by several providers."
+  },
+  {
+   "wave": 2,
+   "kind": "propose_anchor",
+   "title": "Delete REQ-SAG-0502 and put \"launch any LLM\" to the owner as an anchor",
+   "records": [
+    "REQ-SAG-0502"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0502"
+    }
+   ],
+   "justification": "The only statement, \"sc-agent MUST be able to send a request to any LLM a configured provider serves, not only decision models.\", is a capability claim. ANC-013 asks for an LLM trait with one implementation per wire format. ANC-009 asks for config-added rows. Neither says sc-agent can launch any LLM a provider serves. Jev rates it related to both and serving neither (p_serves 0.03 for ANC-013). At aggressive, excess stays deleted until the owner anchors it. The capability is needed: crates/sc-agent/tests/wires.rs has a test, non_decision_llm_selected_by_short_name_returns_the_json_the_model_wrote, that sends to a non-decision LLM by short name. So it goes to the owner as an anchor. The statement dates from c7a40068 (2026-11-09), older than both anchors. Lead: harmonize with the REQ-SAG-0101 and REQ-SAG-0103 proposals, since REQ-SAG-0502 lists both as related.",
+   "source": {
+    "ref": "ANC-013",
+    "quote": "all providers w/ compatible api should use the same impelemntation.",
+    "commit": "c7a40068"
+   },
+   "improvement": "REQ-SAG-0502 no longer exceeds ANC-009 or ANC-013. The capability returns only if the owner anchors it.",
+   "cells": [
+    "REQ-SAG-0502/ANC-009",
+    "REQ-SAG-0502/ANC-013"
+   ],
+   "proposed_anchor": "REQ-SAG-0502: sc-agent can send a request to any LLM a configured provider serves, not only decision models. Needed because decision models are a small part of what sc-agent does."
+  },
+  {
+   "wave": 2,
+   "kind": "resolve_conflict",
+   "title": "Resolve REQ-SAG-0801 against ANC-001: cut the pinned model-id statements",
+   "records": [
+    "REQ-SAG-0801"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0801",
+     "before": "Each local decision runner's model MUST have a fixed model id in the model table."
+    },
+    {
+     "record": "REQ-SAG-0801",
+     "before": "A selection of `decider` MUST resolve to the 4b decider model."
+    }
+   ],
+   "resolution": "cut",
+   "justification": "Jev finds a conflict (p_conflicts 0.82). The anchor ANC-001 says \"I want 'jev' to select latest, config can override default.\" The record pins models instead: \"Each local decision runner's model MUST have a fixed model id in the model table.\" and \"A selection of `decider` MUST resolve to the 4b decider model.\" Neither statement leaves room for a newest-row rule or a config override. Source of truth: ANC-001, the owner's word, locked 2026-11-26. The statements are older (aa1190ba, 2026-11-24, the fixed-model-id ruling; 67203e2f, 2026-11-25). I read the conflict as arguable, since ANC-001 names `jev` and these statements name local runners, so the cell is marked disputed. Cutting is still right: no anchor asks for either pin. In crates/sc-agent/src/lib.rs the `decider` name is served by two provider rows with the same date (decider-4b-v2.1 and decider-2b-v11), so the 4b pin is a table-order accident. Reword and propose_anchor are not proposed, since the anchor is not wrong and there is nothing to reconcile.",
+   "source": {
+    "ref": "ANC-001",
+    "quote": "I want 'jev' to select latest, config can override default.",
+    "commit": "aa1190ba"
+   },
+   "improvement": "REQ-SAG-0801 no longer pins model ids against ANC-001.",
+   "cells": [
+    "REQ-SAG-0801/ANC-001"
+   ]
+  },
+  {
+   "wave": 2,
+   "kind": "propose_anchor",
+   "title": "Cut local-runner address and selection rules from REQ-SAG-0801 and put them to the owner as an anchor",
+   "records": [
+    "REQ-SAG-0801"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0801",
+     "before": "Each local decision runner's network address MUST come from configuration."
+    },
+    {
+     "record": "REQ-SAG-0801",
+     "before": "Each local decision runner MUST be selectable by its name wherever a decision model is selected."
+    },
+    {
+     "record": "REQ-SAG-0801",
+     "before": "`sc-agent` MUST NOT hard-code the network address of any local decision runner."
+    }
+   ],
+   "justification": "ANC-009 is served by \"Configuration MUST be able to add a local model that runs on another computer.\", which stays. The three statements cut here go beyond ANC-009: the runner address comes from config, runners are selectable by name, and no address is hard-coded. At aggressive, excess stays deleted until the owner anchors it. The address rule and the no-hard-code ban state one obligation twice, and the code documents it: laya and decider_4b carry an empty url in PROVIDERS in crates/sc-agent/src/lib.rs. They are proposed as one anchor. The statements date from 67203e2f, a63c0a59 and 1a9af55a (2026-11-24 and 2026-11-25), before ANC-009. The pinned-id statements are handled in the conflict proposal and are not repeated here.",
+   "source": {
+    "ref": "ANC-009",
+    "quote": "hard-coded rows will get stale quickly and often",
+    "commit": "1a9af55a"
+   },
+   "improvement": "REQ-SAG-0801 keeps only the config-added local model statement ANC-009 asks for.",
+   "cells": [
+    "REQ-SAG-0801/ANC-009"
+   ],
+   "proposed_anchor": "REQ-SAG-0801: the host and port of a local decision runner (laya, decider) come from configuration and sc-agent hard-codes none. Each runner is selectable by its name wherever a decision model is selected. Needed because runners differ only in where they run."
+  },
+  {
+   "wave": 2,
+   "kind": "propose_anchor",
+   "title": "Cut provider-handling statements from REQ-SAG-0901 and put the decider-mode rules to the owner as an anchor",
+   "records": [
+    "REQ-SAG-0901"
+   ],
+   "changes": [
+    {
+     "record": "REQ-SAG-0901",
+     "before": "In decider mode, the covered model answering the request MUST itself generate the `probabilities` value when the required schema includes that field."
+    },
+    {
+     "record": "REQ-SAG-0901",
+     "before": "In decider mode, the covered model answering the request MUST itself generate the `confidence` value when the required schema includes that field."
+    },
+    {
+     "record": "REQ-SAG-0901",
+     "before": "Each decision request MUST specify the required schema through the provider's structured-output feature."
+    },
+    {
+     "record": "REQ-SAG-0901",
+     "before": "If a provider response fails to match the required schema, the decision backend MUST return `decision.schema_mismatch`."
+    },
+    {
+     "record": "REQ-SAG-0901",
+     "before": "The covered model handling the decision request MUST pass the request's inputs to the provider."
+    },
+    {
+     "record": "REQ-SAG-0901",
+     "before": "If the provider rejects a request input, the decision backend MUST return the provider's error."
+    }
+   ],
+   "justification": "\"In decider mode, answers from each covered model MUST conform to the required schema.\" stays: it serves ANC-013's check that each wire format receives schema-valid JSON. The six statements cut here go beyond ANC-013, which asks for an LLM trait and one implementation per wire format. Two of them are provider plumbing and are deleted outright with no anchor: the structured-output request, and passing inputs to the provider and returning its errors. The code documents the structured-output request in crates/sc-agent/src/lib.rs. Neither is an owner rule. Two are believed needed and go to the owner as an anchor: the model generates its own `probabilities` and `confidence`, and a response that fails the schema returns `decision.schema_mismatch`. The code documents the error in crates/sc-agent/src/lib.rs, and the first rule keeps Jev and LLM answers comparable. All statements date from 8f41793e (2026-11-25), before ANC-013 (2026-11-26).",
+   "source": {
+    "ref": "ANC-013",
+    "quote": "all providers w/ compatible api should use the same impelemntation.",
+    "commit": "8f41793e"
+   },
+   "improvement": "REQ-SAG-0901 keeps only the schema-conformance statement ANC-013 supports.",
+   "cells": [
+    "REQ-SAG-0901/ANC-013"
+   ],
+   "proposed_anchor": "REQ-SAG-0901: in decider mode the covered model (Haiku, Luna) generates the `probabilities` and `confidence` values itself, and a response that fails the required schema returns `decision.schema_mismatch`. Needed because callers compare Jev and LLM answers directly."
+  }
+ ]
+}

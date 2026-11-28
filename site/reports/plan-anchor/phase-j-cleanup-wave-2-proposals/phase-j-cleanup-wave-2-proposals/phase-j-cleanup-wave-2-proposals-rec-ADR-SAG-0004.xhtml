@@ -1,0 +1,145 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-ADR-SAG-0004">
+  <div class="section-head">
+    <h2>ADR-SAG-0004 Crate layering and error values</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;ADR-SAG-0004&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/retrace2/trace-20261128T011234Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;ADR&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: null,
+    &quot;note&quot;: &quot;No obligation statements.&quot;,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: null
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;66369ba0&quot;,
+        &quot;date&quot;: &quot;2026-11-21&quot;,
+        &quot;summary&quot;: &quot;docs: records follow the reduction plan&quot;
+      },
+      &quot;statement&quot;: &quot;There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.&quot;,
+      &quot;statement_index&quot;: 0
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;alternatives&quot;: {
+      &quot;groups&quot;: [
+        {
+          &quot;cons&quot;: [
+            &quot;Seventeen crates, with traits and wrappers between them, for what about 300 lines of Python did.&quot;
+          ],
+          &quot;description&quot;: &quot;Split types, configuration, secrets, logging, HTTP, schema, each backend and the runner into their own crates.&quot;,
+          &quot;name&quot;: &quot;One crate per layer&quot;,
+          &quot;pros&quot;: [
+            &quot;A program can depend on one layer alone.&quot;
+          ],
+          &quot;why_rejected&quot;: &quot;The reduction plan replaces it with one core crate written fresh to the spec.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;consequences&quot;: {
+      &quot;negative&quot;: [
+        &quot;A program that wants only HTTP or logging still links the whole core.&quot;
+      ],
+      &quot;neutral&quot;: [],
+      &quot;positive&quot;: [
+        &quot;A new launcher reuses `sc-agent` without touching the other launchers.&quot;
+      ],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;context&quot;: {
+      &quot;background&quot;: &quot;&quot;,
+      &quot;problem_statement&quot;: &quot;Crates must be layered so each launcher depends only on what it uses, and errors must keep every lower-layer id and message.&quot;,
+      &quot;text&quot;: &quot;sc-agent will launch decision models, LLMs, CLI agents and SDK agents. Each needs shared types, configuration, secrets, HTTP and logging, but not each other&#x27;s code.&quot;
+    },
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;decision&quot;: {
+      &quot;chosen_approach&quot;: &quot;&quot;,
+      &quot;key_principles&quot;: [
+        &quot;A crate depends only on lower layers.&quot;,
+        &quot;The provider is chosen in one place, `sc-agent`.&quot;
+      ],
+      &quot;text&quot;: &quot;There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.&quot;
+    },
+    &quot;decision_date&quot;: &quot;2026-11-09&quot;,
+    &quot;id&quot;: &quot;ADR-SAG-0004&quot;,
+    &quot;impact_analysis&quot;: {
+      &quot;affected_components&quot;: &quot;&quot;,
+      &quot;maintainability_impact&quot;: &quot;&quot;,
+      &quot;performance_impact&quot;: &quot;&quot;,
+      &quot;security_impact&quot;: &quot;&quot;,
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;implementation&quot;: {
+      &quot;code_examples&quot;: &quot;&quot;,
+      &quot;integration_points&quot;: [],
+      &quot;key_components&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-21&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;rationale&quot;: {
+      &quot;benefits&quot;: [],
+      &quot;text&quot;: &quot;One core crate keeps the code small: ureq, keyring, dotenvy and sc-observability are called directly, with no traits or wrappers between them.\n\nOwner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;Errors are discriminated unions Result&lt;t,e&gt; I don&#x27;t care about per crate\&quot;; \&quot;Extra fields are fine, make sure adr doesn&#x27;t limit too much. I don&#x27;t want findings for returning more.\&quot;\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;always return descriminated unions w/ error info\&quot;&quot;,
+      &quot;trade_offs&quot;: []
+    },
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0002&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0009&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0301&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;title&quot;: &quot;Crate layering and error values&quot;,
+    &quot;version&quot;: &quot;0.4.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">ADR · sc-agent · Approved · version 0.4.0</p>
+  <h3>Context</h3>
+  <p>sc-agent will launch decision models, LLMs, CLI agents and SDK agents. Each needs shared types, configuration, secrets, HTTP and logging, but not each other&#x27;s code.</p>
+  <h3>Problem</h3>
+  <p>Crates must be layered so each launcher depends only on what it uses, and errors must keep every lower-layer id and message.</p>
+  <h3>Decision</h3>
+  <p>There are five crates. `sc-agent` is the bottom layer: the provider tables, `send` and `send_batch`, resends, keys, configuration, errors, logging paths and session rows. `sc-treesitter` (tree-sitter extraction) is over `sc-agent`. On top: `decidr` (the decision CLI), `sitr` (the tree-sitter CLI) and `sc-agent-py` (the one wheel, holding the decidr and sitr APIs). CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result&lt;T, E&gt;`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error&#x27;s id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.</p>
+  <h3>Key principles</h3>
+  <ul>
+    <li>A crate depends only on lower layers.</li>
+    <li>The provider is chosen in one place, `sc-agent`.</li>
+  </ul>
+  <h3>Rationale</h3>
+  <p>One core crate keeps the code small: ureq, keyring, dotenvy and sc-observability are called directly, with no traits or wrappers between them.
+
+Owner ruling 2026-11-21: records follow docs/plans/reduction-plan.md.
+
+Owner ruling (2026-11-21), Rand Lee: &quot;Errors are discriminated unions Result&lt;t,e&gt; I don&#x27;t care about per crate&quot;; &quot;Extra fields are fine, make sure adr doesn&#x27;t limit too much. I don&#x27;t want findings for returning more.&quot;
+
+Owner ruling (2026-11-21), Rand Lee: &quot;always return descriminated unions w/ error info&quot;</p>
+  <h3>Positive consequences</h3>
+  <p>A new launcher reuses `sc-agent` without touching the other launchers.</p>
+  <h3>Negative consequences</h3>
+  <p>A program that wants only HTTP or logging still links the whole core.</p>
+</section>

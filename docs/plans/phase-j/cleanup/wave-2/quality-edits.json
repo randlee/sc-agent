@@ -1,0 +1,4 @@
+[
+ {"record":"REQ-SAG-0018","before":"The consent gate MUST ask for consent only when the Run's provider is TypeSafe.","after":"The consent gate MUST ask for consent only when the Run's provider is TypeSafe, the remote service that runs Jev."},
+ {"record":"REQ-SAG-0005","before":"sc-agent MUST NOT append a session row for a failed call; the error goes to the general log.","after":"sc-agent MUST NOT append a session row for a failed call."}
+]

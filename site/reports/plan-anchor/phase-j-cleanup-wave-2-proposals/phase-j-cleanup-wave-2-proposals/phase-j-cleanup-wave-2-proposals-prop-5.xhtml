@@ -1,0 +1,42 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-proposal" id="prop-5">
+  <div class="section-head">
+    <h2>5. Cut REQ-SAG-0503&#x27;s doctor statements and reword the first to what `decidr models` does</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="5. Cut REQ-SAG-0503&#x27;s doctor statements and reword the first to what `decidr models` does
+Wave 2 · cut excess
+Records: REQ-SAG-0503
+Change:
+- Reword REQ-SAG-0503: “`decidr doctor` MUST compare each configured provider&#x27;s model list with the catalog.” → “`decidr models` MUST list each provider table in the catalog with the models configured for that provider.”
+- Delete from REQ-SAG-0503: “`decidr doctor` MUST warn about every model a provider lists that is in no provider table, naming the provider and the model.”
+- Delete from REQ-SAG-0503: “`decidr doctor` MUST list every detected provider key in the order sc-agent would use it.”
+- Delete from REQ-SAG-0503: “For each detected key, `decidr doctor` MUST show the source it came from: the environment, the repository-root `.env`, or the platform keyring.”
+Rewording (rare; justified): REQ-SAG-0503: No doctor comparison exists. The capability is `decidr models` -&gt; sc_agent::model_catalog (crates/sc-agent/src/lib.rs:1786-1806, crates/decidr/src/main.rs Command::Models), returning every provider table with configured aliases. The reword states that behaviour.
+Justification: No anchor covers REQ-SAG-0503; at aggressive it stays only on code. sc_agent::doctor (lib.rs:1808-1815) returns only settings, files and log_root; it never fetches provider model lists, warns, lists keys or shows key sources. Statements 1-3 are cut. Statement 0 is reworded to the code-backed `decidr models` behaviour, keeping the record the owner declined to delete. Title, rationale and acceptance criteria still say doctor; they need the same correction in a later pass.
+Source of truth: REQ-SAG-0503 — commit 1d855d0e
+Expected improvement:
+- REQ-SAG-0503 states only what `decidr models` does (sc_agent::model_catalog).
+- Records 49 → 49; statements 205 → 202; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 0 of 28">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">Wave 2 · cut excess</p>
+  <h3>Records</h3>
+  <ul>
+    <li><a href="#rec-REQ-SAG-0503" data-panel="rec-REQ-SAG-0503">REQ-SAG-0503</a></li>
+  </ul>
+  <h3>Change</h3>
+  <ul>
+    <li>Reword REQ-SAG-0503: “`decidr doctor` MUST compare each configured provider&#x27;s model list with the catalog.” → “`decidr models` MUST list each provider table in the catalog with the models configured for that provider.”</li>
+    <li>Delete from REQ-SAG-0503: “`decidr doctor` MUST warn about every model a provider lists that is in no provider table, naming the provider and the model.”</li>
+    <li>Delete from REQ-SAG-0503: “`decidr doctor` MUST list every detected provider key in the order sc-agent would use it.”</li>
+    <li>Delete from REQ-SAG-0503: “For each detected key, `decidr doctor` MUST show the source it came from: the environment, the repository-root `.env`, or the platform keyring.”</li>
+  </ul>
+  <h3>Rewording (rare; justified)</h3>
+  <p>REQ-SAG-0503: No doctor comparison exists. The capability is `decidr models` -&gt; sc_agent::model_catalog (crates/sc-agent/src/lib.rs:1786-1806, crates/decidr/src/main.rs Command::Models), returning every provider table with configured aliases. The reword states that behaviour.</p>
+  <h3>Justification</h3>
+  <p>No anchor covers REQ-SAG-0503; at aggressive it stays only on code. sc_agent::doctor (lib.rs:1808-1815) returns only settings, files and log_root; it never fetches provider model lists, warns, lists keys or shows key sources. Statements 1-3 are cut. Statement 0 is reworded to the code-backed `decidr models` behaviour, keeping the record the owner declined to delete. Title, rationale and acceptance criteria still say doctor; they need the same correction in a later pass.</p>
+  <h3>Source of truth</h3>
+  <p>REQ-SAG-0503 — commit 1d855d0e</p>
+  <h3>Expected improvement</h3>
+  <p>REQ-SAG-0503 states only what `decidr models` does (sc_agent::model_catalog).</p>
+  <p>Records 49 → 49; statements 205 → 202; duplicates cleared 0 of 8; conflicts resolved 0 of 1; exceeds cleared 0 of 28</p>
+</section>

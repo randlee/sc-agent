@@ -1,0 +1,96 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel c-serves" id="cell-REQ-SAG-0702-ANC-004">
+  <div class="section-head">
+    <h2>REQ-SAG-0702 × ANC-004 — serves</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;anchor&quot;: &quot;ANC-004&quot;,
+  &quot;answers&quot;: {
+    &quot;conflicts&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.96,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.97,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.02
+      }
+    },
+    &quot;exceeds&quot;: {
+      &quot;choice&quot;: &quot;no&quot;,
+      &quot;confidence&quot;: 0.55,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.7,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.29
+      }
+    },
+    &quot;relates&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.55,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.29,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.7
+      }
+    },
+    &quot;serves&quot;: {
+      &quot;choice&quot;: &quot;yes&quot;,
+      &quot;confidence&quot;: 0.7,
+      &quot;probabilities&quot;: {
+        &quot;no&quot;: 0.19,
+        &quot;unclear&quot;: 0.01,
+        &quot;yes&quot;: 0.8
+      }
+    }
+  },
+  &quot;class&quot;: &quot;serves&quot;,
+  &quot;p_yes&quot;: {
+    &quot;conflicts&quot;: 0.02,
+    &quot;exceeds&quot;: 0.29,
+    &quot;relates&quot;: 0.7,
+    &quot;serves&quot;: 0.8
+  },
+  &quot;record&quot;: &quot;REQ-SAG-0702&quot;,
+  &quot;request_id&quot;: &quot;trace/REQ-SAG-0702/ANC-004/trace/r1&quot;,
+  &quot;session_id&quot;: &quot;01M8FVCG4MBA23Z972TN10XARS&quot;
+}">{}</button>
+      <button type="button" class="icon-button" title="Copy Context" data-copy-text="REQ-SAG-0702 × ANC-004 — serves
+Anchor
+sc-agent must impose no request input size limit of its own beyond the selected model&#x27;s context, so input limits are not over-specified.
+Owner said: “These limits are clearly over-specified. Input is limited by model context.”
+Scope: adds or changes a request size check, a record size check or handling of an sc-observability size error
+Record statements
+A Run MUST accept an optional send timeout.
+A Run MUST accept an optional worker count.
+A Run&#x27;s `timeout_secs` MUST replace the 120 s default send timeout for that Run.
+When a Run has an override, every call through that Run MUST use the override in place of the configured value.
+When a Run has no override, every call through that Run MUST use the configured value.
+When a Run is given an invalid send timeout, it MUST return an error.
+When a Run is given an invalid worker count, it MUST return an error.
+When a provider rejects a request as too large for the model&#x27;s context, the call MUST return the provider&#x27;s error.
+A Run MUST NOT clamp an override.
+An override MUST NOT change the configuration.
+A single call through a Run MUST NOT accept an override.
+Jev P(yes): relates 0.70 · serves 0.80 · exceeds 0.29 · conflicts 0.02">&#x2398;</button>
+    </div>
+  </div>
+  <p class="small">sc-agent</p>
+  <h3>Anchor</h3>
+  <p>sc-agent must impose no request input size limit of its own beyond the selected model&#x27;s context, so input limits are not over-specified.</p>
+  <p>Owner said: “These limits are clearly over-specified. Input is limited by model context.”</p>
+  <p>Scope: adds or changes a request size check, a record size check or handling of an sc-observability size error</p>
+  <h3>Record statements</h3>
+  <ul>
+    <li>A Run MUST accept an optional send timeout.</li>
+    <li>A Run MUST accept an optional worker count.</li>
+    <li>A Run&#x27;s `timeout_secs` MUST replace the 120 s default send timeout for that Run.</li>
+    <li>When a Run has an override, every call through that Run MUST use the override in place of the configured value.</li>
+    <li>When a Run has no override, every call through that Run MUST use the configured value.</li>
+    <li>When a Run is given an invalid send timeout, it MUST return an error.</li>
+    <li>When a Run is given an invalid worker count, it MUST return an error.</li>
+    <li>When a provider rejects a request as too large for the model&#x27;s context, the call MUST return the provider&#x27;s error.</li>
+    <li>A Run MUST NOT clamp an override.</li>
+    <li>An override MUST NOT change the configuration.</li>
+    <li>A single call through a Run MUST NOT accept an override.</li>
+  </ul>
+  <p class="small">Jev P(yes): relates 0.70 · serves 0.80 · exceeds 0.29 · conflicts 0.02</p>
+</section>
