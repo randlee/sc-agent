@@ -850,6 +850,19 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-28T08:49:45+00:00",
+          "event": "excluded",
+          "item": "agt-m-0",
+          "reason": "m-0 adds or changes no REQ, NFR or ADR record of sc-agent, judge-jev, plan-anchor or any other tool; it only cites existing records.",
+          "replaced": false
+        }
+      ],
+      "exclude": [
+        {
+          "item": "agt-m-0",
+          "reason": "m-0 adds or changes no REQ, NFR or ADR record of sc-agent, judge-jev, plan-anchor or any other tool; it only cites existing records."
         }
       ]
     },

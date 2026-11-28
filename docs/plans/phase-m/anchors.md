@@ -334,6 +334,9 @@ Scope: adds or changes REQ/NFR/ADR records of judge-jev, plan-anchor or another 
 
 Deterministic check to pair with the development gate: no derivative-tool record states log placement, model resolution, consent, retries or result-line fields; each points to the sc-agent record
 
+Excluded from (not judged; the cell passes as `excluded`):
+- `agt-m-0`: m-0 adds or changes no REQ, NFR or ADR record of sc-agent, judge-jev, plan-anchor or any other tool; it only cites existing records.
+
 Beads: anchor `agt-fokq`, plan questions `agt-fokq.1`, dev questions `agt-fokq.2`
 
 Fixtures:
