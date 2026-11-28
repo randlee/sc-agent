@@ -82,6 +82,7 @@ When root `Cargo.toml` exists:
 
 - Sprint QA: `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`,
   `cargo test --workspace`
+- A sprint that only moves code is accepted on unchanged tests passing and the boundary check passing.
 - Phase-end artifact command: `cargo fmt --check`,
   `cargo clippy --workspace --all-targets --all-features -- -D warnings`,
   `cargo test --workspace --all-features` unless a phase plan overrides it

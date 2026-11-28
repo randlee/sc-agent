@@ -1,9 +1,9 @@
 # Decision: Crate layering and error values
 
 **Status:** Approved  
-**Version:** 0.5.0  
+**Version:** 0.6.0  
 **Created:** 2026-11-09  
-**Last Updated:** 2026-11-27  
+**Last Updated:** 2026-11-28  
 **Owner:** Rand Lee  
 **Decision Date:** 2026-11-09  
 
@@ -31,7 +31,7 @@ Crates must be layered so each launcher depends only on what it uses, and errors
 
 ### Decision
 
-Crates are in four layers, and a crate depends only on crates in lower layers. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.
+Crates are in four layers. A crate depends only on crates in lower layers, except within layer 1: schema, then types, then config and sqlite, then log; a layer-1 crate depends only on layer-1 crates earlier in that order. Layer 1, core types and traits: `sc-agent-schema`, `sc-agent-sqlite`, `sc-agent-types`, `sc-agent-config`, `sc-agent-log`. Layer 2, one crate per API shape: `sc-decision-systemone`, `sc-anthropic`, `sc-openai`. Layer 3, shared behaviour and the API: `sc-decision-runner`, `sc-llm`. Layer 4, thin public surface: the `decidr` CLI and the Python wheel. `sitr` on `sc-treesitter` is a separate stack. Behaviour shared by crates in one layer is placed in a lower layer. A difference between them stays in the higher layer. A provider, a model and a URL are data: adding one changes configuration and no Rust code. CLI agents and SDK agents get their own crates later. Errors are discriminated unions: every call returns `Result<T, E>`, and `E` carries the error info: at least an id and a message. A layer that changes an error keeps the lower error's id and message (REQ-SAG-0002). An error may carry more fields. Whether a crate has its own error type or shares one is not specified.
 
 **Key Principles:**
 
