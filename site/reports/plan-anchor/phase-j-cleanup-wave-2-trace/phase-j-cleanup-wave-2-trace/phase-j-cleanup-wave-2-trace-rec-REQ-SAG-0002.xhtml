@@ -1,0 +1,264 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0002">
+  <div class="section-head">
+    <h2>REQ-SAG-0002 Errors are a discriminated union carried from bottom to top</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0002&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/retrace2/trace-20261128T011234Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Every public API MUST return a discriminated union of success and error.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Rust APIs MUST return `Result&lt;T, E&gt;` from the lowest layer to the top-level CLI and PyO3 entry points.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;An error MUST carry the error id and message of every lower-layer error that caused it.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;A layer that changes an error MUST change it only by adding detail.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Error text received from a provider MUST be kept whole.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Exception (owner-approved): the API key MUST never appear in an error or log.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Every error MUST have a stable id.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;Rust code MUST NOT panic on any input or runtime failure.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;A layer MUST NOT drop or replace a lower-layer error id or message.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1d855d0e&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;summary&quot;: &quot;Add requirements and architecture decisions as Raptor records&quot;
+      },
+      &quot;statement&quot;: &quot;Every public API MUST return a discriminated union of success and error.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1d855d0e&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;summary&quot;: &quot;Add requirements and architecture decisions as Raptor records&quot;
+      },
+      &quot;statement&quot;: &quot;Rust APIs MUST return `Result&lt;T, E&gt;` from the lowest layer to the top-level CLI and PyO3 entry points.&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1d855d0e&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;summary&quot;: &quot;Add requirements and architecture decisions as Raptor records&quot;
+      },
+      &quot;statement&quot;: &quot;An error MUST carry the error id and message of every lower-layer error that caused it.&quot;,
+      &quot;statement_index&quot;: 2
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1d855d0e&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;summary&quot;: &quot;Add requirements and architecture decisions as Raptor records&quot;
+      },
+      &quot;statement&quot;: &quot;A layer that changes an error MUST change it only by adding detail.&quot;,
+      &quot;statement_index&quot;: 3
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;c7a40068&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;summary&quot;: &quot;Revise records: layering, no tokio or sleep, parallel batch, local runners, LLM schema&quot;
+      },
+      &quot;statement&quot;: &quot;Error text received from a provider MUST be kept whole.&quot;,
+      &quot;statement_index&quot;: 4
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;8d06323d&quot;,
+        &quot;date&quot;: &quot;2026-11-21&quot;,
+        &quot;summary&quot;: &quot;docs: simplify requirements and ADRs to the owner&#x27;s words&quot;
+      },
+      &quot;statement&quot;: &quot;Exception (owner-approved): the API key MUST never appear in an error or log.&quot;,
+      &quot;statement_index&quot;: 5
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;8d06323d&quot;,
+        &quot;date&quot;: &quot;2026-11-21&quot;,
+        &quot;summary&quot;: &quot;docs: simplify requirements and ADRs to the owner&#x27;s words&quot;
+      },
+      &quot;statement&quot;: &quot;Every error MUST have a stable id.&quot;,
+      &quot;statement_index&quot;: 6
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1d855d0e&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;summary&quot;: &quot;Add requirements and architecture decisions as Raptor records&quot;
+      },
+      &quot;statement&quot;: &quot;Rust code MUST NOT panic on any input or runtime failure.&quot;,
+      &quot;statement_index&quot;: 7
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1d855d0e&quot;,
+        &quot;date&quot;: &quot;2026-11-09&quot;,
+        &quot;summary&quot;: &quot;Add requirements and architecture decisions as Raptor records&quot;
+      },
+      &quot;statement&quot;: &quot;A layer MUST NOT drop or replace a lower-layer error id or message.&quot;,
+      &quot;statement_index&quot;: 8
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-09&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0002&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-21&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [
+        &quot;Every crate, the CLI and the PyO3 bindings.&quot;
+      ],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;Agents and tools act on errors programmatically. A dropped lower-layer id or a panic removes the information needed to decide the next step. This rule applies to every repository the owner maintains.\n\nOwner ruling (2026-11-21), Rand Lee: \&quot;always return descriminated unions w/ error info\&quot;&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Every public API MUST return a discriminated union of success and error.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Rust APIs MUST return `Result&lt;T, E&gt;` from the lowest layer to the top-level CLI and PyO3 entry points.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;An error MUST carry the error id and message of every lower-layer error that caused it.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;A layer that changes an error MUST change it only by adding detail.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Error text received from a provider MUST be kept whole.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Exception (owner-approved): the API key MUST never appear in an error or log.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Every error MUST have a stable id.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;Rust code MUST NOT panic on any input or runtime failure.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;A layer MUST NOT drop or replace a lower-layer error id or message.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions: A discriminated union is a tagged result type whose variant names the outcome, such as Rust `Result&lt;T, E&gt;` with an error enum. An error id is the stable identifier of one error case. A lower layer is any crate or function an API calls.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A test that injects a failure at the lowest layer of a call path receives, at the CLI and PyO3 entry points, that failure&#x27;s error id and message in the returned error.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A test in which a provider or local runner echoes the attached key receives an error whose id is unchanged and which contains no copy of the key.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Clippy passes with the workspace lint configuration (`[workspace.lints.clippy]` in `Cargo.toml`), which denies panicking constructs in non-test code.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Errors are a discriminated union carried from bottom to top&quot;,
+    &quot;version&quot;: &quot;0.3.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 0.3.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>Every public API MUST return a discriminated union of success and error.</li>
+    <li>Rust APIs MUST return `Result&lt;T, E&gt;` from the lowest layer to the top-level CLI and PyO3 entry points.</li>
+    <li>An error MUST carry the error id and message of every lower-layer error that caused it.</li>
+    <li>A layer that changes an error MUST change it only by adding detail.</li>
+    <li>Error text received from a provider MUST be kept whole.</li>
+    <li>Exception (owner-approved): the API key MUST never appear in an error or log.</li>
+    <li>Every error MUST have a stable id.</li>
+    <li>Rust code MUST NOT panic on any input or runtime failure.</li>
+    <li>A layer MUST NOT drop or replace a lower-layer error id or message.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions: A discriminated union is a tagged result type whose variant names the outcome, such as Rust `Result&lt;T, E&gt;` with an error enum. An error id is the stable identifier of one error case. A lower layer is any crate or function an API calls.</p>
+  <h3>Rationale</h3>
+  <p>Agents and tools act on errors programmatically. A dropped lower-layer id or a panic removes the information needed to decide the next step. This rule applies to every repository the owner maintains.
+
+Owner ruling (2026-11-21), Rand Lee: &quot;always return descriminated unions w/ error info&quot;</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A test that injects a failure at the lowest layer of a call path receives, at the CLI and PyO3 entry points, that failure&#x27;s error id and message in the returned error.</li>
+    <li>A test in which a provider or local runner echoes the attached key receives an error whose id is unchanged and which contains no copy of the key.</li>
+    <li>Clippy passes with the workspace lint configuration (`[workspace.lints.clippy]` in `Cargo.toml`), which denies panicking constructs in non-test code.</li>
+  </ul>
+</section>

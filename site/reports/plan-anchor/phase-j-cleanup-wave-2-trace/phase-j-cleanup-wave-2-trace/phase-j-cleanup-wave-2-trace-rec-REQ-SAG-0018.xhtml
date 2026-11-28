@@ -1,0 +1,267 @@
+<section xmlns="http://www.w3.org/1999/xhtml" class="section trace-panel" id="rec-REQ-SAG-0018">
+  <div class="section-head">
+    <h2>REQ-SAG-0018 Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel</h2>
+    <div class="section-actions" role="group" aria-label="Copy">
+      <button type="button" class="icon-button" title="Copy JSON" data-copy-text="{
+  &quot;diagnostics&quot;: [],
+  &quot;id&quot;: &quot;REQ-SAG-0018&quot;,
+  &quot;index&quot;: &quot;/Users/randlee/github/sc-agent/scratchpad/phase-j/cleanup/wave-1/retrace2/trace-20261128T011234Z.raptor-1.json&quot;,
+  &quot;kind&quot;: &quot;REQ&quot;,
+  &quot;obligations&quot;: {
+    &quot;field&quot;: &quot;requirement_statement.statements&quot;,
+    &quot;note&quot;: null,
+    &quot;source&quot;: &quot;raptor&quot;,
+    &quot;statements&quot;: [
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;Every consumer MUST make its decision calls from code in its consumer module.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The consumer module MUST pass the model selector through unchanged.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The sc-decidr wheel&#x27;s package data MUST include the consumer template.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The consumer module MUST cancel its running Run on `KeyboardInterrupt`.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;Must&quot;,
+        &quot;text&quot;: &quot;The consent gate MUST ask for consent only when the Run&#x27;s provider is TypeSafe.&quot;
+      },
+      {
+        &quot;modal&quot;: &quot;MustNot&quot;,
+        &quot;text&quot;: &quot;The consumer module MUST NOT contain consumer logic.&quot;
+      }
+    ]
+  },
+  &quot;provenance&quot;: [
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1ba0e29f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;REQ-SAG-0018: say decision calls are made from code in the consumer module&quot;
+      },
+      &quot;statement&quot;: &quot;Every consumer MUST make its decision calls from code in its consumer module.&quot;,
+      &quot;statement_index&quot;: 0
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;e234112e&quot;,
+        &quot;date&quot;: &quot;2026-11-14&quot;,
+        &quot;summary&quot;: &quot;docs: ADR-SAG-0019 R5: no runtime version check, sc-compose external, sc-decidr and sitr version-locked on PyPI; judge-jev fixes to REQ-SAG-0018 and NFR-SAG-0003&quot;
+      },
+      &quot;statement&quot;: &quot;The consumer module MUST pass the model selector through unchanged.&quot;,
+      &quot;statement_index&quot;: 1
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;a614f9c1&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;REQ-SAG-0018: state template location as wheel package data (one obligation)&quot;
+      },
+      &quot;statement&quot;: &quot;The sc-decidr wheel&#x27;s package data MUST include the consumer template.&quot;,
+      &quot;statement_index&quot;: 2
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;1a9af55a&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: D41 cache rule, D42 restores, D43 gate pass&quot;
+      },
+      &quot;statement&quot;: &quot;The consumer module MUST cancel its running Run on `KeyboardInterrupt`.&quot;,
+      &quot;statement_index&quot;: 3
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;67203e2f&quot;,
+        &quot;date&quot;: &quot;2026-11-25&quot;,
+        &quot;summary&quot;: &quot;phase-j records: clean-up to the owner decisions (D1-D40)&quot;
+      },
+      &quot;statement&quot;: &quot;The consent gate MUST ask for consent only when the Run&#x27;s provider is TypeSafe.&quot;,
+      &quot;statement_index&quot;: 4
+    },
+    {
+      &quot;provenance&quot;: {
+        &quot;commit&quot;: &quot;e234112e&quot;,
+        &quot;date&quot;: &quot;2026-11-14&quot;,
+        &quot;summary&quot;: &quot;docs: ADR-SAG-0019 R5: no runtime version check, sc-compose external, sc-decidr and sitr version-locked on PyPI; judge-jev fixes to REQ-SAG-0018 and NFR-SAG-0003&quot;
+      },
+      &quot;statement&quot;: &quot;The consumer module MUST NOT contain consumer logic.&quot;,
+      &quot;statement_index&quot;: 5
+    }
+  ],
+  &quot;raptor&quot;: {
+    &quot;created&quot;: &quot;2026-11-14&quot;,
+    &quot;dependencies&quot;: {
+      &quot;related&quot;: [
+        {
+          &quot;id&quot;: &quot;ADR-SAG-0019&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0016&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0017&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0702&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;NFR-SAG-0003&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;NFR-SAG-0004&quot;,
+          &quot;note&quot;: null
+        },
+        {
+          &quot;id&quot;: &quot;REQ-SAG-0005&quot;,
+          &quot;note&quot;: null
+        }
+      ],
+      &quot;requires&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;id&quot;: &quot;REQ-SAG-0018&quot;,
+    &quot;implementation_notes&quot;: {
+      &quot;key_considerations&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;last_updated&quot;: &quot;2026-11-25&quot;,
+    &quot;owner&quot;: &quot;Rand Lee&quot;,
+    &quot;product_applicability&quot;: {
+      &quot;applies_to&quot;: [],
+      &quot;does_not_apply_to&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;rationale&quot;: &quot;The owner requires every Python consumer to integrate identically, for errors, API keys, model selection, logging and session logging, and to differ only in prompt authoring and in processing results and decision trees. A hand-copied recipe already diverged between two consumers (ADR-SAG-0019, Context); one shipped template removes that divergence. Shipping the template in the wheel makes its version the installed wheel&#x27;s version.&quot;,
+    &quot;related_documents&quot;: {
+      &quot;architecture_decisions&quot;: [],
+      &quot;design_documents&quot;: [],
+      &quot;external_references&quot;: [],
+      &quot;requirements&quot;: [],
+      &quot;text&quot;: &quot;&quot;,
+      &quot;work_items&quot;: []
+    },
+    &quot;requirement_statement&quot;: {
+      &quot;statements&quot;: [
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;Every consumer MUST make its decision calls from code in its consumer module.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The consumer module MUST pass the model selector through unchanged.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The sc-decidr wheel&#x27;s package data MUST include the consumer template.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The consumer module MUST cancel its running Run on `KeyboardInterrupt`.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;Must&quot;,
+          &quot;text&quot;: &quot;The consent gate MUST ask for consent only when the Run&#x27;s provider is TypeSafe.&quot;
+        },
+        {
+          &quot;modal&quot;: &quot;MustNot&quot;,
+          &quot;text&quot;: &quot;The consumer module MUST NOT contain consumer logic.&quot;
+        }
+      ],
+      &quot;text&quot;: &quot;Definitions (how the template is built: ADR-SAG-0019 decision 1):\n\n- A consumer is a Python tool that makes Jev decision calls through the sc-decidr wheel; plan-anchor and judge-jev are the first two.\n- The consumer template is `sc_agent/templates/consumer.py.j2`. A consumer module is the Python file a consumer renders from it.\n- The sc-decidr wheel is the Python wheel that ships the `sc_agent` package.\n- Prompt authoring is building the text sent to the model. Result processing is handling the returned results and decision trees. Consumer logic is prompt authoring together with result processing.\n- A decision call is a Run&#x27;s `send` or `send_batch`.\n- The consent gate is the consumer module&#x27;s `allow_remote_judge` check before a decision call.&quot;
+    },
+    &quot;status&quot;: &quot;Approved&quot;,
+    &quot;success_criteria&quot;: {
+      &quot;acceptance_criteria&quot;: [
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test scans plan-anchor and judge-jev and finds every decision call inside a module rendered from the consumer template.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A loopback unit test passes `haiku` to each rendered module and finds `haiku` as the model selector of its decision call.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A unit test finds the consumer template in the built wheel&#x27;s package data.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A loopback test raises `KeyboardInterrupt` during a batch and finds the Run cancelled.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;A loopback test finds consent asked for a TypeSafe Run and not asked for a `haiku` Run.&quot;
+        },
+        {
+          &quot;checked&quot;: false,
+          &quot;text&quot;: &quot;Inspection of `sc_agent/templates/consumer.py.j2` finds no prompt text or result handling.&quot;
+        }
+      ],
+      &quot;test_evidence&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;superseded_by&quot;: null,
+    &quot;supersedes&quot;: null,
+    &quot;test_strategy&quot;: {
+      &quot;test_types&quot;: [],
+      &quot;text&quot;: &quot;&quot;
+    },
+    &quot;title&quot;: &quot;Python consumers integrate through one generated module rendered from a template shipped in the sc-decidr wheel&quot;,
+    &quot;version&quot;: &quot;1.8.0&quot;
+  },
+  &quot;repository&quot;: &quot;urn:raptor:repo:sc-agent&quot;
+}">{}</button>
+    </div>
+  </div>
+  <p class="small">REQ · sc-agent · Approved · version 1.8.0</p>
+  <h3>Statements</h3>
+  <ul>
+    <li>Every consumer MUST make its decision calls from code in its consumer module.</li>
+    <li>The consumer module MUST pass the model selector through unchanged.</li>
+    <li>The sc-decidr wheel&#x27;s package data MUST include the consumer template.</li>
+    <li>The consumer module MUST cancel its running Run on `KeyboardInterrupt`.</li>
+    <li>The consent gate MUST ask for consent only when the Run&#x27;s provider is TypeSafe.</li>
+    <li>The consumer module MUST NOT contain consumer logic.</li>
+  </ul>
+  <h3>Requirement</h3>
+  <p>Definitions (how the template is built: ADR-SAG-0019 decision 1):
+
+- A consumer is a Python tool that makes Jev decision calls through the sc-decidr wheel; plan-anchor and judge-jev are the first two.
+- The consumer template is `sc_agent/templates/consumer.py.j2`. A consumer module is the Python file a consumer renders from it.
+- The sc-decidr wheel is the Python wheel that ships the `sc_agent` package.
+- Prompt authoring is building the text sent to the model. Result processing is handling the returned results and decision trees. Consumer logic is prompt authoring together with result processing.
+- A decision call is a Run&#x27;s `send` or `send_batch`.
+- The consent gate is the consumer module&#x27;s `allow_remote_judge` check before a decision call.</p>
+  <h3>Rationale</h3>
+  <p>The owner requires every Python consumer to integrate identically, for errors, API keys, model selection, logging and session logging, and to differ only in prompt authoring and in processing results and decision trees. A hand-copied recipe already diverged between two consumers (ADR-SAG-0019, Context); one shipped template removes that divergence. Shipping the template in the wheel makes its version the installed wheel&#x27;s version.</p>
+  <h3>Acceptance criteria</h3>
+  <ul>
+    <li>A unit test scans plan-anchor and judge-jev and finds every decision call inside a module rendered from the consumer template.</li>
+    <li>A loopback unit test passes `haiku` to each rendered module and finds `haiku` as the model selector of its decision call.</li>
+    <li>A unit test finds the consumer template in the built wheel&#x27;s package data.</li>
+    <li>A loopback test raises `KeyboardInterrupt` during a batch and finds the Run cancelled.</li>
+    <li>A loopback test finds consent asked for a TypeSafe Run and not asked for a `haiku` Run.</li>
+    <li>Inspection of `sc_agent/templates/consumer.py.j2` finds no prompt text or result handling.</li>
+  </ul>
+  <h3>Related</h3>
+  <ul>
+    <li>ADR-SAG-0019</li>
+    <li>REQ-SAG-0016</li>
+    <li>REQ-SAG-0017</li>
+    <li>REQ-SAG-0702</li>
+    <li>NFR-SAG-0003</li>
+    <li>NFR-SAG-0004</li>
+    <li>REQ-SAG-0005</li>
+  </ul>
+</section>
