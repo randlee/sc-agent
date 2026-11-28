@@ -1,0 +1,35 @@
+# Layer 1. Allowed edges are the phase-m layer arrows (sprint m-0).
+boundary_id = "BOUNDARY-PHASE-M-sc-agent-sqlite"
+owner_package = "sc-agent-sqlite"
+owner_crate_path = "sc_agent_sqlite"
+name = "sc-agent-sqlite layer 1"
+
+[public]
+facade = "sc_agent_sqlite"
+
+[implementation]
+type = "sc_agent_sqlite"
+module = "sc_agent_sqlite"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = []
+
+[dependencies]
+allowed_dependencies = ["sc-agent-schema", "sc-agent-types"]
+allowed_dependents = ["sc-agent-log"]
+allowed_dev_dependencies = []
+allowed_dev_dependents = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"

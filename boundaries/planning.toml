@@ -1,0 +1,3 @@
+# Required by sc-lint boundary inventory parsing when records exist; Beads is authoritative for progress.
+[planning]
+current_sprint = "M.0"

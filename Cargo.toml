@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/sc-agent", "crates/decidr", "crates/sc-agent-py", "crates/sc-treesitter", "crates/sitr"]
+members = ["crates/sc-agent", "crates/decidr", "crates/sc-agent-py", "crates/sc-treesitter", "crates/sitr", "crates/sc-agent-schema", "crates/sc-agent-sqlite", "crates/sc-agent-types", "crates/sc-agent-config", "crates/sc-agent-http", "crates/sc-agent-log", "crates/sc-decision-systemone", "crates/sc-anthropic", "crates/sc-openai", "crates/sc-decision-runner", "crates/sc-llm"]
 resolver = "3"
 [workspace.package]
 version = "0.4.1"
@@ -8,6 +8,8 @@ license = "MIT"
 rust-version = "1.98.1"
 repository = "https://github.com/randlee/sc-agent"
 readme = "README.md"
+authors = []
+homepage = "https://github.com/randlee/sc-agent"
 [workspace.dependencies]
 sc-agent = { path = "crates/sc-agent", version = "0.4.1" }
 sc-treesitter = { path = "crates/sc-treesitter", version = "0.4.1" }

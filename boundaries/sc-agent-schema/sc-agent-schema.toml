@@ -1,0 +1,35 @@
+# Layer 1. Allowed edges are the phase-m layer arrows (sprint m-0).
+boundary_id = "BOUNDARY-PHASE-M-sc-agent-schema"
+owner_package = "sc-agent-schema"
+owner_crate_path = "sc_agent_schema"
+name = "sc-agent-schema layer 1"
+
+[public]
+facade = "sc_agent_schema"
+
+[implementation]
+type = "sc_agent_schema"
+module = "sc_agent_schema"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = []
+
+[dependencies]
+allowed_dependencies = []
+allowed_dependents = ["sc-agent-log", "sc-agent-sqlite", "sc-agent-types", "sc-anthropic", "sc-decision-systemone", "sc-openai"]
+allowed_dev_dependencies = []
+allowed_dev_dependents = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[status]
+state = "concrete_landed"

@@ -1141,6 +1141,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-agent-config"
+version = "0.4.1"
+dependencies = [
+ "sc-agent-types",
+]
+
+[[package]]
+name = "sc-agent-http"
+version = "0.4.1"
+dependencies = [
+ "sc-agent-types",
+]
+
+[[package]]
+name = "sc-agent-log"
+version = "0.4.1"
+dependencies = [
+ "sc-agent-config",
+ "sc-agent-schema",
+ "sc-agent-sqlite",
+ "sc-agent-types",
+]
+
+[[package]]
 name = "sc-agent-py"
 version = "0.4.1"
 dependencies = [
@@ -1152,6 +1176,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-agent-schema"
+version = "0.4.1"
+
+[[package]]
+name = "sc-agent-sqlite"
+version = "0.4.1"
+dependencies = [
+ "sc-agent-schema",
+ "sc-agent-types",
+]
+
+[[package]]
+name = "sc-agent-types"
+version = "0.4.1"
+dependencies = [
+ "sc-agent-schema",
+]
+
+[[package]]
+name = "sc-anthropic"
+version = "0.4.1"
+dependencies = [
+ "sc-agent-schema",
+ "sc-agent-types",
+]
+
+[[package]]
 name = "sc-config"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1159,6 +1210,21 @@ checksum = "88839829c5885dc2b82f9bb802230095d0638c49706708abe6b3c51c90a1bf80"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "sc-decision-runner"
+version = "0.4.1"
+dependencies = [
+ "sc-agent-types",
+]
+
+[[package]]
+name = "sc-decision-systemone"
+version = "0.4.1"
+dependencies = [
+ "sc-agent-schema",
+ "sc-agent-types",
 ]
 
 [[package]]
@@ -1198,6 +1264,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-llm"
+version = "0.4.1"
+dependencies = [
+ "sc-agent-types",
+]
+
+[[package]]
 name = "sc-observability"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1221,6 +1294,14 @@ dependencies = [
  "serde_json",
  "thiserror",
  "time",
+]
+
+[[package]]
+name = "sc-openai"
+version = "0.4.1"
+dependencies = [
+ "sc-agent-schema",
+ "sc-agent-types",
 ]
 
 [[package]]

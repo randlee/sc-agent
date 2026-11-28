@@ -246,12 +246,35 @@ jobs:
         with:
           command: check advisories licenses
 
+  boundary:
+    name: sc-lint boundary
+    needs: [detect]
+    if: ${{ needs.detect.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      # Generated Just integration (sc-lint docs installation). The runner has no
+      # `just`, so this runs the `just setup` recipe's command, then the boundary
+      # check through the managed install. No lint or test profile.
+      - name: Install sc-lint (just setup)
+        run: python3 .sc-lint/bootstrap.py setup --config sc-lint.toml
+
+      - name: sc-lint boundary check
+        run: python3 .sc-lint/bootstrap.py exec --config sc-lint.toml -- sc-lint lint sc-boundary --config sc-lint.toml
+
   # The one required status check: it always reports, passes when every job
   # above succeeded or was skipped, and fails if any failed or was cancelled.
   ci-result:
     name: CI result
     if: ${{ always() }}
-    needs: [detect, fmt, clippy, test, treesitter, sc-agent-py, deny]
+    needs: [detect, fmt, clippy, test, treesitter, sc-agent-py, deny, boundary]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
