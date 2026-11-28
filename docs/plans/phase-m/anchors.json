@@ -1622,7 +1622,7 @@
       "id": "ANC-029",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "`--resume` is implemented in `sc-llm`; resuming a decision session continues it as an LLM session.",
+      "statement": "`--resume` is implemented in `sc-llm`.",
       "quote": "Refers to sc-llm behavior. —resume on decision session would convert it to llm-session",
       "kind": "directive",
       "stated_by": "Rand Lee",
@@ -1633,14 +1633,14 @@
       "deterministic_check": "",
       "fixtures": {
         "pass": [
-          "`--resume` is handled in sc-llm and turns a decision session into an LLM session."
+          "`--resume` is implemented in sc-llm."
         ],
         "fail": [
-          "`--resume` is implemented in sc-decision-runner and keeps the session a decision session."
+          "`--resume` is implemented in sc-decision-runner."
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -1669,6 +1669,15 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-11-28T08:42:09+00:00",
+          "event": "updated",
+          "fields": [
+            "statement",
+            "fixtures"
+          ],
+          "previous_statement": "`--resume` is implemented in `sc-llm`; resuming a decision session continues it as an LLM session."
         }
       ]
     },
@@ -1851,6 +1860,60 @@
         {
           "item": "agt-m-0",
           "reason": "m-0 adds no table definition and no schema version, and does not touch crates/sc-agent-py."
+        }
+      ]
+    },
+    {
+      "id": "ANC-033",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Resuming a decision session with `--resume` continues that session as an LLM session.",
+      "quote": "—resume on decision session would convert it to llm-session",
+      "kind": "directive",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-11-27",
+      "context": "phase-m planning session, 2026-11-27; split from ANC-029 by arch-ai 2026-11-28 because the tuner found two duties; owner review pending",
+      "summary": "resumed decision session becomes an LLM session",
+      "scope": "adds or changes --resume or session resumption",
+      "deterministic_check": "",
+      "fixtures": {
+        "pass": [
+          "Running `--resume` on a decision session continues it as an LLM session."
+        ],
+        "fail": [
+          "Running `--resume` on a decision session continues it as a decision session."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "agt-kkxs",
+        "plan_questions": "agt-kkxs.1",
+        "dev_questions": "agt-kkxs.2"
+      },
+      "history": [
+        {
+          "at": "2026-11-28T08:42:09+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-11-28T08:42:16+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-11-28T08:42:40+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "agt-kkxs",
+            "plan_questions": "agt-kkxs.1",
+            "dev_questions": "agt-kkxs.2"
+          }
         }
       ]
     }

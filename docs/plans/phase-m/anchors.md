@@ -38,6 +38,7 @@ Intent: `docs/plans/phase-m/intent.md`
 | ANC-030 | locked | Retry and holdoff take provider rules as parameters | 2026-11-27 |
 | ANC-031 | locked | Tool results are stored in SQLite | 2026-11-27 |
 | ANC-032 | locked | Tool tables versioned apart; none in sc-agent-py | 2026-11-27 |
+| ANC-033 | locked | resumed decision session becomes an LLM session | 2026-11-27 |
 
 ## ANC-001
 
@@ -594,11 +595,11 @@ Fixtures:
 
 ## ANC-029
 
-Anchor: `--resume` is implemented in `sc-llm`; resuming a decision session continues it as an LLM session.
+Anchor: `--resume` is implemented in `sc-llm`.
 
 > Refers to sc-llm behavior. —resume on decision session would convert it to llm-session
 
-Said by Rand Lee, phase-m planning session, 2026-11-27, 2026-11-27. Status: locked. Version 2.
+Said by Rand Lee, phase-m planning session, 2026-11-27, 2026-11-27. Status: locked. Version 3.
 
 Summary: --resume lives in sc-llm
 
@@ -607,8 +608,8 @@ Scope: adds or changes --resume or session resumption
 Beads: anchor `agt-x65j`, plan questions `agt-x65j.1`, dev questions `agt-x65j.2`
 
 Fixtures:
-- pass: `--resume` is handled in sc-llm and turns a decision session into an LLM session.
-- fail: `--resume` is implemented in sc-decision-runner and keeps the session a decision session.
+- pass: `--resume` is implemented in sc-llm.
+- fail: `--resume` is implemented in sc-decision-runner.
 
 ## ANC-030
 
@@ -666,3 +667,21 @@ Beads: anchor `agt-ws1i`, plan questions `agt-ws1i.1`, dev questions `agt-ws1i.2
 Fixtures:
 - pass: judge-jev's tables have their own schema version, separate from the core schema version.
 - fail: sc-agent-py defines the judge-jev result table and versions it with the core schema.
+
+## ANC-033
+
+Anchor: Resuming a decision session with `--resume` continues that session as an LLM session.
+
+> —resume on decision session would convert it to llm-session
+
+Said by Rand Lee, phase-m planning session, 2026-11-27; split from ANC-029 by arch-ai 2026-11-28 because the tuner found two duties; owner review pending, 2026-11-27. Status: locked. Version 2.
+
+Summary: resumed decision session becomes an LLM session
+
+Scope: adds or changes --resume or session resumption
+
+Beads: anchor `agt-kkxs`, plan questions `agt-kkxs.1`, dev questions `agt-kkxs.2`
+
+Fixtures:
+- pass: Running `--resume` on a decision session continues it as an LLM session.
+- fail: Running `--resume` on a decision session continues it as a decision session.
