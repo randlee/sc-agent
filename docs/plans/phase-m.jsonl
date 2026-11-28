@@ -1,1 +1,12 @@
 {"sprint": "m-0"}
+{"sprint": "m-1", "depends_on": ["m-0"]}
+{"sprint": "m-2", "depends_on": ["m-1"]}
+{"sprint": "m-3", "depends_on": ["m-2"]}
+{"sprint": "m-4", "depends_on": ["m-3"]}
+{"sprint": "m-5", "depends_on": ["m-4"]}
+{"sprint": "m-6", "depends_on": ["m-5"]}
+{"sprint": "m-7", "depends_on": ["m-6"]}
+{"sprint": "m-8", "depends_on": ["m-7"]}
+{"sprint": "m-9", "depends_on": ["m-8"]}
+{"sprint": "m-10", "depends_on": ["m-9"]}
+{"sprint": "m-11", "depends_on": ["m-10"]}
