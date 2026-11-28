@@ -13,7 +13,7 @@ import ast
 import unittest
 from contextlib import nullcontext, chdir
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import sc_agent
 
@@ -30,8 +30,19 @@ class Runner:
         self.expected_count = expected_count
         self.received = []
         self.lock = threading.Lock()
+        self.active_handlers = 0
+        self.handlers_done = threading.Event()
+        self.handlers_done.set()
+
+        def handler_finished():
+            with self.lock:
+                self.active_handlers -= 1
+                if self.active_handlers == 0:
+                    self.handlers_done.set()
 
         class Handler(BaseHTTPRequestHandler):
+            timeout = 5
+
             def log_message(self, *_args):
                 pass
 
@@ -52,9 +63,27 @@ class Runner:
                 handler.end_headers()
                 handler.wfile.write(encoded)
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.server.daemon_threads = True
-        self.thread = threading.Thread(target=self.server.serve_forever)
+        class ObservedServer(ThreadingHTTPServer):
+            daemon_threads = True
+
+            def process_request(server, request, client_address):
+                with self.lock:
+                    self.active_handlers += 1
+                    self.handlers_done.clear()
+                try:
+                    super().process_request(request, client_address)
+                except BaseException:
+                    handler_finished()
+                    raise
+
+            def process_request_thread(server, request, client_address):
+                try:
+                    super().process_request_thread(request, client_address)
+                finally:
+                    handler_finished()
+
+        self.server = ObservedServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
 
     @property
     def address(self):
@@ -65,9 +94,30 @@ class Runner:
         return self
 
     def __exit__(self, *_args):
-        self.server.shutdown()
-        self.thread.join(5)
+        failures = []
+
+        def shutdown():
+            try:
+                self.server.shutdown()
+            except BaseException as failure:
+                failures.append(f"shutdown failed: {failure!r}")
+
+        shutdown_thread = threading.Thread(target=shutdown, daemon=True)
+        shutdown_thread.start()
+        shutdown_thread.join(15)
+        if shutdown_thread.is_alive():
+            failures.append("shutdown backstop expired")
+        if not self.handlers_done.wait(15):
+            failures.append("handler drain backstop expired")
         self.server.server_close()
+        self.thread.join(15)
+        if self.thread.is_alive():
+            failures.append("serve-thread join backstop expired")
+        if failures:
+            raise AssertionError(f"{'; '.join(failures)}; received={self.received!r}; "
+                                 f"active_handlers={self.active_handlers}; "
+                                 f"shutdown_thread_alive={shutdown_thread.is_alive()}; "
+                                 f"serve_thread_alive={self.thread.is_alive()}")
 
 
 def rendered(path):
@@ -102,11 +152,13 @@ class RenderedWheelLoopback(unittest.TestCase):
 
     def config(self, root, address):
         host, port = address
-        config = {"project": "phase-i-loopback", "laya": {"host": host, "port": port, "model": "loopback"}}
-        (root / "decidr.json").write_text(json.dumps(config))
+        config = {"project": "phase-i-loopback", "laya": {"host": host, "port": port}}
+        (root / "sc-agent.json").write_text(json.dumps(config))
 
     def load_clients(self, root):
-        return [rendered(path) for path in render_consumers(root)]
+        output = root / "rendered"
+        output.mkdir(exist_ok=True)
+        return [rendered(path) for path in render_consumers(output)]
 
     def call_options(self, client, root, logger):
         return {
@@ -160,7 +212,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                         self.assertEqual(rows[0]["agent_role"], client.CLIENT_NAME)
 
     def test_rendered_modules_only_reference_the_permitted_api(self):
-        allowed = {"send", "send_batch", "digest", "logger", "log", "flush", "Cancel", "sitr"}
+        allowed = {"Run", "digest", "logger", "log", "flush", "sitr"}
         with tempfile.TemporaryDirectory() as folder:
             for path in render_consumers(Path(folder)):
                 refs = {node.attr for node in ast.walk(ast.parse(path.read_text()))
@@ -168,6 +220,22 @@ class RenderedWheelLoopback(unittest.TestCase):
                 self.assertTrue(refs)
                 self.assertLessEqual(refs, allowed)
                 self.assertEqual("sitr" in refs, path.stem == "judge_jev_client")
+
+    def test_logger_creation_error_uses_client_tool(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for client in self.load_clients(Path(folder)):
+                client._logger_handle = None
+                name = client.CLIENT_NAME
+                env_name = name.upper().replace("-", "_") + "_LOG_ROOT"
+                original = sc_agent.logger
+                with patch.dict(os.environ, {env_name: folder, "DECIDR_LOG_ROOT": folder}), \
+                        patch.object(sc_agent, "logger", side_effect=lambda _name, *, tool: original(None, tool=tool)):
+                    result = client._logger(sc_agent.logger, None)
+                self.assertFalse(result["ok"])
+                log = Path(folder) / "logs" / f"{name}.log.jsonl"
+                events = [json.loads(line) for line in log.read_text().splitlines()]
+                self.assertTrue(any(event["service"] == name for event in events))
+                self.assertFalse((Path(folder) / "logs/decidr.log.jsonl").exists())
 
     def test_logger_initialization_is_serialized(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -179,11 +247,12 @@ class RenderedWheelLoopback(unittest.TestCase):
                     def __enter__(self):
                         if entered.is_set():
                             contended.set()
-                        mutex.acquire()
+                        if not mutex.acquire(timeout=10):
+                            raise AssertionError("logger test lock acquisition timed out")
                     def __exit__(self, *_):
                         mutex.release()
-                def create(name):
-                    calls.append(name)
+                def create(name, *, tool):
+                    calls.append((name, tool))
                     entered.set()
                     if not release.wait(5):
                         return {"ok": False, "error": "test release absent"}
@@ -201,7 +270,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                         if thread.ident is not None:
                             thread.join(5)
                             self.assertFalse(thread.is_alive())
-                self.assertEqual(calls, [client.CLIENT_NAME])
+                self.assertEqual(calls, [(client.CLIENT_NAME, client.CLIENT_NAME)])
                 self.assertEqual(len(results), 2)
                 self.assertIs(results[0]["value"], results[1]["value"])
 
@@ -219,6 +288,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                         {
                             "DECIDR_LOG_ROOT": str(root),
                             "CONSUMER_TEST_LOG_ROOT": str(root),
+                    "PLAN_ANCHOR_LOG_ROOT": str(root), "JUDGE_JEV_LOG_ROOT": str(root),
                             "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
                             "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
                         },
@@ -239,8 +309,8 @@ class RenderedWheelLoopback(unittest.TestCase):
                         self.assertEqual(failure["error"].code, "TEST.AUTH")
                         self.assertEqual(
                             runner.received,
-                            [("/v1/systemone", {**REQUEST, "model": "loopback"}),
-                             ("/v1/systemone", {**REQUEST, "state": "unauthorized", "model": "loopback"})],
+                            [("/v1/systemone", {**REQUEST, "model": "laya:en"}),
+                             ("/v1/systemone", {**REQUEST, "state": "unauthorized", "model": "laya:en"})],
                             "loopback runner received unexpected requests",
                         )
                         self.assertEqual(callable(getattr(client, "extract", None)), client.CLIENT_NAME == "judge-jev")
@@ -251,10 +321,11 @@ class RenderedWheelLoopback(unittest.TestCase):
                         for path in (root / "sessions").rglob("sessions.jsonl")
                         for line in path.read_text().splitlines()
                     ]
-                    self.assertEqual(len(rows), 2)
+                    self.assertEqual(len(rows), 1)
+                    self.assertTrue(rows[0]["result"]["ok"])
                     for row in rows:
                         self.assertEqual((row["project"], row["agent_role"]), ("phase-i-loopback", client.CLIENT_NAME))
-                    self.assertEqual({row["request"]["state"] for row in rows}, {"ok", "unauthorized"})
+                    self.assertEqual({row["request"]["state"] for row in rows}, {"ok"})
                     log = (root / "logs" / "consumer-test.log.jsonl").read_text()
                     self.assertIn("decision.result", log)
                     self.assertIn("http.auth", log)
@@ -271,6 +342,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                 {
                     "DECIDR_LOG_ROOT": str(root),
                     "CONSUMER_TEST_LOG_ROOT": str(root),
+                    "PLAN_ANCHOR_LOG_ROOT": str(root), "JUDGE_JEV_LOG_ROOT": str(root),
                     "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
                     "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
                 },
@@ -299,7 +371,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                 self.assertTrue(result["ok"], result)
                 self.assertEqual(
                     runner.received,
-                    [("/v1/systemone", {**request, "model": "loopback"})],
+                    [("/v1/systemone", {**request, "model": "laya:en"})],
                     "extracted sitr text did not reach the offline prompt",
                 )
                 received_prompt = runner.received[0][1]["questions"]["q"]["instructions"]
@@ -307,15 +379,16 @@ class RenderedWheelLoopback(unittest.TestCase):
                     self.assertIn(name, received_prompt, f"extracted name {name!r} is missing from the sent prompt")
                 self.assertTrue(sc_agent.flush(logger["value"])["ok"])
 
-    def test_keyboard_interrupt_cancels_the_passed_cancel(self):
+    def test_keyboard_interrupt_cancels_only_the_current_run(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             client = self.load_clients(root)[0]
-            with Runner(1) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(
+            with Runner(2) as runner, allow_local_runner(client.CLIENT_NAME, root), patch.dict(
                 os.environ,
                 {
                     "DECIDR_LOG_ROOT": str(root),
                     "CONSUMER_TEST_LOG_ROOT": str(root),
+                    "PLAN_ANCHOR_LOG_ROOT": str(root), "JUDGE_JEV_LOG_ROOT": str(root),
                     "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
                     "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
                 },
@@ -323,21 +396,19 @@ class RenderedWheelLoopback(unittest.TestCase):
                 self.config(root, runner.address)
                 logger = sc_agent.logger("consumer-test")
                 self.assertTrue(logger["ok"], logger)
-                cancel = sc_agent.Cancel()
 
                 def interrupt_after_first_result(_result):
                     raise KeyboardInterrupt
 
                 batch = client.call_batch_results(
                     [REQUEST] * 3,
-                    cancel=cancel,
                     workers=1,
                     on_result=interrupt_after_first_result,
                     **self.call_options(client, root, logger["value"]),
                 )
                 self.assertEqual(
                     runner.received,
-                    [("/v1/systemone", {**REQUEST, "model": "loopback"})],
+                    [("/v1/systemone", {**REQUEST, "model": "laya:en"})],
                     "cancelled batch sent a surplus loopback request",
                 )
                 self.assertTrue(batch["ok"], batch)
@@ -345,9 +416,9 @@ class RenderedWheelLoopback(unittest.TestCase):
                 self.assertTrue(batch["value"][0]["ok"], batch["value"][0])
                 self.assertEqual([item["error"].code for item in batch["value"][1:]], ["CANCELED", "CANCELED"])
 
-                later = client.call_result(REQUEST, cancel=cancel, **self.call_options(client, root, logger["value"]))
-                self.assertFalse(later["ok"])
-                self.assertEqual(later["error"].code, "CANCELED")
+                later = client.call_result(REQUEST, **self.call_options(client, root, logger["value"]))
+                self.assertTrue(later["ok"], later)
+                self.assertEqual(len(runner.received), 2)
                 self.assertTrue(sc_agent.flush(logger["value"])["ok"])
 
     def test_wheel_keyboard_interrupt_reaches_each_consumer_cancel_handler(self):
@@ -359,6 +430,7 @@ class RenderedWheelLoopback(unittest.TestCase):
                 {
                     "DECIDR_LOG_ROOT": str(root),
                     "CONSUMER_TEST_LOG_ROOT": str(root),
+                    "PLAN_ANCHOR_LOG_ROOT": str(root), "JUDGE_JEV_LOG_ROOT": str(root),
                     "PATH": os.environ["PATH"], "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
                     "GIT_CEILING_DIRECTORIES": str(root.parent.resolve()),
                 },
@@ -371,28 +443,25 @@ class RenderedWheelLoopback(unittest.TestCase):
                 for method, native_call in ((client.call_result, "send"),
                                             (client.call_batch_results, "send_batch")):
                     with self.subTest(native_call=native_call):
-                        cancel = sc_agent.Cancel()
-                        with patch.object(sc_agent, native_call, side_effect=KeyboardInterrupt):
-                            if native_call == "send":
-                                result = method(REQUEST, cancel=cancel, **options)
-                                self.assertFalse(result["ok"], result)
-                                self.assertEqual(result["error"].code, "CANCELED")
-                            else:
-                                result = method([REQUEST], cancel=cancel, **options)
-                                self.assertEqual(result, {"ok": True, "value": []})
-
-                        probe = sc_agent.send(
-                            REQUEST,
-                            model="laya",
-                            project="phase-i-loopback",
-                            agent_role=client.CLIENT_NAME,
-                            config_dir=str(root),
-                            general_log=logger["value"],
-                            timeout_secs=5,
-                            cancel=cancel,
-                        )
-                        self.assertFalse(probe["ok"], probe)
-                        self.assertEqual(probe["error"]["id"], "decision.cancelled")
+                        with sc_agent.Run(tool=client.CLIENT_NAME, model="laya", project="phase-i-loopback",
+                                          agent_role=client.CLIENT_NAME, config_dir=str(root),
+                                          general_log=logger["value"], timeout_secs=5) as real_run:
+                            interrupted = MagicMock()
+                            interrupted.__enter__.return_value = interrupted
+                            interrupted.cancel.side_effect = real_run.cancel
+                            getattr(interrupted, native_call).side_effect = KeyboardInterrupt
+                            with patch.object(sc_agent, "Run", return_value=interrupted):
+                                if native_call == "send":
+                                    result = method(REQUEST, **options)
+                                    self.assertFalse(result["ok"], result)
+                                    self.assertEqual(result["error"].code, "CANCELED")
+                                else:
+                                    result = method([REQUEST], **options)
+                                    self.assertEqual(result, {"ok": True, "value": []})
+                            interrupted.cancel.assert_called_once()
+                            probe = real_run.send(REQUEST)
+                            self.assertFalse(probe["ok"], probe)
+                            self.assertEqual(probe["error"]["id"], "decision.cancelled")
 
                 self.assertEqual(runner.received, [], "KeyboardInterrupt handlers sent unexpected requests")
                 self.assertTrue(sc_agent.flush(logger["value"])["ok"])

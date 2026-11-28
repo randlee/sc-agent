@@ -1,5 +1,5 @@
 pub mod support;
-use sc_agent::{Answer, config, digest, error, key, model, result, schema, slug};
+use sc_agent::{Answer, config, digest, error, key, result, schema, slug};
 use serde_json::json;
 use std::{cell::RefCell, ffi::OsString, fs};
 use support::*;
@@ -55,7 +55,7 @@ fn req_sag_0401_env_dotenv_keyring_order_and_invalid_credentials() -> Test {
     assert!(message.contains("TYPESAFE_API_KEY"));
     assert!(message.contains("environment"));
     assert!(message.contains(".env"));
-    assert!(!message.contains("controlled refusal"));
+    assert!(message.contains("controlled refusal"));
     Ok(())
 }
 
@@ -92,19 +92,26 @@ fn req_sag_0004_config_layers_sources_and_required_project() -> Test {
     }
     let env = vec![(OsString::from("SC_PROJECT"), OsString::from("environment"))];
     assert_eq!(
-        config(Some(&local), Some(&global), &env, Some("flag"))?
-            .config
-            .project_required()?,
+        config(
+            "decidr",
+            Some(&local),
+            Some(&global),
+            &env,
+            Some("flag"),
+            &[]
+        )?
+        .config
+        .project_required()?,
         "flag"
     );
     assert_eq!(
-        config(Some(&local), Some(&global), &env, None)?
+        config("decidr", Some(&local), Some(&global), &env, None, &[])?
             .config
             .project_required()?,
         "environment"
     );
     for (path, expected) in &places {
-        let loaded = config(Some(&local), Some(&global), &[], None)?;
+        let loaded = config("decidr", Some(&local), Some(&global), &[], None, &[])?;
         assert_eq!(loaded.config.project_required()?, *expected);
         let resolved = loaded.rows;
         assert_eq!(
@@ -116,8 +123,8 @@ fn req_sag_0004_config_layers_sources_and_required_project() -> Test {
         );
         fs::remove_file(path)?;
     }
-    let empty = config(Some(&local), Some(&global), &[], None)?;
-    assert_eq!(empty.config.workers, 8);
+    let empty = config("decidr", Some(&local), Some(&global), &[], None, &[])?;
+    assert_eq!(empty.config.get::<usize>("workers")?, 8);
     let error = empty
         .config
         .project_required()
@@ -149,25 +156,29 @@ fn req_sag_0004_config_injected_env_nested_keys_and_outside_git() -> Test {
         ("DECIDR_WORKERS", "3"),
         ("DECIDR_LAYA__HOST", "example.invalid"),
         ("DECIDR_LAYA__PORT", "9000"),
-        ("DECIDR_LAYA__MODEL", "local-model"),
     ]
     .map(|(k, v)| (k.into(), v.into()));
-    let loaded = config(None, Some(&root.0), &environment, None)?;
-    assert_eq!(loaded.config.workers, 3);
-    let runner = loaded.config.laya.ok_or("runner not decoded")?;
+    let loaded = config("decidr", None, Some(&root.0), &environment, None, &[])?;
+    assert_eq!(loaded.config.get::<usize>("workers")?, 3);
+    let runner = loaded.config.get::<sc_agent::Runner>("laya")?;
     assert_eq!(
-        (runner.host.as_str(), runner.port, runner.model.as_str()),
-        ("example.invalid", 9000, "local-model")
+        (runner.host.as_str(), runner.port),
+        ("example.invalid", 9000)
     );
-    let without_override = config(None, Some(&root.0), &[], None)?;
-    assert_eq!(without_override.config.workers, 8);
-    assert!(without_override.config.project.is_none());
+    let without_override = config("decidr", None, Some(&root.0), &[], None, &[])?;
+    assert_eq!(without_override.config.get::<usize>("workers")?, 8);
+    assert!(
+        without_override
+            .config
+            .get::<Option<String>>("project")?
+            .is_none()
+    );
     assert_eq!(
         fs::read_to_string(local.join("decidr.json"))?,
         r#"{"project":"local","workers":2}"#
     );
     fs::write(root.0.join("decidr.json"), "not JSON")?;
-    let bad = config(None, Some(&root.0), &[], None)
+    let bad = config("decidr", None, Some(&root.0), &[], None, &[])
         .err()
         .ok_or("bad config accepted")?;
     assert!(bad.to_string().contains("decidr.json"));
@@ -207,8 +218,14 @@ fn req_sag_0007_0201_distinct_answer_types_and_schema_failures() -> Test {
     ] {
         let typed: Answer = serde_json::from_value(answer.clone())?;
         assert_eq!(serde_json::to_value(typed)?, answer);
+        let mut question = json!({"type":answer["type"]});
+        match answer["type"].as_str() {
+            Some("choice") => question["criteria"] = json!({"yes":"true"}),
+            Some("score") => question["criteria"] = json!(["low"]),
+            _ => {}
+        }
         schema(
-            &json!({"questions":{"q":{"type":answer["type"]}}}),
+            &json!({"questions":{"q":question}}),
             &json!({"answers":{"q":answer}}),
         )?;
     }
@@ -240,6 +257,7 @@ fn req_sag_0002_0016_0017_errors_have_stable_ids_categories_and_omit_unset_attem
         ("http.auth", "auth"),
         ("http.quota_exhausted", "quota"),
         ("decision.cancelled", "cancelled"),
+        ("log.flush", "log"),
         ("config.invalid", "config"),
         ("decision.schema_mismatch", "response_invalid"),
         ("decision.request_parse", "validation"),
@@ -268,11 +286,42 @@ fn req_sag_0101_models_use_provider_tables_and_reseller_passthrough() -> Test {
         ("custom/id", Some("nous"), "custom/id"),
         ("future-model", Some("together"), "future-model"),
     ] {
-        assert_eq!(model(name, provider)?.1, id);
+        let configured = provider
+            .map(|provider| {
+                (
+                    name.into(),
+                    sc_agent::ModelEntry {
+                        provider: provider.into(),
+                        id: id.into(),
+                        released: None,
+                    },
+                )
+            })
+            .into_iter()
+            .collect();
+        assert_eq!(model_with(name, &configured)?.1, id);
     }
-    assert_eq!(model("laya", None)?.0.name, "local");
-    assert!(model("missing", None).is_err());
-    assert!(model("jev", Some("missing")).is_err());
+    assert_eq!(model_with("laya", &Default::default())?.0.name, "laya");
+    assert_eq!(
+        model_with("decider", &Default::default())?.1,
+        "decider-4b-v2.1"
+    );
+    assert!(model_with("missing", &Default::default()).is_err());
+    assert!(
+        model_with(
+            "jev",
+            &[(
+                "jev".into(),
+                sc_agent::ModelEntry {
+                    provider: "missing".into(),
+                    id: "unused".into(),
+                    released: None
+                }
+            )]
+            .into()
+        )
+        .is_err()
+    );
     Ok(())
 }
 
@@ -284,22 +333,98 @@ fn configured_models(
         root.0.join("sc-agent.json"),
         json!({"models": models}).to_string(),
     )?;
-    Ok(config(None, Some(&root.0), &[], None)?.config)
+    Ok(config("decidr", None, Some(&root.0), &[], None, &[])?.config)
 }
 
 #[test]
 fn req_sag_0101_configured_models_override_and_extend_the_built_in_table() -> Test {
     let none = configured_models(json!({}))?;
-    let (provider, id) = sc_agent::model_with("jev", None, &none.models)?;
+    let (provider, id) = model_with("jev", &none.get("models")?)?;
     assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-latest"));
     let pinned = configured_models(json!({
         "jev": {"provider": "typesafe", "id": "jev-1.14.0"},
         "myjev": {"provider": "typesafe", "id": "jev-next"}
     }))?;
-    let (provider, id) = sc_agent::model_with("jev", None, &pinned.models)?;
+    let (provider, id) = model_with("jev", &pinned.get("models")?)?;
     assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-1.14.0"));
-    let (provider, id) = sc_agent::model_with("myjev", None, &pinned.models)?;
+    let (provider, id) = model_with("myjev", &pinned.get("models")?)?;
     assert_eq!((provider.name, id.as_str()), ("typesafe", "jev-next"));
+    Ok(())
+}
+
+#[test]
+fn req_sag_0019_model_entry_accepts_released_date_and_rejects_malformed_date() -> Test {
+    let configured = configured_models(json!({
+        "luna": {
+            "provider": "nous",
+            "id": "openai/gpt-6.1-luna",
+            "released": "2026-11-20"
+        }
+    }))?;
+    let models =
+        configured.get::<std::collections::BTreeMap<String, sc_agent::ModelEntry>>("models")?;
+    let model = models.get("luna").ok_or("missing configured luna")?;
+    assert_eq!(model.provider, "nous");
+    assert_eq!(model.id, "openai/gpt-6.1-luna");
+    assert_eq!(model.released.as_deref(), Some("2026-11-20"));
+
+    let failure = configured_models(json!({
+        "luna": {
+            "provider": "nous",
+            "id": "openai/gpt-6.1-luna",
+            "released": "2026-02-30"
+        }
+    }))
+    .err()
+    .ok_or("invalid release date accepted")?;
+    let message = failure.to_string();
+    assert!(message.contains("config.invalid"), "{message}");
+    let parser_detail = message
+        .split_once("released must be a YYYY-MM-DD date: ")
+        .map(|(_, detail)| detail)
+        .ok_or("released date error lost its key-specific message")?;
+    assert!(!parser_detail.is_empty(), "{message}");
+
+    let failure = configured_models(json!({
+        "luna": {
+            "provider": "nous",
+            "id": "openai/gpt-6.1-luna",
+            "released": null
+        }
+    }))
+    .err()
+    .ok_or("null release date accepted")?;
+    assert!(failure.to_string().contains("config.invalid"));
+    Ok(())
+}
+
+#[test]
+fn configured_release_dates_keep_calendar_and_format_boundaries() -> Test {
+    for (date, valid) in [
+        ("2000-02-29", true),
+        ("2024-02-29", true),
+        ("0000-02-29", true),
+        ("9999-12-31", true),
+        ("1900-02-29", false),
+        ("2025-02-29", false),
+        ("2026-04-31", false),
+        ("2026-00-01", false),
+        ("2026-01-00", false),
+        ("2026-1-01", false),
+        ("2026-01-1", false),
+        ("026-01-01", false),
+        ("+2026-01-01", false),
+        (" 2026-01-01", false),
+        ("2026-01-01T00:00:00Z", false),
+    ] {
+        let result = configured_models(json!({"luna": {
+            "provider":"nous", "id":"openai/gpt-6.1-luna", "released":date
+        }}));
+        assert_eq!(result.is_ok(), valid, "release date {date}");
+        if let Err(error) = result {
+            assert!(error.to_string().contains("config.invalid"), "{error}");
+        }
+    }
     Ok(())
 }
 
@@ -356,14 +481,14 @@ fn adr_sag_0021_log_root_is_not_a_configuration_setting() -> Test {
     let root = Temp::new()?;
     let path = root.0.join("logs-from-env");
     let env = vec![("DECIDR_LOG_ROOT".into(), path.as_os_str().to_owned())];
-    let loaded = config(None, Some(&root.0), &env, None)?;
+    let loaded = config("decidr", None, Some(&root.0), &env, None, &[])?;
     let rows = loaded.rows;
     assert!(rows.iter().all(|row| row["path"] != "log_root"));
     std::fs::write(
         root.0.join("decidr.json"),
         json!({"log_root": path}).to_string(),
     )?;
-    let failure = config(None, Some(&root.0), &env, None)
+    let failure = config("decidr", None, Some(&root.0), &env, None, &[])
         .err()
         .ok_or("accepted log_root setting")?;
     assert!(failure.to_string().contains("log_root"));
@@ -379,7 +504,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
             "DECIDR_WORKERS".into(),
             value.to_string().trim_matches('"').into(),
         )];
-        let failure = config(None, Some(&root.0), &env, None)
+        let failure = config("decidr", None, Some(&root.0), &env, None, &[])
             .err()
             .ok_or("accepted invalid workers")?
             .to_string();
@@ -387,7 +512,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
         assert!(failure.contains("workers"), "{failure}");
         let file = root.0.join("decidr.json");
         fs::write(&file, json!({"workers":value}).to_string())?;
-        let failure = config(None, Some(&root.0), &[], None)
+        let failure = config("decidr", None, Some(&root.0), &[], None, &[])
             .err()
             .ok_or("accepted invalid workers file")?
             .to_string();
@@ -400,7 +525,7 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
     }
     let file = root.0.join("decidr.json");
     fs::write(&file, json!({"laya":{"host":"localhost"}}).to_string())?;
-    let failure = config(None, Some(&root.0), &[], None)
+    let failure = config("decidr", None, Some(&root.0), &[], None, &[])
         .err()
         .ok_or("accepted partial runner")?
         .to_string();
@@ -411,10 +536,10 @@ fn req_sag_0019_0020_invalid_values_name_their_key_and_source() -> Test {
     assert!(failure.contains("laya.port"), "{failure}");
     fs::write(
         &file,
-        json!({"laya":{"host":"localhost","port":9000,"model":"local"}}).to_string(),
+        json!({"laya":{"host":"localhost","port":9000}}).to_string(),
     )?;
     let env = vec![("DECIDR_LAYA__PORT".into(), "bad".into())];
-    let failure = config(None, Some(&root.0), &env, None)
+    let failure = config("decidr", None, Some(&root.0), &env, None, &[])
         .err()
         .ok_or("accepted invalid port")?
         .to_string();
@@ -434,9 +559,9 @@ fn partial_runner_across_layers_names_missing_key_and_all_sources() -> Test {
     )?;
     fs::write(
         root.0.join("sc-agent.json"),
-        json!({"laya":{"model":"local"}}).to_string(),
+        json!({"laya":{"host":"remote"}}).to_string(),
     )?;
-    let failure = config(Some(&local), Some(&root.0), &[], None)
+    let failure = config("decidr", Some(&local), Some(&root.0), &[], None, &[])
         .err()
         .ok_or("partial runner accepted")?
         .to_string();
@@ -469,9 +594,9 @@ fn config_home_and_file_acceptance_are_explicit_and_read_only() -> Test {
     for name in ["sc-agent.local.json", "sitr.json"] {
         fs::write(user.join(name), "invalid JSON must not be read")?;
     }
-    let loaded = config(None, None, &environment, None)?;
+    let loaded = config("decidr", None, None, &environment, None, &[])?;
     assert_eq!(loaded.config.project_required()?, "relocated");
-    assert_eq!(loaded.config.workers, 3);
+    assert_eq!(loaded.config.get::<usize>("workers")?, 3);
     assert_eq!(loaded.files.len(), 3);
     assert_eq!(
         loaded
@@ -482,16 +607,16 @@ fn config_home_and_file_acceptance_are_explicit_and_read_only() -> Test {
         file.to_string_lossy().as_ref()
     );
     assert!(
-        config(None, Some(&root.0), &environment, None)?
+        config("decidr", None, Some(&root.0), &environment, None, &[])?
             .config
-            .project
+            .get::<Option<String>>("project")?
             .is_none()
     );
     for name in ["sc-agent.json", "decidr.json", "decidr.local.json"] {
         let path = user.join(name);
         let text = r#"{"laya":{"unknown":true}}"#;
         fs::write(&path, text)?;
-        let failure = config(None, None, &environment, None)
+        let failure = config("decidr", None, None, &environment, None, &[])
             .err()
             .ok_or("unknown file key accepted")?;
         let failure = serde_json::to_value(failure)?;
@@ -512,37 +637,503 @@ fn config_home_and_file_acceptance_are_explicit_and_read_only() -> Test {
 fn environment_json_and_strings_share_file_validation() -> Test {
     let root = Temp::new()?;
     let file = root.0.join("decidr.json");
-    let runner = json!({"host":"localhost", "port":9000, "model":"local"});
+    let runner = json!({"host":"localhost", "port":9000});
     for raw in ["1", "true", "null", "[1]", "{\"nested\":1}"] {
         fs::write(&file, json!({"laya":runner}).to_string())?;
-        let env = vec![("DECIDR_LAYA__MODEL".into(), raw.into())];
-        let failure = config(None, Some(&root.0), &env, None)
+        let env = vec![("DECIDR_LAYA__HOST".into(), raw.into())];
+        let failure = config("decidr", None, Some(&root.0), &env, None, &[])
             .err()
-            .ok_or("non-string env model accepted")?
+            .ok_or("non-string env host accepted")?
             .to_string();
-        assert!(failure.contains("DECIDR_LAYA__MODEL"), "{failure}");
-        assert!(failure.contains("laya.model"), "{failure}");
+        assert!(failure.contains("DECIDR_LAYA__HOST"), "{failure}");
+        assert!(failure.contains("laya.host"), "{failure}");
         let mut invalid = runner.clone();
-        invalid["model"] = serde_json::from_str(raw)?;
+        invalid["host"] = serde_json::from_str(raw)?;
         fs::write(&file, json!({"laya":invalid}).to_string())?;
-        let failure = config(None, Some(&root.0), &[], None)
+        let failure = config("decidr", None, Some(&root.0), &[], None, &[])
             .err()
-            .ok_or("non-string file model accepted")?
+            .ok_or("non-string file host accepted")?
             .to_string();
         assert!(
             failure.contains(file.to_str().ok_or("non-UTF8 path")?),
             "{failure}"
         );
-        assert!(failure.contains("laya.model"), "{failure}");
+        assert!(failure.contains("laya.host"), "{failure}");
     }
     fs::write(&file, json!({"laya":runner}).to_string())?;
     for raw in ["plain", "\"1\""] {
-        let env = vec![("DECIDR_LAYA__MODEL".into(), raw.into())];
-        let loaded = config(None, Some(&root.0), &env, None)?;
+        let env = vec![("DECIDR_LAYA__HOST".into(), raw.into())];
+        let loaded = config("decidr", None, Some(&root.0), &env, None, &[])?;
         assert_eq!(
-            loaded.config.laya.ok_or("missing runner")?.model,
+            loaded.config.get::<sc_agent::Runner>("laya")?.host,
             if raw == "plain" { "plain" } else { "1" }
         );
     }
+    Ok(())
+}
+
+#[test]
+fn max_sends_and_system_prompt_keys_load_default_and_report() -> Test {
+    let root = Temp::new()?;
+    let defaults = config("decidr", None, Some(&root.0), &[], None, &[])?;
+    assert_eq!(defaults.config.get::<usize>("max_sends")?, 5);
+    let row = |loaded: &sc_agent::Configuration, path: &str| {
+        loaded.rows.iter().find(|row| row["path"] == path).cloned()
+    };
+    assert_eq!(
+        row(&defaults, "max_sends"),
+        Some(json!({"path":"max_sends","value":"5","source":"default"}))
+    );
+    fs::write(
+        root.0.join("sc-agent.json"),
+        json!({"max_sends":3,"decidr":{"luna-system-prompt":"P"}}).to_string(),
+    )?;
+    let loaded = config("decidr", None, Some(&root.0), &[], None, &[])?;
+    assert_eq!(loaded.config.get::<usize>("max_sends")?, 3);
+    assert_eq!(
+        loaded
+            .config
+            .get::<std::collections::BTreeMap<String, String>>("decidr")?["luna-system-prompt"],
+        "P"
+    );
+    assert_eq!(
+        row(&loaded, "decidr.luna-system-prompt").ok_or("row missing")?["value"],
+        "P"
+    );
+    fs::write(
+        root.0.join("sc-agent.json"),
+        json!({"max_sends":0}).to_string(),
+    )?;
+    let failure = config("decidr", None, Some(&root.0), &[], None, &[])
+        .err()
+        .ok_or("zero accepted")?
+        .to_string();
+    assert!(
+        failure.contains("config.invalid") && failure.contains("max_sends"),
+        "{failure}"
+    );
+    fs::write(
+        root.0.join("sc-agent.json"),
+        json!({"decidr":{"sonnet-system-prompt":"P"}}).to_string(),
+    )?;
+    assert_eq!(
+        config("decidr", None, Some(&root.0), &[], None, &[])?
+            .config
+            .values["decidr"]["sonnet-system-prompt"],
+        "P"
+    );
+    Ok(())
+}
+
+#[test]
+fn config_local_endpoints() -> Test {
+    let root = Temp::new()?;
+    let file = root.0.join("decidr.json");
+    fs::write(
+        &file,
+        json!({"decider_4b":{"host":"h4","port":18001},"decider_2b":{"host":"h2","port":18000}})
+            .to_string(),
+    )?;
+    let loaded = config("decidr", None, Some(&root.0), &[], None, &[])?;
+    let runners = ["decider_2b", "decider_4b"].map(|name| {
+        loaded
+            .config
+            .get::<sc_agent::Runner>(name)
+            .map(|r| (name, r))
+    });
+    let runners = runners.into_iter().collect::<Result<Vec<_>, _>>()?;
+    let ports = runners.iter().map(|(n, r)| (*n, r.host.as_str(), r.port));
+    assert_eq!(
+        ports.collect::<Vec<_>>(),
+        [("decider_2b", "h2", 18000), ("decider_4b", "h4", 18001)]
+    );
+    let paths = loaded
+        .rows
+        .iter()
+        .map(|row| row["path"].as_str().unwrap_or(""));
+    let paths = paths.collect::<Vec<_>>();
+    for key in [
+        "decider_4b.host",
+        "decider_4b.port",
+        "decider_2b.host",
+        "decider_2b.port",
+    ] {
+        assert!(paths.contains(&key), "{key}");
+    }
+    assert!(!paths.contains(&"laya.model"));
+    fs::write(
+        &file,
+        json!({"laya":{"host":"h","port":1,"model":"x"}}).to_string(),
+    )?;
+    let failure = config("decidr", None, Some(&root.0), &[], None, &[])
+        .err()
+        .ok_or("laya.model accepted")?
+        .to_string();
+    assert!(
+        failure.contains("config.invalid") && failure.contains("laya.model"),
+        "{failure}"
+    );
+    Ok(())
+}
+
+#[test]
+fn built_in_rows_are_newest_first() {
+    for provider in sc_agent::PROVIDERS {
+        assert!(
+            provider
+                .models
+                .windows(2)
+                .all(|rows| rows[0].2 >= rows[1].2),
+            "{}",
+            provider.name
+        );
+    }
+}
+
+#[test]
+fn generated_answer_schema_rejects_invalid_answer_fields() -> Test {
+    let choice = json!({"type":"choice","choice":"a","confidence":0.875,"probabilities":{"a":0.123456789,"b":0.2}});
+    let score = json!({"type":"score","score":0.123456789,"confidence":0.8,"legend":{"0":"low","1":"high"},"probabilities":{"0":0.3,"1":0.4}});
+    let bounds = json!({"top":0.1,"bottom":0.9,"left":0.2,"right":0.8});
+    let boxed = json!({"type":"box","box":bounds,"confidence":null});
+    let noul = json!({"type":"noul","noul":0.875});
+    let changed = |original: &serde_json::Value, field: &str, value| {
+        let mut answer = original.clone();
+        answer[field] = value;
+        answer
+    };
+    for (question, valid, invalid) in [
+        (
+            json!({"type":"choice","criteria":{"a":"A","b":"B"}}),
+            choice.clone(),
+            vec![
+                changed(&choice, "choice", json!("outside")),
+                changed(&choice, "probabilities", json!({})),
+                changed(
+                    &choice,
+                    "probabilities",
+                    json!({"a":0.1,"b":0.2,"extra":0.3}),
+                ),
+                changed(&choice, "extra", json!(true)),
+            ],
+        ),
+        (
+            json!({"type":"score","criteria":["low","high"]}),
+            score.clone(),
+            vec![
+                changed(&score, "legend", json!({"0":"low"})),
+                changed(&score, "probabilities", json!({"0":0.1})),
+            ],
+        ),
+        (
+            json!({"type":"box"}),
+            boxed.clone(),
+            vec![
+                json!({"type":"box","box":null}),
+                changed(&boxed, "box", changed(&bounds, "extra", json!(1))),
+            ],
+        ),
+        (
+            json!({"type":"noul"}),
+            noul.clone(),
+            vec![changed(&noul, "extra", json!(true))],
+        ),
+    ] {
+        let request = json!({"questions":{"q":question}});
+        schema(
+            &request,
+            &json!({"model":"reply-metadata","answers":{"q":valid}}),
+        )?;
+        for answer in invalid {
+            let failure = schema(&request, &json!({"answers":{"q":answer}}))
+                .err()
+                .ok_or_else(|| format!("accepted invalid answer {answer}"))?;
+            let failure = serde_json::to_value(failure)?;
+            assert_eq!(failure["id"], "decision.schema_mismatch");
+            assert!(
+                failure["message"]
+                    .as_str()
+                    .ok_or("no error message")?
+                    .contains('q')
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn array_shaped_answers_and_boxes_are_schema_mismatches() -> Test {
+    let mut accepted = Vec::new();
+    for (question, answer) in [
+        (json!({"type":"noul"}), json!(["noul", 0.5])),
+        (
+            json!({"type":"choice","criteria":{"a":"A"}}),
+            json!(["choice", "outside", 0.8, {}]),
+        ),
+        (
+            json!({"type":"score","criteria":["low"]}),
+            json!(["score",0.5,0.8,{"0":"low"},{"0":1.0}]),
+        ),
+        (json!({"type":"box"}), json!(["box", null, null])),
+        (
+            json!({"type":"box"}),
+            json!({"type":"box","box":[0.1,0.9,0.2,0.8],"confidence":null}),
+        ),
+    ] {
+        match schema(
+            &json!({"questions":{"q":question}}),
+            &json!({"answers":{"q":answer}}),
+        ) {
+            Ok(()) => accepted.push(answer),
+            Err(failure) => assert_eq!(
+                serde_json::to_value(failure)?["id"],
+                "decision.schema_mismatch"
+            ),
+        }
+    }
+    assert!(
+        accepted.is_empty(),
+        "accepted array-shaped values: {accepted:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn configuration_files_environment_and_missing_project_follow_the_tool_name() -> Test {
+    let root = Temp::new()?;
+    std::fs::write(
+        root.0.join("judge-jev.json"),
+        r#"{"project":"tool-file","workers":2}"#,
+    )?;
+    assert_eq!(
+        config("judge-jev", None, Some(&root.0), &[], None, &[])?
+            .config
+            .get::<Option<String>>("project")?
+            .as_deref(),
+        Some("tool-file")
+    );
+    let env = vec![
+        ("SC_PROJECT".into(), "shared-env".into()),
+        ("JUDGE_JEV_WORKERS".into(), "3".into()),
+        ("DECIDR_WORKERS".into(), "5".into()),
+    ];
+    let loaded = config("judge-jev", None, Some(&root.0), &env, None, &[])?.config;
+    assert_eq!(
+        loaded.get::<Option<String>>("project")?.as_deref(),
+        Some("shared-env")
+    );
+    assert_eq!(loaded.get::<usize>("workers")?, 3);
+    let absent = config("another-tool", None, Some(&root.0), &[], None, &[])?.config;
+    let failure = absent
+        .project_required()
+        .err()
+        .ok_or("project was invented")?
+        .to_string();
+    assert!(failure.contains("SC_PROJECT"), "{failure}");
+    assert!(failure.contains("another-tool.json"), "{failure}");
+    Ok(())
+}
+
+#[test]
+fn arbitrary_configured_model_prompt_is_accepted() -> Test {
+    let root = Temp::new()?;
+    fs::write(
+        root.0.join("decidr.json"),
+        json!({
+            "models":{"custom":{"provider":"openai","id":"custom-wire-id"}},
+            "decidr":{"custom-system-prompt":"custom instruction"}
+        })
+        .to_string(),
+    )?;
+    config("decidr", None, Some(&root.0), &[], None, &[])?;
+    Ok(())
+}
+
+#[test]
+fn consumer_declarations_supply_nested_defaults_types_and_provenance() -> Test {
+    let root = Temp::new()?;
+    // This consumer-owned declaration is the only change needed to add its setting.
+    let own = [sc_agent::Setting::new::<u16>(
+        "review.limit",
+        Some(json!(7)),
+    )];
+    let load =
+        |env: &[(OsString, OsString)]| config("my-tool", None, Some(&root.0), env, None, &own);
+    let loaded = load(&[])?;
+    assert_eq!(loaded.config.get::<u16>("review.limit")?, 7);
+    assert!(
+        loaded
+            .rows
+            .iter()
+            .any(|r| r == &json!({"path":"review.limit","value":"7","source":"default"}))
+    );
+    let file = root.0.join("my-tool.json");
+    fs::write(&file, json!({"review":{"limit":11}}).to_string())?;
+    assert_eq!(load(&[])?.config.get::<u16>("review.limit")?, 11);
+    let env = [("MY_TOOL_REVIEW__LIMIT".into(), "13".into())];
+    let loaded = load(&env)?;
+    assert_eq!(loaded.config.get::<u16>("review.limit")?, 13);
+    assert!(
+        loaded
+            .rows
+            .iter()
+            .any(|r| r["path"] == "review.limit" && r["source"] == "MY_TOOL_REVIEW__LIMIT")
+    );
+    for value in ["oops", "65536", "-1"] {
+        let failure = load(&[("MY_TOOL_REVIEW__LIMIT".into(), value.into())])
+            .err()
+            .ok_or("wrong type accepted")?
+            .to_string();
+        assert!(
+            failure.contains("review.limit") && failure.contains("MY_TOOL_REVIEW__LIMIT"),
+            "{failure}"
+        );
+    }
+    fs::write(&file, json!({"review":{"limit":"oops"}}).to_string())?;
+    let failure = load(&[])
+        .err()
+        .ok_or("wrong file type accepted")?
+        .to_string();
+    assert!(
+        failure.contains("review.limit") && failure.contains(file.to_str().ok_or("path")?),
+        "{failure}"
+    );
+    Ok(())
+}
+
+#[test]
+fn model_and_timeout_settings_validate_and_follow_environment_precedence() -> Test {
+    let root = Temp::new()?;
+    let local = root.0.join("local");
+    fs::create_dir(&local)?;
+    let load = |env: &[(OsString, OsString)]| {
+        config("decidr", Some(&local), Some(&root.0), env, None, &[])
+    };
+    let defaults = load(&[])?.config;
+    assert_eq!(defaults.get::<String>("model")?, "jev");
+    assert_eq!(defaults.get::<f64>("timeout_secs")?, 120.0);
+    fs::write(
+        root.0.join("decidr.json"),
+        json!({"model":"haiku", "timeout_secs":37}).to_string(),
+    )?;
+    let configured = load(&[])?.config;
+    assert_eq!(configured.get::<String>("model")?, "haiku");
+    assert_eq!(configured.get::<f64>("timeout_secs")?, 37.0);
+    let env = [
+        ("DECIDR_MODEL".into(), "luna".into()),
+        ("DECIDR_TIMEOUT_SECS".into(), "17.5".into()),
+    ];
+    let loaded = load(&env)?.config;
+    assert_eq!(loaded.get::<String>("model")?, "luna");
+    assert_eq!(loaded.get::<f64>("timeout_secs")?, 17.5);
+    for value in ["-1", "oops", "1e100"] {
+        let failure = load(&[("DECIDR_TIMEOUT_SECS".into(), value.into())])
+            .err()
+            .ok_or("bad timeout accepted")?
+            .to_string();
+        assert!(
+            failure.contains("timeout_secs") && failure.contains("DECIDR_TIMEOUT_SECS"),
+            "{failure}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn unknown_prompt_keys_are_load_errors_with_file_and_full_path() -> Test {
+    let root = Temp::new()?;
+    let file = root.0.join("decidr.json");
+    for key in [
+        "luna-sytem-prompt",
+        "not-configured-system-prompt",
+        "system-prompt",
+        "custom.full/id-system-prompt-typo",
+    ] {
+        fs::write(
+            &file,
+            json!({"models":{"":{"provider":"openai","id":"wire"}},"decidr":{key:"instruction"}})
+                .to_string(),
+        )?;
+        let own = [sc_agent::Setting::new::<String>(
+            format!("decidr.{key}"),
+            None,
+        )];
+        let failure = config("decidr", None, Some(&root.0), &[], None, &own)
+            .err()
+            .ok_or("unknown prompt accepted")?;
+        assert_eq!(serde_json::to_value(&failure)?["id"], "config.invalid");
+        let text = failure.to_string();
+        assert!(text.contains(file.to_str().ok_or("path")?), "{text}");
+        assert!(text.contains(&format!("decidr.{key}")), "{text}");
+    }
+    Ok(())
+}
+
+#[test]
+fn doctor_keeps_unset_declarations_and_model_prompts() -> Test {
+    let root = Temp::new()?;
+    let own = [
+        sc_agent::Setting::new::<String>("consumer_note", None),
+        sc_agent::Setting::new::<String>("review.note", None),
+        sc_agent::Setting::new::<u32>("review.limit", Some(json!(7))),
+    ];
+    fs::write(
+        root.0.join("decidr.json"),
+        json!({"models":{"custom.full/id":{"provider":"openai","id":"custom-wire-id"}}})
+            .to_string(),
+    )?;
+    let loaded = config("decidr", None, Some(&root.0), &[], None, &own)?;
+    let mut expected = vec![
+        "review.note".to_owned(),
+        "consumer_note".to_owned(),
+        "decidr.custom.full/id-system-prompt".into(),
+    ];
+    for provider in sc_agent::PROVIDERS {
+        if provider.url.is_empty() {
+            expected.extend(["host", "port"].map(|key| format!("{}.{key}", provider.name)));
+        }
+        for (alias, id, _) in provider.models {
+            expected.extend([alias, id].map(|model| format!("decidr.{model}-system-prompt")));
+        }
+    }
+    for path in expected {
+        let rows = loaded
+            .rows
+            .iter()
+            .filter(|row| row["path"] == path)
+            .collect::<Vec<_>>();
+        assert_eq!(rows.len(), 1, "missing or repeated {path}: {rows:?}");
+        assert_eq!(rows[0]["value"], "unset", "{path}");
+        assert_eq!(rows[0]["source"], "default", "{path}");
+    }
+    Ok(())
+}
+
+#[test]
+fn an_environment_map_cannot_hide_an_unknown_prompt_in_a_file() -> Test {
+    let root = Temp::new()?;
+    let file = root.0.join("decidr.json");
+    fs::write(
+        &file,
+        json!({"decidr":{"luna-sytem-prompt":"bad"}}).to_string(),
+    )?;
+    let env = [(
+        "DECIDR_DECIDR".into(),
+        json!({"luna-system-prompt":"good"}).to_string().into(),
+    )];
+    let failure = config("decidr", None, Some(&root.0), &env, None, &[])
+        .err()
+        .ok_or("override hid an unknown file key")?
+        .to_string();
+    assert!(failure.contains("decidr.luna-sytem-prompt"), "{failure}");
+    assert!(failure.contains(file.to_str().ok_or("path")?), "{failure}");
+    Ok(())
+}
+
+#[test]
+fn empty_prompt_maps_remain_valid() -> Test {
+    let root = Temp::new()?;
+    fs::write(root.0.join("decidr.json"), json!({"decidr":{}}).to_string())?;
+    config("decidr", None, Some(&root.0), &[], None, &[])?;
     Ok(())
 }

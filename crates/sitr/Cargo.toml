@@ -17,4 +17,4 @@ clap = { version = "4", features = ["derive"] }
 workspace = true
 
 [dev-dependencies]
-serde.workspace = true
+sc-docli = "=0.2.0"

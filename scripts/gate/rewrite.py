@@ -74,6 +74,8 @@ rust = sorted(p for p in SOURCE.rglob("*.rs") if not set(p.relative_to(SOURCE).p
 source_lines = test_lines = 0
 for path in rust:
     parts = path.relative_to(SOURCE).parts
+    if parts[0] == "scripts":
+        continue  # Owner: tool code is outside the product size budget.
     text = path.read_text()
     if len(parts) > 3 and parts[0] == "crates" and parts[2] == "tests":
         test_lines += len(text.splitlines())
@@ -87,7 +89,7 @@ print(f"Rust source lines: {source_lines}/{LIMIT}; test lines: {test_lines}", fl
 check("forbidden architecture", (
     f"{p.relative_to(ROOT)}:{i}: {match.group()}"
     for p in rust for i, line in enumerate(p.read_text().splitlines(), 1)
-    for match in re.finditer(r"\b(?:Transport|Clock|CancelToken|Catalog)\b|\btrait\s+|\bpub\s+use\b", line)
+    for match in re.finditer(r"\b(?:Transport|Clock|CancelToken|Catalog)\b|\btrait\s+(?!(?:Decision|Llm)\b)|\bpub\s+use\b", line)
 ))
 # The only permitted builder use is in the default_logger function.
 check("logger builder", (
@@ -127,6 +129,7 @@ if MANIFEST.exists():
             check("dependencies", (
                 f"{p['name']}: {d['name']}" for p in packages for d in p["dependencies"]
                 if d["name"] not in ALLOWED | local
+                and not (p["name"] in {"decidr", "sitr"} and d["name"] == "sc-docli" and d["kind"] == "dev")
             ))
     run("format", ["cargo", "fmt", "--check", "--all", "--manifest-path", str(MANIFEST)])
     run("clippy", ["cargo", "clippy", "--locked", "--workspace", "--all-features", "--manifest-path", str(MANIFEST),

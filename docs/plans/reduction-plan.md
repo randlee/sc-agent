@@ -12,6 +12,10 @@ sc-agent replaces about 300 lines of per-tool Python (judge-jev `jev_judge.py.j2
 
 **No exceptions thrown:** every wheel function returns a result value (`{ok, value}` or `{ok: false, error: {id, message, action}}`) and never raises; the generated client never raises. Rust non-test code has no `unwrap`, `expect`, `panic!` or indexing that can panic (clippy `unwrap_used`, `expect_used`, `panic`, `indexing_slicing` denied).
 
+## Owner-directed tool scope (2026-11-27)
+
+Owner: "docli is a tool, not production code. Docli code should match docli recommendations." The product size counter excludes tool code under `scripts/`; it still checks that code for forbidden architecture and logger builders. The cap in `scripts/gate/rewrite.py` is unchanged. The CLI-model examples call sc-docli's recommended `docli::clap_model::from_clap` directly through a pinned development dependency; sc-docli is allowed only as a development dependency of `decidr` and `sitr`, never as a product dependency.
+
 ## Method: rewrite to a spec, do not trim
 
 Trimming the old code in place keeps its structure (17 crates, traits, wrappers) and moves a few hundred lines per pass. The new code is written fresh on one branch from the spec below, then the old crates are deleted in one commit.

@@ -15,10 +15,8 @@ pub enum Command {
     Models,
     Doctor,
     Send {
-        #[arg(long, default_value = "jev")]
-        model: String,
         #[arg(long)]
-        provider: Option<String>,
+        model: Option<String>,
         #[arg(long)]
         agent_role: String,
         #[arg(long)]
@@ -27,7 +25,7 @@ pub enum Command {
         batch: bool,
         #[arg(long, allow_hyphen_values = true)]
         workers: Option<i64>,
-        #[arg(long, default_value = "120")]
-        timeout_secs: f64,
+        #[arg(long)]
+        timeout_secs: Option<f64>,
     },
 }
