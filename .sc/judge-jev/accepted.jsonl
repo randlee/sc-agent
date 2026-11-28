@@ -12,3 +12,4 @@
 {"id": "ADR-SAG-0019", "file": "docs/adr/ADR-SAG-0019.md", "sha256": "937e0d1e1491bda10a80bb9ae3ade5afda801f89b867c0815c838c920082b347", "runs": ["flat-1", "flat-2", "flat-3"], "lowest": 0.94, "commit": "0d8a61e"}
 {"id": "ADR-SAG-0021", "file": "docs/adr/ADR-SAG-0021.md", "sha256": "edd67be7aa6269b639a411eb9e07591670ac43978497906ae753e7615e69fa24", "runs": ["flat-1", "flat-2", "flat-3"], "lowest": 1.0, "commit": "0d8a61e"}
 {"id": "REQ-SAG-0008", "file": "docs/requirements/REQ-SAG-0008.md", "sha256": "714bb75627fc9a5430f5e9d79051df2294142056045c89d87dc935efcec6e71e", "runs": ["flat-1", "flat-2", "flat-3"], "lowest": 0.65, "commit": "0d8a61e"}
+{"id":"REQ-SAG-0018","sha256":"f79949823d5b2d4a70f3642d60c91891d14eb05c394c1c2b81ea171d7271d9a5","runs":["REQ-SAG-0018-comb-r1","REQ-SAG-0018-comb-r2","REQ-SAG-0018-comb-r3"],"lowest":0.72}

@@ -22,6 +22,7 @@ Definitions (how the template is built: ADR-SAG-0019 decision 1):
 - Prompt authoring is building the text sent to the model. Result processing is handling the returned results and decision trees. Consumer logic is prompt authoring together with result processing.
 - A decision call is a Run's `send` or `send_batch`.
 - The consent gate is the consumer module's `allow_remote_judge` check before a decision call.
+- The model selector is the Run argument that names the model for a decision call, such as `haiku`.
 
 **MUST statements:**
 
@@ -29,7 +30,7 @@ Definitions (how the template is built: ADR-SAG-0019 decision 1):
 - The consumer module MUST pass the model selector through unchanged.
 - The sc-decidr wheel's package data MUST include the consumer template.
 - The consumer module MUST cancel its running Run on `KeyboardInterrupt`.
-- The consent gate MUST ask for consent only when the Run's provider is TypeSafe.
+- The consent gate MUST ask for consent only when the Run's provider is TypeSafe, the remote service that runs Jev.
 
 **MUST NOT statements:**
 
